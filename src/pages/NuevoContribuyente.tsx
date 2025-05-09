@@ -1,0 +1,44 @@
+import React, { FC, useMemo, memo } from 'react';
+import ContribuyenteForm from '../components/ContribuyenteForm';
+import MainLayout from '../layout/MainLayout';
+import Breadcrumb from '../components/Breadcrumb';
+import { BreadcrumbItem } from '../components/Breadcrumb';
+
+/**
+ * Página para crear un nuevo contribuyente
+ * 
+ * Esta página muestra el encabezado, la navegación de migas de pan
+ * y el formulario principal para registrar un nuevo contribuyente.
+ */
+const NuevoContribuyente: FC = memo(() => {
+  // Definir las migas de pan para la navegación
+  const breadcrumbItems: BreadcrumbItem[] = useMemo(() => [
+    { label: 'Módulo', path: '/' },
+    { label: 'Contribuyente', path: '/contribuyente' },
+    { label: 'Nuevo contribuyente', active: true }
+  ], []);
+
+  return (
+    <MainLayout>
+      <div className="space-y-4">
+        {/* Navegación de migas de pan */}
+        <Breadcrumb items={breadcrumbItems} />
+      
+        {/* Título de la página */}
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-800">Nuevo Contribuyente</h1>
+        </div>
+      
+        {/* Contenedor del formulario */}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+         <ContribuyenteForm />
+        </div>
+      </div>
+  </MainLayout>
+);
+});
+
+// Nombre para DevTools
+NuevoContribuyente.displayName = 'NuevoContribuyente';
+
+export default NuevoContribuyente;
