@@ -39,17 +39,19 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
   const isSubMenuOpen = openSubmenu === id || openSubmenus.includes(id);
   const paddingLeft = level > 0 ? `${level * 1}rem` : '';
 
-  const handleClick = () => {
-    setActiveItem(id);
+  const handleClick = (e: React.MouseEvent) => {
     if (hasSubMenu) {
+      e.preventDefault(); // Prevenir navegación si tiene submenú
       toggleSubmenu(id);
     }
+    setActiveItem(id);
   };
 
   // Función recursiva para renderizar submenús anidados
   const renderSubMenu = (items: SubMenuItem[], currentLevel: number) => {
     return items.map((item) => {
       const hasNestedSubMenu = item.subMenuItems && item.subMenuItems.length > 0;
+      const isItemOpen = openSubmenus.includes(item.id);
       
       return (
         <div key={item.id} className="mt-1">
@@ -58,7 +60,7 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
               to={item.path}
               className="flex items-center py-2 text-sm text-gray-500 hover:text-gray-700"
               style={{ paddingLeft: `${(currentLevel + 1) * 0.75}rem` }}
-              onClick={() => setActiveItem(id)}
+              onClick={() => setActiveItem(item.id)}
             >
               {item.icon && (
                 <div className="w-4 h-4 mr-2">
@@ -68,9 +70,16 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
               <span>{item.label}</span>
             </Link>
           ) : (
-            <div className="flex items-center py-2 text-sm text-gray-500 hover:text-gray-700 cursor-pointer"
-                style={{ paddingLeft: `${(currentLevel + 1) * 0.75}rem` }}
-                onClick={() => hasNestedSubMenu && toggleSubmenu(item.id)}
+            // Elemento que tiene submenú anidado
+            <div 
+              className="flex items-center py-2 text-sm text-gray-500 hover:text-gray-700 cursor-pointer"
+              style={{ paddingLeft: `${(currentLevel + 1) * 0.75}rem` }}
+              onClick={(e) => {
+                e.stopPropagation(); // Evitar que el evento se propague al padre
+                if (hasNestedSubMenu) {
+                  toggleSubmenu(item.id);
+                }
+              }}
             >
               {item.icon && (
                 <div className="w-4 h-4 mr-2">
@@ -81,7 +90,7 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
               {hasNestedSubMenu && (
                 <div className="ml-auto">
                   <svg 
-                    className={`w-4 h-4 transition-transform duration-200 ${openSubmenu === item.id ? 'transform rotate-180' : ''}`} 
+                    className={`w-4 h-4 transition-transform duration-200 ${isItemOpen ? 'transform rotate-180' : ''}`} 
                     fill="none" 
                     stroke="currentColor" 
                     viewBox="0 0 24 24"
@@ -94,7 +103,7 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
           )}
           
           {/* Renderizado recursivo de submenús anidados */}
-          {hasNestedSubMenu && (openSubmenu === item.id || openSubmenus.includes(item.id)) && (
+          {hasNestedSubMenu && isItemOpen && (
             <div className="pl-2 border-l-2 border-gray-100 ml-4">
               {renderSubMenu(item.subMenuItems!, currentLevel + 1)}
             </div>
@@ -107,57 +116,50 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
   return (
     <div className="relative">
       {/* Elemento principal del menú */}
-      <div 
-        className={`flex items-center cursor-pointer transition-colors duration-200 ${
-          isActive ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
-        }`}
-        onClick={handleClick}
-        style={{ paddingLeft }}
-      >
-        {path ? (
-          <Link 
-            to={path} 
-            className="flex items-center w-full py-3 px-4"
-            onClick={(e) => hasSubMenu && e.preventDefault()}
-          >
-            <div className="w-6 h-6 flex items-center justify-center mr-3">
-              {icon}
-            </div>
-            {isExpanded && <span className="font-medium">{label}</span>}
-            {hasSubMenu && isExpanded && (
-              <div className="ml-auto">
-                <svg 
-                  className={`w-5 h-5 transition-transform duration-200 ${isSubMenuOpen ? 'transform rotate-180' : ''}`} 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            )}
-          </Link>
-        ) : (
-          <div className="flex items-center w-full py-3 px-4">
-            <div className="w-6 h-6 flex items-center justify-center mr-3">
-              {icon}
-            </div>
-            {isExpanded && <span className="font-medium">{label}</span>}
-            {hasSubMenu && isExpanded && (
-              <div className="ml-auto">
-                <svg 
-                  className={`w-5 h-5 transition-transform duration-200 ${isSubMenuOpen ? 'transform rotate-180' : ''}`} 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            )}
+      {path && !hasSubMenu ? (
+        <Link 
+          to={path} 
+          className={`flex items-center w-full py-3 px-4 cursor-pointer transition-colors duration-200 ${
+            isActive ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+          }`}
+          style={{ paddingLeft }}
+          onClick={() => setActiveItem(id)}
+        >
+          <div className="w-6 h-6 flex items-center justify-center mr-3">
+            {icon}
           </div>
-        )}
-      </div>
+          {isExpanded && <span className="font-medium">{label}</span>}
+        </Link>
+      ) : (
+        <div 
+          className={`flex items-center w-full py-3 px-4 cursor-pointer transition-colors duration-200 ${
+            isActive ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+          }`}
+          style={{ paddingLeft }}
+          onClick={handleClick}
+        >
+          <div className="w-6 h-6 flex items-center justify-center mr-3">
+            {icon}
+          </div>
+          {isExpanded && (
+            <>
+              <span className="font-medium">{label}</span>
+              {hasSubMenu && (
+                <div className="ml-auto">
+                  <svg 
+                    className={`w-5 h-5 transition-transform duration-200 ${isSubMenuOpen ? 'transform rotate-180' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Submenú con soporte para anidamiento */}
       {hasSubMenu && isSubMenuOpen && isExpanded && (

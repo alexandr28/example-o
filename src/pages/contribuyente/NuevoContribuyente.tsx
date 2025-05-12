@@ -23,10 +23,7 @@ const NuevoContribuyente: FC = memo(() => {
         {/* Navegación de migas de pan */}
         <Breadcrumb items={breadcrumbItems} />
       
-        {/* Título de la página */}
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">Nuevo Contribuyente</h1>
-        </div>
+      
       
         {/* Contenedor del formulario */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">

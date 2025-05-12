@@ -2,8 +2,6 @@ import React, { FC, memo } from 'react';
 import { useLocation } from 'react-router-dom';
 import SidebarWidget from './SidebarWiget';
 import { useSidebar } from '../context/SidebarContext';
-import {
-    GridIcon,PageIcon,ListIcon, PieChartIcon,TableIcon,TaskIcon,BoxCubeIcon,PlugInIcon,DocsIcon} from "../icons"
 
 // Iconos para el menú
 const DashboardIcon = () => (
@@ -222,8 +220,10 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
     isMobileOpen, 
     activeItem, 
     openSubmenu, 
+    openSubmenus,
     setActiveItem, 
     toggleSubmenu,
+    toggleSidebar: contextToggleSidebar,
     setIsHovered
   } = useSidebar();
 
@@ -264,6 +264,13 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
     </div>
   );
 
+  // Manejar el toggle del sidebar
+  const handleToggleSidebar = () => {
+    if (contextToggleSidebar) {
+      contextToggleSidebar();
+    }
+  };
+
   return (
     <aside 
       className={`flex flex-col h-screen bg-white border-r border-gray-200 transition-all duration-300 ${
@@ -273,7 +280,26 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Logo */}
-      {renderLogo()}
+      <div className="flex items-center">
+        {renderLogo()}
+        {/* Botón para toggle cuando la barra está colapsada */}
+        {!isExpanded && (
+          <button 
+            onClick={handleToggleSidebar}
+            className="absolute right-2 top-3 text-gray-500 hover:text-gray-700"
+            aria-label="Expandir menú"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth="2" 
+                d="M13 5l7 7-7 7M5 5l7 7-7 7" 
+              />
+            </svg>
+          </button>
+        )}
+      </div>
 
       {/* Sección MENU */}
       {isExpanded && <div className="px-4 py-2 text-xs font-semibold text-gray-400">MENU</div>}
@@ -322,8 +348,11 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
             <div className="text-sm font-semibold text-gray-700">Sub Gerencia de Sistemas</div>
             <div className="text-xs text-gray-500 mt-1">Todos los Derechos Reservados</div>
             <div className="text-xs text-gray-500">Municipalidad Distrital de la Esperanza</div>
-            <button className="mt-3 bg-green-600 text-white rounded-md w-full py-2 text-sm font-medium">
-              MDE
+            <button 
+              className="mt-3 bg-green-600 text-white rounded-md w-full py-2 text-sm font-medium"
+              onClick={handleToggleSidebar}
+            >
+              Colapsar
             </button>
           </div>
         </div>

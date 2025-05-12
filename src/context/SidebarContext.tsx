@@ -61,16 +61,21 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const toggleSubmenu = (item: string) => {
-    setOpenSubmenu((prev) => (prev === item ? null : item));
-    
-    // Manejar también el arreglo de submenús abiertos para soporte multinivel
-    setOpenSubmenus((prevOpenSubmenus) => {
-      if (prevOpenSubmenus.includes(item)) {
-        return prevOpenSubmenus.filter(id => id !== item);
-      } else {
-        return [...prevOpenSubmenus, item];
+    // Si el ítem ya está en el array, lo quitamos
+    if (openSubmenus.includes(item)) {
+      setOpenSubmenus(prevOpenSubmenus => prevOpenSubmenus.filter(id => id !== item));
+      
+      // También actualizamos el openSubmenu si coincide con el ítem actual
+      if (openSubmenu === item) {
+        setOpenSubmenu(null);
       }
-    });
+    } else {
+      // Si no está, lo añadimos
+      setOpenSubmenus(prevOpenSubmenus => [...prevOpenSubmenus, item]);
+      
+      // Actualizamos también openSubmenu para mantener compatibilidad con el código antiguo
+      setOpenSubmenu(item);
+    }
   };
 
   return (
