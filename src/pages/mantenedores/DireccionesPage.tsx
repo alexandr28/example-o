@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import {MainLayout} from '../../layout';
 import {Breadcrumb, DireccionForm, DireccionList} from '../../components';
-import { BreadcrumbItem } from '../../components/Breadcrumb';
+import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useDirecciones } from '../../hooks/useDirecciones';
 
 /**

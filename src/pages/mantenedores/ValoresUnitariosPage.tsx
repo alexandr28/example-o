@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {MainLayout} from '../../layout';
-import {Breadcrumb,ValorUnitarioForm, ValorUnitarioList,Button } from '../../components';
-import { BreadcrumbItem } from '../../components/Breadcrumb';
+import {Breadcrumb, ValorUnitarioForm, ValorUnitarioList, Button } from '../../components';
+import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useValoresUnitarios } from '../../hooks/useValoresUnitarios';
 
 /**
@@ -112,8 +112,8 @@ const ValoresUnitariosPage: React.FC = () => {
           </div>
         )}
         
-        {/* Sección superior */}
-        <div className="flex flex-col space-y-4">
+        {/* Sección superior con formulario y botones */}
+        <div className="flex gap-6">
           {/* Formulario de registro */}
           <ValorUnitarioForm 
             años={años}
@@ -133,43 +133,38 @@ const ValoresUnitariosPage: React.FC = () => {
             costoValue={costo}
           />
           
-          {/* Botón Registrar - Ahora ubicado a la derecha del formulario */}
-          <div className="flex justify-end">
+          {/* Contenedor de botones vertical centrado */}
+          <div className="flex flex-col space-y-3 justify-center">
             <Button
               type="button"
               variant="primary"
               onClick={handleRegistrar}
               disabled={loading || !isFormValid}
+              className="w-36"
             >
               Registrar
             </Button>
-          </div>
-          
-        </div>
-        
-        {/* Sección de tabla y botón Eliminar */}
-        <div className="flex flex-col space-y-4">
-          {/* Tabla de valores unitarios */}
-          <ValorUnitarioList 
-            años={años}
-            añoTabla={añoTabla}
-            valoresPorCategoria={valoresPorCategoria}
-            loading={loading}
-            onAñoTablaChange={handleAñoTablaChange}
-          />
-          
-          {/* Botón Eliminar - Ahora ubicado a la derecha de la tabla */}
-          <div className="flex justify-end">
+            
             <Button
               type="button"
               variant="secondary"
               onClick={handleEliminar}
               disabled={loading || !añoTabla}
+              className="w-36"
             >
               Eliminar
             </Button>
           </div>
         </div>
+        
+        {/* Tabla de valores unitarios */}
+        <ValorUnitarioList 
+          años={años}
+          añoTabla={añoTabla}
+          valoresPorCategoria={valoresPorCategoria}
+          loading={loading}
+          onAñoTablaChange={handleAñoTablaChange}
+        />
       </div>
     </MainLayout>
   );

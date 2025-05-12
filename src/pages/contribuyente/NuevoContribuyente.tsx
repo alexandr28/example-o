@@ -1,8 +1,7 @@
-import React, { FC, useMemo, memo } from 'react';
-import ContribuyenteForm from '../components/ContribuyenteForm';
-import MainLayout from '../layout/MainLayout';
-import Breadcrumb from '../components/Breadcrumb';
-import { BreadcrumbItem } from '../components/Breadcrumb';
+import { FC, useMemo, memo } from 'react';
+import {ContribuyenteForm, Breadcrumb} from '../../components';
+import {MainLayout} from '../../layout';
+import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 
 /**
  * Página para crear un nuevo contribuyente

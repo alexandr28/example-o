@@ -1,9 +1,8 @@
 import { FC, useCallback, useMemo, memo } from 'react';
-
-import FormSection from './FormSecction';
-import { useContribuyenteForm } from '../hooks';
-import { TipoContribuyente } from '../types';
-import {Select,Button,PersonaForm,SelectorDirecciones} from '../components'
+import FormSection from '../utils/FormSecction';
+import { useContribuyenteForm } from '../../hooks';
+import { TipoContribuyente } from '../../types/formTypes';
+import {Select,Button,PersonaForm,SelectorDirecciones} from '../'
 
 /**
  * Formulario principal para registro y edición de contribuyentes

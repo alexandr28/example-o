@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {MainLayout} from '../../layout';
 import {CalleList,CalleForm,Breadcrumb} from '../../components';
-import { BreadcrumbItem } from '../../components/Breadcrumb';
+import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 
 
 // Tipo para la entidad Calle

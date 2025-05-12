@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Modal from './Modal';
-import Button from './ui/Button';
-import { Direccion, DireccionSeleccionadaModalProps } from '../types';
+import Button from '../ui/Button';
+import { Direccion, DireccionSeleccionadaModalProps } from '../../types';
 
 const SelectorDirecciones: React.FC<DireccionSeleccionadaModalProps> = ({
   isOpen,

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import {MainLayout} from '../../layout';
 import {Breadcrumb, ArancelForm, ArancelList} from '../../components';
-import { BreadcrumbItem } from '../../components/Breadcrumb';
+import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useAranceles } from '../../hooks/useAranceles';
 
 /**

@@ -1,10 +1,8 @@
 import React from 'react';
 import { UseFormReturn } from 'react-hook-form';
-import Select from './ui/Select';
-import Input from './ui/Input';
-import Button from './ui/Button';
-import CalendarInput from './CalendarInput';
-import { Direccion, TipoDocumento, Sexo, EstadoCivil } from '../types';
+import {Select,Input,Button } from '../';
+import CalendarInput from '../utils/CalendarInput';
+import { Direccion, TipoDocumento, Sexo, EstadoCivil } from '../../types/formTypes';
 
 interface PersonaFormProps {
   form: UseFormReturn<any>;

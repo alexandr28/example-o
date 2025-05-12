@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Input, Select } from '../';
 import { CategoriaValorUnitario, SubcategoriaValorUnitario, LetraValorUnitario } from '../../models';
 
@@ -67,14 +67,14 @@ const ValorUnitarioForm: React.FC<ValorUnitarioFormProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-md shadow-sm overflow-hidden">
-      <div className="px-6 py-4 bg-gray-50 border-b">
+    <div className="bg-white rounded-md shadow-sm overflow-hidden w-3/4">
+      <div className="px-6 py-3 bg-gray-50 border-b">
         <h2 className="text-lg font-medium text-gray-800">Valores Unitarios</h2>
       </div>
       
-      <div className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Año */}
+      <div className="p-4">
+        <div className="grid grid-cols-2 gap-3">
+          {/* Fila 1: Año y Categoría */}
           <div>
             <Select
               label="Años"
@@ -86,7 +86,6 @@ const ValorUnitarioForm: React.FC<ValorUnitarioFormProps> = ({
             />
           </div>
           
-          {/* Categoría */}
           <div>
             <Select
               label="Categorías"
@@ -98,7 +97,7 @@ const ValorUnitarioForm: React.FC<ValorUnitarioFormProps> = ({
             />
           </div>
           
-          {/* Subcategoría */}
+          {/* Fila 2: Subcategoría y Letra */}
           <div>
             <Select
               label="Subcategorías"
@@ -110,7 +109,6 @@ const ValorUnitarioForm: React.FC<ValorUnitarioFormProps> = ({
             />
           </div>
           
-          {/* Letra */}
           <div>
             <Select
               label="Letra"
@@ -122,8 +120,8 @@ const ValorUnitarioForm: React.FC<ValorUnitarioFormProps> = ({
             />
           </div>
           
-          {/* Costo */}
-          <div>
+          {/* Fila 3: Costo */}
+          <div className="col-span-2">
             <Input
               label="Costo"
               type="number"
