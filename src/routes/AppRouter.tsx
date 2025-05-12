@@ -1,7 +1,16 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 //import NuevoContribuyenteConLayout from '../pages/NuevoContribuyente';
-import {DemoPage,CallePage,NuevoContribuyente} from  '../pages'
+import { 
+  DemoPage,
+  CallePage,
+  NuevoContribuyente, 
+  SectoresPage,
+  BarriosPage, 
+  DireccionesPage,
+  ArancelesPage,
+ValoresUnitariosPage} 
+  from  '../pages'
 import { SidebarProvider } from '../context/SidebarContext';
 import { ThemeProvider } from '../context/ThemeContext';
 
@@ -12,26 +21,39 @@ const AppRouter: React.FC = () => {
         <Router>
           <Routes>
             <Route path="/dashboard" element={<DemoPage />} />
-            {/* Dos versiones de la misma página, una con el layout integrado y otra sin él */}
-            
+
+            {/* Rutas de contribuyente */}
             <Route path="/contribuyente/nuevo" element={<NuevoContribuyente />} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            
-            {/* Rutas de ejemplo para los diferentes elementos del menú */}
             <Route path="/contribuyente/buscar" element={<DemoPage />} />
             <Route path="/contribuyente/listado" element={<DemoPage />} />
-            
+
+            {/* Rutas de predio */}
             <Route path="/predio/nuevo" element={<DemoPage />} />
             <Route path="/predio/buscar" element={<DemoPage />} />
             <Route path="/predio/listado" element={<DemoPage />} />
+
+             {/* Rutas Caja */}
+            <Route path="/caja/apertura" element={<DemoPage />} />
+            <Route path="/caja/Cierre" element={<DemoPage />} />
+            <Route path="/caja/movimiento" element={<DemoPage />} />
+
+            {/* Rutas Reportes */}
+            <Route path="/reportes/contribuyente" element={<DemoPage />} />
+            <Route path="/reportes/predio" element={<DemoPage />} />
+            <Route path="/reportes/recaudacion" element={<DemoPage />} />
+
+            {/* Rutas coactiva */}
+            <Route path="/coactiva/expediente" element={<DemoPage />} />
+             <Route path="/coactiva/resoluciones" element={<DemoPage />} />
+              <Route path="/coactiva/notificaciones" element={<DemoPage />} />
             
             {/* Rutas de mantenedores */}
             <Route path="/mantenedores/ubicacion/calles" element={<CallePage />} />
-            <Route path="/mantenedores/ubicacion/sectores" element={<DemoPage />} />
-            <Route path="/mantenedores/ubicacion/barrios" element={<DemoPage />} />
-            <Route path="/mantenedores/ubicacion/direcciones" element={<DemoPage />} />
-            <Route path="/mantenedores/arancel/asignacion" element={<DemoPage />} />
-            <Route path="/mantenedores/arancel/valoresUnitarios" element={<DemoPage />} />
+            <Route path="/mantenedores/ubicacion/sectores" element={<SectoresPage />} />
+            <Route path="/mantenedores/ubicacion/barrios" element={<BarriosPage />} />
+            <Route path="/mantenedores/ubicacion/direcciones" element={<DireccionesPage />} />
+             <Route path="/mantenedores/arancel/asignacion" element={<ArancelesPage />} />
+             <Route path="/mantenedores/arancel/valoresUnitarios" element={<ValoresUnitariosPage />} />
             <Route path="/mantenedores/usuarios" element={<DemoPage />} />
             <Route path="/mantenedores/roles" element={<DemoPage />} />
             
