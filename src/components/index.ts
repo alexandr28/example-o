@@ -49,3 +49,8 @@ export { default as UitList } from './uit/UitList';
 export { default as Alcabala } from './alcabala/Alcabala';
 export { default as AlcabalaList } from './alcabala/AlcabalaList';
 export { default as AlcabalaForm } from './alcabala/AlcabalaForm';
+
+// Exportación centralizada de los componentes Depreciación
+export { default as Depreciacion } from './depreciacion/Depreciacion';
+export { default as BuscarDepreciacion } from './depreciacion/BuscarDepreciacion';
+export { default as DepreciacionForm } from './depreciacion/DepreciacionForm';

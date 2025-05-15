@@ -12,7 +12,8 @@ import {
 ValoresUnitariosPage,
 ConsultaContribuyente,
 UitPage,
-AlcabalaPage
+AlcabalaPage,
+DepreciacionPage
 } 
   from  '../pages'
 import { SidebarProvider } from '../context/SidebarContext';
@@ -59,7 +60,7 @@ const AppRouter: React.FC = () => {
              <Route path="/mantenedores/arancel/valoresUnitarios" element={<ValoresUnitariosPage />} />
             <Route path="/mantenedores/tarifas/uit" element={<UitPage />} />
             <Route path="/mantenedores/tarifas/alcabala" element={<AlcabalaPage />} />
-            <Route path="/mantenedores/tarifas/depreciacion" element={<DemoPage />} />
+            <Route path="/mantenedores/tarifas/depreciacion" element={<DepreciacionPage />} />
             <Route path="/mantenedores/tarifas/arbitrios" element={<DemoPage />} />
             <Route path="/mantenedores/roles" element={<DemoPage />} />
             

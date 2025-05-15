@@ -10,3 +10,4 @@ export { default as ArancelesPage } from './mantenedores/ArancelesPage';
 export { default as ValoresUnitariosPage } from './mantenedores/ValoresUnitariosPage';
 export {default as UitPage} from './mantenedores/UitPage'
 export {default as AlcabalaPage} from './mantenedores/AlcabalaPage'
+export {default as DepreciacionPage} from './mantenedores/DepreciacionPage'
