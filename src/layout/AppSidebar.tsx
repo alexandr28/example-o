@@ -1,9 +1,27 @@
-import React, { FC, memo } from 'react';
+import React, { FC, memo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import SidebarWidget from './SidebarWiget';
 import { useSidebar } from '../context/SidebarContext';
 
-// Iconos para el menú
+// Define la estructura de los elementos del submenú para permitir anidamiento
+interface SubMenuItem {
+  id: string;
+  label: string;
+  path?: string;
+  icon?: React.ReactNode;
+  subMenuItems?: SubMenuItem[];
+}
+
+// Define la estructura de los elementos del menú principal
+interface MenuItem {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  path?: string;
+  subMenuItems?: SubMenuItem[];
+}
+
+// Iconos para el menú (componentes del proyecto original)
 const DashboardIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 6h16M4 12h16m-7 6h7" />
@@ -64,25 +82,7 @@ const MigracionIcon = () => (
   </svg>
 );
 
-// Define la estructura de los elementos del submenú para permitir anidamiento
-interface SubMenuItem {
-  id: string;
-  label: string;
-  path?: string;
-  icon?: React.ReactNode;
-  subMenuItems?: SubMenuItem[];
-}
-
-// Define la estructura de los elementos del menú principal
-interface MenuItem {
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-  path?: string;
-  subMenuItems?: SubMenuItem[];
-}
-
-// Configuración de los elementos del menú
+// Configuración de los elementos del menú - PRIMERO DECLARAMOS LOS ARRAYS
 const menuItems: MenuItem[] = [
   {
     id: 'dashboard',
@@ -96,7 +96,7 @@ const menuItems: MenuItem[] = [
     icon: <ContribuyenteIcon/>,
     subMenuItems: [
       { id: 'nuevo-contribuyente', label: 'Registrar', path: '/contribuyente/nuevo' },
-      { id: 'consulta-contribuyentes', label: 'Consulta', path: '/contribuyente/listado' },
+      { id: 'consulta-contribuyentes', label: 'Consulta', path: '/contribuyente/consulta' },
     ],
   },
   {
@@ -160,7 +160,7 @@ const othersMenuItems: MenuItem[] = [
     icon: <MantenedoresIcon />,
     subMenuItems: [
       { 
-        id: 'parametros', 
+        id: 'ubicacion-parametros', 
         label: 'Ubicacion', 
         subMenuItems: [
           { id: 'calles-ubicacion', label: 'Calles', path: '/mantenedores/ubicacion/calles' },
@@ -170,15 +170,23 @@ const othersMenuItems: MenuItem[] = [
         ]
       },
       { 
-        id: 'parametros', 
+        id: 'arancel-parametros', 
         label: 'Arancel', 
         subMenuItems: [
           { id: 'asignacion-arancel', label: 'Asignación', path: '/mantenedores/arancel/asignacion' },
           { id: 'valoresUnitarios-arancel', label: 'Valores Unitarios', path: '/mantenedores/arancel/valoresUnitarios' },
         ]
       },
-      { id: 'usuarios', label: 'Usuarios', path: '/mantenedores/usuarios' },
-      { id: 'roles', label: 'Roles', path: '/mantenedores/roles' },
+      { id: 'tarifas',
+        label: 'Tarifas',  
+        subMenuItems:[
+          {id:'uit-epa',label:'UIT - EPA',path: '/mantenedores/tarifas/uit'},
+          {id:'alcabala',label:'Alcabala',path: '/mantenedores/tarifas/alcabala'},
+          {id:'depreciacion',label:'Depreciacion',path: '/mantenedores/tarifas/depreciacion'},
+          {id:'arbitrios',label:'Arbitrios',path: '/mantenedores/tarifas/arbitrios'}
+        ]
+      },
+      { id: 'escala', label: 'Escala', path: '/mantenedores/escala' },
     ],
   },
   {
@@ -224,7 +232,8 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
     setActiveItem, 
     toggleSubmenu,
     toggleSidebar: contextToggleSidebar,
-    setIsHovered
+    setIsHovered,
+    setOpenSubmenus,
   } = useSidebar();
 
   // Determina si un elemento del menú está activo
@@ -242,6 +251,66 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
     }
     return !!item.subMenuItems?.some(subItem => isActiveRoute(subItem.path));
   };
+
+  // Efecto para mantener los menús necesarios abiertos según la ruta
+  useEffect(() => {
+    const currentPath = location.pathname;
+    
+    // Función simplificada para encontrar todas las rutas padre
+    function findParentRoutes(path: string): string[] {
+      const parentIds: string[] = [];
+      
+      // Función auxiliar para buscar recursivamente
+      function searchInMenu(items: MenuItem[] | SubMenuItem[], parentId?: string) {
+        for (const item of items) {
+          // Si este elemento tiene la ruta actual, agregamos su ID si tiene un padre
+          if (item.path && (item.path === path || path.startsWith(item.path + '/'))) {
+            if (parentId) {
+              parentIds.push(parentId);
+            }
+          }
+          
+          // Si tiene submenús, buscamos dentro de ellos
+          if (item.subMenuItems && item.subMenuItems.length > 0) {
+            searchInMenu(item.subMenuItems, item.id);
+          }
+        }
+      }
+      
+      // Buscar en los menús principales y otros
+      searchInMenu(menuItems);
+      searchInMenu(othersMenuItems);
+      
+      return parentIds;
+    }
+    
+    // Obtener todos los IDs de menús padre
+    const parentIds = findParentRoutes(currentPath);
+    
+    // Si encontramos alguno, actualizar los submenús abiertos
+    if (parentIds.length > 0) {
+      // También incluir 'mantenedores' si algún submenu de mantenedores está en la ruta
+      if (currentPath.includes('/mantenedores/')) {
+        parentIds.push('mantenedores');
+      }
+      
+      // Incluir 'ubicacion-parametros' para rutas de ubicación
+      if (currentPath.includes('/mantenedores/ubicacion/')) {
+        parentIds.push('ubicacion-parametros');
+      }
+      
+      // Incluir 'arancel-parametros' para rutas de arancel
+      if (currentPath.includes('/mantenedores/arancel/')) {
+        parentIds.push('arancel-parametros');
+      }
+      
+      // Actualizar el estado
+      setOpenSubmenus(prev => {
+        const combined = [...new Set([...prev, ...parentIds])];
+        return combined;
+      });
+    }
+  }, [location.pathname, setOpenSubmenus]);
 
   // Renderiza el logo
   const renderLogo = () => (
@@ -322,7 +391,7 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
         </nav>
 
         {/* Separador OTHERS */}
-        {isExpanded && <div className="px-4 py-2 mt-4 text-xs font-semibold text-gray-400">OTHERS</div>}
+        {isExpanded && <div className="px-4 py-2 mt-4 text-xs font-semibold text-gray-400">SISTEMA</div>}
         {!isExpanded && <div className="flex justify-center text-xs py-2 mt-4">•••</div>}
 
         {/* Elementos del menú OTHER */}

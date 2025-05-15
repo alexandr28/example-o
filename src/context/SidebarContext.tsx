@@ -12,6 +12,7 @@ type SidebarContextType = {
   setIsHovered: (isHovered: boolean) => void;
   setActiveItem: (item: string | null) => void;
   toggleSubmenu: (item: string) => void;
+  setOpenSubmenus: (submenus: string[] | ((prev: string[]) => string[])) => void;
 };
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
@@ -52,6 +53,38 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, []);
 
+  // Verifica si un ID o su ruta está entre los activos
+  const isPathActive = (pathname: string, items: any[]): boolean => {
+    for (const item of items) {
+      if (item.path && (pathname === item.path || pathname.startsWith(item.path + '/'))) {
+        return true;
+      }
+      if (item.subMenuItems && isPathActive(pathname, item.subMenuItems)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Encuentra todos los IDs de los menús padres de una ruta activa
+  const findActiveMenuParents = (pathname: string, items: any[], parentIds: string[] = []): string[] => {
+    for (const item of items) {
+      // Si este ítem coincide o es un padre de la ruta activa
+      if (item.path && (pathname === item.path || pathname.startsWith(item.path + '/'))) {
+        return parentIds;
+      }
+      
+      // Si tiene submenús, búscalo recursivamente
+      if (item.subMenuItems) {
+        const foundIds = findActiveMenuParents(pathname, item.subMenuItems, [...parentIds, item.id]);
+        if (foundIds.length > 0) {
+          return foundIds;
+        }
+      }
+    }
+    return [];
+  };
+
   const toggleSidebar = () => {
     setIsExpanded((prev) => !prev);
   };
@@ -61,8 +94,26 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const toggleSubmenu = (item: string) => {
-    // Si el ítem ya está en el array, lo quitamos
-    if (openSubmenus.includes(item)) {
+    // Verificamos si ya existe en la lista
+    const isOpen = openSubmenus.includes(item);
+    
+    if (isOpen) {
+      // Si ya está abierto y no tiene elementos hijos activos, lo cerramos
+      const pathname = window.location.pathname;
+      let hasActiveChild = false;
+      
+      // Aquí es donde verificaríamos si tiene elementos activos dentro
+      // Como no tenemos acceso directo a la estructura del menú en este contexto,
+      // implementamos una solución parcial:
+      
+      // Si el elemento corresponde a una ruta activa o es padre de una, no lo cerramos
+      if (pathname.includes(item.toLowerCase())) {
+        // Ruta incluye el nombre del ítem, probablemente es parte de su jerarquía
+        // No lo cerramos
+        return;
+      }
+      
+      // Si llegamos aquí, podemos cerrarlo
       setOpenSubmenus(prevOpenSubmenus => prevOpenSubmenus.filter(id => id !== item));
       
       // También actualizamos el openSubmenu si coincide con el ítem actual
@@ -70,7 +121,7 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
         setOpenSubmenu(null);
       }
     } else {
-      // Si no está, lo añadimos
+      // Si no está abierto, lo añadimos
       setOpenSubmenus(prevOpenSubmenus => [...prevOpenSubmenus, item]);
       
       // Actualizamos también openSubmenu para mantener compatibilidad con el código antiguo
@@ -92,6 +143,7 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
         setIsHovered,
         setActiveItem,
         toggleSubmenu,
+        setOpenSubmenus,
       }}
     >
       {children}

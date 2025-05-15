@@ -35,14 +35,45 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
   level = 0
 }) => {
   const { isExpanded, openSubmenu, openSubmenus, setActiveItem, toggleSubmenu } = useSidebar();
+  // Determina si un elemento del menú está activo basado en la ruta actual
+  const isActiveRoute = (path?: string): boolean => {
+    if (!path) return false;
+    const location = window.location.pathname;
+    return location === path || location.startsWith(path + '/');
+  };
+
+  // Determina si cualquier submenú tiene un elemento activo (para mantenerlo abierto)
+  const hasActiveSubmenuItem = (items: SubMenuItem[]): boolean => {
+    for (const item of items) {
+      if (isActiveRoute(item.path)) {
+        return true;
+      }
+      if (item.subMenuItems && hasActiveSubmenuItem(item.subMenuItems)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Verifica si este menú tiene algún elemento activo
+  const shouldBeOpen = hasActiveSubmenuItem(subMenuItems);
+
+  // Determinar si el ítem actual corresponde a la ruta activa o un elemento hijo lo está
+  const isMenuActive = isActive || shouldBeOpen || isActiveRoute(path);
+
   const hasSubMenu = subMenuItems.length > 0;
-  const isSubMenuOpen = openSubmenu === id || openSubmenus.includes(id);
+  // Determinar si el elemento debe estar abierto
+  const isSubMenuOpen = openSubmenu === id || openSubmenus.includes(id) || (hasSubMenu && (shouldBeOpen || isMenuActive));
   const paddingLeft = level > 0 ? `${level * 1}rem` : '';
 
   const handleClick = (e: React.MouseEvent) => {
     if (hasSubMenu) {
       e.preventDefault(); // Prevenir navegación si tiene submenú
-      toggleSubmenu(id);
+      
+      // Si el elemento ya está en openSubmenus, no lo quitamos para mantenerlo abierto
+      if (!openSubmenus.includes(id)) {
+        toggleSubmenu(id);
+      }
     }
     setActiveItem(id);
   };
@@ -58,9 +89,45 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
           {item.path && !hasNestedSubMenu ? (
             <Link
               to={item.path}
-              className="flex items-center py-2 text-sm text-gray-500 hover:text-gray-700"
+              className={`flex items-center py-2 text-sm transition-colors duration-150 
+                ${isActiveRoute(item.path) 
+                  ? 'bg-gray-100 text-green-600 font-medium' 
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
               style={{ paddingLeft: `${(currentLevel + 1) * 0.75}rem` }}
-              onClick={() => setActiveItem(item.id)}
+              onClick={() => {
+                // Evitamos cerrar submenús al navegar
+                setActiveItem(item.id);
+                
+                // Almacenar los menús abiertos en localStorage para persistencia
+                if (item.path) {
+                  try {
+                    const currentPath = item.path;
+                    const parentMenuIds = [id]; // Incluir el id del menú padre actual
+                    
+                    // Si hay submenús padres, añadir también sus IDs
+                    if (level > 0) {
+                      const parentId = `parent-${level-1}`;
+                      const storedParentId = localStorage.getItem(parentId);
+                      if (storedParentId) {
+                        parentMenuIds.unshift(storedParentId);
+                      }
+                    }
+                    
+                    // Guardar esta información en localStorage
+                    localStorage.setItem('activeMenuPath', currentPath);
+                    localStorage.setItem('activeMenuParents', JSON.stringify(parentMenuIds));
+                    
+                    // Forzar la apertura de todos los menús padres
+                    parentMenuIds.forEach(menuId => {
+                      if (!openSubmenus.includes(menuId)) {
+                        toggleSubmenu(menuId);
+                      }
+                    });
+                  } catch (e) {
+                    console.error('Error saving menu state:', e);
+                  }
+                }
+              }}
             >
               {item.icon && (
                 <div className="w-4 h-4 mr-2">
@@ -72,12 +139,18 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
           ) : (
             // Elemento que tiene submenú anidado
             <div 
-              className="flex items-center py-2 text-sm text-gray-500 hover:text-gray-700 cursor-pointer"
+              className={`flex items-center py-2 text-sm transition-colors duration-150 cursor-pointer
+                ${openSubmenus.includes(item.id) 
+                  ? 'bg-gray-50 text-gray-800 font-medium' 
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
               style={{ paddingLeft: `${(currentLevel + 1) * 0.75}rem` }}
               onClick={(e) => {
                 e.stopPropagation(); // Evitar que el evento se propague al padre
                 if (hasNestedSubMenu) {
-                  toggleSubmenu(item.id);
+                  // Si ya está abierto y hacemos clic, no queremos cerrarlo si tiene elementos activos
+                  if (!openSubmenus.includes(item.id) || !hasActiveSubmenuItem(item.subMenuItems || [])) {
+                    toggleSubmenu(item.id);
+                  }
                 }
               }}
             >
@@ -119,9 +192,10 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
       {path && !hasSubMenu ? (
         <Link 
           to={path} 
-          className={`flex items-center w-full py-3 px-4 cursor-pointer transition-colors duration-200 ${
-            isActive ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
-          }`}
+          className={`flex items-center w-full py-3 px-4 cursor-pointer transition-colors duration-200 
+            ${isActive || isActiveRoute(path)
+              ? 'bg-gray-100 text-green-600 font-medium' 
+              : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}
           style={{ paddingLeft }}
           onClick={() => setActiveItem(id)}
         >
@@ -132,9 +206,10 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
         </Link>
       ) : (
         <div 
-          className={`flex items-center w-full py-3 px-4 cursor-pointer transition-colors duration-200 ${
-            isActive ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
-          }`}
+          className={`flex items-center w-full py-3 px-4 cursor-pointer transition-colors duration-200 
+            ${isActive || shouldBeOpen
+              ? 'bg-gray-50 text-green-600 font-medium' 
+              : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}
           style={{ paddingLeft }}
           onClick={handleClick}
         >

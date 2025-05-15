@@ -9,7 +9,11 @@ import {
   BarriosPage, 
   DireccionesPage,
   ArancelesPage,
-ValoresUnitariosPage} 
+ValoresUnitariosPage,
+ConsultaContribuyente,
+UitPage,
+AlcabalaPage
+} 
   from  '../pages'
 import { SidebarProvider } from '../context/SidebarContext';
 import { ThemeProvider } from '../context/ThemeContext';
@@ -24,8 +28,7 @@ const AppRouter: React.FC = () => {
 
             {/* Rutas de contribuyente */}
             <Route path="/contribuyente/nuevo" element={<NuevoContribuyente />} />
-            <Route path="/contribuyente/buscar" element={<DemoPage />} />
-            <Route path="/contribuyente/listado" element={<DemoPage />} />
+            <Route path="/contribuyente/consulta" element={<ConsultaContribuyente/>} />
 
             {/* Rutas de predio */}
             <Route path="/predio/nuevo" element={<DemoPage />} />
@@ -54,7 +57,10 @@ const AppRouter: React.FC = () => {
             <Route path="/mantenedores/ubicacion/direcciones" element={<DireccionesPage />} />
              <Route path="/mantenedores/arancel/asignacion" element={<ArancelesPage />} />
              <Route path="/mantenedores/arancel/valoresUnitarios" element={<ValoresUnitariosPage />} />
-            <Route path="/mantenedores/usuarios" element={<DemoPage />} />
+            <Route path="/mantenedores/tarifas/uit" element={<UitPage />} />
+            <Route path="/mantenedores/tarifas/alcabala" element={<AlcabalaPage />} />
+            <Route path="/mantenedores/tarifas/depreciacion" element={<DemoPage />} />
+            <Route path="/mantenedores/tarifas/arbitrios" element={<DemoPage />} />
             <Route path="/mantenedores/roles" element={<DemoPage />} />
             
             {/* Rutas de sistema */}

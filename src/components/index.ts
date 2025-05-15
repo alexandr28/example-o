@@ -12,6 +12,8 @@ export { default as BreadcrumbItem } from './utils/Breadcrumb';
 
 export { default as PersonaForm } from './contribuyentes/PersonaForm';
 export { default as ContribuyenteForm } from './contribuyentes/ContribuyenteForm';
+export { default as FiltroContribuyenteForm } from './contribuyentes/FiltroContribuyenteForm';
+export { default as ContribuyenteList } from './contribuyentes/ContribuyenteList';
 export {default as SelectorDirecciones } from './modal/SelectorDirecciones';
 export {default as FormSecction }from './utils/FormSecction';
 
@@ -35,3 +37,15 @@ export { default as ArancelList } from './aranceles/ArancelList';
 // Valores Unitarios
 export { default as ValorUnitarioForm } from './unitarios/ValorUnitarioForm';
 export { default as ValorUnitarioList } from './unitarios/ValorUnitarioList';
+
+
+// Exportación centralizada de los componentes UIT
+export { default as UIT } from './uit/UIT';
+export { default as AlicuotaComponent } from './uit/Alicuota';
+export { default as UitForm } from './uit/UitForm';
+export { default as UitList } from './uit/UitList';
+
+// Exportación centralizada de los componentes Alcabala
+export { default as Alcabala } from './alcabala/Alcabala';
+export { default as AlcabalaList } from './alcabala/AlcabalaList';
+export { default as AlcabalaForm } from './alcabala/AlcabalaForm';
