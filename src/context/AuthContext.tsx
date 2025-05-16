@@ -1,5 +1,5 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import { AuthUser } from '../models/Auth';
+import { AuthUser} from '../models/Auth';
 import useAuth from '../hooks/useAuth';
 
 // Tipo para el contexto de autenticación
@@ -10,6 +10,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (credentials: { username: string; password: string }) => Promise<any>;
   logout: () => void;
+  renewToken: () => Promise<boolean>;
 }
 
 // Crear el contexto

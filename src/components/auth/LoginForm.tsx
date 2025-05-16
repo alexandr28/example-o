@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../context/AuthContext';
-//import {Input,Button} from '../'
 
 /**
  * Componente para el formulario de inicio de sesión
@@ -14,20 +13,33 @@ const LoginForm: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   
   // Manejar el envío del formulario
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     
-    if (!username || !password) {
-      return; // Validación básica
+    // Validación básica
+    if (!username) {
+      setFormError('El nombre de usuario es obligatorio');
+      return;
     }
     
-    const result = await login({ username, password });
+    if (!password) {
+      setFormError('La contraseña es obligatoria');
+      return;
+    }
     
-    if (result.success) {
-      // Redirigir al dashboard en caso de éxito
-      navigate('/dashboard');
+    try {
+      const result = await login({ username, password });
+      
+      if (result.success) {
+        // Redirigir al dashboard en caso de éxito
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      console.error('Error al iniciar sesión:', err);
     }
   };
   
@@ -46,7 +58,7 @@ const LoginForm: React.FC = () => {
       {/* Título */}
       <h2 className="text-2xl text-center text-gray-700 font-medium mb-6">Sistema de Rentas</h2>
       
-       {/* Formulario */}
+      {/* Formulario */}
       <form onSubmit={handleSubmit}>
         {/* Nombre de usuario */}
         <div className="mb-4">
@@ -60,6 +72,7 @@ const LoginForm: React.FC = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
             placeholder="Ingresa tu nombre de usuario"
           />
+          <p className="text-xs text-gray-500 mt-1">Ejemplo: paredes</p>
         </div>
         
         {/* Contraseña */}
@@ -92,12 +105,13 @@ const LoginForm: React.FC = () => {
               )}
             </button>
           </div>
+          <p className="text-xs text-gray-500 mt-1">Ejemplo: 13579</p>
         </div>
         
         {/* Mensaje de error */}
-        {error && (
+        {(error || formError) && (
           <div className="mb-4 p-2 bg-red-100 border border-red-400 text-red-700 rounded-md text-sm">
-            {error}
+            {formError || error}
           </div>
         )}
         

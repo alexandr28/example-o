@@ -14,6 +14,21 @@ export interface AuthCredentials {
 }
 
 /**
+ * Respuesta de la API de autenticación
+ */
+export interface AuthApiResponse {
+  /**
+   * Token JWT devuelto por el servidor
+   */
+  token: string;
+  
+  /**
+   * Mensaje opcional (éxito o error)
+   */
+  message?: string;
+}
+
+/**
  * Modelo para representar el usuario autenticado
  */
 export interface AuthUser {
