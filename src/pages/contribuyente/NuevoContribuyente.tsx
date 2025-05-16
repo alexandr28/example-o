@@ -6,7 +6,7 @@ import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 /**
  * Página para crear un nuevo contribuyente
  * 
- * Esta página muestra el encabezado, la navegación de migas de pan
+ * Esta página muestra el encabezado,
  * y el formulario principal para registrar un nuevo contribuyente.
  */
 const NuevoContribuyente: FC = memo(() => {

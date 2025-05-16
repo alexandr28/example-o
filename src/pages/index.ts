@@ -11,3 +11,4 @@ export { default as ValoresUnitariosPage } from './mantenedores/ValoresUnitarios
 export {default as UitPage} from './mantenedores/UitPage'
 export {default as AlcabalaPage} from './mantenedores/AlcabalaPage'
 export {default as DepreciacionPage} from './mantenedores/DepreciacionPage'
+export { default as LoginPage } from './Login/LoginPage';

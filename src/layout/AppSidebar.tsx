@@ -421,7 +421,7 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
               className="mt-3 bg-green-600 text-white rounded-md w-full py-2 text-sm font-medium"
               onClick={handleToggleSidebar}
             >
-              Colapsar
+              MDE
             </button>
           </div>
         </div>

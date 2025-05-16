@@ -54,3 +54,6 @@ export { default as AlcabalaForm } from './alcabala/AlcabalaForm';
 export { default as Depreciacion } from './depreciacion/Depreciacion';
 export { default as BuscarDepreciacion } from './depreciacion/BuscarDepreciacion';
 export { default as DepreciacionForm } from './depreciacion/DepreciacionForm';
+
+export {default as LoginForm } from './auth/LoginForm'
+export {default as ProtectedRoute} from './auth/ProtectedRoute'

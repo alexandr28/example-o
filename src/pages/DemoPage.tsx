@@ -1,7 +1,8 @@
-import React, { FC, memo } from 'react';
+import { FC, memo } from 'react';
 import MainLayout from '../layout/MainLayout';
 import { useTheme } from '../context/ThemeContext';
 import { useSidebar } from '../context/SidebarContext';
+import { useAuthContext } from '../context/AuthContext';
 
 /**
  * Página de demostración que utiliza el MainLayout con AppSidebar
@@ -9,12 +10,13 @@ import { useSidebar } from '../context/SidebarContext';
 const DemoPage: FC = memo(() => {
   const { theme } = useTheme();
   const { isExpanded, toggleSidebar } = useSidebar();
+  const { user } = useAuthContext();
 
   return (
     <MainLayout>
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-          Bienvenido al Sistema Tributario
+          Bienvenido al Sistema Tributario, {user?.nombreCompleto || user?.username || 'Usuario'}
         </h1>
         <p className="text-gray-600 dark:text-gray-300 mb-6">
           Esta es una página de demostración que muestra el layout principal con la barra lateral.
@@ -42,6 +44,9 @@ const DemoPage: FC = memo(() => {
           <ul className="list-disc ml-5 space-y-1 text-gray-600 dark:text-gray-300">
             <li>Tema: <span className="font-medium">{theme}</span></li>
             <li>Barra lateral: <span className="font-medium">{isExpanded ? 'Expandida' : 'Colapsada'}</span></li>
+            <li>Usuario: <span className="font-medium">{user?.username}</span></li>
+            <li>Nombre: <span className="font-medium">{user?.nombreCompleto}</span></li>
+            <li>Roles: <span className="font-medium">{user?.roles ? user.roles.join(', ') : 'Sin roles'}</span></li>
           </ul>
           <div className="mt-4 flex space-x-4">
             <button

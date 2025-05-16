@@ -1,4 +1,4 @@
-import  { FC, ReactNode, memo } from 'react';
+import { FC, ReactNode, memo } from 'react';
 import AppSidebar from './AppSidebar';
 import Header from './Header';
 import { SidebarProvider } from '../context/SidebarContext';
@@ -9,14 +9,12 @@ interface MainLayoutProps {
   title?: string;
 }
 
-/**
- * Componente de diseño principal que integra AppSidebar, Header y el contenido principal
- * Envuelve todo con los proveedores de contexto necesarios
- */
 const MainLayout: FC<MainLayoutProps> = memo(({ 
   children, 
   title = 'Gerencia de Administración Tributaria'
 }) => {
+  
+
   return (
     <ThemeProvider>
       <SidebarProvider>

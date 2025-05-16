@@ -1,6 +1,5 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-//import NuevoContribuyenteConLayout from '../pages/NuevoContribuyente';
 import { 
   DemoPage,
   CallePage,
@@ -19,67 +18,205 @@ DepreciacionPage
 import { SidebarProvider } from '../context/SidebarContext';
 import { ThemeProvider } from '../context/ThemeContext';
 
+import LoginPage from '../pages/Login/LoginPage';
+import { AuthProvider } from '../context/AuthContext';
+import ProtectedRoute from '../components/auth/ProtectedRoute';
+
 const AppRouter: React.FC = () => {
   return (
-    <ThemeProvider>
-      <SidebarProvider>
-        <Router>
-          <Routes>
-            <Route path="/dashboard" element={<DemoPage />} />
+    <AuthProvider>
+      <ThemeProvider>
+        <SidebarProvider>
+          <Router>
+            <Routes>
+              {/* Ruta pública - Login */}
+              <Route path="/login" element={<LoginPage />} />
+              
+              {/* Ruta por defecto */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              
+              {/* Rutas protegidas */}
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
 
-            {/* Rutas de contribuyente */}
-            <Route path="/contribuyente/nuevo" element={<NuevoContribuyente />} />
-            <Route path="/contribuyente/consulta" element={<ConsultaContribuyente/>} />
+              {/* Rutas de contribuyente */}
+              <Route path="/contribuyente/nuevo" element={
+                <ProtectedRoute>
+                  <NuevoContribuyente />
+                </ProtectedRoute>
+              } />
+              <Route path="/contribuyente/consulta" element={
+                <ProtectedRoute>
+                  <ConsultaContribuyente/>
+                </ProtectedRoute>
+              } />
 
-            {/* Rutas de predio */}
-            <Route path="/predio/nuevo" element={<DemoPage />} />
-            <Route path="/predio/buscar" element={<DemoPage />} />
-            <Route path="/predio/listado" element={<DemoPage />} />
+              {/* Rutas de predio */}
+              <Route path="/predio/nuevo" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/predio/buscar" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/predio/listado" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
 
-             {/* Rutas Caja */}
-            <Route path="/caja/apertura" element={<DemoPage />} />
-            <Route path="/caja/Cierre" element={<DemoPage />} />
-            <Route path="/caja/movimiento" element={<DemoPage />} />
+               {/* Rutas Caja */}
+              <Route path="/caja/apertura" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/caja/Cierre" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/caja/movimiento" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
 
-            {/* Rutas Reportes */}
-            <Route path="/reportes/contribuyente" element={<DemoPage />} />
-            <Route path="/reportes/predio" element={<DemoPage />} />
-            <Route path="/reportes/recaudacion" element={<DemoPage />} />
+              {/* Rutas Reportes */}
+              <Route path="/reportes/contribuyente" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/reportes/predio" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/reportes/recaudacion" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
 
-            {/* Rutas coactiva */}
-            <Route path="/coactiva/expediente" element={<DemoPage />} />
-             <Route path="/coactiva/resoluciones" element={<DemoPage />} />
-              <Route path="/coactiva/notificaciones" element={<DemoPage />} />
-            
-            {/* Rutas de mantenedores */}
-            <Route path="/mantenedores/ubicacion/calles" element={<CallePage />} />
-            <Route path="/mantenedores/ubicacion/sectores" element={<SectoresPage />} />
-            <Route path="/mantenedores/ubicacion/barrios" element={<BarriosPage />} />
-            <Route path="/mantenedores/ubicacion/direcciones" element={<DireccionesPage />} />
-             <Route path="/mantenedores/arancel/asignacion" element={<ArancelesPage />} />
-             <Route path="/mantenedores/arancel/valoresUnitarios" element={<ValoresUnitariosPage />} />
-            <Route path="/mantenedores/tarifas/uit" element={<UitPage />} />
-            <Route path="/mantenedores/tarifas/alcabala" element={<AlcabalaPage />} />
-            <Route path="/mantenedores/tarifas/depreciacion" element={<DepreciacionPage />} />
-            <Route path="/mantenedores/tarifas/arbitrios" element={<DemoPage />} />
-            <Route path="/mantenedores/roles" element={<DemoPage />} />
-            
-            {/* Rutas de sistema */}
-            <Route path="/sistema/configuracion" element={<DemoPage />} />
-            <Route path="/sistema/auditoria" element={<DemoPage />} />
-            <Route path="/sistema/respaldo" element={<DemoPage />} />
-            
-            {/* Rutas de migración */}
-            <Route path="/migracion/importar" element={<DemoPage />} />
-            <Route path="/migracion/exportar" element={<DemoPage />} />
-            <Route path="/migracion/historial" element={<DemoPage />} />
-            
-            {/* Ruta por defecto */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </Router>
-      </SidebarProvider>
-    </ThemeProvider>
+              {/* Rutas coactiva */}
+              <Route path="/coactiva/expediente" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/coactiva/resoluciones" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/coactiva/notificaciones" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+              
+              {/* Rutas de mantenedores */}
+              <Route path="/mantenedores/ubicacion/calles" element={
+                <ProtectedRoute>
+                  <CallePage />
+                </ProtectedRoute>
+              } />
+              <Route path="/mantenedores/ubicacion/sectores" element={
+                <ProtectedRoute>
+                  <SectoresPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/mantenedores/ubicacion/barrios" element={
+                <ProtectedRoute>
+                  <BarriosPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/mantenedores/ubicacion/direcciones" element={
+                <ProtectedRoute>
+                  <DireccionesPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/mantenedores/arancel/asignacion" element={
+                <ProtectedRoute>
+                  <ArancelesPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/mantenedores/arancel/valoresUnitarios" element={
+                <ProtectedRoute>
+                  <ValoresUnitariosPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/mantenedores/tarifas/uit" element={
+                <ProtectedRoute>
+                  <UitPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/mantenedores/tarifas/alcabala" element={
+                <ProtectedRoute>
+                  <AlcabalaPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/mantenedores/tarifas/depreciacion" element={
+                <ProtectedRoute>
+                  <DepreciacionPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/mantenedores/tarifas/arbitrios" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/mantenedores/roles" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+              
+              {/* Rutas de sistema */}
+              <Route path="/sistema/configuracion" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/sistema/auditoria" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/sistema/respaldo" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+              
+              {/* Rutas de migración */}
+              <Route path="/migracion/importar" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/migracion/exportar" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/migracion/historial" element={
+                <ProtectedRoute>
+                  <DemoPage />
+                </ProtectedRoute>
+              } />
+            </Routes>
+          </Router>
+        </SidebarProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
 };
 

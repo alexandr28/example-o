@@ -10,3 +10,4 @@ export * from './Contribuyente';
 export * from './UIT';
 export * from './Alcabala';
 export * from './Depreciacion';
+export * from './Auth'

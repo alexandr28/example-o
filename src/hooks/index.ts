@@ -9,4 +9,5 @@ export * from './useValoresUnitarios';
 export * from './useContribuyentes';
 export * from './useUIT';
 export * from './useAlcabala';
-export * from './useDepreciacion'
+export * from './useDepreciacion';
+export * from './useAuth'
