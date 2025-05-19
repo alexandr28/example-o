@@ -1,13 +1,13 @@
 // Reexportamos todos los hooks desde este archivo
-export * from './useContribuyente';
-export * from './useCalles';
-export * from './useSectores';
-export * from './useBarrios';
-export * from './useDirecciones';
-export * from './useAranceles';
-export * from './useValoresUnitarios';
-export * from './useContribuyentes';
-export * from './useUIT';
-export * from './useAlcabala';
-export * from './useDepreciacion';
-export * from './useAuth'
+export {useContribuyente} from './useContribuyente';
+export { useCalles } from './useCalles';
+export { useSectores } from './useSectores';
+export { useBarrios } from './useBarrios';
+export { useDirecciones } from './useDirecciones';
+export { useAranceles } from './useAranceles';
+export { useValoresUnitarios } from './useValoresUnitarios';
+export { useContribuyentes } from './useContribuyentes';
+export { useUIT } from './useUIT';
+export { useAlcabala } from './useAlcabala';
+export { useDepreciacion } from './useDepreciacion';
+export { useAuth } from './useAuth';

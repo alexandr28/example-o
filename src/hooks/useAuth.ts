@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { AuthCredentials, AuthUser, AuthResult } from '../models/Auth';
+import { AUTH_ENDPOINTS } from '../config/constants';
 
 /**
  * Hook personalizado para la gestión de autenticación
@@ -9,7 +10,7 @@ import { AuthCredentials, AuthUser, AuthResult } from '../models/Auth';
  */
 export const useAuth = () => {
   // Estados
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<AuthUser | null | undefined>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -43,8 +44,9 @@ export const useAuth = () => {
             token: storedToken
           });
           setIsAuthenticated(true);
-        } catch (err) {
+        } catch (error) {
           // Si hay un error al parsear, limpiar el storage
+          console.error('Error al parsear datos de usuario:', error);
           localStorage.removeItem('auth_user');
           localStorage.removeItem('auth_token');
           localStorage.removeItem('auth_token_expiry');
@@ -63,42 +65,101 @@ export const useAuth = () => {
   }, []);
 
   // Función para iniciar sesión con modo offline para pruebas
-  const login = useCallback(async (credentials: AuthCredentials): Promise<AuthResult> => {
+ // En useAuth.ts
+const login = useCallback(async (credentials: AuthCredentials): Promise<AuthResult> => {
+  try {
+    setLoading(true);
+    setError(null);
+    
+    console.log('Iniciando login con username:', credentials.username);
+    
+    // Intentar conectar con el servidor
     try {
-      setLoading(true);
-      setError(null);
+      console.log('Intentando conectar con el servidor...');
       
-      // Intentar conectar con el servidor
-      try {
-        // Realizar petición a la API real
-        const response = await fetch('http://localhost:8080/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(credentials),
-        });
+      // Realizar petición a la API real
+      const response = await fetch(AUTH_ENDPOINTS.LOGIN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
+      });
+      
+      
+      
+      // Verificar si la respuesta es exitosa
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const errorMessage = errorData?.message || 'Error al iniciar sesión. Por favor, inténtelo de nuevo.';
+        throw new Error(errorMessage);
+      }
+      console.log('Conexión exitosa, código de respuesta:', response.status);
+      // Obtener el token de la respuesta
+      const data = await response.json();
+      const token = data.token;
+      
+      if (!token) {
+        throw new Error('No se recibió un token válido del servidor');
+      }
+       // Crear objeto de usuario con el token
+      const user: AuthUser = {
+        id: '1', // Este valor podría venir del token decodificado
+        username: credentials.username,
+        nombreCompleto: credentials.username, // Este valor podría venir del token decodificado
+        roles: ['USER'], // Estos valores podrían venir del token decodificado
+        token: token
+      // Resto del código para autenticación exitosa...
+      };
+      // Calcular tiempo de expiración (20 minutos desde ahora)
+      const expiryTime = new Date();
+      expiryTime.setMinutes(expiryTime.getMinutes() + 20);
+ // Guardar en localStorage para persistencia
+      localStorage.setItem('auth_user', JSON.stringify(user));
+      localStorage.setItem('auth_token', token);
+      localStorage.setItem('auth_token_expiry', expiryTime.toISOString());
+       // Actualizar estados
+      setUser(user);
+      setIsAuthenticated(true);
+      setLoading(false);
+      console.log('Login exitoso, usuario:', user.username);
+
+      return { success: true, user, token };
+      
+    } catch (apiError: unknown) {
+      console.error('Error al conectar con la API:', apiError);
+      
+      // Mejorar la detección de errores de red
+      let isNetworkError = false;
+      
+      if (apiError instanceof Error) {
+        // Para errores de tipo TypeError (como Failed to fetch)
+        isNetworkError = 
+          (apiError instanceof TypeError && apiError.message.includes('fetch')) || 
+          apiError.message.includes('network') || 
+          apiError.message.includes('connection') ||
+          !window.navigator.onLine;
         
-        // Verificar si la respuesta es exitosa
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-          const errorMessage = errorData?.message || 'Error al iniciar sesión. Por favor, inténtelo de nuevo.';
-          throw new Error(errorMessage);
-        }
+        console.log('Tipo de error:', apiError.constructor.name);
+        console.log('Mensaje de error:', apiError.message);
+      }
+      
+      // SIEMPRE activar el modo fallback cuando hay un error de conexión
+      console.log('¿Es error de red?', isNetworkError);
+      
+      // MODO FALLBACK: Siempre activar para desarrollo mientras no haya API
+      console.log('Activando modo fallback de autenticación');
+      
+      if (credentials.username && credentials.password) {
+        console.log('Credenciales proporcionadas, generando token simulado');
+        // Crear un token simulado
+        const mockToken = `mock_token_${Math.random().toString(36).substr(2, 9)}`;
         
-        // Obtener el token de la respuesta
-        const data = await response.json();
-        const token = data.token;
-        
-        if (!token) {
-          throw new Error('No se recibió un token válido del servidor');
-        }
-        
-        // Crear objeto de usuario con el token
+        // Crear objeto de usuario simulado
         const user: AuthUser = {
-          id: '1', // Este valor podría venir del token decodificado
+          id: '1',
           username: credentials.username,
-          nombreCompleto: credentials.username, // Este valor podría venir del token decodificado
-          roles: ['USER'], // Estos valores podrían venir del token decodificado
-          token: token
+          nombreCompleto: `Usuario ${credentials.username}`,
+          roles: ['USER'],
+          token: mockToken
         };
         
         // Calcular tiempo de expiración (20 minutos desde ahora)
@@ -107,7 +168,7 @@ export const useAuth = () => {
         
         // Guardar en localStorage para persistencia
         localStorage.setItem('auth_user', JSON.stringify(user));
-        localStorage.setItem('auth_token', token);
+        localStorage.setItem('auth_token', mockToken);
         localStorage.setItem('auth_token_expiry', expiryTime.toISOString());
         
         // Actualizar estados
@@ -115,87 +176,49 @@ export const useAuth = () => {
         setIsAuthenticated(true);
         setLoading(false);
         
-        return { success: true, user, token };
-        
-      } catch (apiError: any) {
-        console.error('Error al conectar con la API:', apiError);
-        
-        // Verificar si es un error de conectividad (fetch failed)
-        if (apiError.message.includes('fetch') || apiError.message.includes('network') || !window.navigator.onLine) {
-          console.log('Funcionando en modo fallback de autenticación');
-          
-          // MODO FALLBACK: Autenticación simulada para pruebas
-          if (credentials.username && credentials.password) {
-            // Crear un token simulado
-            const mockToken = `mock_token_${Math.random().toString(36).substr(2, 9)}`;
-            
-            // Crear objeto de usuario con el token
-            const user: AuthUser = {
-              id: '1',
-              username: credentials.username,
-              nombreCompleto: `Usuario ${credentials.username}`,
-              roles: ['USER'],
-              token: mockToken
-            };
-            
-            // Calcular tiempo de expiración (20 minutos desde ahora)
-            const expiryTime = new Date();
-            expiryTime.setMinutes(expiryTime.getMinutes() + 20);
-            
-            // Guardar en localStorage para persistencia
-            localStorage.setItem('auth_user', JSON.stringify(user));
-            localStorage.setItem('auth_token', mockToken);
-            localStorage.setItem('auth_token_expiry', expiryTime.toISOString());
-            
-            // Actualizar estados
-            setUser(user);
-            setIsAuthenticated(true);
-            setLoading(false);
-            
-            console.log('Autenticación simulada exitosa');
-            return { success: true, user, token: mockToken };
-          } else {
-            throw new Error('Credenciales inválidas');
-          }
-        } else {
-          // Si no es un error de conectividad, reenviar el error
-          throw apiError;
-        }
+        console.log('Autenticación simulada exitosa');
+        return { success: true, user, token: mockToken };
+      } else {
+        console.log('Credenciales faltantes:', { 
+          username: !!credentials.username, 
+          password: !!credentials.password 
+        });
+        throw new Error('Credenciales inválidas');
       }
-      
-    } catch (err: any) {
-      const errorMessage = err.message || 'Error al iniciar sesión';
-      setError(errorMessage);
-      setLoading(false);
-      return { success: false, error: errorMessage };
     }
-  }, []);
+    
+  } catch (err: unknown) {
+    console.error('Error en el proceso de login:', err);
+    const errorMessage = err instanceof Error ? err.message : 'Error al iniciar sesión';
+    setError(errorMessage);
+    setLoading(false);
+    return { success: false, error: errorMessage };
+  }
+}, []);
 
   // Función para cerrar sesión
-  const logout = useCallback(() => {
-    // Eliminar datos de autenticación del almacenamiento local
-    localStorage.removeItem('auth_user');
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_token_expiry');
-    
-    // Resetear estados
-    setUser(null);
-    setIsAuthenticated(false);
-    setError(null);
-    
-    // En un caso real, también podríamos hacer una petición al backend
-    // para invalidar el token en el servidor
-    try {
-      fetch('http://localhost:8080/auth/logout', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${user?.token}`
-        }
-      }).catch(e => console.log('Error al cerrar sesión en el servidor:', e));
-    } catch (e) {
-      console.log('Error al cerrar sesión en el servidor:', e);
+// Función para cerrar sesión
+const logout = useCallback(() => {
+  // Eliminar datos de autenticación del almacenamiento local
+  localStorage.removeItem('auth_user');
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_token_expiry');
+  
+  // Resetear estados - usar null en lugar de undefined
+  setUser(null);
+  setIsAuthenticated(false);
+  setError(null);
+  
+  // Intentar notificar al servidor, pero sin bloquear el flujo
+  fetch('http://localhost:8080/auth/logout', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${user?.token || ''}`
     }
-  }, [user]);
+  }).catch(() => {
+    console.log('No se pudo notificar al servidor sobre el cierre de sesión. Esto es normal si el servidor no está disponible.');
+  });
+}, [user]);
 
   // Función para renovar el token
   const renewToken = useCallback(async (): Promise<boolean> => {
@@ -237,8 +260,8 @@ export const useAuth = () => {
       localStorage.setItem('auth_user', JSON.stringify(updatedUser));
       
       return true;
-    } catch (err) {
-      console.error('Error al renovar el token:', err);
+    } catch (renewError: unknown) {
+      console.error('Error al renovar el token:', renewError);
       return false;
     }
   }, [user]);

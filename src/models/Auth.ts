@@ -86,24 +86,10 @@ export interface AuthState {
 /**
  * Resultado de un intento de autenticación
  */
+// En Auth.ts
 export interface AuthResult {
-  /**
-   * Indica si la autenticación fue exitosa
-   */
   success: boolean;
-  
-  /**
-   * Usuario autenticado (en caso de éxito)
-   */
-  user?: AuthUser;
-  
-  /**
-   * Mensaje de error (en caso de fallo)
-   */
+   user?: AuthUser | null; // Opcional, pero no puede ser null
   error?: string;
-  
-  /**
-   * Token de acceso (en caso de éxito)
-   */
   token?: string;
 }

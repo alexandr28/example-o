@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import SimpleDebug from '../components/debug/SimpleDebud';
 import { 
   DemoPage,
   CallePage,
@@ -27,6 +28,8 @@ const AppRouter: React.FC = () => {
     <AuthProvider>
       <ThemeProvider>
         <SidebarProvider>
+          {/* Añadir esto para depuración básica */}
+          <SimpleDebug />
           <Router>
             <Routes>
               {/* Ruta pública - Login */}

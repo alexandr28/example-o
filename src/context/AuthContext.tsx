@@ -1,5 +1,5 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import { AuthUser} from '../models/Auth';
+import { AuthUser, AuthCredentials, AuthResult } from '../models/Auth';
 import useAuth from '../hooks/useAuth';
 
 // Tipo para el contexto de autenticación
@@ -8,7 +8,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   isAuthenticated: boolean;
-  login: (credentials: { username: string; password: string }) => Promise<any>;
+  login: (credentials: AuthCredentials) => Promise<AuthResult>;
   logout: () => void;
   renewToken: () => Promise<boolean>;
 }
@@ -25,17 +25,37 @@ export const useAuthContext = () => {
   return context;
 };
 
-// Props para el proveedor de autenticación
+// Definir explícitamente el tipo de las props
 interface AuthProviderProps {
   children: ReactNode;
 }
 
 // Componente proveedor de autenticación
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider = ({ children }: AuthProviderProps) => {
   const auth = useAuth();
+  
+  // Para depuración
+  React.useEffect(() => {
+    console.log('AuthProvider state:', { 
+      isAuthenticated: auth.isAuthenticated, 
+      user: auth.user?.username || 'none',
+      loading: auth.loading 
+    });
+  }, [auth.isAuthenticated, auth.user, auth.loading]);
+
+  // Crear un objeto que cumpla exactamente con el tipo AuthContextType
+  const authContextValue: AuthContextType = {
+    user: auth.user || null, // Convertir undefined a null
+    loading: auth.loading,
+    error: auth.error,
+    isAuthenticated: auth.isAuthenticated,
+    login: auth.login,
+    logout: auth.logout,
+    renewToken: auth.renewToken
+  };
 
   return (
-    <AuthContext.Provider value={auth}>
+    <AuthContext.Provider value={authContextValue}>
       {children}
     </AuthContext.Provider>
   );

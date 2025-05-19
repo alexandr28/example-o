@@ -20,6 +20,7 @@ interface BarrioFormProps {
   onNuevo: () => void;
   onEditar: () => void;
   loading?: boolean;
+  error?: string | null;
 }
 
 const BarrioForm: React.FC<BarrioFormProps> = ({
@@ -29,8 +30,9 @@ const BarrioForm: React.FC<BarrioFormProps> = ({
   onNuevo,
   onEditar,
   loading = false,
+  error = null
 }) => {
-  const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm<BarrioFormData>({
+  const { register, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm<BarrioFormData>({
     resolver: zodResolver(barrioSchema),
     defaultValues: {
       sectorId: '',
@@ -51,7 +53,6 @@ const BarrioForm: React.FC<BarrioFormProps> = ({
       nombre: data.nombre,
       sectorId: parseInt(data.sectorId)
     });
-    reset();
   };
 
   const handleNuevo = () => {
@@ -65,6 +66,10 @@ const BarrioForm: React.FC<BarrioFormProps> = ({
     label: sector.nombre
   }));
 
+  // Valor actual del sector seleccionado para mostrar detalles
+  const sectorIdSelected = watch('sectorId');
+  const sectorSeleccionado = sectores.find(s => s.id.toString() === sectorIdSelected);
+
   return (
     <div className="bg-white rounded-md shadow-sm overflow-hidden">
       <div className="px-6 py-4 bg-gray-50 border-b">
@@ -72,24 +77,40 @@ const BarrioForm: React.FC<BarrioFormProps> = ({
       </div>
       
       <form onSubmit={handleSubmit(onSubmit)} className="p-6">
+        {/* Mostrar errores si hay */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md" role="alert">
+            <span className="block sm:inline">{error}</span>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Select
             label="Sector"
             options={sectorOptions}
-            error={errors.sectorId?.message}
+            error={errors.sectorId?.message as string}
             disabled={loading}
-            placeholder="Ingrese nombre del sector"
+            placeholder="Seleccione un sector"
             {...register('sectorId')}
           />
           
           <Input
             label="Nombre"
-            error={errors.nombre?.message}
+            error={errors.nombre?.message as string}
             disabled={loading}
             placeholder="Ingrese nombre del barrio"
             {...register('nombre')}
           />
         </div>
+        
+        {/* Mostrar información del sector seleccionado si existe */}
+        {sectorSeleccionado && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-sm text-blue-700">
+              El barrio pertenecerá al sector: <strong>{sectorSeleccionado.nombre}</strong>
+            </p>
+          </div>
+        )}
         
         <div className="flex justify-center space-x-4 mt-6">
           <Button 
@@ -97,14 +118,22 @@ const BarrioForm: React.FC<BarrioFormProps> = ({
             variant="primary"
             disabled={loading}
           >
-            Guardar
+            {loading ? (
+              <div className="flex items-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Guardando...</span>
+              </div>
+            ) : "Guardar"}
           </Button>
           
           <Button
             type="button"
             variant="secondary"
             onClick={onEditar}
-            disabled={loading}
+            disabled={loading || !barrioSeleccionado}
           >
             Editar
           </Button>

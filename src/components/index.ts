@@ -7,6 +7,7 @@ export { default as CalendarInput } from './utils/CalendarInput';
 export { default as Modal } from './modal/Modal';
 export { default as Breadcrumb } from './utils/Breadcrumb';
 export { default as BreadcrumbItem } from './utils/Breadcrumb';
+export { default as NotificationContainer } from './utils/Notification';
 
 // Exportaciones de componentes específicos
 

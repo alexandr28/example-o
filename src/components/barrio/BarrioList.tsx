@@ -1,26 +1,42 @@
-import React, { useState } from 'react';
-import { Input,Button } from '../';
+import React, { useState, useEffect } from 'react';
+import { Input, Button } from '../';
 import { Barrio } from '../../models';
 
 interface BarrioListProps {
   barrios: Barrio[];
   onSelectBarrio: (barrio: Barrio) => void;
+  onDeleteBarrio?: (id: number) => void;
+  onSearch?: (term: string) => void;
+  searchTerm?: string;
   loading?: boolean;
 }
 
 const BarrioList: React.FC<BarrioListProps> = ({ 
   barrios, 
   onSelectBarrio,
+  onDeleteBarrio,
+  onSearch,
+  searchTerm: externalSearchTerm,
   loading = false 
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+  // Si se proporciona un término de búsqueda externo, lo usamos
+  // De lo contrario, mantenemos nuestro estado local para búsqueda en el lado del cliente
+  const [internalSearchTerm, setInternalSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Filtrar la lista de barrios según el término de búsqueda
-  const filteredBarrios = barrios.filter(barrio => 
-    barrio.nombre.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Actualizar la página a 1 cuando cambia el término de búsqueda
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [externalSearchTerm]);
+
+  // Si hay un manejador de búsqueda externo, usar ese, de lo contrario filtrar localmente
+  const filteredBarrios = onSearch 
+    ? barrios // Si hay búsqueda externa, los barrios ya vienen filtrados de la API
+    : barrios.filter(barrio => 
+        barrio.nombre.toLowerCase().includes(internalSearchTerm.toLowerCase()) ||
+        (barrio.sector?.nombre && barrio.sector.nombre.toLowerCase().includes(internalSearchTerm.toLowerCase()))
+      );
 
   // Calcular la cantidad de páginas
   const totalPages = Math.ceil(filteredBarrios.length / itemsPerPage);
@@ -32,6 +48,35 @@ const BarrioList: React.FC<BarrioListProps> = ({
 
   // Cambiar de página
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+
+  // Manejar la búsqueda
+  const handleSearch = () => {
+    if (onSearch) {
+      onSearch(externalSearchTerm || internalSearchTerm);
+    }
+    setCurrentPage(1);
+  };
+
+  // Manejar cambios en el input de búsqueda
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTerm = e.target.value;
+    if (onSearch) {
+      // Si hay búsqueda del lado del servidor, actualizamos el término externo
+      onSearch(newTerm);
+    } else {
+      // Si no, actualizamos el término interno
+      setInternalSearchTerm(newTerm);
+    }
+  };
+
+  // Manejar la eliminación de un barrio
+  const handleDelete = (id: number, event: React.MouseEvent) => {
+    event.stopPropagation(); // Evitar que se seleccione el barrio al hacer clic en eliminar
+    
+    if (onDeleteBarrio && window.confirm('¿Está seguro de eliminar este barrio?')) {
+      onDeleteBarrio(id);
+    }
+  };
 
   return (
     <div className="bg-white rounded-md shadow-sm overflow-hidden mt-6">
@@ -47,12 +92,17 @@ const BarrioList: React.FC<BarrioListProps> = ({
             </div>
             <div className="flex-1 relative">
               <Input
-                placeholder="Buscar por nombre del barrio"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar por nombre del barrio o sector"
+                value={onSearch ? externalSearchTerm : internalSearchTerm}
+                onChange={handleSearchChange}
                 disabled={loading}
+                className="rounded-r-none"
               />
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+              <Button
+                onClick={handleSearch}
+                className="absolute inset-y-0 right-0 rounded-l-none"
+                disabled={loading}
+              >
                 <svg
                   className="h-5 w-5 text-gray-400"
                   fill="none"
@@ -67,7 +117,7 @@ const BarrioList: React.FC<BarrioListProps> = ({
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                   />
                 </svg>
-              </div>
+              </Button>
             </div>
           </div>
         </div>
@@ -92,26 +142,42 @@ const BarrioList: React.FC<BarrioListProps> = ({
                     Sector
                     <span className="ml-1">▼</span>
                   </th>
+                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {currentItems.map((barrio) => (
-                  <tr
-                    key={barrio.id}
-                    className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => onSelectBarrio(barrio)}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {barrio.nombre}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {barrio.sector?.nombre || 'Sin sector'}
-                    </td>
-                  </tr>
-                ))}
-                {currentItems.length === 0 && (
+                {currentItems.length > 0 ? (
+                  currentItems.map((barrio) => (
+                    <tr
+                      key={barrio.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => onSelectBarrio(barrio)}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {barrio.nombre}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {barrio.sector?.nombre || 'Sin sector'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        {onDeleteBarrio && (
+                          <Button
+                            onClick={(e) => handleDelete(barrio.id, e)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
                   <tr>
-                    <td colSpan={2} className="px-6 py-4 text-center text-sm text-gray-500">
+                    <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-500">
                       No se encontraron resultados
                     </td>
                   </tr>
@@ -125,22 +191,49 @@ const BarrioList: React.FC<BarrioListProps> = ({
         {!loading && totalPages > 1 && (
           <div className="mt-4 flex justify-between items-center">
             <div className="text-sm text-gray-500">
-              Mostrar de {indexOfFirstItem + 1} a {Math.min(indexOfLastItem, filteredBarrios.length)} de {filteredBarrios.length} datos
+              Mostrando {indexOfFirstItem + 1} a {Math.min(indexOfLastItem, filteredBarrios.length)} de {filteredBarrios.length} barrios
             </div>
             <nav className="flex space-x-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((number) => (
-                <Button
-                  key={number}
-                  onClick={() => paginate(number)}
-                  className={`px-3 py-1 rounded ${
-                    currentPage === number
-                      ? 'bg-gray-200 text-gray-700'
-                      : 'text-gray-500 hover:bg-gray-100'
-                  }`}
-                >
-                  {number}
-                </Button>
-              ))}
+              <Button
+                onClick={() => paginate(Math.max(1, currentPage - 1))}
+                className="px-3 py-1 rounded text-gray-500 hover:bg-gray-100"
+                disabled={currentPage === 1}
+              >
+                <span aria-hidden="true">&lt;</span>
+              </Button>
+              
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                // Calcular qué números de página mostrar
+                let pageNum;
+                if (totalPages <= 5) {
+                  // Mostrar páginas 1-5 si hay 5 o menos páginas
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  // Al inicio, mostrar páginas 1-5
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  // Al final, mostrar las últimas 5 páginas
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  // En el medio, mostrar 2 páginas antes y 2 después de la actual
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <Button
+                    key={pageNum}
+                    onClick={() => paginate(pageNum)}
+                    className={`px-3 py-1 rounded ${
+                      currentPage === pageNum
+                        ? 'bg-gray-200 text-gray-700'
+                        : 'text-gray-500 hover:bg-gray-100'
+                    }`}
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+              
               <Button
                 onClick={() => paginate(Math.min(currentPage + 1, totalPages))}
                 className="px-3 py-1 rounded text-gray-500 hover:bg-gray-100"

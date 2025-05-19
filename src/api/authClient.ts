@@ -32,23 +32,30 @@ const handleFetchError = (error: any, url: string, method: string) => {
   console.error(`Error ${method} ${url}:`, error);
   
   // Verificar si es un error de red
-  if (!window.navigator.onLine || error.message.includes('fetch') || error.message.includes('network')) {
+  if (!window.navigator.onLine || error.message.includes('fetch') || error.message.includes('network') || error.name === 'TypeError') {
     console.log('Error de red detectado, trabajando en modo offline');
     
-    // Si estamos en modo de desarrollo, podemos devolver datos simulados
-    if (process.env.NODE_ENV === 'development') {
-      // Generamos datos simulados según la URL
-      if (url.includes('users')) {
-        return { success: true, data: [{ id: 1, name: 'Usuario simulado' }] };
-      }
-      
-      // Datos genéricos simulados
-      return { success: true, data: { message: 'Datos simulados en modo offline' } };
-    }
+    // Lanzar un error específico para que sea manejado por el hook
+    error.isOfflineError = true;
+    throw error;
   }
   
   // Si no podemos manejar el error, lo reenviamos
   throw error;
+};
+
+// Función auxiliar para renovar token
+const attemptTokenRenewal = async (): Promise<boolean> => {
+  try {
+    const auth = useAuthContext();
+    if (auth && auth.renewToken) {
+      return await auth.renewToken();
+    }
+    return false;
+  } catch (error) {
+    console.error("Error al renovar token:", error);
+    return false;
+  }
 };
 
 /**
@@ -61,8 +68,7 @@ export const authGet = async (url: string, retry = true) => {
     // Verificar si el token ha expirado
     if (token && isTokenExpired() && retry) {
       // Intentar renovar el token
-      const { renewToken } = useAuthContext();
-      const renewed = await renewToken();
+      const renewed = await attemptTokenRenewal();
       
       if (renewed) {
         // Si se renovó correctamente, intentar nuevamente la petición
@@ -89,8 +95,7 @@ export const authGet = async (url: string, retry = true) => {
       // Si la respuesta es 401 Unauthorized, podríamos manejar el logout
       if (response.status === 401 && retry) {
         // Intentar renovar el token
-        const { renewToken } = useAuthContext();
-        const renewed = await renewToken();
+        const renewed = await attemptTokenRenewal();
         
         if (renewed) {
           // Si se renovó correctamente, intentar nuevamente la petición
@@ -124,8 +129,7 @@ export const authPost = async (url: string, data: any, retry = true) => {
     // Verificar si el token ha expirado
     if (token && isTokenExpired() && retry) {
       // Intentar renovar el token
-      const { renewToken } = useAuthContext();
-      const renewed = await renewToken();
+      const renewed = await attemptTokenRenewal();
       
       if (renewed) {
         // Si se renovó correctamente, intentar nuevamente la petición
@@ -153,8 +157,7 @@ export const authPost = async (url: string, data: any, retry = true) => {
       // Si la respuesta es 401 Unauthorized, podríamos manejar el logout
       if (response.status === 401 && retry) {
         // Intentar renovar el token
-        const { renewToken } = useAuthContext();
-        const renewed = await renewToken();
+        const renewed = await attemptTokenRenewal();
         
         if (renewed) {
           // Si se renovó correctamente, intentar nuevamente la petición
@@ -188,8 +191,7 @@ export const authPut = async (url: string, data: any, retry = true) => {
     // Verificar si el token ha expirado
     if (token && isTokenExpired() && retry) {
       // Intentar renovar el token
-      const { renewToken } = useAuthContext();
-      const renewed = await renewToken();
+      const renewed = await attemptTokenRenewal();
       
       if (renewed) {
         // Si se renovó correctamente, intentar nuevamente la petición
@@ -217,8 +219,7 @@ export const authPut = async (url: string, data: any, retry = true) => {
       // Si la respuesta es 401 Unauthorized, podríamos manejar el logout
       if (response.status === 401 && retry) {
         // Intentar renovar el token
-        const { renewToken } = useAuthContext();
-        const renewed = await renewToken();
+        const renewed = await attemptTokenRenewal();
         
         if (renewed) {
           // Si se renovó correctamente, intentar nuevamente la petición
@@ -252,8 +253,7 @@ export const authDelete = async (url: string, retry = true) => {
     // Verificar si el token ha expirado
     if (token && isTokenExpired() && retry) {
       // Intentar renovar el token
-      const { renewToken } = useAuthContext();
-      const renewed = await renewToken();
+      const renewed = await attemptTokenRenewal();
       
       if (renewed) {
         // Si se renovó correctamente, intentar nuevamente la petición
@@ -280,8 +280,7 @@ export const authDelete = async (url: string, retry = true) => {
       // Si la respuesta es 401 Unauthorized, podríamos manejar el logout
       if (response.status === 401 && retry) {
         // Intentar renovar el token
-        const { renewToken } = useAuthContext();
-        const renewed = await renewToken();
+        const renewed = await attemptTokenRenewal();
         
         if (renewed) {
           // Si se renovó correctamente, intentar nuevamente la petición

@@ -1,17 +1,24 @@
 import React, { useState } from 'react';
-import { Input,Button } from '../';
+import { Input, Button } from '../';
 
 interface Sector {
-  id: number;
+  id?: number;
   nombre: string;
 }
 
 interface SectorListProps {
   sectores: Sector[];
   onSelectSector: (sector: Sector) => void;
+  isOfflineMode?: boolean;
+  onEliminar?: (id: number) => void;
 }
 
-const SectorList: React.FC<SectorListProps> = ({ sectores, onSelectSector }) => {
+const SectorList: React.FC<SectorListProps> = ({ 
+  sectores, 
+  onSelectSector,
+  isOfflineMode = false,
+  onEliminar
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -32,10 +39,29 @@ const SectorList: React.FC<SectorListProps> = ({ sectores, onSelectSector }) => 
   // Cambiar de página
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
+  // Manejar eliminación de un sector
+  const handleEliminar = (id: number | undefined, e: React.MouseEvent) => {
+    e.stopPropagation(); // Evitar que se active la selección del sector
+    
+    if (id && onEliminar) {
+      if (window.confirm('¿Está seguro de eliminar este sector?')) {
+        onEliminar(id);
+      }
+    }
+  };
+
   return (
     <div className="bg-white rounded-md shadow-sm overflow-hidden mt-6">
-      <div className="px-6 py-4 bg-gray-50 border-b">
+      <div className="px-6 py-4 bg-gray-50 border-b flex justify-between items-center">
         <h2 className="text-lg font-medium text-gray-800">Lista de sectores</h2>
+        {isOfflineMode && (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+            <svg className="-ml-0.5 mr-1.5 h-2 w-2 text-yellow-400" fill="currentColor" viewBox="0 0 8 8">
+              <circle cx="4" cy="4" r="3" />
+            </svg>
+            Modo sin conexión
+          </span>
+        )}
       </div>
       
       <div className="p-6">
@@ -46,7 +72,7 @@ const SectorList: React.FC<SectorListProps> = ({ sectores, onSelectSector }) => 
             </div>
             <div className="flex-1 relative">
               <Input
-                placeholder="Buscar por nombre de vía"
+                placeholder="Buscar por nombre de sector"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -78,6 +104,11 @@ const SectorList: React.FC<SectorListProps> = ({ sectores, onSelectSector }) => 
                   Sector
                   <span className="ml-1">▼</span>
                 </th>
+                {onEliminar && (
+                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Acciones
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -90,11 +121,23 @@ const SectorList: React.FC<SectorListProps> = ({ sectores, onSelectSector }) => 
                   <td className="px-6 py-4 whitespace-nowrap">
                     {sector.nombre}
                   </td>
+                  {onEliminar && (
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <button
+                        onClick={(e) => handleEliminar(sector.id, e)}
+                        className="text-red-600 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-400 rounded-md p-1"
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
               {currentItems.length === 0 && (
                 <tr>
-                  <td colSpan={1} className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan={onEliminar ? 2 : 1} className="px-6 py-4 text-center text-sm text-gray-500">
                     No se encontraron resultados
                   </td>
                 </tr>

@@ -1,42 +1,64 @@
 import { useState, useCallback } from 'react';
 import { Calle, CalleFormData } from '../models/Calle';
+import { authGet, authPost, authPut, authDelete } from '../api/authClient';
 
-// Datos de ejemplo para pruebas
-const callesIniciales: Calle[] = [
-  { id: 1, tipoVia: 'avenida', nombre: 'Gran Chimú' },
-  { id: 2, tipoVia: 'calle', nombre: 'Los Álamos' },
-  { id: 3, tipoVia: 'jiron', nombre: 'Carabobo' },
-];
+// URL base para la API de calles
+const API_URL = 'http://localhost:8080/api/calles';
 
 /**
  * Hook personalizado para la gestión de calles
  * 
  * Proporciona funcionalidades para listar, crear, actualizar y eliminar calles
+ * Incluye manejo de errores de conectividad y modo fallback
  */
 export const useCalles = () => {
   // Estados
-  const [calles, setCalles] = useState<Calle[]>(callesIniciales);
+  const [calles, setCalles] = useState<Calle[]>([]);
   const [calleSeleccionada, setCalleSeleccionada] = useState<Calle | null>(null);
   const [modoEdicion, setModoEdicion] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
 
-  // Cargar calles (simula una petición a API)
+  // Cargar calles desde la API
   const cargarCalles = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Aquí iría la petición a la API
-      // const response = await fetch('/api/calles');
-      // const data = await response.json();
-      // setCalles(data);
-      
-      // Simulamos un retardo
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setCalles(callesIniciales);
-    } catch (err) {
-      setError('Error al cargar las calles');
+      try {
+        // Intentar cargar desde la API
+        const data = await authGet(`${API_URL}`);
+        
+        if (data && Array.isArray(data)) {
+          setCalles(data);
+          setIsOfflineMode(false);
+        } else {
+          throw new Error('Formato de datos incorrecto');
+        }
+      } catch (apiError) {
+        console.error('Error al cargar calles desde API:', apiError);
+        
+        // Verificar si es un error de conectividad
+        if (!navigator.onLine || apiError.message.includes('fetch failed') || apiError.message.includes('network')) {
+          console.log('Funcionando en modo sin conexión para calles');
+          setIsOfflineMode(true);
+          
+          // Cargar datos locales de ejemplo para modo sin conexión
+          const callesIniciales = [
+            { id: 1, tipoVia: 'avenida', nombre: 'Gran Chimú' },
+            { id: 2, tipoVia: 'calle', nombre: 'Los Álamos' },
+            { id: 3, tipoVia: 'jiron', nombre: 'Carabobo' },
+          ];
+          
+          setCalles(callesIniciales);
+        } else {
+          // Si es otro tipo de error, propagarlo
+          throw apiError;
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error al cargar las calles');
       console.error(err);
     } finally {
       setLoading(false);
@@ -63,45 +85,71 @@ export const useCalles = () => {
       
       if (modoEdicion && calleSeleccionada) {
         // Actualizar calle existente
-        // Aquí iría la petición a la API para actualizar
-        // await fetch(`/api/calles/${calleSeleccionada.id}`, {
-        //   method: 'PUT',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify(data),
-        // });
-        
-        // Actualizamos el estado local
-        setCalles(prevCalles => 
-          prevCalles.map(c => 
-            c.id === calleSeleccionada.id 
-              ? { ...c, ...data } 
-              : c
-          )
-        );
+        try {
+          const response = await authPut(`${API_URL}/${calleSeleccionada.id}`, data);
+          
+          if (response) {
+            // Actualizar estado local con datos del servidor
+            setCalles(prev => prev.map(c => 
+              c.id === calleSeleccionada.id ? response : c
+            ));
+            setIsOfflineMode(false);
+          }
+        } catch (apiError) {
+          console.error('Error al actualizar calle en API:', apiError);
+          
+          // Verificar si es un error de conectividad
+          if (!navigator.onLine || apiError.message.includes('fetch failed') || apiError.message.includes('network')) {
+            console.log('Funcionando en modo sin conexión para actualizar calle');
+            setIsOfflineMode(true);
+            
+            // Actualizar localmente en modo offline
+            setCalles(prevCalles => 
+              prevCalles.map(c => 
+                c.id === calleSeleccionada.id ? { ...c, ...data } : c
+              )
+            );
+          } else {
+            // Si es otro tipo de error, propagarlo
+            throw apiError;
+          }
+        }
       } else {
         // Crear nueva calle
-        // Aquí iría la petición a la API para crear
-        // const response = await fetch('/api/calles', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify(data),
-        // });
-        // const nuevaCalle = await response.json();
-        
-        // Simulamos la creación con un ID nuevo
-        const nuevaCalle: Calle = {
-          id: Math.max(0, ...calles.map(c => c.id)) + 1,
-          ...data,
-        };
-        
-        // Actualizamos el estado local
-        setCalles(prevCalles => [...prevCalles, nuevaCalle]);
+        try {
+          const response = await authPost(`${API_URL}`, data);
+          
+          if (response) {
+            // Actualizar estado local con datos del servidor
+            setCalles(prev => [...prev, response]);
+            setIsOfflineMode(false);
+          }
+        } catch (apiError) {
+          console.error('Error al crear calle en API:', apiError);
+          
+          // Verificar si es un error de conectividad
+          if (!navigator.onLine || apiError.message.includes('fetch failed') || apiError.message.includes('network')) {
+            console.log('Funcionando en modo sin conexión para crear calle');
+            setIsOfflineMode(true);
+            
+            // Crear localmente en modo offline
+            const nuevaCalle: Calle = {
+              id: Math.max(0, ...calles.map(c => c.id || 0)) + 1,
+              ...data,
+            };
+            
+            setCalles(prevCalles => [...prevCalles, nuevaCalle]);
+          } else {
+            // Si es otro tipo de error, propagarlo
+            throw apiError;
+          }
+        }
       }
       
       // Resetear estados
       limpiarSeleccion();
-    } catch (err) {
-      setError('Error al guardar la calle');
+    } catch (err: any) {
+      setError(err.message || 'Error al guardar la calle');
       console.error(err);
     } finally {
       setLoading(false);
@@ -114,20 +162,35 @@ export const useCalles = () => {
       setLoading(true);
       setError(null);
       
-      // Aquí iría la petición a la API para eliminar
-      // await fetch(`/api/calles/${id}`, {
-      //   method: 'DELETE',
-      // });
-      
-      // Actualizamos el estado local
-      setCalles(prevCalles => prevCalles.filter(c => c.id !== id));
+      try {
+        // Intentar eliminar en la API
+        await authDelete(`${API_URL}/${id}`);
+        
+        // Actualizar estado local
+        setCalles(prevCalles => prevCalles.filter(c => c.id !== id));
+        setIsOfflineMode(false);
+      } catch (apiError) {
+        console.error('Error al eliminar calle en API:', apiError);
+        
+        // Verificar si es un error de conectividad
+        if (!navigator.onLine || apiError.message.includes('fetch failed') || apiError.message.includes('network')) {
+          console.log('Funcionando en modo sin conexión para eliminar calle');
+          setIsOfflineMode(true);
+          
+          // Eliminar localmente en modo offline
+          setCalles(prevCalles => prevCalles.filter(c => c.id !== id));
+        } else {
+          // Si es otro tipo de error, propagarlo
+          throw apiError;
+        }
+      }
       
       // Si la calle eliminada estaba seleccionada, limpiamos la selección
       if (calleSeleccionada?.id === id) {
         limpiarSeleccion();
       }
-    } catch (err) {
-      setError('Error al eliminar la calle');
+    } catch (err: any) {
+      setError(err.message || 'Error al eliminar la calle');
       console.error(err);
     } finally {
       setLoading(false);
@@ -140,6 +203,7 @@ export const useCalles = () => {
     modoEdicion,
     loading,
     error,
+    isOfflineMode,
     cargarCalles,
     seleccionarCalle,
     limpiarSeleccion,
@@ -148,3 +212,6 @@ export const useCalles = () => {
     setModoEdicion,
   };
 };
+
+// Exportación por defecto para mantener compatibilidad
+export default useCalles;

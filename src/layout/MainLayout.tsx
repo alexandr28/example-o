@@ -1,8 +1,10 @@
-import { FC, ReactNode, memo } from 'react';
+import { FC, ReactNode, memo, useEffect } from 'react';
 import AppSidebar from './AppSidebar';
 import Header from './Header';
 import { SidebarProvider } from '../context/SidebarContext';
 import { ThemeProvider } from '../context/ThemeContext';
+import { useAuthContext } from '../context/AuthContext';
+// import AuthDebug from '../components/debug/AuthDebug'; // Descomentar para depuración
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -13,7 +15,20 @@ const MainLayout: FC<MainLayoutProps> = memo(({
   children, 
   title = 'Gerencia de Administración Tributaria'
 }) => {
+  const { loading, isAuthenticated } = useAuthContext();
   
+  // Para depuración
+  useEffect(() => {
+    console.log('MainLayout rendered', { loading, isAuthenticated });
+  }, [loading, isAuthenticated]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
 
   return (
     <ThemeProvider>
@@ -32,6 +47,9 @@ const MainLayout: FC<MainLayoutProps> = memo(({
               {children}
             </main>
           </div>
+          
+          {/* Componente de depuración */}
+          {/* <AuthDebug /> */}
         </div>
       </SidebarProvider>
     </ThemeProvider>

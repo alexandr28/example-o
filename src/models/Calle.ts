@@ -1,3 +1,4 @@
+// src/models/Calle.ts
 // Enumeración para tipos de vía
 export enum TipoVia {
   AVENIDA = 'avenida',
@@ -12,11 +13,11 @@ export enum TipoVia {
 // Interfaz para la entidad Calle
 export interface Calle {
   id: number;
-  tipoVia: TipoVia | string;
+  tipoVia: string;
   nombre: string;
   estado?: boolean;
-  fechaCreacion?: Date;
-  fechaModificacion?: Date;
+  fechaCreacion?: string | Date;
+  fechaModificacion?: string | Date;
   usuarioCreacion?: string;
   usuarioModificacion?: string;
 }
@@ -28,7 +29,7 @@ export type CalleFormData = Omit<Calle, 'id' | 'estado' | 'fechaCreacion' | 'fec
 export const formatearNombreCalle = (calle: Calle): string => {
   let prefijo = '';
   
-  switch (calle.tipoVia) {
+  switch (calle.tipoVia.toLowerCase()) {
     case TipoVia.AVENIDA:
       prefijo = 'Av. ';
       break;
