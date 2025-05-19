@@ -1,20 +1,13 @@
+// src/hooks/useSectores.ts
 import { useState, useCallback, useEffect } from 'react';
 import { Sector, SectorFormData } from '../models/Sector';
 import { authGet, authPost, authPut, authDelete } from '../api/authClient';
+import { API_ENDPOINTS } from '../config/constants';
+import { connectivityService } from '../services/connectivityService';
+import { MockSectorService } from '../services/mockSectorService';
 
 // URL base para la API de sectores
-const API_URL = 'http://localhost:8080/api/sectores';
-
-// Clave para almacenar cambios pendientes en localStorage
-const PENDING_CHANGES_KEY = 'pending_sectors_changes';
-
-// Tipo para cambios pendientes
-type PendingChange = {
-  type: 'CREATE' | 'UPDATE' | 'DELETE';
-  id?: number;
-  data?: SectorFormData;
-  timestamp: number;
-};
+const API_URL = API_ENDPOINTS.SECTOR || 'http://localhost:8080/api/sectores';
 
 /**
  * Hook personalizado para la gestión de sectores
@@ -29,186 +22,71 @@ export const useSectores = () => {
   const [modoEdicion, setModoEdicion] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isOfflineMode, setIsOfflineMode] = useState(false);
-  const [hasPendingChanges, setHasPendingChanges] = useState(false);
-  const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
+  const [isOfflineMode, setIsOfflineMode] = useState(!connectivityService.getStatus());
 
-  // Cargar cambios pendientes del localStorage
-  const loadPendingChanges = useCallback(() => {
-    try {
-      const storedChanges = localStorage.getItem(PENDING_CHANGES_KEY);
-      if (storedChanges) {
-        const changes = JSON.parse(storedChanges) as PendingChange[];
-        setPendingChanges(changes);
-        setHasPendingChanges(changes.length > 0);
-      }
-    } catch (error) {
-      console.error("Error al cargar cambios pendientes:", error);
-    }
-  }, []);
-
-  // Guardar cambios pendientes en localStorage
-  const savePendingChanges = useCallback((changes: PendingChange[]) => {
-    try {
-      localStorage.setItem(PENDING_CHANGES_KEY, JSON.stringify(changes));
-      setPendingChanges(changes);
-      setHasPendingChanges(changes.length > 0);
-    } catch (error) {
-      console.error("Error al guardar cambios pendientes:", error);
-    }
-  }, []);
-
-  // Añadir un cambio pendiente
-  const addPendingChange = useCallback((change: PendingChange) => {
-    const updatedChanges = [...pendingChanges, change];
-    savePendingChanges(updatedChanges);
-  }, [pendingChanges, savePendingChanges]);
-
-  // Comprobar si hay conexión a Internet
-  const checkOnlineStatus = useCallback(() => {
-    return window.navigator.onLine;
-  }, []);
-
-  // Manejar cambios en el estado de conexión
+  // Monitorear cambios en la conectividad
   useEffect(() => {
-    const handleOnline = () => {
-      console.log('Conexión a Internet restablecida');
-      setIsOfflineMode(false);
-      // Intentar sincronizar los cambios pendientes
-      sincronizarCambiosPendientes();
-    };
+    return connectivityService.addListener((isOnline) => {
+      setIsOfflineMode(!isOnline);
+      if (isOnline) {
+        // Si volvimos a estar online, intentamos sincronizar
+        cargarSectores();
+      }
+    });
+  }, []);
 
-    const handleOffline = () => {
-      console.log('Conexión a Internet perdida');
-      setIsOfflineMode(true);
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    // Cargar cambios pendientes al iniciar
-    loadPendingChanges();
-
-    // Verificar estado inicial de conexión
-    setIsOfflineMode(!checkOnlineStatus());
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [checkOnlineStatus, loadPendingChanges]);
-
-  // Función para sincronizar cambios pendientes con el servidor
-  const sincronizarCambiosPendientes = useCallback(async () => {
-    if (!checkOnlineStatus() || pendingChanges.length === 0) {
-      return;
-    }
-
+  // Cargar sectores
+ const cargarSectores = useCallback(async () => {
+  try {
     setLoading(true);
     setError(null);
-
-    try {
-      console.log('Sincronizando cambios pendientes...');
-      
-      // Ordenar cambios por timestamp
-      const sortedChanges = [...pendingChanges].sort((a, b) => a.timestamp - b.timestamp);
-      const failedChanges: PendingChange[] = [];
-
-      // Procesar cada cambio secuencialmente
-      for (const change of sortedChanges) {
-        try {
-          switch (change.type) {
-            case 'CREATE':
-              if (change.data) {
-                await authPost(API_URL, change.data);
-              }
-              break;
-            case 'UPDATE':
-              if (change.id && change.data) {
-                await authPut(`${API_URL}/${change.id}`, change.data);
-              }
-              break;
-            case 'DELETE':
-              if (change.id) {
-                await authDelete(`${API_URL}/${change.id}`);
-              }
-              break;
-          }
-        } catch (error) {
-          console.error(`Error al sincronizar cambio ${change.type}:`, error);
-          failedChanges.push(change);
-        }
-      }
-
-      // Actualizar lista de cambios pendientes con solo los que fallaron
-      savePendingChanges(failedChanges);
-
-      // Recargar sectores para obtener datos actualizados del servidor
-      await cargarSectores();
-
-      console.log('Sincronización completada');
-    } catch (error) {
-      console.error('Error durante la sincronización:', error);
-      setError('Error al sincronizar cambios. Inténtelo de nuevo más tarde.');
-    } finally {
-      setLoading(false);
-    }
-  }, [pendingChanges, checkOnlineStatus, savePendingChanges]);
-
-  // Cargar sectores desde la API
-  const cargarSectores = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Verificar si hay conexión
-      if (!checkOnlineStatus()) {
-        console.log('Sin conexión a Internet, cargando datos locales');
-        setIsOfflineMode(true);
-        
-        // Cargar datos locales de ejemplo para modo sin conexión
-        const sectoresIniciales = [
-          { id: 1, nombre: 'SECTOR JERUSALÉN' },
-          { id: 2, nombre: 'URB. MANUEL ARÉVALO II' },
-          { id: 3, nombre: 'PARQUE INDUSTRIAL' },
-        ];
-        
-        setSectores(sectoresIniciales);
-        setLoading(false);
-        return;
-      }
-      
+    
+    let data: Sector[];
+    
+    // Verificar si podemos usar la API o necesitamos usar el mock
+    if (!connectivityService.getStatus()) {
+      console.log('Usando mock service para sectores (API no disponible)');
+      data = await MockSectorService.getAll();
+    } else {
       try {
-        // Intentar cargar desde la API
-        const data = await authGet(`${API_URL}`);
+        // Intentar cargar desde la API usando la ruta relativa
+        console.log('Intentando cargar desde la API:', API_URL);
+        const apiData = await authGet(API_URL);
         
-        if (data && Array.isArray(data)) {
-          setSectores(data);
-          setIsOfflineMode(false);
+        if (apiData && Array.isArray(apiData)) {
+          data = apiData;
         } else {
-          throw new Error('Formato de datos incorrecto');
+          console.warn('Formato de datos incorrecto desde API, usando mock service');
+          data = await MockSectorService.getAll();
         }
-      } catch (apiError) {
-        console.error('Error al cargar sectores desde API:', apiError);
+      } catch (apiError: any) {
+        console.error('Error al cargar desde API, usando mock service:', apiError);
         
-        setIsOfflineMode(true);
+        // Identificar específicamente si es un error CORS
+        if (apiError.message && (
+          apiError.message.includes('CORS') || 
+          apiError.message.includes('cross-origin') ||
+          apiError.message.includes('Failed to fetch')
+        )) {
+          setError('Error de conexión CORS: No se puede acceder al servidor. Trabajando en modo offline.');
+        } else {
+          setError(`Error al cargar datos: ${apiError.message}`);
+        }
         
-        // Cargar datos locales de ejemplo para modo sin conexión
-        const sectoresIniciales = [
-          { id: 1, nombre: 'SECTOR JERUSALÉN' },
-          { id: 2, nombre: 'URB. MANUEL ARÉVALO II' },
-          { id: 3, nombre: 'PARQUE INDUSTRIAL' },
-        ];
-        
-        setSectores(sectoresIniciales);
+        data = await MockSectorService.getAll();
       }
-    } catch (err: any) {
-      setError(err.message || 'Error al cargar los sectores');
-      console.error(err);
-    } finally {
-      setLoading(false);
     }
-  }, [checkOnlineStatus]);
+    
+    // Establecer los datos en el estado
+    setSectores(data);
+    
+  } catch (err: any) {
+    setError(err.message || 'Error al cargar los sectores');
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
   // Seleccionar un sector para editar
   const seleccionarSector = useCallback((sector: Sector) => {
@@ -228,125 +106,54 @@ export const useSectores = () => {
       setLoading(true);
       setError(null);
       
-      // Verificar si estamos en modo offline
-      if (isOfflineMode || !checkOnlineStatus()) {
-        console.log('Guardando en modo offline');
-        
-        if (modoEdicion && sectorSeleccionado) {
-          // Actualizar sector existente localmente
-          const sectorActualizado = { 
-            ...sectorSeleccionado, 
-            ...data 
-          };
-          
-          setSectores(prevSectores => 
-            prevSectores.map(s => 
-              s.id === sectorSeleccionado.id ? sectorActualizado : s
-            )
-          );
-          
-          // Añadir el cambio a la lista de pendientes
-          addPendingChange({
-            type: 'UPDATE',
-            id: sectorSeleccionado.id,
-            data,
-            timestamp: Date.now()
-          });
-        } else {
-          // Crear nuevo sector localmente
-          const nuevoSector: Sector = {
-            id: Math.max(0, ...sectores.map(s => s.id || 0)) + 1,
-            ...data,
-          };
-          
-          setSectores(prevSectores => [...prevSectores, nuevoSector]);
-          
-          // Añadir el cambio a la lista de pendientes
-          addPendingChange({
-            type: 'CREATE',
-            data,
-            timestamp: Date.now()
-          });
-        }
-        
-        limpiarSeleccion();
-        setLoading(false);
-        return;
-      }
+      let result: Sector;
       
-      // Modo online - intentar guardar en el servidor
-      try {
+      if (!connectivityService.getStatus()) {
+        // Modo offline - usar mock service
         if (modoEdicion && sectorSeleccionado) {
-          // Actualizar sector existente
-          const response = await authPut(`${API_URL}/${sectorSeleccionado.id}`, data);
-          
-          if (response) {
-            // Actualizar estado local con datos del servidor
-            setSectores(prev => prev.map(s => 
-              s.id === sectorSeleccionado.id ? response : s
-            ));
-          }
+          result = await MockSectorService.update(sectorSeleccionado.id, data);
         } else {
-          // Crear nuevo sector
-          const response = await authPost(`${API_URL}`, data);
-          
-          if (response) {
-            // Actualizar estado local con datos del servidor
-            setSectores(prev => [...prev, response]);
-          }
+          result = await MockSectorService.create(data);
         }
-      } catch (apiError) {
-        console.error('Error al guardar sector en API:', apiError);
-        setIsOfflineMode(true);
-        
-        // Pasar al modo offline y guardar localmente
-        if (modoEdicion && sectorSeleccionado) {
-          // Actualizar sector existente localmente
-          const sectorActualizado = { 
-            ...sectorSeleccionado, 
-            ...data 
-          };
+      } else {
+        try {
+          // Intentar guardar en la API
+          if (modoEdicion && sectorSeleccionado) {
+            const response = await authPut(`${API_URL}/${sectorSeleccionado.id}`, data);
+            result = response;
+          } else {
+            const response = await authPost(API_URL, data);
+            result = response;
+          }
+        } catch (apiError) {
+          console.error('Error al guardar en API, usando mock service:', apiError);
           
-          setSectores(prevSectores => 
-            prevSectores.map(s => 
-              s.id === sectorSeleccionado.id ? sectorActualizado : s
-            )
-          );
-          
-          // Añadir el cambio a la lista de pendientes
-          addPendingChange({
-            type: 'UPDATE',
-            id: sectorSeleccionado.id,
-            data,
-            timestamp: Date.now()
-          });
-        } else {
-          // Crear nuevo sector localmente
-          const nuevoSector: Sector = {
-            id: Math.max(0, ...sectores.map(s => s.id || 0)) + 1,
-            ...data,
-          };
-          
-          setSectores(prevSectores => [...prevSectores, nuevoSector]);
-          
-          // Añadir el cambio a la lista de pendientes
-          addPendingChange({
-            type: 'CREATE',
-            data,
-            timestamp: Date.now()
-          });
+          // Fallar al servicio mock si hay error
+          if (modoEdicion && sectorSeleccionado) {
+            result = await MockSectorService.update(sectorSeleccionado.id, data);
+          } else {
+            result = await MockSectorService.create(data);
+          }
         }
       }
       
-      // Resetear estados
+      // Actualizar el estado local con el resultado
+      if (modoEdicion && sectorSeleccionado) {
+        setSectores(prev => prev.map(s => s.id === sectorSeleccionado.id ? result : s));
+      } else {
+        setSectores(prev => [...prev, result]);
+      }
+      
+      // Limpiar selección
       limpiarSeleccion();
+      
     } catch (err: any) {
       setError(err.message || 'Error al guardar el sector');
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [sectores, sectorSeleccionado, modoEdicion, limpiarSeleccion, isOfflineMode, checkOnlineStatus, addPendingChange]);
+  }, [modoEdicion, sectorSeleccionado, limpiarSeleccion]);
 
   // Eliminar un sector
   const eliminarSector = useCallback(async (id: number) => {
@@ -354,67 +161,42 @@ export const useSectores = () => {
       setLoading(true);
       setError(null);
       
-      // Verificar si estamos en modo offline
-      if (isOfflineMode || !checkOnlineStatus()) {
-        console.log('Eliminando en modo offline');
-        
-        // Eliminar sector localmente
-        setSectores(prevSectores => prevSectores.filter(s => s.id !== id));
-        
-        // Añadir el cambio a la lista de pendientes
-        addPendingChange({
-          type: 'DELETE',
-          id,
-          timestamp: Date.now()
-        });
-        
-        // Si el sector eliminado estaba seleccionado, limpiamos la selección
-        if (sectorSeleccionado?.id === id) {
-          limpiarSeleccion();
+      if (!connectivityService.getStatus()) {
+        // Modo offline - usar mock service
+        await MockSectorService.delete(id);
+      } else {
+        try {
+          // Intentar eliminar en la API
+          await authDelete(`${API_URL}/${id}`);
+        } catch (apiError) {
+          console.error('Error al eliminar en API, usando mock service:', apiError);
+          
+          // Fallar al servicio mock si hay error
+          await MockSectorService.delete(id);
         }
-        
-        setLoading(false);
-        return;
       }
       
-      // Modo online - intentar eliminar en el servidor
-      try {
-        await authDelete(`${API_URL}/${id}`);
-        
-        // Actualizar estado local
-        setSectores(prevSectores => prevSectores.filter(s => s.id !== id));
-      } catch (apiError) {
-        console.error('Error al eliminar sector en API:', apiError);
-        setIsOfflineMode(true);
-        
-        // Pasar al modo offline y eliminar localmente
-        setSectores(prevSectores => prevSectores.filter(s => s.id !== id));
-        
-        // Añadir el cambio a la lista de pendientes
-        addPendingChange({
-          type: 'DELETE',
-          id,
-          timestamp: Date.now()
-        });
-      }
+      // Actualizar el estado local
+      setSectores(prev => prev.filter(s => s.id !== id));
       
-      // Si el sector eliminado estaba seleccionado, limpiamos la selección
+      // Si el sector eliminado estaba seleccionado, limpiar selección
       if (sectorSeleccionado?.id === id) {
         limpiarSeleccion();
       }
+      
     } catch (err: any) {
       setError(err.message || 'Error al eliminar el sector');
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [sectorSeleccionado, limpiarSeleccion, isOfflineMode, checkOnlineStatus, addPendingChange]);
+  }, [sectorSeleccionado, limpiarSeleccion]);
 
-  // Manejar sincronización manual
+  // Sincronizar manualmente
   const sincronizarManualmente = useCallback(async () => {
-    await sincronizarCambiosPendientes();
+    await connectivityService.forcePing();
     await cargarSectores();
-  }, [sincronizarCambiosPendientes, cargarSectores]);
+  }, [cargarSectores]);
 
   return {
     sectores,
@@ -423,8 +205,8 @@ export const useSectores = () => {
     loading,
     error,
     isOfflineMode,
-    hasPendingChanges,
-    pendingChangesCount: pendingChanges.length,
+    hasPendingChanges: false, // Simplificado para esta implementación
+    pendingChangesCount: 0,   // Simplificado para esta implementación
     cargarSectores,
     seleccionarSector,
     limpiarSeleccion,

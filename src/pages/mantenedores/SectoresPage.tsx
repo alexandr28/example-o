@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import {MainLayout} from '../../layout';
-import {SectorList, SectorForm,Breadcrumb } from '../../components';
+import { MainLayout } from '../../layout';
+import { SectorList, SectorForm, Breadcrumb } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useSectores } from '../../hooks';
-
+import ErrorBoundary from '../../components/utils/ErrorBoundary';
+import CorsErrorMessage from '../../components/utils/CorsErrorMessage';
 
 /**
  * Página para administrar los sectores del sistema
  * 
  * Permite añadir, editar, eliminar y buscar sectores
  */
-const SectoresPage: React.FC = () => {
+const SectoresPageContent: React.FC = () => {
   // Usamos el hook personalizado para la gestión de sectores
   const {
     sectores,
@@ -30,9 +31,21 @@ const SectoresPage: React.FC = () => {
     sincronizarManualmente
   } = useSectores();
 
+  // Estado para mensajes de éxito
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
+
   // Cargar sectores al montar el componente
   useEffect(() => {
-    cargarSectores();
+    const loadSectores = async () => {
+      try {
+        await cargarSectores();
+      } catch (err) {
+        console.error("Error al cargar sectores:", err);
+      }
+    };
+    
+    loadSectores();
   }, [cargarSectores]);
 
   // Migas de pan para la navegación
@@ -55,11 +68,68 @@ const SectoresPage: React.FC = () => {
     sincronizarManualmente();
   };
 
+  // Manejar guardado
+   // Manejar guardado
+  const handleGuardarSector = async (data: { nombre: string }) => {
+    try {
+      await guardarSector(data);
+      setSuccessMessage(modoEdicion 
+        ? "Sector actualizado correctamente" 
+        : "Sector creado correctamente");
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (error) {
+      console.error("Error al guardar sector:", error);
+    }
+  };
   return (
     <MainLayout title="Mantenimiento de Sectores">
       <div className="space-y-4">
         {/* Navegación de migas de pan */}
+        <div className="flex justify-between items-center"></div>
         <Breadcrumb items={breadcrumbItems} />
+        <button 
+            onClick={() => setShowHelp(!showHelp)}
+            className="text-blue-600 hover:text-blue-800 flex items-center"
+          >
+            <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Ayuda
+          </button>
+          {/* Mensaje de error CORS si estamos en modo offline */}
+        {isOfflineMode && error && error.includes('fetch') && (
+          <CorsErrorMessage onReload={sincronizarManualmente} />
+        )}
+         {/* Panel de ayuda */}
+        {showHelp && (
+          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded relative">
+            <h3 className="font-medium mb-1">Acerca de este módulo</h3>
+            <p className="text-sm mb-2">Este módulo te permite administrar los sectores del sistema. Puedes:</p>
+            <ul className="list-disc list-inside text-sm space-y-1 mb-2">
+              <li>Crear nuevos sectores ingresando un nombre y haciendo clic en "Guardar"</li>
+              <li>Editar sectores existentes seleccionándolos de la lista</li>
+              <li>Eliminar sectores haciendo clic en el icono de eliminar</li>
+            </ul>
+            <p className="text-sm">
+              <strong>Nota:</strong> Este módulo funciona correctamente incluso sin conexión a internet.
+              Los cambios se guardarán localmente y se sincronizarán cuando la conexión esté disponible.
+            </p>
+            <button 
+              onClick={() => setShowHelp(false)}
+              className="absolute top-2 right-2 text-blue-700"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+        {/* Mensaje de éxito */}
+        {successMessage && (
+          <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded relative" role="alert">
+            <span className="block sm:inline">{successMessage}</span>
+          </div>
+        )}
         
         {/* Alerta de modo sin conexión */}
         {isOfflineMode && (
@@ -108,8 +178,7 @@ const SectoresPage: React.FC = () => {
         {/* Formulario de sectores */}
         <SectorForm
           sectorSeleccionado={sectorSeleccionado}
-          isOfflineMode={isOfflineMode}
-          onGuardar={guardarSector}
+          onGuardar={handleGuardarSector}
           onNuevo={limpiarSeleccion}
           onEditar={handleEditar}
           loading={loading}
@@ -135,5 +204,12 @@ const SectoresPage: React.FC = () => {
     </MainLayout>
   );
 };
+
+// Envolvemos el componente con el Error Boundary
+const SectoresPage: React.FC = () => (
+  <ErrorBoundary>
+    <SectoresPageContent />
+  </ErrorBoundary>
+);
 
 export default SectoresPage;

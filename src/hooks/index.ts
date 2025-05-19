@@ -1,5 +1,5 @@
 // Reexportamos todos los hooks desde este archivo
-export {useContribuyente} from './useContribuyente';
+export { useContribuyenteForm } from './useContribuyente';
 export { useCalles } from './useCalles';
 export { useSectores } from './useSectores';
 export { useBarrios } from './useBarrios';

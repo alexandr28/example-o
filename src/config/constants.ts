@@ -14,13 +14,13 @@ export const AUTH_ENDPOINTS = {
 // URLs de los endpoints
 export const API_ENDPOINTS = {
   // Mantenedores
-  BARRIO: `${API_BASE_URL}/barrio`,
-  SECTOR: `${API_BASE_URL}/sector`,
-  CALLE: `${API_BASE_URL}/calle`,
-  DIRECCION: `${API_BASE_URL}/direccion`,
+  BARRIO: `${API_BASE_URL}${API_PREFIX}/barrio`,
+  SECTOR: `${API_BASE_URL}${API_PREFIX}/sector`,
+  CALLE: `${API_BASE_URL}${API_PREFIX}/calle`,
+  DIRECCION: `${API_BASE_URL}${API_PREFIX}/direccion`,
   
   // Contribuyentes
-  CONTRIBUYENTE: `${API_BASE_URL}/contribuyente`,
+  CONTRIBUYENTE: `${API_BASE_URL}/api/contribuyente`,
   
   // Predio
   PREDIO: `${API_BASE_URL}/predio`,

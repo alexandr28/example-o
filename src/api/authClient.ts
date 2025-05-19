@@ -63,26 +63,10 @@ const attemptTokenRenewal = async (): Promise<boolean> => {
  */
 export const authGet = async (url: string, retry = true) => {
   try {
+    console.log(`Realizando petición GET a: ${url}`);
     const token = getAuthToken();
     
-    // Verificar si el token ha expirado
-    if (token && isTokenExpired() && retry) {
-      // Intentar renovar el token
-      const renewed = await attemptTokenRenewal();
-      
-      if (renewed) {
-        // Si se renovó correctamente, intentar nuevamente la petición
-        return authGet(url, false);
-      } else {
-        // Si no se pudo renovar, redirigir al login
-        localStorage.removeItem('auth_user');
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_token_expiry');
-        window.location.href = '/login';
-        throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
-      }
-    }
-    
+    // Usamos fetch con la URL proporcionada (relativa)
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -92,24 +76,6 @@ export const authGet = async (url: string, retry = true) => {
     });
     
     if (!response.ok) {
-      // Si la respuesta es 401 Unauthorized, podríamos manejar el logout
-      if (response.status === 401 && retry) {
-        // Intentar renovar el token
-        const renewed = await attemptTokenRenewal();
-        
-        if (renewed) {
-          // Si se renovó correctamente, intentar nuevamente la petición
-          return authGet(url, false);
-        } else {
-          // Si no se pudo renovar, redirigir al login
-          localStorage.removeItem('auth_user');
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('auth_token_expiry');
-          window.location.href = '/login';
-          throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
-        }
-      }
-      
       throw new Error(`Error en la petición: ${response.statusText}`);
     }
     
@@ -118,6 +84,7 @@ export const authGet = async (url: string, retry = true) => {
     return handleFetchError(error, url, 'GET');
   }
 };
+
 
 /**
  * Realiza una petición POST autenticada
