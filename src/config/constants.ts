@@ -1,20 +1,20 @@
-/**
- * Constantes para configuración de la aplicación
- */
-
-// URL base de la API
+// src/config/constants.ts
+// URL base de la API - mantenemos por compatibilidad con código existente
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 export const API_PREFIX = '';
+
+// Actualizar endpoints de autenticación para usar rutas relativas 
+// (aprovechando el proxy configurado en vite.config.ts)
 export const AUTH_ENDPOINTS = {
-  LOGIN: `${API_BASE_URL}/auth/login`,
-  LOGOUT: `${API_BASE_URL}/auth/logout`,
-  REFRESH: `${API_BASE_URL}/auth/refresh`,
+  LOGIN: `/auth/login`,
+  LOGOUT: `/auth/logout`,
+  REFRESH: `/auth/refresh`,
 };
 
-// URLs de los endpoints
+// Resto del archivo sin cambios
 export const API_ENDPOINTS = {
   // Mantenedores
-   BARRIO: `${API_BASE_URL}${API_PREFIX}/barrio`,
+  BARRIO: `${API_BASE_URL}${API_PREFIX}/barrio`,
   SECTOR: `${API_BASE_URL}${API_PREFIX}/sector`,
   CALLE: `${API_BASE_URL}${API_PREFIX}/calle`,
   DIRECCION: `${API_BASE_URL}${API_PREFIX}/direccion`,
@@ -34,12 +34,3 @@ export const API_ENDPOINTS = {
   ALCABALA: `${API_BASE_URL}/alcabala`,
   DEPRECIACION: `${API_BASE_URL}/depreciacion`,
 };
-
-// Valores para paginación
-export const PAGINATION = {
-  DEFAULT_PAGE_SIZE: 10,
-  DEFAULT_PAGE: 1,
-};
-
-// Tiempo de expiración del token (en milisegundos)
-export const TOKEN_EXPIRY_TIME = 20 * 60 * 1000; // 20 minutos
