@@ -22,6 +22,7 @@ import { ThemeProvider } from '../context/ThemeContext';
 import LoginPage from '../pages/Login/LoginPage';
 import { AuthProvider } from '../context/AuthContext';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
+import AuthHandler from '../components/auth/AuthHandler';
 
 const AppRouter: React.FC = () => {
   return (
@@ -31,6 +32,8 @@ const AppRouter: React.FC = () => {
           {/* Añadir esto para depuración básica */}
           <SimpleDebug />
           <Router>
+            {/* Este componente maneja la autenticación automática y notificaciones */}
+            <AuthHandler />
             <Routes>
               {/* Ruta pública - Login */}
               <Route path="/login" element={<LoginPage />} />

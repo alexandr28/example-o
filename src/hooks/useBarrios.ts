@@ -1,21 +1,12 @@
+// src/hooks/useBarrios.ts
 import { useState, useCallback, useEffect } from 'react';
-import { Barrio, BarrioFormData, Sector } from '../models';
-import { API_BASE_URL } from './../config/constants';
-import { authGet, authPost, authPut, authDelete } from '../api/authClient';
-import { 
-  ApiResponse, 
-  ApiErrorResponse,
-
-} from '../types/apiTypes';
-
-// URLs de los endpoints
-const BARRIOS_API_URL = `${API_BASE_URL}/barrios`;
-const SECTORES_API_URL = `${API_BASE_URL}/sectores`;
+import { Barrio, BarrioFormData, Sector } from '../models/';
+import { BarrioService } from '../services/barrioService';
+import { connectivityService } from '../services/connectivityService';
 
 /**
  * Hook personalizado para la gestión de barrios
- * 
- * Proporciona funcionalidades para listar, crear, actualizar y eliminar barrios
+ * Versión modificada para no usar token
  */
 export const useBarrios = () => {
   // Estados
@@ -33,27 +24,26 @@ export const useBarrios = () => {
       setLoading(true);
       setError(null);
       
-      // Petición a la API utilizando el cliente autenticado
-      const response = await authGet(`${BARRIOS_API_URL}`) as ApiResponse<Barrio[]>;
-      
-      if (response && response.success === true) {
-        setBarrios(response.data);
-      } else {
-        const errorResponse = response as ApiErrorResponse;
-        throw new Error(errorResponse?.message || 'Error al cargar los barrios');
-      }
-    } catch (err: unknown) {
-      const error = err as Error;
-      setError(error.message || 'Error al cargar los barrios');
-      console.error('Error en cargarBarrios:', error);
-      
-      // Modo fallback: Si hay un error de red, usar datos de caché local si existen
-      const cachedBarrios = localStorage.getItem('cachedBarrios');
-      if (cachedBarrios) {
-        try {
-          setBarrios(JSON.parse(cachedBarrios));
-        } catch (cacheErr) {
-          console.error('Error al cargar barrios desde caché:', cacheErr);
+      // Petición a la API sin autenticación
+      try {
+        const barrios = await BarrioService.getAll();
+        setBarrios(barrios);
+        
+        // Actualizar caché local
+        localStorage.setItem('cachedBarrios', JSON.stringify(barrios));
+      } catch (err: unknown) {
+        const error = err as Error;
+        setError(error.message || 'Error al cargar los barrios');
+        console.error('Error en cargarBarrios:', error);
+        
+        // Modo fallback: Si hay un error de red, usar datos de caché local si existen
+        const cachedBarrios = localStorage.getItem('cachedBarrios');
+        if (cachedBarrios) {
+          try {
+            setBarrios(JSON.parse(cachedBarrios));
+          } catch (cacheErr) {
+            console.error('Error al cargar barrios desde caché:', cacheErr);
+          }
         }
       }
     } finally {
@@ -67,27 +57,33 @@ export const useBarrios = () => {
       setLoading(true);
       setError(null);
       
-      // Petición a la API utilizando el cliente autenticado
-      const response = await authGet(`${SECTORES_API_URL}`) as ApiResponse<Sector[]>;
-      
-      if (response && response.success === true) {
-        setSectores(response.data);
-      } else {
-        const errorResponse = response as ApiErrorResponse;
-        throw new Error(errorResponse?.message || 'Error al cargar los sectores');
-      }
-    } catch (err: unknown) {
-      const error = err as Error;
-      setError(error.message || 'Error al cargar los sectores');
-      console.error('Error en cargarSectores:', error);
-      
-      // Modo fallback: Si hay un error de red, usar datos de caché local si existen
-      const cachedSectores = localStorage.getItem('cachedSectores');
-      if (cachedSectores) {
-        try {
-          setSectores(JSON.parse(cachedSectores));
-        } catch (cacheErr) {
-          console.error('Error al cargar sectores desde caché:', cacheErr);
+      // Petición a la API sin autenticación
+      try {
+        // Usar fetch directamente porque estamos modificando los servicios para no usar autenticación
+        const response = await fetch('/api/sector');
+        
+        if (!response.ok) {
+          throw new Error(`Error HTTP: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setSectores(data);
+        
+        // Actualizar caché local
+        localStorage.setItem('cachedSectores', JSON.stringify(data));
+        } catch (err: unknown) {
+        const error = err as Error;
+        setError(error.message || 'Error al cargar los sectores');
+        console.error('Error en cargarSectores:', error);
+        
+        // Modo fallback: Si hay un error de red, usar datos de caché local si existen
+        const cachedSectores = localStorage.getItem('cachedSectores');
+        if (cachedSectores) {
+          try {
+            setSectores(JSON.parse(cachedSectores));
+          } catch (cacheErr) {
+            console.error('Error al cargar sectores desde caché:', cacheErr);
+          }
         }
       }
     } finally {
@@ -160,48 +156,43 @@ export const useBarrios = () => {
         sectorId: parseInt(data.sectorId.toString()) // Aseguramos que sectorId sea un número
       };
       
-      let response: ApiResponse<Barrio>;
+      let nuevoBarrio: Barrio;
       
       if (modoEdicion && barrioSeleccionado) {
-        // Actualizar barrio existente mediante PUT
-        response = await authPut(`${BARRIOS_API_URL}/${barrioSeleccionado.id}`, barrioData) as ApiResponse<Barrio>;
-        
-        if (response && response.success === true) {
+        // Actualizar barrio existente mediante el servicio
+        try {
+          nuevoBarrio = await BarrioService.update(barrioSeleccionado.id, barrioData);
+          
           // Actualizamos el estado local con los datos devueltos por la API
           setBarrios(prevBarrios => 
             prevBarrios.map(b => 
               b.id === barrioSeleccionado.id 
-                ? { ...response.data, sector: sectorSeleccionado } 
+                ? { ...nuevoBarrio, sector: sectorSeleccionado } 
                 : b
             )
           );
-        } else {
-          const errorResponse = response as ApiErrorResponse;
-          throw new Error(errorResponse?.message || 'Error al actualizar el barrio');
+        } catch (updateError) {
+          console.error('Error al actualizar barrio:', updateError);
+          throw new Error('Error al actualizar el barrio');
         }
       } else {
-        // Crear nuevo barrio mediante POST
-        response = await authPost(BARRIOS_API_URL, barrioData) as ApiResponse<Barrio>;
-        
-        if (response && response.success === true) {
-          // Añadimos el nuevo barrio al estado local con los datos devueltos por la API
-          const nuevoBarrio = {
-            ...response.data,
-            sector: sectorSeleccionado
-          };
+        // Crear nuevo barrio mediante el servicio
+        try {
+          nuevoBarrio = await BarrioService.create(barrioData);
           
-          setBarrios(prevBarrios => [...prevBarrios, nuevoBarrio]);
-        } else {
-          const errorResponse = response as ApiErrorResponse;
-          throw new Error(errorResponse?.message || 'Error al crear el barrio');
+          // Añadimos el nuevo barrio al estado local con los datos devueltos por la API
+          setBarrios(prevBarrios => [
+            ...prevBarrios, 
+            { ...nuevoBarrio, sector: sectorSeleccionado }
+          ]);
+        } catch (createError) {
+          console.error('Error al crear barrio:', createError);
+          throw new Error('Error al crear el barrio');
         }
       }
       
       // Actualizar caché local
-      const updatedBarriosResponse = await authGet(BARRIOS_API_URL) as ApiResponse<Barrio[]>;
-      if (updatedBarriosResponse && updatedBarriosResponse.success === true) {
-        localStorage.setItem('cachedBarrios', JSON.stringify(updatedBarriosResponse.data));
-      }
+      await cargarBarrios();
       
       // Resetear estados
       limpiarSeleccion();
@@ -212,7 +203,7 @@ export const useBarrios = () => {
     } finally {
       setLoading(false);
     }
-  }, [barrios, barrioSeleccionado, modoEdicion, limpiarSeleccion, sectores]);
+  }, [barrios, barrioSeleccionado, modoEdicion, limpiarSeleccion, sectores, cargarBarrios]);
 
   // Eliminar un barrio
   const eliminarBarrio = useCallback(async (id: number) => {
@@ -221,25 +212,22 @@ export const useBarrios = () => {
       setError(null);
       
       // Petición DELETE a la API
-      const response = await authDelete(`${BARRIOS_API_URL}/${id}`) as ApiResponse<Record<string, never>>;
-      
-      if (response && response.success === true) {
+      try {
+        await BarrioService.delete(id);
+        
         // Actualizamos el estado local removiendo el barrio eliminado
         setBarrios(prevBarrios => prevBarrios.filter(b => b.id !== id));
         
         // Actualizar caché local
-        const updatedBarriosResponse = await authGet(BARRIOS_API_URL) as ApiResponse<Barrio[]>;
-        if (updatedBarriosResponse && updatedBarriosResponse.success === true) {
-          localStorage.setItem('cachedBarrios', JSON.stringify(updatedBarriosResponse.data));
-        }
+        await cargarBarrios();
         
         // Si el barrio eliminado estaba seleccionado, limpiamos la selección
         if (barrioSeleccionado?.id === id) {
           limpiarSeleccion();
         }
-      } else {
-        const errorResponse = response as ApiErrorResponse;
-        throw new Error(errorResponse?.message || 'Error al eliminar el barrio');
+      } catch (deleteError) {
+        console.error('Error al eliminar barrio:', deleteError);
+        throw new Error('Error al eliminar el barrio');
       }
     } catch (err: unknown) {
       const error = err as Error;
@@ -248,7 +236,7 @@ export const useBarrios = () => {
     } finally {
       setLoading(false);
     }
-  }, [barrioSeleccionado, limpiarSeleccion]);
+  }, [barrioSeleccionado, limpiarSeleccion, cargarBarrios]);
 
   // Obtener barrio por ID
   const obtenerBarrioPorId = useCallback(async (id: number) => {
@@ -257,34 +245,29 @@ export const useBarrios = () => {
       setError(null);
       
       // Petición GET a la API para obtener un barrio específico
-      const response = await authGet(`${BARRIOS_API_URL}/${id}`) as ApiResponse<Barrio>;
-      
-      if (response && response.success === true) {
+      try {
+        const barrio = await BarrioService.getById(id);
+        
         // Buscar el sector correspondiente para incluirlo en el objeto barrio
-        const sector = sectores.find(s => s.id === response.data.sectorId);
+        const sector = sectores.find(s => s.id === barrio.sectorId);
         
         // Retornar el barrio con su sector asociado
         return {
-          ...response.data,
+          ...barrio,
           sector
         };
-      } else {
-        const errorResponse = response as ApiErrorResponse;
-        throw new Error(errorResponse?.message || 'Error al obtener el barrio');
+      } catch (getError) {
+        console.error('Error al obtener barrio por ID:', getError);
+        
+        // Si hay un error, buscar en el estado local
+        return barrios.find(b => b.id === id) || null;
       }
-    } catch (err: unknown) {
-      const error = err as Error;
-      setError(error.message || 'Error al obtener el barrio');
-      console.error('Error en obtenerBarrioPorId:', error);
-      
-      // Si hay un error, buscar en el estado local
-      return barrios.find(b => b.id === id) || null;
     } finally {
       setLoading(false);
     }
   }, [barrios, sectores]);
 
-  // Buscar barrios por término en la API
+  // Búsqueda de barrios
   const buscarBarrios = useCallback(async () => {
     try {
       if (!searchTerm.trim()) {
@@ -296,23 +279,18 @@ export const useBarrios = () => {
       setError(null);
       
       // Petición GET a la API con parámetro de búsqueda
-      const response = await authGet(`${BARRIOS_API_URL}?search=${encodeURIComponent(searchTerm)}`) as ApiResponse<Barrio[]>;
-      
-      if (response && response.success === true) {
+      try {
+        const resultados = await BarrioService.search(searchTerm);
+        
         // Actualizar el estado con los resultados de la búsqueda
-        setBarrios(response.data);
-        return response.data;
-      } else {
-        const errorResponse = response as ApiErrorResponse;
-        throw new Error(errorResponse?.message || 'Error al buscar barrios');
+        setBarrios(resultados);
+        return resultados;
+      } catch (searchError) {
+        console.error('Error al buscar barrios:', searchError);
+        
+        // Si hay error, realizar búsqueda local
+        return filtrarBarriosLocalmente();
       }
-    } catch (err: unknown) {
-      const error = err as Error;
-      setError(error.message || 'Error al buscar barrios');
-      console.error('Error en buscarBarrios:', error);
-      
-      // Si hay un error, realizar búsqueda local
-      return filtrarBarriosLocalmente();
     } finally {
       setLoading(false);
     }

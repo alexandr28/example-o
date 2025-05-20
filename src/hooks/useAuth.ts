@@ -1,4 +1,4 @@
-// Modificación para src/hooks/useAuth.ts
+// src/hooks/useAuth.ts
 import { useState, useCallback, useEffect } from 'react';
 import { AuthCredentials, AuthUser, AuthResult } from '../models/Auth';
 import { AUTH_ENDPOINTS } from '../config/constants';
@@ -8,6 +8,8 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Añadimos el estado para el token en memoria
+  const [authToken, setAuthToken] = useState<string | null>(null);
 
   // Verificar si hay un usuario en el almacenamiento local al cargar
   useEffect(() => {
@@ -17,8 +19,8 @@ export const useAuth = () => {
       const tokenExpiry = localStorage.getItem('auth_token_expiry');
     
       console.log('🔑 Verificando autenticación al iniciar:');
-      console.log('Token almacenado:', storedToken);
-      console.log('Usuario almacenado:', storedUser);
+      console.log('Token almacenado:', storedToken ? 'Presente' : 'No encontrado');
+      console.log('Usuario almacenado:', storedUser ? 'Presente' : 'No encontrado');
       console.log('Expiración:', tokenExpiry ? new Date(tokenExpiry).toLocaleString() : 'No definida');
       
       if (storedUser && storedToken) {
@@ -32,6 +34,7 @@ export const useAuth = () => {
             localStorage.removeItem('auth_token');
             localStorage.removeItem('auth_token_expiry');
             setUser(null);
+            setAuthToken(null); // Limpiar el token en memoria
             setIsAuthenticated(false);
             setError('La sesión ha expirado. Por favor, inicie sesión nuevamente.');
             return;
@@ -42,6 +45,7 @@ export const useAuth = () => {
             ...parsedUser,
             token: storedToken
           });
+          setAuthToken(storedToken); // Guardar el token en memoria
           setIsAuthenticated(true);
           console.log('✅ Sesión restaurada correctamente para:', parsedUser.username);
         } catch (error) {
@@ -49,6 +53,7 @@ export const useAuth = () => {
           localStorage.removeItem('auth_user');
           localStorage.removeItem('auth_token');
           localStorage.removeItem('auth_token_expiry');
+          setAuthToken(null); // Limpiar el token en memoria
         }
       } else {
         console.log('❌ No hay sesión almacenada');
@@ -69,7 +74,7 @@ export const useAuth = () => {
       // Guardar y mostrar credenciales en consola
       console.log('🔐 CREDENCIALES DE LOGIN:');
       console.log('Usuario:', credentials.username);
-      console.log('Contraseña:', credentials.password);
+      console.log('Contraseña:', '********');
       
       // Dirección del API de autenticación - usando ruta relativa para el proxy
       const loginUrl = '/auth/login';
@@ -110,7 +115,7 @@ export const useAuth = () => {
           throw new Error('No se recibió un token válido del servidor');
         }
         
-        console.log('🎫 Token recibido:', token);
+        console.log('🎫 Token recibido:', token.substring(0, 10) + '...');
         
         // Extraer información del usuario
         let userId = '1';
@@ -149,6 +154,7 @@ export const useAuth = () => {
         
         // Actualizar estados
         setUser(user);
+        setAuthToken(token); // Guardar token en memoria
         setIsAuthenticated(true);
         setLoading(false);
         console.log('✅ Login exitoso, usuario:', user.username);
@@ -190,6 +196,7 @@ export const useAuth = () => {
           
           // Actualizar estados
           setUser(user);
+          setAuthToken(mockToken); // Guardar token simulado en memoria
           setIsAuthenticated(true);
           setLoading(false);
           
@@ -219,9 +226,14 @@ export const useAuth = () => {
     localStorage.removeItem('auth_user');
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_token_expiry');
+
+    // Añadir marca de logout explícito (con un tiempo de expiración)
+  localStorage.setItem('explicit_logout', 'true');
+  localStorage.setItem('explicit_logout_time', new Date().toISOString());
     
     // Resetear estados
     setUser(null);
+    setAuthToken(null); // Limpiar token en memoria
     setIsAuthenticated(false);
     setError(null);
     
@@ -276,7 +288,7 @@ export const useAuth = () => {
         throw new Error('No se recibió un token válido del servidor');
       }
       
-      console.log('🎫 Nuevo token recibido:', newToken);
+      console.log('🎫 Nuevo token recibido:', newToken.substring(0, 10) + '...');
       
       // Calcular nuevo tiempo de expiración
       const expiryTime = new Date();
@@ -289,6 +301,7 @@ export const useAuth = () => {
       // Actualizar usuario con nuevo token
       const updatedUser = { ...user, token: newToken };
       setUser(updatedUser);
+      setAuthToken(newToken); // Actualizar token en memoria
       localStorage.setItem('auth_user', JSON.stringify(updatedUser));
       
       console.log('✅ Token renovado correctamente');
@@ -303,6 +316,7 @@ export const useAuth = () => {
 
   return {
     user,
+    authToken, // Exponer el token en memoria
     loading,
     error,
     isAuthenticated,

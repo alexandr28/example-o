@@ -1,3 +1,4 @@
+// src/components/sector/SectorList.tsx
 import React, { useState } from 'react';
 import { Input, Button } from '../';
 
@@ -24,8 +25,9 @@ const SectorList: React.FC<SectorListProps> = ({
   const itemsPerPage = 10;
 
   // Filtrar la lista de sectores según el término de búsqueda
+  // ¡AQUÍ ESTÁ EL ERROR! - Necesitamos verificar que sector.nombre no sea undefined
   const filteredSectores = sectores.filter(sector => 
-    sector.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+    sector && sector.nombre && sector.nombre.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Calcular la cantidad de páginas
@@ -112,30 +114,31 @@ const SectorList: React.FC<SectorListProps> = ({
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {currentItems.map((sector) => (
-                <tr
-                  key={sector.id}
-                  className="hover:bg-gray-50 cursor-pointer"
-                  onClick={() => onSelectSector(sector)}
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {sector.nombre}
-                  </td>
-                  {onEliminar && (
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <button
-                        onClick={(e) => handleEliminar(sector.id, e)}
-                        className="text-red-600 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-400 rounded-md p-1"
-                      >
-                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+              {currentItems.length > 0 ? (
+                currentItems.map((sector) => (
+                  <tr
+                    key={sector.id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => onSelectSector(sector)}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {sector.nombre}
                     </td>
-                  )}
-                </tr>
-              ))}
-              {currentItems.length === 0 && (
+                    {onEliminar && (
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <Button
+                          onClick={(e) => handleEliminar(sector.id, e)}
+                          className="text-red-600 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-400 rounded-md p-1"
+                        >
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </Button>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              ) : (
                 <tr>
                   <td colSpan={onEliminar ? 2 : 1} className="px-6 py-4 text-center text-sm text-gray-500">
                     No se encontraron resultados

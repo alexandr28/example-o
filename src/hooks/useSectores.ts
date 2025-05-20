@@ -1,19 +1,13 @@
 // src/hooks/useSectores.ts
 import { useState, useCallback, useEffect } from 'react';
 import { Sector, SectorFormData } from '../models/Sector';
-import { authGet, authPost, authPut, authDelete } from '../api/authClient';
-import { API_ENDPOINTS } from '../config/constants';
+import SectorService from '../services/sectorService';
 import { connectivityService } from '../services/connectivityService';
 import { MockSectorService } from '../services/mockSectorService';
 
-// URL base para la API de sectores
-const API_URL = API_ENDPOINTS.SECTOR || 'http://localhost:8080/api/sector';
-
 /**
  * Hook personalizado para la gestión de sectores
- * 
- * Proporciona funcionalidades para listar, crear, actualizar y eliminar sectores
- * Incluye manejo de errores de conectividad y modo fallback
+ * Versión modificada para no usar token
  */
 export const useSectores = () => {
   // Estados
@@ -25,57 +19,50 @@ export const useSectores = () => {
   const [isOfflineMode, setIsOfflineMode] = useState(!connectivityService.getStatus());
 
   // Cargar sectores
- const cargarSectores = useCallback(async () => {
-  try {
-    setLoading(true);
-    setError(null);
-    
-    let data: Sector[];
-    
-    // Verificar si podemos usar la API o necesitamos usar el mock
-    if (!connectivityService.getStatus()) {
-      console.log('Usando mock service para sectores (API no disponible)');
-      data = await MockSectorService.getAll();
-    } else {
-      try {
-        // Intentar cargar desde la API usando la ruta relativa
-        console.log('Intentando cargar desde la API:', API_URL);
-        const apiData = await authGet(API_URL);
-        
-        if (apiData && Array.isArray(apiData)) {
-          data = apiData;
-        } else {
-          console.warn('Formato de datos incorrecto desde API, usando mock service');
+  const cargarSectores = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      let data: Sector[];
+      
+      // Verificar si podemos usar la API o necesitamos usar el mock
+      if (!connectivityService.getStatus()) {
+        console.log('Usando mock service para sectores (API no disponible)');
+        data = await MockSectorService.getAll();
+      } else {
+        try {
+          // Intentar cargar desde la API sin autenticación
+          console.log('Intentando cargar desde la API sin autenticación');
+          data = await SectorService.getAll();
+        } catch (apiError: any) {
+          console.error('Error al cargar desde API, usando mock service:', apiError);
+          
+          // Identificar específicamente si es un error CORS
+          if (apiError.message && (
+            apiError.message.includes('CORS') || 
+            apiError.message.includes('cross-origin') ||
+            apiError.message.includes('Failed to fetch')
+          )) {
+            setError('Error de conexión CORS: No se puede acceder al servidor. Trabajando en modo offline.');
+          } else {
+            setError(`Error al cargar datos: ${apiError.message}`);
+          }
+          
           data = await MockSectorService.getAll();
         }
-      } catch (apiError: any) {
-        console.error('Error al cargar desde API, usando mock service:', apiError);
-        
-        // Identificar específicamente si es un error CORS
-        if (apiError.message && (
-          apiError.message.includes('CORS') || 
-          apiError.message.includes('cross-origin') ||
-          apiError.message.includes('Failed to fetch')
-        )) {
-          setError('Error de conexión CORS: No se puede acceder al servidor. Trabajando en modo offline.');
-        } else {
-          setError(`Error al cargar datos: ${apiError.message}`);
-        }
-        
-        data = await MockSectorService.getAll();
       }
+      
+      // Establecer los datos en el estado
+      setSectores(data);
+      
+    } catch (err: any) {
+      setError(err.message || 'Error al cargar los sectores');
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-    
-    // Establecer los datos en el estado
-    setSectores(data);
-    
-  } catch (err: any) {
-    setError(err.message || 'Error al cargar los sectores');
-    console.error(err);
-  } finally {
-    setLoading(false);
-  }
-}, []);
+  }, []);
 
   // Monitorear cambios en la conectividad
   useEffect(() => {
@@ -117,13 +104,11 @@ export const useSectores = () => {
         }
       } else {
         try {
-          // Intentar guardar en la API
+          // Intentar guardar en la API sin autenticación
           if (modoEdicion && sectorSeleccionado) {
-            const response = await authPut(`${API_URL}/${sectorSeleccionado.id}`, data);
-            result = response;
+            result = await SectorService.update(sectorSeleccionado.id, data);
           } else {
-            const response = await authPost(API_URL, data);
-            result = response;
+            result = await SectorService.create(data);
           }
         } catch (apiError) {
           console.error('Error al guardar en API, usando mock service:', apiError);
@@ -166,8 +151,8 @@ export const useSectores = () => {
         await MockSectorService.delete(id);
       } else {
         try {
-          // Intentar eliminar en la API
-          await authDelete(`${API_URL}/${id}`);
+          // Intentar eliminar en la API sin autenticación
+          await SectorService.delete(id);
         } catch (apiError) {
           console.error('Error al eliminar en API, usando mock service:', apiError);
           

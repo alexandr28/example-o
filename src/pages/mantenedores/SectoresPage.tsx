@@ -1,3 +1,4 @@
+// src/pages/mantenedores/SectoresPage.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { MainLayout } from '../../layout';
 import { SectorList, SectorForm, Breadcrumb } from '../../components';
@@ -8,8 +9,7 @@ import CorsErrorMessage from '../../components/utils/CorsErrorMessage';
 
 /**
  * Página para administrar los sectores del sistema
- * 
- * Permite añadir, editar, eliminar y buscar sectores
+ * Versión actualizada con validación de datos mejorada y manejo de errores
  */
 const SectoresPageContent: React.FC = () => {
   // Usamos el hook personalizado para la gestión de sectores
@@ -34,12 +34,40 @@ const SectoresPageContent: React.FC = () => {
   // Estado para mensajes de éxito
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [dataValidationError, setDataValidationError] = useState<string | null>(null);
+
+  // Verificar la validez de los datos cargados
+  useEffect(() => {
+    if (sectores && sectores.length > 0) {
+      try {
+        // Verificar que todos los sectores tengan una estructura válida
+        const sectoresInvalidos = sectores.filter(sector => 
+          !sector || typeof sector !== 'object' || !sector.nombre
+        );
+        
+        if (sectoresInvalidos.length > 0) {
+          console.warn('Se detectaron sectores con estructura inválida:', sectoresInvalidos);
+          setDataValidationError(
+            `Se detectaron ${sectoresInvalidos.length} sectores con datos incompletos. ` +
+            'Esto puede causar problemas en la visualización.'
+          );
+        } else {
+          setDataValidationError(null);
+        }
+      } catch (validationError) {
+        console.error('Error al validar datos de sectores:', validationError);
+        setDataValidationError('Error al validar la estructura de los datos recibidos.');
+      }
+    }
+  }, [sectores]);
 
   // Cargar sectores al montar el componente
   useEffect(() => {
     const loadSectores = async () => {
       try {
+        console.log('Iniciando carga de sectores...');
         await cargarSectores();
+        console.log('Sectores cargados correctamente:', sectores?.length || 0);
       } catch (err) {
         console.error("Error al cargar sectores:", err);
       }
@@ -60,18 +88,30 @@ const SectoresPageContent: React.FC = () => {
   const handleEditar = () => {
     if (sectorSeleccionado) {
       setModoEdicion(true);
+    } else {
+      setSuccessMessage("Por favor, seleccione un sector para editar");
+      setTimeout(() => setSuccessMessage(null), 3000);
     }
   };
 
   // Manejar reintento de conexión y sincronización
-  const handleSyncAndRetry = () => {
-    sincronizarManualmente();
+  const handleSyncAndRetry = async () => {
+    setSuccessMessage("Intentando sincronizar datos...");
+    await sincronizarManualmente();
+    setSuccessMessage("Sincronización completada");
+    setTimeout(() => setSuccessMessage(null), 3000);
   };
 
   // Manejar guardado
-   // Manejar guardado
   const handleGuardarSector = async (data: { nombre: string }) => {
     try {
+      // Validar que el nombre no esté vacío
+      if (!data.nombre || data.nombre.trim() === '') {
+        setSuccessMessage("El nombre del sector no puede estar vacío");
+        setTimeout(() => setSuccessMessage(null), 3000);
+        return;
+      }
+      
       await guardarSector(data);
       setSuccessMessage(modoEdicion 
         ? "Sector actualizado correctamente" 
@@ -79,15 +119,40 @@ const SectoresPageContent: React.FC = () => {
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (error) {
       console.error("Error al guardar sector:", error);
+      setSuccessMessage("Error al guardar el sector. Intente nuevamente.");
+      setTimeout(() => setSuccessMessage(null), 3000);
     }
   };
+
+  // Manejar eliminación
+  const handleEliminarSector = async (id: number) => {
+    try {
+      await eliminarSector(id);
+      setSuccessMessage("Sector eliminado correctamente");
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (error) {
+      console.error("Error al eliminar sector:", error);
+      setSuccessMessage("Error al eliminar el sector. Intente nuevamente.");
+      setTimeout(() => setSuccessMessage(null), 3000);
+    }
+  };
+
+  // Procesar sectores para asegurar que son válidos
+  const sectoresValidos = useMemo(() => {
+    if (!sectores) return [];
+    
+    return sectores.filter(sector => 
+      sector && typeof sector === 'object' && sector.nombre && typeof sector.nombre === 'string'
+    );
+  }, [sectores]);
+
   return (
     <MainLayout title="Mantenimiento de Sectores">
       <div className="space-y-4">
         {/* Navegación de migas de pan */}
-        <div className="flex justify-between items-center"></div>
-        <Breadcrumb items={breadcrumbItems} />
-        <button 
+        <div className="flex justify-between items-center">
+          <Breadcrumb items={breadcrumbItems} />
+          <button 
             onClick={() => setShowHelp(!showHelp)}
             className="text-blue-600 hover:text-blue-800 flex items-center"
           >
@@ -96,11 +161,32 @@ const SectoresPageContent: React.FC = () => {
             </svg>
             Ayuda
           </button>
-          {/* Mensaje de error CORS si estamos en modo offline */}
-        {isOfflineMode && error && error.includes('fetch') && (
+        </div>
+        
+        {/* Mensaje de error CORS si estamos en modo offline */}
+        {isOfflineMode && error && error.includes('CORS') && (
           <CorsErrorMessage onReload={sincronizarManualmente} />
         )}
-         {/* Panel de ayuda */}
+        
+        {/* Mensaje de validación de datos si hay problemas con la estructura */}
+        {dataValidationError && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700">
+                  {dataValidationError}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+         
+        {/* Panel de ayuda */}
         {showHelp && (
           <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded relative">
             <h3 className="font-medium mb-1">Acerca de este módulo</h3>
@@ -124,6 +210,7 @@ const SectoresPageContent: React.FC = () => {
             </button>
           </div>
         )}
+        
         {/* Mensaje de éxito */}
         {successMessage && (
           <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded relative" role="alert">
@@ -169,7 +256,7 @@ const SectoresPageContent: React.FC = () => {
         )}
         
         {/* Mensajes de error, si hay */}
-        {error && (
+        {error && !error.includes('CORS') && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
             <span className="block sm:inline">{error}</span>
           </div>
@@ -194,11 +281,23 @@ const SectoresPageContent: React.FC = () => {
           </div>
         ) : (
           <SectorList
-            sectores={sectores}
+            sectores={sectoresValidos} // Usando la versión filtrada y validada
             onSelectSector={seleccionarSector}
             isOfflineMode={isOfflineMode}
-            onEliminar={eliminarSector}
+            onEliminar={handleEliminarSector}
           />
+        )}
+        
+        {/* Información de depuración si estamos en modo desarrollo */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-8 p-4 bg-gray-100 rounded-md text-xs font-mono overflow-auto max-h-40">
+            <div className="font-semibold mb-2">Debug info:</div>
+            <div>Sectores cargados: {sectores?.length || 0}</div>
+            <div>Sectores válidos: {sectoresValidos.length}</div>
+            <div>Modo offline: {isOfflineMode ? 'Sí' : 'No'}</div>
+            <div>Cambios pendientes: {pendingChangesCount}</div>
+            <div>Error: {error || 'Ninguno'}</div>
+          </div>
         )}
       </div>
     </MainLayout>
