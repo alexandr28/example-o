@@ -1,4 +1,3 @@
-// src/components/utils/CorsErrorMessage.tsx
 import React from 'react';
 
 interface CorsErrorMessageProps {
@@ -20,16 +19,16 @@ const CorsErrorMessage: React.FC<CorsErrorMessageProps> = ({ onReload }) => {
           </h3>
           <div className="mt-2 text-sm leading-5 text-orange-700">
             <p>
-              La aplicación está funcionando en modo offline porque no puede conectarse con el servidor API. 
+              La aplicación está funcionando en modo offline porque no puede conectarse con el servidor API en <strong>http://localhost:8080/api/via</strong>. 
               Los cambios que realices se guardarán localmente.
             </p>
             <p className="mt-2">
               Posibles soluciones:
             </p>
             <ul className="list-disc list-inside mt-1">
-              <li>Verifica que el servidor API esté en ejecución en http://localhost:8080</li>
+              <li>Verifica que el servidor API esté en ejecución en el puerto 8080</li>
               <li>Asegúrate que el servidor tenga CORS habilitado</li>
-              <li>Usa el proxy configurado en Vite (ya activo)</li>
+              <li>Confirma que la ruta /api/via está disponible en el servidor</li>
             </ul>
             <button
               className="mt-3 px-3 py-1 bg-orange-200 text-orange-800 rounded"

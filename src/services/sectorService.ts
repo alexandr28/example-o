@@ -2,7 +2,7 @@ import { Sector, SectorFormData } from '../models/Sector';
 import { authGet, authPost, authPut, authDelete } from '../api/authClient';
 
 // URL base para la API de sectores
-const API_URL = 'http://localhost:8080/api/sectores';
+const API_URL = '/api/sector';
 
 // Clave para almacenar cambios pendientes en localStorage
 const PENDING_CHANGES_KEY = 'pending_sectors_changes';

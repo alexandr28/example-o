@@ -7,7 +7,7 @@
 const API_HEALTH_ENDPOINTS = {
   sectores: 'http://localhost:8080/api/sectores/health',
   contribuyentes: 'http://localhost:8080/api/contribuyentes/health',
-  direcciones: 'http://localhost:8080/api/direcciones/health',
+  direcciones: 'http://localhost:8080/api/direccion/health',
   default: 'http://localhost:8080/api/health'
 };
 

@@ -7,7 +7,7 @@ import { connectivityService } from '../services/connectivityService';
 import { MockSectorService } from '../services/mockSectorService';
 
 // URL base para la API de sectores
-const API_URL = API_ENDPOINTS.SECTOR || 'http://localhost:8080/api/sectores';
+const API_URL = API_ENDPOINTS.SECTOR || 'http://localhost:8080/api/sector';
 
 /**
  * Hook personalizado para la gestión de sectores
@@ -23,17 +23,6 @@ export const useSectores = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isOfflineMode, setIsOfflineMode] = useState(!connectivityService.getStatus());
-
-  // Monitorear cambios en la conectividad
-  useEffect(() => {
-    return connectivityService.addListener((isOnline) => {
-      setIsOfflineMode(!isOnline);
-      if (isOnline) {
-        // Si volvimos a estar online, intentamos sincronizar
-        cargarSectores();
-      }
-    });
-  }, []);
 
   // Cargar sectores
  const cargarSectores = useCallback(async () => {
@@ -87,6 +76,17 @@ export const useSectores = () => {
     setLoading(false);
   }
 }, []);
+
+  // Monitorear cambios en la conectividad
+  useEffect(() => {
+    return connectivityService.addListener((isOnline) => {
+      setIsOfflineMode(!isOnline);
+      if (isOnline) {
+        // Si volvimos a estar online, intentamos sincronizar
+        cargarSectores();
+      }
+    });
+  }, [cargarSectores]);
 
   // Seleccionar un sector para editar
   const seleccionarSector = useCallback((sector: Sector) => {

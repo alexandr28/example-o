@@ -4,21 +4,20 @@
 
 // URL base de la API
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-export const API_PREFIX = '/api';
+export const API_PREFIX = '';
 export const AUTH_ENDPOINTS = {
-  LOGIN: `${API_PREFIX}/auth/login`,
-  LOGOUT: `${API_PREFIX}/auth/logout`,
-  REFRESH: `${API_PREFIX}/auth/refresh`,
+  LOGIN: `${API_BASE_URL}/auth/login`,
+  LOGOUT: `${API_BASE_URL}/auth/logout`,
+  REFRESH: `${API_BASE_URL}/auth/refresh`,
 };
 
 // URLs de los endpoints
 export const API_ENDPOINTS = {
   // Mantenedores
-  BARRIO: `${API_BASE_URL}${API_PREFIX}/barrio`,
+   BARRIO: `${API_BASE_URL}${API_PREFIX}/barrio`,
   SECTOR: `${API_BASE_URL}${API_PREFIX}/sector`,
   CALLE: `${API_BASE_URL}${API_PREFIX}/calle`,
   DIRECCION: `${API_BASE_URL}${API_PREFIX}/direccion`,
-  
   // Contribuyentes
   CONTRIBUYENTE: `${API_BASE_URL}/api/contribuyente`,
   
