@@ -25,7 +25,6 @@ const SectorList: React.FC<SectorListProps> = ({
   const itemsPerPage = 10;
 
   // Filtrar la lista de sectores según el término de búsqueda
-  // ¡AQUÍ ESTÁ EL ERROR! - Necesitamos verificar que sector.nombre no sea undefined
   const filteredSectores = sectores.filter(sector => 
     sector && sector.nombre && sector.nombre.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -115,9 +114,10 @@ const SectorList: React.FC<SectorListProps> = ({
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {currentItems.length > 0 ? (
-                currentItems.map((sector) => (
+                currentItems.map((sector, index) => (
                   <tr
-                    key={sector.id}
+                    // CORRECCIÓN 1: Garantizar una key única incluso si sector.id es undefined
+                    key={sector.id !== undefined ? sector.id : `sector-${index}`}
                     className="hover:bg-gray-50 cursor-pointer"
                     onClick={() => onSelectSector(sector)}
                   >
@@ -156,9 +156,10 @@ const SectorList: React.FC<SectorListProps> = ({
               Mostrar de {indexOfFirstItem + 1} a {Math.min(indexOfLastItem, filteredSectores.length)} de {filteredSectores.length} datos
             </div>
             <nav className="flex space-x-1">
+              {/* CORRECCIÓN 2: Asegurar claves únicas para la paginación incluyendo un prefijo */}
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((number) => (
                 <Button
-                  key={number}
+                  key={`page-${number}`}
                   onClick={() => paginate(number)}
                   className={`px-3 py-1 rounded ${
                     currentPage === number

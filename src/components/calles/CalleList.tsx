@@ -29,13 +29,59 @@ const CalleList: React.FC<CalleListProps> = ({
     setLocalSearchTerm(searchTerm);
   }, [searchTerm]);
 
+  // Formatear el tipo de vía de manera segura
+  const formatTipoVia = (tipoVia: string | undefined | null): string => {
+    // Si tipoVia es undefined o null, devolver un valor por defecto
+    if (tipoVia === undefined || tipoVia === null) {
+      return 'Sin tipo';
+    }
+    
+    // Ahora que sabemos que tipoVia no es undefined ni null, es seguro usar toLowerCase
+    switch (tipoVia.toLowerCase()) {
+      case 'avenida': return 'Av.';
+      case 'jiron': return 'Jr.';
+      case 'pasaje': return 'Psje.';
+      case 'calle': return 'Calle';
+      default: return tipoVia; // Devolver el valor original si no coincide con ningún caso
+    }
+  };
+
+  // Filtrar las calles de manera segura
+  const filteredCalles = calles
+    // Primero filtrar calles inválidas
+    .filter(calle => {
+      if (!calle || typeof calle !== 'object') {
+        console.warn('Calle inválida encontrada:', calle);
+        return false;
+      }
+      return true;
+    })
+    // Luego aplicar el filtro de búsqueda
+    .filter(calle => {
+      if (!localSearchTerm) return true;
+      
+      const searchTermLower = localSearchTerm.toLowerCase();
+      
+      // Buscar en nombre (asegurándose de que no sea undefined)
+      const nombreMatch = calle.nombre 
+        ? calle.nombre.toLowerCase().includes(searchTermLower) 
+        : false;
+      
+      // Buscar en tipo de vía (asegurándose de que no sea undefined)
+      const tipoViaMatch = calle.tipoVia 
+        ? calle.tipoVia.toLowerCase().includes(searchTermLower) 
+        : false;
+      
+      return nombreMatch || tipoViaMatch;
+    });
+
   // Calcular la cantidad de páginas
-  const totalPages = Math.ceil(calles.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredCalles.length / itemsPerPage);
   
   // Obtener los elementos de la página actual
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = calles.slice(indexOfFirstItem, indexOfLastItem);
+  const currentItems = filteredCalles.slice(indexOfFirstItem, indexOfLastItem);
 
   // Cambiar de página
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
@@ -58,26 +104,21 @@ const CalleList: React.FC<CalleListProps> = ({
     }
   };
 
-  // Manejar eliminación de una calle
-  const handleDelete = (e: React.MouseEvent, id: number) => {
+  // Manejar eliminación de una calle de manera segura
+  const handleDelete = (e: React.MouseEvent, id: number | undefined) => {
     e.stopPropagation(); // Evitar que se seleccione la calle al eliminarla
+    
+    // Verificar que id no sea undefined
+    if (id === undefined) {
+      console.warn('Intentando eliminar una calle sin ID');
+      return;
+    }
     
     if (onDeleteCalle) {
       // Confirmar antes de eliminar
       if (window.confirm('¿Está seguro de eliminar esta calle?')) {
         onDeleteCalle(id);
       }
-    }
-  };
-
-  // Formatear el tipo de vía
-  const formatTipoVia = (tipoVia: string): string => {
-    switch (tipoVia.toLowerCase()) {
-      case 'avenida': return 'Av.';
-      case 'jiron': return 'Jr.';
-      case 'pasaje': return 'Psje.';
-      case 'calle': return 'Calle';
-      default: return tipoVia;
     }
   };
 
@@ -88,7 +129,7 @@ const CalleList: React.FC<CalleListProps> = ({
         
         {/* Contador de resultados */}
         <div className="text-sm text-gray-500">
-          {calles.length} {calles.length === 1 ? 'resultado' : 'resultados'}
+          {filteredCalles.length} {filteredCalles.length === 1 ? 'resultado' : 'resultados'}
         </div>
       </div>
       
@@ -147,9 +188,9 @@ const CalleList: React.FC<CalleListProps> = ({
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {currentItems.length > 0 ? (
-                  currentItems.map((calle) => (
+                  currentItems.map((calle, index) => (
                     <tr
-                      key={calle.id}
+                      key={calle.id ?? `calle-${index}`}
                       className="hover:bg-gray-50 cursor-pointer"
                       onClick={() => onSelectCalle(calle)}
                     >
@@ -157,7 +198,7 @@ const CalleList: React.FC<CalleListProps> = ({
                         {formatTipoVia(calle.tipoVia)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
-                        {calle.nombre}
+                        {calle.nombre || 'Sin nombre'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
@@ -192,11 +233,11 @@ const CalleList: React.FC<CalleListProps> = ({
           </div>
         )}
         
-        {/* Paginación */}
+        {/* Paginación (código sin cambios) */}
         {totalPages > 1 && (
           <div className="mt-4 flex justify-between items-center">
             <div className="text-sm text-gray-500">
-              Mostrando {indexOfFirstItem + 1} a {Math.min(indexOfLastItem, calles.length)} de {calles.length} resultados
+              Mostrando {indexOfFirstItem + 1} a {Math.min(indexOfLastItem, filteredCalles.length)} de {filteredCalles.length} resultados
             </div>
             <nav className="flex space-x-1">
               {currentPage > 1 && (
@@ -228,7 +269,7 @@ const CalleList: React.FC<CalleListProps> = ({
                 
                 return (
                   <Button
-                    key={pageNum}
+                    key={`page-${pageNum}`}
                     onClick={() => paginate(pageNum)}
                     className={`px-3 py-1 rounded ${
                       currentPage === pageNum

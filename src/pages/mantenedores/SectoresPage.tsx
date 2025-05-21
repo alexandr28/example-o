@@ -6,7 +6,7 @@ import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useSectores } from '../../hooks';
 import ErrorBoundary from '../../components/utils/ErrorBoundary';
 import CorsErrorMessage from '../../components/utils/CorsErrorMessage';
-
+import AuthRequiredModal from '../../components/auth/AuthRequiredModal';
 /**
  * Página para administrar los sectores del sistema
  * Versión actualizada con validación de datos mejorada y manejo de errores
@@ -34,7 +34,10 @@ const SectoresPageContent: React.FC = () => {
   // Estado para mensajes de éxito
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
-  const [dataValidationError, setDataValidationError] = useState<string | null>(null);
+  const [dataValidationError, setDataValidationError] = useState<string | null>(null);  
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalMessage, setAuthModalMessage] = useState('');
+
 
   // Verificar la validez de los datos cargados
   useEffect(() => {
@@ -94,6 +97,8 @@ const SectoresPageContent: React.FC = () => {
     }
   };
 
+
+
   // Manejar reintento de conexión y sincronización
   const handleSyncAndRetry = async () => {
     setSuccessMessage("Intentando sincronizar datos...");
@@ -103,26 +108,34 @@ const SectoresPageContent: React.FC = () => {
   };
 
   // Manejar guardado
-  const handleGuardarSector = async (data: { nombre: string }) => {
-    try {
-      // Validar que el nombre no esté vacío
-      if (!data.nombre || data.nombre.trim() === '') {
-        setSuccessMessage("El nombre del sector no puede estar vacío");
-        setTimeout(() => setSuccessMessage(null), 3000);
-        return;
-      }
-      
-      await guardarSector(data);
-      setSuccessMessage(modoEdicion 
-        ? "Sector actualizado correctamente" 
-        : "Sector creado correctamente");
+ const handleGuardarSector = async (data: { nombre: string }) => {
+  try {
+    // Validar que el nombre no esté vacío
+    if (!data.nombre || data.nombre.trim() === '') {
+      setSuccessMessage("El nombre del sector no puede estar vacío");
       setTimeout(() => setSuccessMessage(null), 3000);
-    } catch (error) {
-      console.error("Error al guardar sector:", error);
+      return;
+    }
+    
+    await guardarSector(data);
+    setSuccessMessage(modoEdicion 
+      ? "Sector actualizado correctamente" 
+      : "Sector creado correctamente");
+    setTimeout(() => setSuccessMessage(null), 3000);
+  } catch (error: any) {
+    console.error("Error al guardar sector:", error);
+    
+    // Verificar si es un error 403
+    if (error.message && error.message.includes('403')) {
+      // Mostrar modal de autenticación
+      setAuthModalMessage('Necesitas iniciar sesión para guardar cambios en los sectores.');
+      setShowAuthModal(true);
+    } else {
       setSuccessMessage("Error al guardar el sector. Intente nuevamente.");
       setTimeout(() => setSuccessMessage(null), 3000);
     }
-  };
+  }
+};
 
   // Manejar eliminación
   const handleEliminarSector = async (id: number) => {
@@ -138,13 +151,38 @@ const SectoresPageContent: React.FC = () => {
   };
 
   // Procesar sectores para asegurar que son válidos
-  const sectoresValidos = useMemo(() => {
-    if (!sectores) return [];
+// En la sección donde se procesan los datos antes de renderizar
+const sectoresValidos = useMemo(() => {
+  if (!sectores) return [];
+  
+  console.log('🔍 Procesando sectores para renderizado:', sectores);
+  
+  // Verificar explícitamente cada sector para diagnóstico
+  const procesados = sectores.map((sector, index) => {
+    console.log(`📋 Sector ${index}:`, sector);
     
-    return sectores.filter(sector => 
-      sector && typeof sector === 'object' && sector.nombre && typeof sector.nombre === 'string'
-    );
-  }, [sectores]);
+    if (!sector || typeof sector !== 'object') {
+      console.warn(`⚠️ Sector ${index} no es un objeto:`, sector);
+      return null;
+    }
+    
+    if (!sector.nombre) {
+      console.warn(`⚠️ Sector ${index} no tiene nombre:`, sector);
+      return null;
+    }
+    
+    // Si el nombre es "Sector X", es probable que sea un nombre generado
+    if (/^Sector \d+$/.test(sector.nombre)) {
+      console.warn(`⚠️ Sector ${index} parece tener un nombre generado:`, sector.nombre);
+    }
+    
+    return sector;
+  }).filter(Boolean);
+  
+  console.log('✅ Sectores válidos procesados:', procesados);
+  
+  return procesados;
+}, [sectores]);
 
   return (
     <MainLayout title="Mantenimiento de Sectores">
@@ -300,6 +338,11 @@ const SectoresPageContent: React.FC = () => {
           </div>
         )}
       </div>
+       <AuthRequiredModal
+      isOpen={showAuthModal}
+      onClose={() => setShowAuthModal(false)}
+      message={authModalMessage}
+    />
     </MainLayout>
   );
 };
