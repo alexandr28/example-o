@@ -24,8 +24,17 @@ export default defineConfig(({ mode }) => {
     // Configuración del servidor de desarrollo
     server: {
       port: 3000,
+      // Para hacer la app accesible desde la red local
+      host: true,  // Usar '0.0.0.0' en vez de 'localhost' (escucha en todas las interfaces)
+      strictPort: true, // No intentar otro puerto si 3000 está ocupado
+      // Mostrar dirección de red al iniciar
       // Opciones para obtener mejor información de errores
-      hmr: { overlay: true },
+      hmr: { 
+        overlay: true,
+        // Opciones para hot module replacement
+        clientPort: 3000, // Puerto fijo para WebSocket HMR
+
+      },
       
       // Configuración de proxy para todas las peticiones a la API
       proxy: {
