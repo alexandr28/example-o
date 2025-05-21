@@ -241,62 +241,29 @@ export default defineConfig(({ mode }) => {
         },
         
         // Proxy para API de barrios (SIN AUTENTICACIÓN Y MEJORADO)
-        '/api/barrio': {
+       '/api/barrio': {
           target: API_BASE_URL,
           changeOrigin: true,
           secure: false,
           rewrite: (path) => {
-            const newPath = path.replace(/^\/api\/barrio/, '/barrio');
-            console.log(`Reescribiendo ruta: ${path} → ${newPath}`);
-            return newPath;
-          },
-          configure: (proxy, _options) => {
-            proxy.on('error', (err, req, res) => {
-              console.error('Proxy error en /api/barrio:', err);
-              if (!res.headersSent && res.writeHead) {
-                res.writeHead(500, {
-                  'Content-Type': 'application/json'
-                });
-                res.end(JSON.stringify({ error: 'Proxy error', message: err.message }));
-              }
-            });
-            
-            proxy.on('proxyReq', (proxyReq, req, _res) => {
-              console.log(`Proxy request to barrio: ${req.method} ${req.url}`);
-              
-              // IMPORTANTE: Limpiar todas las cabeceras de autenticación
-              if (proxyReq.hasHeader('Authorization')) proxyReq.removeHeader('Authorization');
-              if (proxyReq.hasHeader('authorization')) proxyReq.removeHeader('authorization');
-              if (proxyReq.hasHeader('Cookie')) proxyReq.removeHeader('Cookie');
-              
-              // Establecer los encabezados correctos
-              proxyReq.setHeader('Host', new URL(API_BASE_URL).host);
-              proxyReq.setHeader('Origin', req.headers.origin || 'http://localhost:3000');
-              proxyReq.setHeader('Content-Type', 'application/json');
-              
-              // Añadir token de desarrollo si está configurado
-              const devToken = env.VITE_DEV_TOKEN;
-              if (devToken) {
-                proxyReq.setHeader('X-Dev-Token', devToken);
-              }
-            });
-            
-            proxy.on('proxyRes', (proxyRes, req, _res) => {
-              console.log(`Proxy barrio response: ${req.method} ${req.url} - ${proxyRes.statusCode}`);
-              
-              // Agregar encabezados CORS a la respuesta
-              proxyRes.headers['Access-Control-Allow-Origin'] = req.headers.origin || '*';
-              proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH';
-              proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With';
-              proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
-              proxyRes.headers['Access-Control-Max-Age'] = '86400'; // 24 horas
-              
-              // Para peticiones OPTIONS, asegurar código 200
-              if (req.method === 'OPTIONS') {
-                proxyRes.statusCode = 200;
-              }
-            });
-          }
+          const newPath = path.replace(/^\/api\/barrio/, '/barrio');
+          console.log(`Reescribiendo ruta: ${path} → ${newPath}`);
+          return newPath;
+        },
+        configure: (proxy, _options) => {
+          // Configuración para evitar problemas CORS
+           proxy.on('proxyReq', (proxyReq, req, _res) => {
+         // IMPORTANTE: Limpiar todas las cabeceras de autenticación
+           if (proxyReq.hasHeader('Authorization')) proxyReq.removeHeader('Authorization');
+           if (proxyReq.hasHeader('authorization')) proxyReq.removeHeader('authorization');
+          if (proxyReq.hasHeader('Cookie')) proxyReq.removeHeader('Cookie');
+      
+          // Establecer los encabezados correctos
+          proxyReq.setHeader('Host', new URL(API_BASE_URL).host);
+           proxyReq.setHeader('Origin', req.headers.origin || 'http://localhost:3000');
+          proxyReq.setHeader('Content-Type', 'application/json');
+          });
+        }
         },
         
         // Proxy general para el resto de la API (CON AUTENTICACIÓN)

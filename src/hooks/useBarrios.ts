@@ -2,11 +2,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Barrio, BarrioFormData, Sector } from '../models/';
 import { BarrioService } from '../services/barrioService';
-import { connectivityService } from '../services/connectivityService';
+import { SectorService } from '../services/sectorService';
 
 /**
  * Hook personalizado para la gestión de barrios
- * Versión modificada para no usar token
  */
 export const useBarrios = () => {
   // Estados
@@ -24,21 +23,22 @@ export const useBarrios = () => {
       setLoading(true);
       setError(null);
       
-      // Petición a la API sin autenticación
       try {
-        const barrios = await BarrioService.getAll();
-        setBarrios(barrios);
+        console.log('Cargando barrios desde la API...');
+        const data = await BarrioService.getAll();
+        setBarrios(data);
         
-        // Actualizar caché local
-        localStorage.setItem('cachedBarrios', JSON.stringify(barrios));
-      } catch (err: unknown) {
-        const error = err as Error;
-        setError(error.message || 'Error al cargar los barrios');
-        console.error('Error en cargarBarrios:', error);
+        // Actualizar caché local para uso offline
+        localStorage.setItem('cachedBarrios', JSON.stringify(data));
+        console.log(`${data.length} barrios cargados correctamente`);
+      } catch (err: any) {
+        console.error('Error al cargar barrios desde API:', err);
+        setError(err.message || 'Error al cargar los barrios');
         
-        // Modo fallback: Si hay un error de red, usar datos de caché local si existen
+        // Modo fallback: Si hay error de red, usar datos de caché local si existen
         const cachedBarrios = localStorage.getItem('cachedBarrios');
         if (cachedBarrios) {
+          console.log('Utilizando datos de caché local');
           try {
             setBarrios(JSON.parse(cachedBarrios));
           } catch (cacheErr) {
@@ -57,28 +57,21 @@ export const useBarrios = () => {
       setLoading(true);
       setError(null);
       
-      // Petición a la API sin autenticación
       try {
-        // Usar fetch directamente porque estamos modificando los servicios para no usar autenticación
-        const response = await fetch('/api/sector');
-        
-        if (!response.ok) {
-          throw new Error(`Error HTTP: ${response.status}`);
-        }
-        
-        const data = await response.json();
+        console.log('Cargando sectores desde la API...');
+        const data = await SectorService.getAll();
         setSectores(data);
         
         // Actualizar caché local
         localStorage.setItem('cachedSectores', JSON.stringify(data));
-        } catch (err: unknown) {
-        const error = err as Error;
-        setError(error.message || 'Error al cargar los sectores');
-        console.error('Error en cargarSectores:', error);
+        console.log(`${data.length} sectores cargados correctamente`);
+      } catch (err: any) {
+        console.error('Error al cargar sectores desde API:', err);
         
-        // Modo fallback: Si hay un error de red, usar datos de caché local si existen
+        // Modo fallback: Si hay error de red, usar datos de caché local si existen
         const cachedSectores = localStorage.getItem('cachedSectores');
         if (cachedSectores) {
+          console.log('Utilizando datos de caché local para sectores');
           try {
             setSectores(JSON.parse(cachedSectores));
           } catch (cacheErr) {
@@ -90,25 +83,6 @@ export const useBarrios = () => {
       setLoading(false);
     }
   }, []);
-
-  // Cargar datos iniciales al montar el componente
-  useEffect(() => {
-    cargarSectores();
-    cargarBarrios();
-  }, [cargarSectores, cargarBarrios]);
-
-  // Efecto para guardar en caché local los datos cargados
-  useEffect(() => {
-    if (barrios.length > 0) {
-      localStorage.setItem('cachedBarrios', JSON.stringify(barrios));
-    }
-  }, [barrios]);
-
-  useEffect(() => {
-    if (sectores.length > 0) {
-      localStorage.setItem('cachedSectores', JSON.stringify(sectores));
-    }
-  }, [sectores]);
 
   // Seleccionar un barrio para editar
   const seleccionarBarrio = useCallback((barrio: Barrio) => {
@@ -122,33 +96,11 @@ export const useBarrios = () => {
     setModoEdicion(false);
   }, []);
 
-  // Manejar cambio en el término de búsqueda
-  const handleSearchTermChange = useCallback((term: string) => {
-    setSearchTerm(term);
-  }, []);
-  
-  // Filtrar barrios por término de búsqueda (búsqueda local)
-  const filtrarBarriosLocalmente = useCallback(() => {
-    if (!searchTerm.trim()) return barrios;
-    
-    return barrios.filter(barrio => 
-      barrio.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (barrio.sector?.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || false)
-    );
-  }, [barrios, searchTerm]);
-
   // Guardar un barrio (crear o actualizar)
   const guardarBarrio = useCallback(async (data: BarrioFormData) => {
     try {
       setLoading(true);
       setError(null);
-      
-      // Encontrar el sector correspondiente
-      const sectorSeleccionado = sectores.find(s => s.id === parseInt(data.sectorId.toString()));
-      
-      if (!sectorSeleccionado) {
-        throw new Error('Sector no encontrado');
-      }
       
       // Preparamos los datos para enviar a la API
       const barrioData = {
@@ -160,46 +112,51 @@ export const useBarrios = () => {
       
       if (modoEdicion && barrioSeleccionado) {
         // Actualizar barrio existente mediante el servicio
-        try {
-          nuevoBarrio = await BarrioService.update(barrioSeleccionado.id, barrioData);
-          
-          // Actualizamos el estado local con los datos devueltos por la API
-          setBarrios(prevBarrios => 
-            prevBarrios.map(b => 
-              b.id === barrioSeleccionado.id 
-                ? { ...nuevoBarrio, sector: sectorSeleccionado } 
-                : b
-            )
-          );
-        } catch (updateError) {
-          console.error('Error al actualizar barrio:', updateError);
-          throw new Error('Error al actualizar el barrio');
-        }
+        console.log(`Actualizando barrio ID ${barrioSeleccionado.id}:`, barrioData);
+        nuevoBarrio = await BarrioService.update(barrioSeleccionado.id, barrioData);
+        
+        // Encontrar el sector correspondiente
+        const sectorSeleccionado = sectores.find(s => s.id === parseInt(data.sectorId.toString()));
+        
+        // Actualizamos el estado local con los datos devueltos por la API
+        setBarrios(prevBarrios => 
+          prevBarrios.map(b => 
+            b.id === barrioSeleccionado.id 
+              ? { ...nuevoBarrio, sector: sectorSeleccionado } 
+              : b
+          )
+        );
+        
+        console.log('Barrio actualizado correctamente:', nuevoBarrio);
       } else {
         // Crear nuevo barrio mediante el servicio
-        try {
-          nuevoBarrio = await BarrioService.create(barrioData);
-          
-          // Añadimos el nuevo barrio al estado local con los datos devueltos por la API
-          setBarrios(prevBarrios => [
-            ...prevBarrios, 
-            { ...nuevoBarrio, sector: sectorSeleccionado }
-          ]);
-        } catch (createError) {
-          console.error('Error al crear barrio:', createError);
-          throw new Error('Error al crear el barrio');
-        }
+        console.log('Creando nuevo barrio:', barrioData);
+        nuevoBarrio = await BarrioService.create(barrioData);
+        
+        // Encontrar el sector correspondiente
+        const sectorSeleccionado = sectores.find(s => s.id === parseInt(data.sectorId.toString()));
+        
+        // Añadimos el nuevo barrio al estado local con los datos devueltos por la API
+        setBarrios(prevBarrios => [
+          ...prevBarrios, 
+          { ...nuevoBarrio, sector: sectorSeleccionado }
+        ]);
+        
+        console.log('Barrio creado correctamente:', nuevoBarrio);
       }
       
-      // Actualizar caché local
-      await cargarBarrios();
-      
-      // Resetear estados
+      // Limpiar selección
       limpiarSeleccion();
-    } catch (err: unknown) {
-      const error = err as Error;
-      setError(error.message || 'Error al guardar el barrio');
-      console.error('Error en guardarBarrio:', error);
+      
+      // Actualizar caché local
+      setTimeout(() => cargarBarrios(), 300);
+      
+      return nuevoBarrio;
+    } catch (err: any) {
+      const errorMsg = err.message || 'Error al guardar el barrio';
+      setError(errorMsg);
+      console.error('Error en guardarBarrio:', err);
+      throw new Error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -211,90 +168,63 @@ export const useBarrios = () => {
       setLoading(true);
       setError(null);
       
-      // Petición DELETE a la API
-      try {
-        await BarrioService.delete(id);
-        
-        // Actualizamos el estado local removiendo el barrio eliminado
-        setBarrios(prevBarrios => prevBarrios.filter(b => b.id !== id));
-        
-        // Actualizar caché local
-        await cargarBarrios();
-        
-        // Si el barrio eliminado estaba seleccionado, limpiamos la selección
-        if (barrioSeleccionado?.id === id) {
-          limpiarSeleccion();
-        }
-      } catch (deleteError) {
-        console.error('Error al eliminar barrio:', deleteError);
-        throw new Error('Error al eliminar el barrio');
+      console.log(`Eliminando barrio ID ${id}...`);
+      await BarrioService.delete(id);
+      
+      // Actualizar el estado local
+      setBarrios(prev => prev.filter(b => b.id !== id));
+      console.log('Barrio eliminado correctamente');
+      
+      // Si el barrio eliminado estaba seleccionado, limpiar selección
+      if (barrioSeleccionado?.id === id) {
+        limpiarSeleccion();
       }
-    } catch (err: unknown) {
-      const error = err as Error;
-      setError(error.message || 'Error al eliminar el barrio');
-      console.error('Error en eliminarBarrio:', error);
+      
+    } catch (err: any) {
+      setError(err.message || 'Error al eliminar el barrio');
+      console.error('Error al eliminar barrio:', err);
+      throw err;
     } finally {
       setLoading(false);
     }
-  }, [barrioSeleccionado, limpiarSeleccion, cargarBarrios]);
+  }, [barrioSeleccionado, limpiarSeleccion]);
 
-  // Obtener barrio por ID
-  const obtenerBarrioPorId = useCallback(async (id: number) => {
+  // Buscar barrios
+  const buscarBarrios = useCallback(async (term: string) => {
+    setSearchTerm(term);
+    
     try {
       setLoading(true);
       setError(null);
       
-      // Petición GET a la API para obtener un barrio específico
-      try {
-        const barrio = await BarrioService.getById(id);
-        
-        // Buscar el sector correspondiente para incluirlo en el objeto barrio
-        const sector = sectores.find(s => s.id === barrio.sectorId);
-        
-        // Retornar el barrio con su sector asociado
-        return {
-          ...barrio,
-          sector
-        };
-      } catch (getError) {
-        console.error('Error al obtener barrio por ID:', getError);
-        
-        // Si hay un error, buscar en el estado local
-        return barrios.find(b => b.id === id) || null;
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [barrios, sectores]);
-
-  // Búsqueda de barrios
-  const buscarBarrios = useCallback(async () => {
-    try {
-      if (!searchTerm.trim()) {
+      if (!term.trim()) {
         await cargarBarrios();
-        return barrios;
+        return;
       }
       
-      setLoading(true);
-      setError(null);
+      console.log(`Buscando barrios con término "${term}"...`);
       
-      // Petición GET a la API con parámetro de búsqueda
       try {
-        const resultados = await BarrioService.search(searchTerm);
-        
-        // Actualizar el estado con los resultados de la búsqueda
+        const resultados = await BarrioService.search(term);
         setBarrios(resultados);
-        return resultados;
+        console.log(`${resultados.length} barrios encontrados`);
       } catch (searchError) {
         console.error('Error al buscar barrios:', searchError);
         
-        // Si hay error, realizar búsqueda local
-        return filtrarBarriosLocalmente();
+        // Si hay error, realizar búsqueda local en los barrios ya cargados
+        const termLower = term.toLowerCase();
+        const barriosFiltrados = barrios.filter(barrio => 
+          barrio.nombre.toLowerCase().includes(termLower) ||
+          (barrio.sector?.nombre && barrio.sector.nombre.toLowerCase().includes(termLower))
+        );
+        
+        console.log(`${barriosFiltrados.length} barrios encontrados localmente`);
+        setBarrios(barriosFiltrados);
       }
     } finally {
       setLoading(false);
     }
-  }, [barrios, searchTerm, cargarBarrios, filtrarBarriosLocalmente]);
+  }, [barrios, cargarBarrios]);
 
   return {
     barrios,
@@ -310,10 +240,7 @@ export const useBarrios = () => {
     limpiarSeleccion,
     guardarBarrio,
     eliminarBarrio,
-    obtenerBarrioPorId,
     buscarBarrios,
-    handleSearchTermChange,
-    filtrarBarriosLocalmente,
     setModoEdicion,
   };
 };

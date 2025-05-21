@@ -241,9 +241,8 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
     if (!path) return false;
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
-
   // Determina si un elemento del menú debe mostrarse como activo
-  const isActiveMenuItem = (item: MenuItem): boolean => {
+   const isActiveMenuItem = (item: MenuItem): boolean => {
     if (activeItem === item.id) return true;
     if (isActiveRoute(item.path)) {
       setActiveItem(item.id);
@@ -251,8 +250,72 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
     }
     return !!item.subMenuItems?.some(subItem => isActiveRoute(subItem.path));
   };
+// Efecto para actualizar el activeItem basado en la ruta actual
+  useEffect(() => {
+    // Definir una función que busca el item activo basado en la ruta
+    const updateActiveItem = () => {
+      // Primero verificar los menús principales
+      for (const item of menuItems) {
+        if (isActiveRoute(item.path)) {
+          setActiveItem(item.id);
+          return;
+        }
+        
+        // Luego verificar los submenús
+        if (item.subMenuItems) {
+          for (const subItem of item.subMenuItems) {
+            if (isActiveRoute(subItem.path)) {
+              setActiveItem(item.id);
+              return;
+            }
+            
+            // Si hay un nivel más profundo de submenús
+            if (subItem.subMenuItems) {
+              for (const nestedItem of subItem.subMenuItems) {
+                if (isActiveRoute(nestedItem.path)) {
+                  setActiveItem(item.id);
+                  return;
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      // Revisar también otherMenuItems
+      for (const item of othersMenuItems) {
+        if (isActiveRoute(item.path)) {
+          setActiveItem(item.id);
+          return;
+        }
+        
+        // Luego verificar los submenús
+        if (item.subMenuItems) {
+          for (const subItem of item.subMenuItems) {
+            if (isActiveRoute(subItem.path)) {
+              setActiveItem(item.id);
+              return;
+            }
+            
+            // Si hay un nivel más profundo de submenús
+            if (subItem.subMenuItems) {
+              for (const nestedItem of subItem.subMenuItems) {
+                if (isActiveRoute(nestedItem.path)) {
+                  setActiveItem(item.id);
+                  return;
+                }
+              }
+            }
+          }
+        }
+      }
+    };
+    
+    // Ejecutar la función cuando cambie la ruta
+    updateActiveItem();
+  }, [location.pathname, setActiveItem]);
 
-  // Efecto para mantener los menús necesarios abiertos según la ruta
+   // Efecto para mantener los menús necesarios abiertos según la ruta
   useEffect(() => {
     const currentPath = location.pathname;
     
@@ -304,7 +367,7 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
         parentIds.push('arancel-parametros');
       }
       
-      // Actualizar el estado
+      // Actualizar el estado de manera segura
       setOpenSubmenus(prev => {
         const combined = [...new Set([...prev, ...parentIds])];
         return combined;
@@ -312,7 +375,7 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
     }
   }, [location.pathname, setOpenSubmenus]);
 
-  // Renderiza el logo
+ // Renderiza el logo
   const renderLogo = () => (
     <div className="flex items-center justify-center py-3 px-3">
       {!isExpanded ? (
@@ -340,7 +403,7 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
     }
   };
 
-  return (
+ return (
     <aside 
       className={`flex flex-col h-screen bg-white border-r border-gray-200 transition-all duration-300 ${
         isExpanded ? 'w-64' : 'w-16'
