@@ -1,6 +1,6 @@
-// src/components/barrio/BarrioList.tsx - versión corregida con keys únicas
+// src/components/barrio/BarrioList.tsx - versión con debugging mejorado
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input, Button } from '../';
 
 interface Sector {
@@ -32,10 +32,43 @@ const BarrioList: React.FC<BarrioListProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  // Debug: Log cuando cambien los barrios
+  useEffect(() => {
+    console.log('🏠 BarrioList - Barrios recibidos:', barrios);
+    console.log('🔢 BarrioList - Cantidad:', barrios?.length || 0);
+    if (barrios && barrios.length > 0) {
+      console.log('📋 BarrioList - Primer barrio:', barrios[0]);
+    }
+  }, [barrios]);
+
   // Filtrar la lista de barrios según el término de búsqueda
-  const filteredBarrios = barrios.filter(barrio => 
-    barrio && barrio.nombre && barrio.nombre.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredBarrios = React.useMemo(() => {
+    if (!barrios || !Array.isArray(barrios)) {
+      console.warn('⚠️ BarrioList - barrios no es un array válido:', barrios);
+      return [];
+    }
+
+    const filtered = barrios.filter(barrio => {
+      if (!barrio || typeof barrio !== 'object') {
+        console.warn('⚠️ BarrioList - barrio inválido:', barrio);
+        return false;
+      }
+      
+      if (!barrio.nombre) {
+        console.warn('⚠️ BarrioList - barrio sin nombre:', barrio);
+        return false;
+      }
+
+      if (!searchTerm.trim()) {
+        return true;
+      }
+
+      return barrio.nombre.toLowerCase().includes(searchTerm.toLowerCase());
+    });
+
+    console.log('🔍 BarrioList - Barrios filtrados:', filtered.length);
+    return filtered;
+  }, [barrios, searchTerm]);
 
   // Calcular la cantidad de páginas
   const totalPages = Math.ceil(filteredBarrios.length / itemsPerPage);
@@ -45,12 +78,17 @@ const BarrioList: React.FC<BarrioListProps> = ({
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredBarrios.slice(indexOfFirstItem, indexOfLastItem);
 
+  // Debug para los elementos actuales
+  useEffect(() => {
+    console.log('📄 BarrioList - Elementos en página actual:', currentItems.length);
+  }, [currentItems]);
+
   // Cambiar de página
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
   // Manejar eliminación de un barrio
   const handleEliminar = (id: number | undefined, e: React.MouseEvent) => {
-    e.stopPropagation(); // Evitar que se active la selección del barrio
+    e.stopPropagation();
     
     if (id !== undefined && onEliminar) {
       if (window.confirm('¿Está seguro de eliminar este barrio?')) {
@@ -62,7 +100,9 @@ const BarrioList: React.FC<BarrioListProps> = ({
   return (
     <div className="bg-white rounded-md shadow-sm overflow-hidden mt-6">
       <div className="px-6 py-4 bg-gray-50 border-b flex justify-between items-center">
-        <h2 className="text-lg font-medium text-gray-800">Lista de barrios</h2>
+        <h2 className="text-lg font-medium text-gray-800">
+          Lista de barrios ({filteredBarrios.length})
+        </h2>
         {isOfflineMode && (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
             <svg className="-ml-0.5 mr-1.5 h-2 w-2 text-yellow-400" fill="currentColor" viewBox="0 0 8 8">
@@ -126,37 +166,42 @@ const BarrioList: React.FC<BarrioListProps> = ({
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {currentItems.length > 0 ? (
-                currentItems.map((barrio, index) => (
-                  <tr
-                    // Garantizar una key única incluso si barrio.id es undefined
-                    key={barrio.id !== undefined ? `barrio-${barrio.id}` : `barrio-index-${index}`}
-                    className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => onSelectBarrio(barrio)}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {barrio.nombre}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {barrio.sector?.nombre || 'Sin sector'}
-                    </td>
-                    {onEliminar && (
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <Button
-                          onClick={(e) => handleEliminar(barrio.id, e)}
-                          className="text-red-600 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-400 rounded-md p-1"
-                        >
-                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </Button>
+                currentItems.map((barrio, index) => {
+                  console.log(`🏠 Renderizando barrio ${index}:`, barrio);
+                  return (
+                    <tr
+                      key={barrio.id !== undefined ? `barrio-${barrio.id}` : `barrio-index-${index}`}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => onSelectBarrio(barrio)}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {barrio.nombre || 'Sin nombre'}
                       </td>
-                    )}
-                  </tr>
-                ))
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {barrio.sector?.nombre || `Sector ID: ${barrio.sectorId}` || 'Sin sector'}
+                      </td>
+                      {onEliminar && (
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <Button
+                            onClick={(e) => handleEliminar(barrio.id, e)}
+                            className="text-red-600 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-400 rounded-md p-1"
+                          >
+                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </Button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan={onEliminar ? 3 : 2} className="px-6 py-4 text-center text-sm text-gray-500">
-                    No se encontraron resultados
+                    {barrios && barrios.length === 0 ? 
+                      'No hay barrios disponibles' : 
+                      'No se encontraron resultados para la búsqueda'
+                    }
                   </td>
                 </tr>
               )}
@@ -164,14 +209,24 @@ const BarrioList: React.FC<BarrioListProps> = ({
           </table>
         </div>
         
-        {/* Paginación - Esta parte tiene el problema con las keys */}
+        {/* Debug info */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 p-2 bg-gray-100 text-xs">
+            <div>Debug Info:</div>
+            <div>- Barrios recibidos: {barrios?.length || 0}</div>
+            <div>- Barrios filtrados: {filteredBarrios.length}</div>
+            <div>- Elementos en página: {currentItems.length}</div>
+            <div>- Término de búsqueda: "{searchTerm}"</div>
+          </div>
+        )}
+        
+        {/* Paginación */}
         {totalPages > 1 && (
           <div className="mt-4 flex justify-between items-center">
             <div className="text-sm text-gray-500">
               Mostrar de {indexOfFirstItem + 1} a {Math.min(indexOfLastItem, filteredBarrios.length)} de {filteredBarrios.length} datos
             </div>
             <nav className="flex space-x-1">
-              {/* Botón para página anterior */}
               <Button
                 key="prev-page"
                 onClick={() => paginate(Math.max(1, currentPage - 1))}
@@ -181,28 +236,21 @@ const BarrioList: React.FC<BarrioListProps> = ({
                 <span aria-hidden="true">&lt;</span>
               </Button>
               
-              {/* Números de página - AQUÍ ESTÁ EL PROBLEMA DE LAS KEYS */}
               {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
-                // Calcular el número de página a mostrar
                 let pageNum;
                 
                 if (totalPages <= 5) {
-                  // Si hay 5 o menos páginas, mostrar todas
                   pageNum = i + 1;
                 } else if (currentPage <= 3) {
-                  // Si estamos en las primeras 3 páginas
                   pageNum = i + 1;
                 } else if (currentPage >= totalPages - 2) {
-                  // Si estamos en las últimas 3 páginas
                   pageNum = totalPages - 4 + i;
                 } else {
-                  // En el medio
                   pageNum = currentPage - 2 + i;
                 }
                 
                 return (
                   <Button
-                    // Añadir una key única para cada botón de página
                     key={`page-${pageNum}`}
                     onClick={() => paginate(pageNum)}
                     className={`px-3 py-1 rounded ${
@@ -216,7 +264,6 @@ const BarrioList: React.FC<BarrioListProps> = ({
                 );
               })}
               
-              {/* Botón para página siguiente */}
               <Button
                 key="next-page"
                 onClick={() => paginate(Math.min(currentPage + 1, totalPages))}

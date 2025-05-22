@@ -99,6 +99,11 @@ const BarriosPage: React.FC = () => {
     };
     
     cargarDatosIniciales();
+    console.log('🏘️ BarriosPage - Estado actual:');
+    console.log('- Barrios:', barrios?.length || 0, barrios);
+    console.log('- Sectores:', sectores?.length || 0, sectores);
+    console.log('- Loading:', loading);
+    console.log('- Error:', error);
   }, [cargarSectores, cargarBarrios]);
 
   return (

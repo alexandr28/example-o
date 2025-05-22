@@ -1,13 +1,28 @@
-// src/services/barrioService.ts
+// src/services/barrioService.ts - versión con normalización de datos
+
 import { Barrio, BarrioFormData } from '../models/Barrio';
 
-// URL base para la API de barrios - USAR URL COMPLETA desde constants.ts
 const API_URL = 'http://localhost:8080/api/barrio';
 
 /**
- * Servicio para la gestión de barrios
- * Versión para acceso directo al backend sin autenticación
+ * Función para normalizar los datos de barrio que vienen de la API
  */
+const normalizeBarrioData = (apiBarrio: any): Barrio => {
+  return {
+    id: apiBarrio.codBarrio || apiBarrio.id,
+    codBarrio: apiBarrio.codBarrio,
+    nombre: apiBarrio.nombreBarrio || apiBarrio.nombre, // Normalizar el nombre
+    nombreBarrio: apiBarrio.nombreBarrio,
+    sectorId: apiBarrio.sectorId || apiBarrio.sector?.id || 0,
+    sector: apiBarrio.sector,
+    estado: apiBarrio.estado,
+    fechaCreacion: apiBarrio.fechaCreacion ? new Date(apiBarrio.fechaCreacion) : undefined,
+    fechaModificacion: apiBarrio.fechaModificacion ? new Date(apiBarrio.fechaModificacion) : undefined,
+    usuarioCreacion: apiBarrio.usuarioCreacion,
+    usuarioModificacion: apiBarrio.usuarioModificacion
+  };
+};
+
 export class BarrioService {
   /**
    * Obtener todos los barrios
@@ -20,23 +35,32 @@ export class BarrioService {
           'Content-Type': 'application/json'
         },
         mode: 'cors',
-        credentials: 'omit' // Importante: omitir credenciales para evitar problemas CORS
+        credentials: 'omit'
       });
       
       if (!response.ok) {
         throw new Error(`Error HTTP: ${response.status}`);
       }
       
-      return await response.json();
+      const rawData = await response.json();
+      console.log('🔍 Datos crudos de la API:', rawData);
+      
+      // Normalizar los datos
+      const normalizedData = Array.isArray(rawData) 
+        ? rawData.map(normalizeBarrioData)
+        : [];
+      
+      console.log('✅ Datos normalizados:', normalizedData);
+      
+      return normalizedData;
     } catch (error) {
       console.error('Error al obtener barrios:', error);
       throw error;
     }
   }
 
-  /**
-   * Obtener un barrio por ID
-   */
+  // ... resto de métodos también normalizando datos
+  
   static async getById(id: number): Promise<Barrio> {
     try {
       const response = await fetch(`${API_URL}/${id}`, {
@@ -52,16 +76,14 @@ export class BarrioService {
         throw new Error(`Error HTTP: ${response.status}`);
       }
       
-      return await response.json();
+      const rawData = await response.json();
+      return normalizeBarrioData(rawData);
     } catch (error) {
       console.error(`Error al obtener barrio ID ${id}:`, error);
       throw error;
     }
   }
 
-  /**
-   * Crear un nuevo barrio
-   */
   static async create(data: BarrioFormData): Promise<Barrio> {
     try {
       const response = await fetch(API_URL, {
@@ -69,7 +91,10 @@ export class BarrioService {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          nombreBarrio: data.nombre, // Mapear nombre a nombreBarrio para la API
+          sectorId: data.sectorId
+        }),
         mode: 'cors',
         credentials: 'omit'
       });
@@ -78,16 +103,14 @@ export class BarrioService {
         throw new Error(`Error HTTP: ${response.status}`);
       }
       
-      return await response.json();
+      const rawData = await response.json();
+      return normalizeBarrioData(rawData);
     } catch (error) {
       console.error('Error al crear barrio:', error);
       throw error;
     }
   }
 
-  /**
-   * Actualizar un barrio existente
-   */
   static async update(id: number, data: BarrioFormData): Promise<Barrio> {
     try {
       const response = await fetch(`${API_URL}/${id}`, {
@@ -95,7 +118,10 @@ export class BarrioService {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          nombreBarrio: data.nombre, // Mapear nombre a nombreBarrio para la API
+          sectorId: data.sectorId
+        }),
         mode: 'cors',
         credentials: 'omit'
       });
@@ -104,16 +130,14 @@ export class BarrioService {
         throw new Error(`Error HTTP: ${response.status}`);
       }
       
-      return await response.json();
+      const rawData = await response.json();
+      return normalizeBarrioData(rawData);
     } catch (error) {
       console.error(`Error al actualizar barrio ID ${id}:`, error);
       throw error;
     }
   }
 
-  /**
-   * Eliminar un barrio
-   */
   static async delete(id: number): Promise<void> {
     try {
       const response = await fetch(`${API_URL}/${id}`, {
@@ -134,9 +158,6 @@ export class BarrioService {
     }
   }
 
-  /**
-   * Buscar barrios
-   */
   static async search(term: string): Promise<Barrio[]> {
     try {
       const response = await fetch(`${API_URL}/search?q=${encodeURIComponent(term)}`, {
@@ -152,7 +173,8 @@ export class BarrioService {
         throw new Error(`Error HTTP: ${response.status}`);
       }
       
-      return await response.json();
+      const rawData = await response.json();
+      return Array.isArray(rawData) ? rawData.map(normalizeBarrioData) : [];
     } catch (error) {
       console.error(`Error al buscar barrios con término "${term}":`, error);
       throw error;

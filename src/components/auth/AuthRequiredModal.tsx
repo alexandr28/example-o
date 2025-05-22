@@ -50,7 +50,6 @@ const AuthRequiredModal: React.FC<AuthRequiredModalProps> = ({
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
             <input
-            title='tex'
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -62,7 +61,6 @@ const AuthRequiredModal: React.FC<AuthRequiredModalProps> = ({
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
             <input
-            title='text'
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

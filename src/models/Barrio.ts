@@ -1,9 +1,13 @@
+// src/models/Barrio.ts - versión corregida
+
 import { Sector } from './';
 
 // Interfaz para la entidad Barrio
 export interface Barrio {
-  id: number;
-  nombre: string;
+  id?: number;
+  codBarrio?: number; // Campo adicional que viene de la API
+  nombre?: string; // Campo normalizado
+  nombreBarrio?: string; // Campo que viene de la API
   sectorId: number;
   sector?: Sector;
   estado?: boolean;

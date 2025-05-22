@@ -201,5 +201,4 @@ const AuthHandler: React.FC = () => {
   );
 };
 
-
 export default AuthHandler;

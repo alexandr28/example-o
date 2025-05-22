@@ -1,8 +1,10 @@
+// src/layout/SidebarWiget.tsx - versión actualizada
+
 import React, { FC, ReactNode, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { useSidebar } from '../context/SidebarContext';
 
-// Interfaces para los elementos del menú con soporte para anidamiento
+// Interfaces para los elementos del submenú con soporte para anidamiento
 export interface SubMenuItem {
   id: string;
   label: string;
@@ -19,6 +21,7 @@ interface SidebarWidgetProps {
   isActive?: boolean;
   subMenuItems?: SubMenuItem[];
   level?: number;
+  onCustomToggle?: (menuId: string) => void; // Nueva prop para el toggle personalizado
 }
 
 /**
@@ -32,9 +35,11 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
   path,
   isActive = false,
   subMenuItems = [],
-  level = 0
+  level = 0,
+  onCustomToggle
 }) => {
-  const { isExpanded, openSubmenu, openSubmenus, setActiveItem, toggleSubmenu } = useSidebar();
+  const { isExpanded, openSubmenus, setActiveItem } = useSidebar();
+  
   // Determina si un elemento del menú está activo basado en la ruta actual
   const isActiveRoute = (path?: string): boolean => {
     if (!path) return false;
@@ -57,22 +62,22 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
 
   // Verifica si este menú tiene algún elemento activo
   const shouldBeOpen = hasActiveSubmenuItem(subMenuItems);
-
+  
   // Determinar si el ítem actual corresponde a la ruta activa o un elemento hijo lo está
   const isMenuActive = isActive || shouldBeOpen || isActiveRoute(path);
 
   const hasSubMenu = subMenuItems.length > 0;
   // Determinar si el elemento debe estar abierto
-  const isSubMenuOpen = openSubmenu === id || openSubmenus.includes(id) || (hasSubMenu && (shouldBeOpen || isMenuActive));
+  const isSubMenuOpen = openSubmenus.includes(id) || (hasSubMenu && shouldBeOpen);
   const paddingLeft = level > 0 ? `${level * 1}rem` : '';
 
   const handleClick = (e: React.MouseEvent) => {
     if (hasSubMenu) {
       e.preventDefault(); // Prevenir navegación si tiene submenú
       
-      // Si el elemento ya está en openSubmenus, no lo quitamos para mantenerlo abierto
-      if (!openSubmenus.includes(id)) {
-        toggleSubmenu(id);
+      // Usar el toggle personalizado si está disponible
+      if (onCustomToggle) {
+        onCustomToggle(id);
       }
     }
     setActiveItem(id);
@@ -95,38 +100,7 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
               style={{ paddingLeft: `${(currentLevel + 1) * 0.75}rem` }}
               onClick={() => {
-                // Evitamos cerrar submenús al navegar
                 setActiveItem(item.id);
-                
-                // Almacenar los menús abiertos en localStorage para persistencia
-                if (item.path) {
-                  try {
-                    const currentPath = item.path;
-                    const parentMenuIds = [id]; // Incluir el id del menú padre actual
-                    
-                    // Si hay submenús padres, añadir también sus IDs
-                    if (level > 0) {
-                      const parentId = `parent-${level-1}`;
-                      const storedParentId = localStorage.getItem(parentId);
-                      if (storedParentId) {
-                        parentMenuIds.unshift(storedParentId);
-                      }
-                    }
-                    
-                    // Guardar esta información en localStorage
-                    localStorage.setItem('activeMenuPath', currentPath);
-                    localStorage.setItem('activeMenuParents', JSON.stringify(parentMenuIds));
-                    
-                    // Forzar la apertura de todos los menús padres
-                    parentMenuIds.forEach(menuId => {
-                      if (!openSubmenus.includes(menuId)) {
-                        toggleSubmenu(menuId);
-                      }
-                    });
-                  } catch (e) {
-                    console.error('Error saving menu state:', e);
-                  }
-                }
               }}
             >
               {item.icon && (
@@ -146,11 +120,8 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
               style={{ paddingLeft: `${(currentLevel + 1) * 0.75}rem` }}
               onClick={(e) => {
                 e.stopPropagation(); // Evitar que el evento se propague al padre
-                if (hasNestedSubMenu) {
-                  // Si ya está abierto y hacemos clic, no queremos cerrarlo si tiene elementos activos
-                  if (!openSubmenus.includes(item.id) || !hasActiveSubmenuItem(item.subMenuItems || [])) {
-                    toggleSubmenu(item.id);
-                  }
+                if (hasNestedSubMenu && onCustomToggle) {
+                  onCustomToggle(item.id);
                 }
               }}
             >
