@@ -1,4 +1,4 @@
-// src/pages/mantenedores/SectoresPage.tsx
+// src/pages/mantenedores/SectoresPage.tsx - VERSIÓN COMPLETA CON MEJORAS
 import React, { useState, useEffect, useMemo } from 'react';
 import { MainLayout } from '../../layout';
 import { SectorList, SectorForm, Breadcrumb } from '../../components';
@@ -7,12 +7,13 @@ import { useSectores } from '../../hooks';
 import ErrorBoundary from '../../components/utils/ErrorBoundary';
 import CorsErrorMessage from '../../components/utils/CorsErrorMessage';
 import AuthRequiredModal from '../../components/auth/AuthRequiredModal';
+
 /**
  * Página para administrar los sectores del sistema
- * Versión actualizada con validación de datos mejorada y manejo de errores
+ * Versión mejorada con detección de conectividad corregida y forzar modo online
  */
 const SectoresPageContent: React.FC = () => {
-  // Usamos el hook personalizado para la gestión de sectores
+  // Hook de sectores con todas las funcionalidades
   const {
     sectores,
     sectorSeleccionado,
@@ -28,22 +29,32 @@ const SectoresPageContent: React.FC = () => {
     guardarSector,
     eliminarSector,
     setModoEdicion,
-    sincronizarManualmente
+    sincronizarManualmente,
+    forzarModoOnline, // Nueva función para forzar modo online
+    testApiConnection, // Para debugging
   } = useSectores();
 
-  // Estado para mensajes de éxito
+  // Estados locales
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [dataValidationError, setDataValidationError] = useState<string | null>(null);  
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalMessage, setAuthModalMessage] = useState('');
 
+  // Verificar si tenemos datos reales (no genéricos)
+  const tienesDatosReales = useMemo(() => {
+    return sectores.some(sector => 
+      sector.nombre && 
+      !sector.nombre.match(/^Sector \d+$/) && // No es "Sector 1", "Sector 2", etc.
+      sector.nombre.length > 5 &&
+      !sector.nombre.includes('(datos inválidos)')
+    );
+  }, [sectores]);
 
   // Verificar la validez de los datos cargados
   useEffect(() => {
     if (sectores && sectores.length > 0) {
       try {
-        // Verificar que todos los sectores tengan una estructura válida
         const sectoresInvalidos = sectores.filter(sector => 
           !sector || typeof sector !== 'object' || !sector.nombre
         );
@@ -68,11 +79,11 @@ const SectoresPageContent: React.FC = () => {
   useEffect(() => {
     const loadSectores = async () => {
       try {
-        console.log('Iniciando carga de sectores...');
+        console.log('🚀 [SectoresPage] Iniciando carga de sectores...');
         await cargarSectores();
-        console.log('Sectores cargados correctamente:', sectores?.length || 0);
+        console.log('✅ [SectoresPage] Sectores cargados:', sectores?.length || 0);
       } catch (err) {
-        console.error("Error al cargar sectores:", err);
+        console.error("❌ [SectoresPage] Error al cargar sectores:", err);
       }
     };
     
@@ -97,8 +108,6 @@ const SectoresPageContent: React.FC = () => {
     }
   };
 
-
-
   // Manejar reintento de conexión y sincronización
   const handleSyncAndRetry = async () => {
     setSuccessMessage("Intentando sincronizar datos...");
@@ -107,82 +116,120 @@ const SectoresPageContent: React.FC = () => {
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 
-  // Manejar guardado
- const handleGuardarSector = async (data: { nombre: string }) => {
-  try {
-    // Validar que el nombre no esté vacío
-    if (!data.nombre || data.nombre.trim() === '') {
-      setSuccessMessage("El nombre del sector no puede estar vacío");
-      setTimeout(() => setSuccessMessage(null), 3000);
-      return;
+  // 🚀 NUEVA FUNCIÓN: Forzar modo online
+  const handleForzarOnline = async () => {
+    console.log('🔄 [SectoresPage] Forzando modo online desde UI...');
+    setSuccessMessage("Forzando modo online...");
+    
+    try {
+      if (forzarModoOnline) {
+        await forzarModoOnline();
+        setSuccessMessage("✅ Modo online activado - usando API real");
+      } else {
+        // Fallback si la función no está disponible
+        await cargarSectores();
+        setSuccessMessage("✅ Datos recargados desde API");
+      }
+    } catch (error) {
+      console.error('❌ [SectoresPage] Error al forzar modo online:', error);
+      setSuccessMessage("❌ Error al forzar modo online");
     }
     
-    await guardarSector(data);
-    setSuccessMessage(modoEdicion 
-      ? "Sector actualizado correctamente" 
-      : "Sector creado correctamente");
     setTimeout(() => setSuccessMessage(null), 3000);
-  } catch (error: any) {
-    console.error("Error al guardar sector:", error);
+  };
+
+  // 🆕 NUEVA FUNCIÓN: Test manual de API
+  const handleTestApi = async () => {
+    setSuccessMessage("Probando conexión con API...");
     
-    // Verificar si es un error 403
-    if (error.message && error.message.includes('403')) {
-      // Mostrar modal de autenticación
-      setAuthModalMessage('Necesitas iniciar sesión para guardar cambios en los sectores.');
-      setShowAuthModal(true);
-    } else {
-      setSuccessMessage("Error al guardar el sector. Intente nuevamente.");
-      setTimeout(() => setSuccessMessage(null), 3000);
+    try {
+      if (testApiConnection) {
+        const isConnected = await testApiConnection();
+        setSuccessMessage(isConnected 
+          ? "✅ API conectada correctamente" 
+          : "❌ API no responde o devuelve datos inválidos"
+        );
+      } else {
+        setSuccessMessage("❌ Función de test no disponible");
+      }
+    } catch (error) {
+      setSuccessMessage("❌ Error al probar API");
     }
-  }
-};
+    
+    setTimeout(() => setSuccessMessage(null), 4000);
+  };
+
+  // Manejar guardado con mejor manejo de errores
+  const handleGuardarSector = async (data: { nombre: string }) => {
+    try {
+      // Validar que el nombre no esté vacío
+      if (!data.nombre || data.nombre.trim() === '') {
+        setSuccessMessage("❌ El nombre del sector no puede estar vacío");
+        setTimeout(() => setSuccessMessage(null), 3000);
+        return;
+      }
+      
+      await guardarSector(data);
+      setSuccessMessage(modoEdicion 
+        ? "✅ Sector actualizado correctamente" 
+        : "✅ Sector creado correctamente");
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (error: any) {
+      console.error("❌ [SectoresPage] Error al guardar sector:", error);
+      
+      // Verificar si es un error 403
+      if (error.message && error.message.includes('403')) {
+        // Mostrar modal de autenticación
+        setAuthModalMessage('Necesitas iniciar sesión para guardar cambios en los sectores.');
+        setShowAuthModal(true);
+      } else {
+        setSuccessMessage("❌ Error al guardar el sector. Intente nuevamente.");
+        setTimeout(() => setSuccessMessage(null), 3000);
+      }
+    }
+  };
 
   // Manejar eliminación
   const handleEliminarSector = async (id: number) => {
+    if (!window.confirm('¿Está seguro de eliminar este sector?')) {
+      return;
+    }
+
     try {
       await eliminarSector(id);
-      setSuccessMessage("Sector eliminado correctamente");
+      setSuccessMessage("✅ Sector eliminado correctamente");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (error) {
-      console.error("Error al eliminar sector:", error);
-      setSuccessMessage("Error al eliminar el sector. Intente nuevamente.");
+      console.error("❌ [SectoresPage] Error al eliminar sector:", error);
+      setSuccessMessage("❌ Error al eliminar el sector. Intente nuevamente.");
       setTimeout(() => setSuccessMessage(null), 3000);
     }
   };
 
   // Procesar sectores para asegurar que son válidos
-// En la sección donde se procesan los datos antes de renderizar
-const sectoresValidos = useMemo(() => {
-  if (!sectores) return [];
-  
-  console.log('🔍 Procesando sectores para renderizado:', sectores);
-  
-  // Verificar explícitamente cada sector para diagnóstico
-  const procesados = sectores.map((sector, index) => {
-    console.log(`📋 Sector ${index}:`, sector);
+  const sectoresValidos = useMemo(() => {
+    if (!sectores) return [];
     
-    if (!sector || typeof sector !== 'object') {
-      console.warn(`⚠️ Sector ${index} no es un objeto:`, sector);
-      return null;
-    }
+    console.log('🔍 [SectoresPage] Procesando sectores para renderizado:', sectores);
     
-    if (!sector.nombre) {
-      console.warn(`⚠️ Sector ${index} no tiene nombre:`, sector);
-      return null;
-    }
+    const procesados = sectores.map((sector, index) => {
+      if (!sector || typeof sector !== 'object') {
+        console.warn(`⚠️ [SectoresPage] Sector ${index} no es un objeto:`, sector);
+        return null;
+      }
+      
+      if (!sector.nombre) {
+        console.warn(`⚠️ [SectoresPage] Sector ${index} no tiene nombre:`, sector);
+        return null;
+      }
+      
+      return sector;
+    }).filter(Boolean);
     
-    // Si el nombre es "Sector X", es probable que sea un nombre generado
-    if (/^Sector \d+$/.test(sector.nombre)) {
-      console.warn(`⚠️ Sector ${index} parece tener un nombre generado:`, sector.nombre);
-    }
+    console.log('✅ [SectoresPage] Sectores válidos procesados:', procesados);
     
-    return sector;
-  }).filter(Boolean);
-  
-  console.log('✅ Sectores válidos procesados:', procesados);
-  
-  return procesados;
-}, [sectores]);
+    return procesados;
+  }, [sectores]);
 
   return (
     <MainLayout title="Mantenimiento de Sectores">
@@ -190,15 +237,26 @@ const sectoresValidos = useMemo(() => {
         {/* Navegación de migas de pan */}
         <div className="flex justify-between items-center">
           <Breadcrumb items={breadcrumbItems} />
-          <button 
-            onClick={() => setShowHelp(!showHelp)}
-            className="text-blue-600 hover:text-blue-800 flex items-center"
-          >
-            <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Ayuda
-          </button>
+          <div className="flex space-x-2">
+            <button 
+              onClick={handleTestApi}
+              className="text-purple-600 hover:text-purple-800 flex items-center text-sm"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+              Test API
+            </button>
+            <button 
+              onClick={() => setShowHelp(!showHelp)}
+              className="text-blue-600 hover:text-blue-800 flex items-center text-sm"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Ayuda
+            </button>
+          </div>
         </div>
         
         {/* Mensaje de error CORS si estamos en modo offline */}
@@ -234,9 +292,16 @@ const sectoresValidos = useMemo(() => {
               <li>Editar sectores existentes seleccionándolos de la lista</li>
               <li>Eliminar sectores haciendo clic en el icono de eliminar</li>
             </ul>
+            <div className="text-sm mb-2">
+              <strong>Estado actual:</strong>
+              <ul className="list-disc list-inside ml-4">
+                <li>Datos: {tienesDatosReales ? '✅ Reales de la API' : '⚠️ Genéricos/Mock'}</li>
+                <li>Conexión: {isOfflineMode ? '❌ Offline' : '✅ Online'}</li>
+                <li>Sectores cargados: {sectores.length}</li>
+              </ul>
+            </div>
             <p className="text-sm">
-              <strong>Nota:</strong> Este módulo funciona correctamente incluso sin conexión a internet.
-              Los cambios se guardarán localmente y se sincronizarán cuando la conexión esté disponible.
+              <strong>Nota:</strong> Si tienes datos reales pero aparece como offline, usa el botón "Forzar Online".
             </p>
             <button 
               onClick={() => setShowHelp(false)}
@@ -251,29 +316,49 @@ const sectoresValidos = useMemo(() => {
         
         {/* Mensaje de éxito */}
         {successMessage && (
-          <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded relative" role="alert">
+          <div className={`border px-4 py-3 rounded relative ${
+            successMessage.includes('❌') 
+              ? 'bg-red-50 border-red-200 text-red-800' 
+              : 'bg-green-50 border-green-200 text-green-800'
+          }`} role="alert">
             <span className="block sm:inline">{successMessage}</span>
           </div>
         )}
         
-        {/* Alerta de modo sin conexión */}
+        {/* 🚀 ALERTA MEJORADA DE MODO SIN CONEXIÓN */}
         {isOfflineMode && (
-          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded relative flex justify-between items-center" role="alert">
-            <div>
-              <span className="font-medium">Modo sin conexión:</span>
-              <span className="ml-1">Trabajando con datos locales. Los cambios se guardarán cuando se restaure la conexión.</span>
-              {hasPendingChanges && (
-                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-200 text-yellow-800">
-                  {pendingChangesCount} {pendingChangesCount === 1 ? 'cambio pendiente' : 'cambios pendientes'}
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded relative" role="alert">
+            <div className="flex justify-between items-center">
+              <div className="flex-1">
+                <span className="font-medium">Modo sin conexión:</span>
+                <span className="ml-1">
+                  {tienesDatosReales 
+                    ? '⚠️ Tienes datos reales pero está marcado como offline incorrectamente.' 
+                    : 'Trabajando con datos locales. Los cambios se guardarán cuando se restaure la conexión.'}
                 </span>
-              )}
+                {hasPendingChanges && (
+                  <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-200 text-yellow-800">
+                    {pendingChangesCount} {pendingChangesCount === 1 ? 'cambio pendiente' : 'cambios pendientes'}
+                  </span>
+                )}
+              </div>
+              <div className="flex space-x-2 ml-4">
+                {tienesDatosReales && (
+                  <button 
+                    onClick={handleForzarOnline}
+                    className="px-3 py-1 bg-green-200 text-green-800 rounded hover:bg-green-300 focus:outline-none focus:ring-2 focus:ring-green-400 text-sm font-medium"
+                  >
+                    🚀 Forzar Online
+                  </button>
+                )}
+                <button 
+                  onClick={handleSyncAndRetry}
+                  className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-400 text-sm"
+                >
+                  {hasPendingChanges ? 'Sincronizar' : 'Reintentar'}
+                </button>
+              </div>
             </div>
-            <button 
-              onClick={handleSyncAndRetry}
-              className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-            >
-              {hasPendingChanges ? 'Sincronizar y reintentar' : 'Reintentar conexión'}
-            </button>
           </div>
         )}
         
@@ -319,7 +404,7 @@ const sectoresValidos = useMemo(() => {
           </div>
         ) : (
           <SectorList
-            sectores={sectoresValidos} // Usando la versión filtrada y validada
+            sectores={sectoresValidos}
             onSelectSector={seleccionarSector}
             isOfflineMode={isOfflineMode}
             onEliminar={handleEliminarSector}
@@ -329,20 +414,24 @@ const sectoresValidos = useMemo(() => {
         {/* Información de depuración si estamos en modo desarrollo */}
         {process.env.NODE_ENV === 'development' && (
           <div className="mt-8 p-4 bg-gray-100 rounded-md text-xs font-mono overflow-auto max-h-40">
-            <div className="font-semibold mb-2">Debug info:</div>
-            <div>Sectores cargados: {sectores?.length || 0}</div>
-            <div>Sectores válidos: {sectoresValidos.length}</div>
-            <div>Modo offline: {isOfflineMode ? 'Sí' : 'No'}</div>
-            <div>Cambios pendientes: {pendingChangesCount}</div>
-            <div>Error: {error || 'Ninguno'}</div>
+            <div className="font-semibold mb-2">🔧 Debug Info:</div>
+            <div>📊 Sectores cargados: {sectores?.length || 0}</div>
+            <div>✅ Sectores válidos: {sectoresValidos.length}</div>
+            <div>🌐 Modo offline: {isOfflineMode ? 'Sí' : 'No'}</div>
+            <div>📈 Datos reales: {tienesDatosReales ? 'Sí' : 'No'}</div>
+            <div>🔄 Cambios pendientes: {pendingChangesCount}</div>
+            <div>❌ Error: {error || 'Ninguno'}</div>
+            <div>🎯 Primer sector: {sectores[0]?.nombre || 'N/A'}</div>
           </div>
         )}
       </div>
-       <AuthRequiredModal
-      isOpen={showAuthModal}
-      onClose={() => setShowAuthModal(false)}
-      message={authModalMessage}
-    />
+      
+      {/* Modal de autenticación requerida */}
+      <AuthRequiredModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        message={authModalMessage}
+      />
     </MainLayout>
   );
 };

@@ -1,3 +1,4 @@
+// src/components/auth/AuthHandler.tsx - SIN AUTOLOGIN AUTOMÁTICO
 import { useEffect, useState } from 'react';
 import { useAuthContext } from '../../context/AuthContext';
 
@@ -55,7 +56,7 @@ const NotificationManager: React.FC<{
 };
 
 /**
- * Componente para manejar la autenticación automática y mostrar notificaciones
+ * Componente para manejar la autenticación - SIN AUTOLOGIN
  */
 const AuthHandler: React.FC = () => {
   const auth = useAuthContext();
@@ -76,51 +77,16 @@ const AuthHandler: React.FC = () => {
     setNotifications(prev => prev.filter(notification => notification.id !== id));
   };
   
-  // Efecto para autologin en desarrollo
- useEffect(() => {
-  const attemptAutoLogin = async () => {
-    // Solo en desarrollo
-    if (process.env.NODE_ENV === 'development') {
-      // Verificar si el usuario cerró sesión explícitamente
-      const explicitLogout = localStorage.getItem('explicit_logout') === 'true';
-      const logoutTimeStr = localStorage.getItem('explicit_logout_time');
-      
-      // Si el logout fue explícito y hace menos de 10 minutos, no hacer autologin
-      if (explicitLogout && logoutTimeStr) {
-        const logoutTime = new Date(logoutTimeStr);
-        const now = new Date();
-        const minutesSinceLogout = (now.getTime() - logoutTime.getTime()) / (1000 * 60);
-        
-        if (minutesSinceLogout < 10) { // 10 minutos de "periodo de gracia"
-          console.log('⚠️ No se realizará autologin porque el usuario cerró sesión hace menos de 10 minutos');
-          return;
-        } else {
-          // Limpiar la marca de logout si ya pasaron más de 10 minutos
-          localStorage.removeItem('explicit_logout');
-          localStorage.removeItem('explicit_logout_time');
-        }
-      }
-      
-      // Verificar si ya hay token
-      const hasToken = localStorage.getItem('auth_token');
-      
-      if (!hasToken && !auth.isAuthenticated) {
-        console.log('🔄 Desarrollo: Sin token, intentando login automático');
-        
-        // Resto del código de autologin...
-      }
-    }
-  };
-  
-  attemptAutoLogin();
-}, [auth]);
+  // 🚫 AUTOLOGIN REMOVIDO COMPLETAMENTE
+  // Ya no hay autologin automático - el usuario debe hacer login manualmente
   
   // Monitor de estado de autenticación
   useEffect(() => {
     console.log('🔐 Estado de autenticación:', auth.isAuthenticated ? 'Autenticado' : 'No autenticado');
     
-    if (auth.error) {
+    if (auth.error && auth.error !== 'La sesión ha expirado. Por favor, inicie sesión nuevamente.') {
       console.error('❌ Error de autenticación:', auth.error);
+      showNotification(auth.error, 'error');
     }
   }, [auth.isAuthenticated, auth.error]);
   
@@ -138,7 +104,13 @@ const AuthHandler: React.FC = () => {
         if (expiryDate.getTime() - now.getTime() < 2 * 60 * 1000) {
           console.log('⚠️ Token a punto de expirar, intentando renovar');
           auth.renewToken().then(success => {
-            console.log(success ? '✅ Token renovado' : '❌ No se pudo renovar token');
+            if (success) {
+              console.log('✅ Token renovado');
+              showNotification('Sesión renovada automáticamente', 'info');
+            } else {
+              console.log('❌ No se pudo renovar token');
+              showNotification('Su sesión expirará pronto. Por favor, guarde su trabajo.', 'error');
+            }
           });
         }
       }
@@ -150,39 +122,32 @@ const AuthHandler: React.FC = () => {
     return () => clearInterval(interval);
   }, [auth]);
   
-  // Solo en modo desarrollo, agregar depuración básica
+  // Debug en modo desarrollo (solo con Alt+D)
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      const checkTokenInfo = () => {
-        const token = localStorage.getItem('auth_token');
-        const expiry = localStorage.getItem('auth_token_expiry');
-        const expiryDate = expiry ? new Date(expiry) : null;
-        const isExpired = expiryDate ? expiryDate < new Date() : true;
-        
-        console.log('🔑 Token Information:');
-        console.log('- Token exists:', !!token);
-        if (token) console.log('- Token preview:', token.substring(0, 15) + '...');
-        console.log('- Expiry date:', expiryDate ? expiryDate.toLocaleString() : 'None');
-        console.log('- Is expired:', isExpired);
-      };
-      
-      // Verificar token al inicio
-      checkTokenInfo();
-      
-      // Hacer debug con Alt+D
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.altKey && e.key === 'd') {
-          checkTokenInfo();
+          const token = localStorage.getItem('auth_token');
+          const expiry = localStorage.getItem('auth_token_expiry');
+          const expiryDate = expiry ? new Date(expiry) : null;
+          const isExpired = expiryDate ? expiryDate < new Date() : true;
           
-          // También para renovación manual
+          console.log('🔑 Token Information:');
+          console.log('- Token exists:', !!token);
+          if (token) console.log('- Token preview:', token.substring(0, 15) + '...');
+          console.log('- Expiry date:', expiryDate ? expiryDate.toLocaleString() : 'None');
+          console.log('- Is expired:', isExpired);
+          console.log('- Is authenticated:', auth.isAuthenticated);
+          console.log('- User:', auth.user?.username || 'None');
+          
+          // Renovación manual con Shift+Alt+D
           if (e.shiftKey) {
             console.log('🔄 Intentando renovar token manualmente...');
             auth.renewToken().then(success => {
+              const message = success ? 'Token renovado manualmente' : 'Renovación manual fallida';
+              const type = success ? 'success' : 'error';
               console.log(success ? '✅ Token renovado manualmente' : '❌ Renovación manual fallida');
-              showNotification(
-                success ? 'Token renovado manualmente' : 'Renovación manual fallida',
-                success ? 'success' : 'error'
-              );
+              showNotification(message, type);
             });
           }
         }

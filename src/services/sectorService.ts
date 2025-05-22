@@ -1,282 +1,268 @@
-// src/services/sectorService.ts
+// src/services/sectorService.ts - CORREGIDO SIN AUTENTICACIÓN
 import { Sector, SectorFormData } from '../models/Sector';
 
-// URL base para la API de sectores - USAR URL COMPLETA
+// URL base para la API de sectores
 const API_URL = 'http://localhost:8080/api/sector';
 
 /**
  * Servicio centralizado para operaciones con sectores
- * Versión para acceso directo al backend
+ * VERSIÓN SIN AUTENTICACIÓN - Todos los métodos funcionan sin token
  */
 export class SectorService {
   // Obtener todos los sectores
-static async getAll(): Promise<Sector[]> {
-  try {
-    console.log('Iniciando petición GET a:', API_URL);
-    
-    const response = await fetch(API_URL, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      mode: 'cors',
-      credentials: 'omit'
-    });
-    
-    console.log('Respuesta recibida:', response.status, response.statusText);
-    
-    if (!response.ok) {
-      // Manejar error...
-      throw new Error(`Error HTTP: ${response.status}`);
-    }
-    
-    // Obtener el cuerpo de la respuesta y mostrarlo completo
-    const responseText = await response.text();
-    console.log('Respuesta completa:', responseText);
-    
-    // Convertir el texto a JSON
-    let data;
+  static async getAll(): Promise<Sector[]> {
     try {
-      data = JSON.parse(responseText);
-    } catch (e) {
-      console.error('Error al parsear JSON:', e);
-      throw new Error('La respuesta no es un JSON válido');
-    }
-    
-    console.log('Datos procesados como JSON:', data);
-    
-    // Verificar la estructura exacta de la respuesta
-    if (Array.isArray(data)) {
-      console.log('La respuesta es un array');
-      // Revisar la estructura exacta del primer elemento (si existe)
-      if (data.length > 0) {
-        console.log('Estructura del primer elemento:', JSON.stringify(data[0], null, 2));
-      }
+      console.log('📡 GET Sectores - Iniciando petición a:', API_URL);
       
-      // Verificar cada elemento del array
-      const sectores = data.map((item, index) => {
-        // Verificar que el item sea un objeto
-        if (typeof item !== 'object' || item === null) {
-          console.log(`Item ${index} no es un objeto:`, item);
-          return { id: index + 1, nombre: `Sector ${index + 1}` };
-        }
-        
-        // Buscar dónde está el nombre, podría estar en diferentes propiedades
-        let nombre = null;
-        
-        // Verificar propiedades comunes donde podría estar el nombre
-        if (item.nombre) nombre = item.nombre;
-        else if (item.name) nombre = item.name;
-        else if (item.descripcion) nombre = item.descripcion;
-        else if (item.description) nombre = item.description;
-        else if (item.text) nombre = item.text;
-        else if (item.value) nombre = item.value;
-        
-        // Si no se encontró ninguna propiedad que pueda ser el nombre, 
-        // imprimir todas las propiedades del objeto para análisis
-        if (!nombre) {
-          console.log(`No se encontró nombre para el item ${index}, propiedades disponibles:`, 
-            Object.keys(item));
-          
-          // Si hay alguna propiedad de tipo string, usarla como nombre
-          const stringProps = Object.entries(item)
-            .filter(([_, value]) => typeof value === 'string')
-            .map(([key, value]) => ({ key, value }));
-            
-          if (stringProps.length > 0) {
-            console.log('Propiedades string disponibles:', stringProps);
-            // Usar la primera propiedad string como nombre
-            nombre = stringProps[0].value;
-          } else {
-            nombre = `Sector ${index + 1}`;
-          }
-        }
-        
-        // Verificar si tiene ID
-        let id = null;
-        if (item.id !== undefined) id = item.id;
-        else if (item.codigo !== undefined) id = item.codigo;
-        else if (item.code !== undefined) id = item.code;
-        else id = index + 1;
-        
-        return {
-          id: id,
-          nombre: nombre
-        };
+      const response = await fetch(API_URL, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          // NO incluir Authorization header
+        },
+        mode: 'cors',
+        credentials: 'omit' // Importante: no enviar cookies
       });
       
-      return sectores;
-    } else if (data && typeof data === 'object') {
-      console.log('La respuesta es un objeto. Propiedades:', Object.keys(data));
+      console.log('📡 GET Sectores - Respuesta:', response.status, response.statusText);
       
-      // Intentar encontrar un array en las propiedades del objeto
-      let sectoresArray = null;
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+      }
       
-      // Buscar en propiedades comunes
-      if (Array.isArray(data.data)) sectoresArray = data.data;
-      else if (Array.isArray(data.sectores)) sectoresArray = data.sectores;
-      else if (Array.isArray(data.items)) sectoresArray = data.items;
-      else if (Array.isArray(data.results)) sectoresArray = data.results;
-      else if (Array.isArray(data.resultado)) sectoresArray = data.resultado;
+      const responseText = await response.text();
+      console.log('📡 GET Sectores - Respuesta texto:', responseText);
       
-      if (sectoresArray) {
-        console.log('Se encontró un array en la propiedad:', 
-          Object.keys(data).find(key => Array.isArray(data[key])));
-        
-        // Procesar el array encontrado (usando la misma lógica de arriba)
-        return sectoresArray.map((item, index) => {
-          // (mismo código de procesamiento que arriba)
-          // ...
-        });
-      } else {
-        // Si no hay un array, tratar de convertir las propiedades a un array
-        const sectores = Object.entries(data).map(([key, value], index) => {
-          if (typeof value === 'object' && value !== null) {
-            // Si el valor es un objeto, intentar extraer nombre e id
-            let nombre = null;
-            if (value.nombre) nombre = value.nombre;
-            else if (value.name) nombre = value.name;
-            else nombre = key; // Usar la clave como nombre
-            
-            let id = null;
-            if (value.id !== undefined) id = value.id;
-            else id = index + 1;
-            
-            return { id, nombre };
-          } else if (typeof value === 'string') {
-            // Si el valor es una string, usarla como nombre
-            return { id: index + 1, nombre: value };
-          } else {
-            // Caso por defecto
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ Error al parsear JSON:', parseError);
+        throw new Error('Respuesta no es JSON válido');
+      }
+      
+      console.log('📡 GET Sectores - Datos procesados:', data);
+      
+      if (Array.isArray(data)) {
+        return data.map((item, index) => {
+          if (!item || typeof item !== 'object') {
             return { id: index + 1, nombre: `Sector ${index + 1}` };
           }
+          
+          return {
+            id: item.id || item.codigo || index + 1,
+            nombre: item.nombre || item.name || item.descripcion || `Sector ${index + 1}`
+          };
         });
-        
-        return sectores;
+      } else if (data && typeof data === 'object') {
+        // Si es un objeto, buscar array dentro
+        const sectoresArray = data.data || data.sectores || data.items || data.results;
+        if (Array.isArray(sectoresArray)) {
+          return sectoresArray.map((item, index) => ({
+            id: item.id || item.codigo || index + 1,
+            nombre: item.nombre || item.name || `Sector ${index + 1}`
+          }));
+        }
       }
-    } else {
-      console.error('Estructura de datos desconocida:', data);
+      
       return [];
+    } catch (error) {
+      console.error('❌ Error al obtener sectores:', error);
+      throw error;
     }
-  } catch (error) {
-    console.error('Error al obtener sectores:', error);
-    throw error;
   }
-}
 
   // Obtener un sector por ID
   static async getById(id: number): Promise<Sector> {
     try {
+      console.log(`📡 GET Sector ID ${id} - Iniciando petición`);
+      
       const response = await fetch(`${API_URL}/${id}`, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          // NO incluir Authorization header
         },
         mode: 'cors',
         credentials: 'omit'
       });
       
+      console.log(`📡 GET Sector ID ${id} - Respuesta:`, response.status);
+      
       if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
+        throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      return {
+        id: data.id || data.codigo || id,
+        nombre: data.nombre || data.name || data.descripcion || `Sector ${id}`
+      };
     } catch (error) {
-      console.error(`Error al obtener sector ID ${id}:`, error);
+      console.error(`❌ Error al obtener sector ID ${id}:`, error);
       throw error;
     }
   }
 
-  // Crear un nuevo sector
+  // Crear un nuevo sector - SIN AUTENTICACIÓN
   static async create(data: SectorFormData): Promise<Sector> {
     try {
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data),
-        mode: 'cors',
-        credentials: 'omit'
+      console.log('📡 POST Sector - Iniciando creación:', data);
+      console.log('📡 POST Sector - URL:', API_URL);
+      
+      // 🚨 IMPORTANTE: Headers sin Authorization
+      const headers = {
+        'Content-Type': 'application/json',
+        // NO incluir Authorization: Bearer token aquí
+      };
+      
+      console.log('📡 POST Sector - Headers:', headers);
+      
+      const requestBody = JSON.stringify({
+        nombre: data.nombre // Mapear correctamente según tu API
       });
       
+      console.log('📡 POST Sector - Body:', requestBody);
+      
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: headers,
+        body: requestBody,
+        mode: 'cors',
+        credentials: 'omit' // No enviar cookies ni credenciales
+      });
+      
+      console.log('📡 POST Sector - Respuesta:', response.status, response.statusText);
+      
       if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
+        // Obtener más detalles del error
+        let errorMessage = `Error HTTP: ${response.status} - ${response.statusText}`;
+        try {
+          const errorText = await response.text();
+          console.error('📡 POST Sector - Error detallado:', errorText);
+          
+          // Intentar parsear como JSON
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.message || errorJson.error || errorMessage;
+          } catch {
+            // Si no es JSON, usar el texto tal como está
+            if (errorText) {
+              errorMessage += ` - ${errorText}`;
+            }
+          }
+        } catch (e) {
+          console.error('No se pudo leer el cuerpo del error');
+        }
+        
+        throw new Error(errorMessage);
       }
       
-      return await response.json();
+      const responseData = await response.json();
+      console.log('📡 POST Sector - Datos de respuesta:', responseData);
+      
+      return {
+        id: responseData.id || responseData.codigo || Math.random(),
+        nombre: responseData.nombre || responseData.name || data.nombre
+      };
     } catch (error) {
-      console.error('Error al crear sector:', error);
+      console.error('❌ Error al crear sector:', error);
       throw error;
     }
   }
 
-  // Actualizar un sector existente
- static async update(id: number, data: SectorFormData): Promise<Sector> {
-  try {
-    // Obtener token de autenticación si existe
-    const token = localStorage.getItem('auth_token');
-    
-    console.log(`Actualizando sector ID ${id} con datos:`, data);
-    console.log('Token disponible:', token ? 'Sí' : 'No');
-    
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json'
-    };
-    
-    // Añadir token de autorización si existe
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    const response = await fetch(`${API_URL}/${id}`, {
-      method: 'PUT',
-      headers: headers,
-      body: JSON.stringify(data),
-      mode: 'cors',
-      credentials: 'include' // Cambiar a 'include' para enviar cookies si es necesario
-    });
-    
-    console.log('Respuesta de actualización:', response.status, response.statusText);
-    
-    if (!response.ok) {
-      // Intentar obtener más detalles sobre el error
-      let errorMsg = `Error HTTP: ${response.status}`;
-      try {
-        const errorDetails = await response.text();
-        console.error('Detalles del error:', errorDetails);
-        errorMsg += ` - ${errorDetails}`;
-      } catch (e) {
-        console.error('No se pudo leer el cuerpo de la respuesta');
+  // Actualizar un sector existente - SIN AUTENTICACIÓN
+  static async update(id: number, data: SectorFormData): Promise<Sector> {
+    try {
+      console.log(`📡 PUT Sector ID ${id} - Iniciando actualización:`, data);
+      
+      // 🚨 IMPORTANTE: Headers sin Authorization
+      const headers = {
+        'Content-Type': 'application/json',
+        // NO incluir Authorization: Bearer token aquí
+      };
+      
+      console.log(`📡 PUT Sector ID ${id} - Headers:`, headers);
+      
+      const requestBody = JSON.stringify({
+        nombre: data.nombre
+      });
+      
+      console.log(`📡 PUT Sector ID ${id} - Body:`, requestBody);
+      
+      const response = await fetch(`${API_URL}/${id}`, {
+        method: 'PUT',
+        headers: headers,
+        body: requestBody,
+        mode: 'cors',
+        credentials: 'omit'
+      });
+      
+      console.log(`📡 PUT Sector ID ${id} - Respuesta:`, response.status, response.statusText);
+      
+      if (!response.ok) {
+        let errorMessage = `Error HTTP: ${response.status} - ${response.statusText}`;
+        try {
+          const errorDetails = await response.text();
+          console.error(`📡 PUT Sector ID ${id} - Error:`, errorDetails);
+          if (errorDetails) {
+            errorMessage += ` - ${errorDetails}`;
+          }
+        } catch (e) {
+          console.error('No se pudo leer detalles del error');
+        }
+        
+        throw new Error(errorMessage);
       }
       
-      throw new Error(errorMsg);
+      const responseData = await response.json();
+      console.log(`📡 PUT Sector ID ${id} - Éxito:`, responseData);
+      
+      return {
+        id: responseData.id || responseData.codigo || id,
+        nombre: responseData.nombre || responseData.name || data.nombre
+      };
+    } catch (error) {
+      console.error(`❌ Error al actualizar sector ID ${id}:`, error);
+      throw error;
     }
-    
-    return await response.json();
-  } catch (error) {
-    console.error(`Error al actualizar sector ID ${id}:`, error);
-    throw error;
   }
-}
 
-  // Eliminar un sector
+  // Eliminar un sector - SIN AUTENTICACIÓN
   static async delete(id: number): Promise<void> {
     try {
+      console.log(`📡 DELETE Sector ID ${id} - Iniciando eliminación`);
+      
       const response = await fetch(`${API_URL}/${id}`, {
         method: 'DELETE',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          // NO incluir Authorization header
         },
         mode: 'cors',
         credentials: 'omit'
       });
       
+      console.log(`📡 DELETE Sector ID ${id} - Respuesta:`, response.status);
+      
       if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
+        let errorMessage = `Error HTTP: ${response.status} - ${response.statusText}`;
+        try {
+          const errorDetails = await response.text();
+          console.error(`📡 DELETE Sector ID ${id} - Error:`, errorDetails);
+          if (errorDetails) {
+            errorMessage += ` - ${errorDetails}`;
+          }
+        } catch (e) {
+          console.error('No se pudo leer detalles del error');
+        }
+        
+        throw new Error(errorMessage);
       }
+      
+      console.log(`📡 DELETE Sector ID ${id} - Éxito`);
     } catch (error) {
-      console.error(`Error al eliminar sector ID ${id}:`, error);
+      console.error(`❌ Error al eliminar sector ID ${id}:`, error);
       throw error;
     }
   }
