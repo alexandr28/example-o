@@ -1,18 +1,12 @@
-// src/pages/mantenedores/CallePage.tsx
+// src/pages/mantenedores/CallePage.tsx - CON DEBUG PARA VERIFICAR NOMBRES
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { MainLayout } from '../../layout';
 import { CalleList, CalleForm, Breadcrumb } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useCalles } from '../../hooks';
-import ErrorBoundary from '../../components/utils/ErrorBoundary';
-import CorsErrorMessage from '../../components/utils/CorsErrorMessage';
 
-/**
- * Página para administrar las calles del sistema
- * Versión mejorada con mejor manejo de errores y estados
- */
-const CallePageContent: React.FC = () => {
-  // Usamos el hook personalizado para la gestión de calles
+const CallePage: React.FC = () => {
   const {
     calles,
     calleSeleccionada,
@@ -21,53 +15,21 @@ const CallePageContent: React.FC = () => {
     error,
     isOfflineMode,
     searchTerm,
-    pendingChangesCount,
     cargarCalles,
     seleccionarCalle,
     limpiarSeleccion,
     guardarCalle,
     eliminarCalle,
     buscarCalles,
-    sincronizarCambios,
+    forzarModoOnline,
+    testApiConnection,
     setModoEdicion,
   } = useCalles();
 
-  // Estado para mensajes de éxito
+  // Estados locales
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [showHelp, setShowHelp] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<string | null>(null);
-
-  // Cargar calles e iniciar debug cuando se monta el componente
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        console.log('🏁 Iniciando carga de datos en CallePage');
-        await cargarCalles();
-        
-        // Imprimir información de debug después de cargar datos
-        setTimeout(() => {
-          console.log('📊 Estado después de cargar:');
-          console.log('- Calles cargadas:', calles.length);
-          console.log('- Primera calle:', calles[0]);
-          console.log('- Modo offline:', isOfflineMode);
-          console.log('- Error:', error);
-          
-          // Almacenar información de debug
-          setDebugInfo(JSON.stringify({
-            callesCount: calles.length,
-            firstCalle: calles[0],
-            isOfflineMode,
-            error,
-            timestamp: new Date().toISOString()
-          }, null, 2));
-        }, 1000);
-      } catch (err) {
-        console.error("❌ Error al cargar datos:", err);
-      }
-    };
-    
-    loadData();
-  }, [cargarCalles]);
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   // Migas de pan para la navegación
   const breadcrumbItems: BreadcrumbItem[] = useMemo(() => [
@@ -77,207 +39,346 @@ const CallePageContent: React.FC = () => {
     { label: 'Calles', active: true }
   ], []);
 
+  // Cargar datos al montar
+  useEffect(() => {
+    console.log('🎬 [CallePage] Componente montado');
+    cargarCalles();
+  }, [cargarCalles]);
+
+  // Función para mostrar mensaje temporal
+  const showMessage = (message: string, isError = false) => {
+    setSuccessMessage(message);
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
   // Manejo de edición
   const handleEditar = () => {
     if (calleSeleccionada) {
       setModoEdicion(true);
     } else {
-      setSuccessMessage("Por favor, seleccione una calle para editar");
-      setTimeout(() => setSuccessMessage(null), 3000);
+      showMessage("Por favor, seleccione una calle para editar");
     }
   };
 
-  // Botón para forzar recarga de datos
-  const handleForceReload = async () => {
-    setSuccessMessage("Recargando datos...");
-    await cargarCalles();
-    setSuccessMessage("Datos recargados");
-    setTimeout(() => setSuccessMessage(null), 3000);
+  // Función de debug específica para calles
+  const handleDebugInfo = async () => {
+    console.log('🔧 [CallePage] Generando información de debug para calles...');
+    
+    try {
+      // Probar conexión API
+      const apiConnected = await testApiConnection();
+      
+      // Hacer petición directa para obtener respuesta cruda
+      let rawApiResponse = null;
+      try {
+        const response = await fetch('http://localhost:8080/api/via', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          mode: 'cors',
+          credentials: 'omit'
+        });
+        
+        if (response.ok) {
+          const text = await response.text();
+          try {
+            rawApiResponse = JSON.parse(text);
+          } catch {
+            rawApiResponse = text;
+          }
+        } else {
+          rawApiResponse = `Error ${response.status}: ${response.statusText}`;
+        }
+      } catch (err: any) {
+        rawApiResponse = `Error de conexión: ${err.message}`;
+      }
+      
+      // Analizar estructura de datos
+      const analisisCalles = calles.map((calle, index) => ({
+        indice: index,
+        id: calle.id,
+        tipoVia: calle.tipoVia,
+        nombre: calle.nombre,
+        tipoNombre: typeof calle.nombre,
+        nombreValido: !!(calle.nombre && calle.nombre.trim()),
+        longitudNombre: calle.nombre ? calle.nombre.length : 0,
+        esMock: calle.nombre ? calle.nombre.includes('sin nombre') : false
+      }));
+      
+      const debug = {
+        timestamp: new Date().toLocaleString(),
+        componente: 'CallePage',
+        estado: {
+          callesCargadas: calles.length,
+          loading,
+          error,
+          isOfflineMode,
+          calleSeleccionada: calleSeleccionada?.nombre || 'Ninguna',
+          searchTerm
+        },
+        analisisCalles,
+        primeraCalleCompleta: calles[0] || null,
+        api: {
+          conectada: apiConnected,
+          url: 'http://localhost:8080/api/via',
+          respuestaCruda: Array.isArray(rawApiResponse) ? rawApiResponse.slice(0, 3) : rawApiResponse,
+          totalElementosAPI: Array.isArray(rawApiResponse) ? rawApiResponse.length : 'N/A'
+        },
+        navegador: {
+          userAgent: navigator.userAgent,
+          online: navigator.onLine,
+          localStorage: {
+            callesCache: localStorage.getItem('calles_cache') ? 'Presente' : 'Ausente',
+          }
+        }
+      };
+      
+      setDebugInfo(debug);
+      console.log('🔧 [CallePage] Debug info completo:', debug);
+      
+    } catch (err) {
+      console.error('❌ [CallePage] Error generando debug:', err);
+      setDebugInfo({ error: 'Error generando información de debug' });
+    }
   };
 
-  // Cargar datos de ejemplo
-  const handleLoadSampleData = () => {
-    // Datos de ejemplo
-    const sampleData = [
-      { id: 1, tipoVia: 'avenida', nombre: 'Gran Chimú' },
-      { id: 2, tipoVia: 'calle', nombre: 'Los Álamos' },
-      { id: 3, tipoVia: 'jiron', nombre: 'Carabobo' },
-      { id: 4, tipoVia: 'avenida', nombre: 'España' },
-      { id: 5, tipoVia: 'calle', nombre: 'San Martín' },
-    ];
+  // Test directo de normalización
+  const handleTestNormalization = async () => {
+    showMessage("Probando normalización de datos...");
     
-    // Actualizar localStorage con datos de ejemplo
-    localStorage.setItem('calles_cache', JSON.stringify(sampleData));
+    try {
+      // Obtener datos crudos de la API
+      const response = await fetch('http://localhost:8080/api/via', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        credentials: 'omit'
+      });
+      
+      if (response.ok) {
+        const rawData = await response.json();
+        console.log('🧪 [CallePage] Datos crudos de API:', rawData);
+        
+        if (Array.isArray(rawData) && rawData.length > 0) {
+          const firstItem = rawData[0];
+          console.log('🧪 [CallePage] Primer elemento:', firstItem);
+          console.log('🧪 [CallePage] Campos disponibles:', Object.keys(firstItem));
+          console.log('🧪 [CallePage] nombreVia:', firstItem.nombreVia);
+          console.log('🧪 [CallePage] tipoVia:', firstItem.tipoVia);
+          
+          showMessage(`✅ Test completado. Ver consola para detalles.`);
+        } else {
+          showMessage(`❌ API no devolvió array válido`, true);
+        }
+      } else {
+        showMessage(`❌ Error ${response.status}: ${response.statusText}`, true);
+      }
+    } catch (error: any) {
+      showMessage(`❌ Error de conexión: ${error.message}`, true);
+    }
+  };
+
+  // Test rápido de API
+  const handleTestApi = async () => {
+    showMessage("Probando conexión con API...");
     
-    // Recargar desde la nueva caché
-    cargarCalles();
+    try {
+      const isConnected = await testApiConnection();
+      showMessage(isConnected 
+        ? "✅ API conectada correctamente" 
+        : "❌ API no responde correctamente"
+      );
+    } catch (error) {
+      showMessage("❌ Error al probar API", true);
+    }
+  };
+
+  // Forzar recarga desde API
+  const handleForceReload = async () => {
+    showMessage("Forzando recarga desde API...");
     
-    setSuccessMessage("Datos de ejemplo cargados correctamente");
-    setTimeout(() => setSuccessMessage(null), 3000);
+    try {
+      await forzarModoOnline();
+      showMessage("✅ Datos recargados desde API");
+    } catch (error: any) {
+      showMessage("❌ Error al forzar recarga: " + error.message, true);
+    }
+  };
+
+  // Limpiar cache
+  const handleClearCache = () => {
+    localStorage.removeItem('calles_cache');
+    showMessage("🧹 Cache limpiado");
   };
 
   return (
     <MainLayout title="Mantenimiento de Calles">
       <div className="space-y-4">
-        {/* Navegación de migas de pan */}
+        {/* Header con botones de debug */}
         <div className="flex justify-between items-center">
           <Breadcrumb items={breadcrumbItems} />
+          
           <div className="flex space-x-2">
             <button 
-              onClick={handleForceReload}
-              className="text-blue-600 hover:text-blue-800 flex items-center"
+              onClick={handleTestApi}
+              className="text-purple-600 hover:text-purple-800 flex items-center text-sm px-2 py-1 rounded border border-purple-200 hover:bg-purple-50"
             >
-              <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Recargar
+              🧪 Test API
             </button>
+            
             <button 
-              onClick={() => setShowHelp(!showHelp)}
-              className="text-blue-600 hover:text-blue-800 flex items-center"
+              onClick={handleTestNormalization}
+              className="text-green-600 hover:text-green-800 flex items-center text-sm px-2 py-1 rounded border border-green-200 hover:bg-green-50"
             >
-              <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Ayuda
+              🔬 Test Normalización
+            </button>
+            
+            <button 
+              onClick={handleForceReload}
+              className="text-blue-600 hover:text-blue-800 flex items-center text-sm px-2 py-1 rounded border border-blue-200 hover:bg-blue-50"
+            >
+              🔄 Recargar
+            </button>
+            
+            <button 
+              onClick={handleClearCache}
+              className="text-orange-600 hover:text-orange-800 flex items-center text-sm px-2 py-1 rounded border border-orange-200 hover:bg-orange-50"
+            >
+              🧹 Limpiar Cache
+            </button>
+            
+            <button 
+              onClick={() => {
+                setShowDebug(!showDebug);
+                if (!showDebug) handleDebugInfo();
+              }}
+              className="text-gray-600 hover:text-gray-800 flex items-center text-sm px-2 py-1 rounded border border-gray-200 hover:bg-gray-50"
+            >
+              🔧 {showDebug ? 'Ocultar' : 'Debug'}
             </button>
           </div>
         </div>
-        
-        {/* Mensaje de error si no hay calles cargadas */}
-        {calles.length === 0 && !loading && (
-          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded relative flex justify-between">
-            <div>
-              <span className="font-medium">No hay calles para mostrar.</span>
-              <span className="ml-2">Puede deberse a un problema de conexión o a que no hay datos disponibles.</span>
+
+        {/* Panel de debug */}
+        {showDebug && debugInfo && (
+          <div className="bg-gray-900 text-green-400 p-4 rounded-md font-mono text-xs overflow-auto max-h-96">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-green-300 font-bold">🔧 DEBUG - CALLES</h3>
+              <button 
+                onClick={handleDebugInfo}
+                className="text-green-300 hover:text-green-200 px-2 py-1 rounded border border-green-600"
+              >
+                Actualizar
+              </button>
             </div>
-            <button
-              onClick={handleLoadSampleData}
-              className="bg-yellow-200 text-yellow-800 px-3 py-1 rounded hover:bg-yellow-300"
-            >
-              Cargar datos de ejemplo
-            </button>
+            <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
           </div>
         )}
-        
-        {/* Mensaje de error CORS si estamos en modo offline */}
-        {isOfflineMode && error && error.includes('CORS') && (
-          <CorsErrorMessage onReload={cargarCalles} />
-        )}
-        
-        {/* Panel de ayuda */}
-        {showHelp && (
-          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded relative">
-            <h3 className="font-medium mb-1">Acerca de este módulo</h3>
-            <p className="text-sm mb-2">Este módulo te permite administrar las calles del sistema. Puedes:</p>
-            <ul className="list-disc list-inside text-sm space-y-1 mb-2">
-              <li>Crear nuevas calles seleccionando un tipo de vía e ingresando un nombre</li>
-              <li>Editar calles existentes seleccionándolas de la lista</li>
-              <li>Eliminar calles haciendo clic en el icono de eliminar</li>
-              <li>Buscar calles por nombre o tipo de vía</li>
-            </ul>
-            <p className="text-sm">
-              <strong>Nota:</strong> Este módulo se conecta a la API en http://localhost:8080/api/via.
-              También funciona sin conexión guardando cambios localmente para sincronizar posteriormente.
-            </p>
-            <button 
-              onClick={() => setShowHelp(false)}
-              className="absolute top-2 right-2 text-blue-700"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            
-            {/* Información de debug */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mt-4">
-                <button
-                  onClick={() => setDebugInfo(prev => prev ? null : JSON.stringify({
-                    callesCount: calles.length,
-                    calles: calles.slice(0, 3),
-                    isOfflineMode,
-                    error,
-                    timestamp: new Date().toISOString()
-                  }, null, 2))}
-                  className="text-sm underline"
-                >
-                  {debugInfo ? 'Ocultar' : 'Mostrar'} información de debug
-                </button>
-                
-                {debugInfo && (
-                  <pre className="mt-2 p-2 bg-white text-blue-900 text-xs overflow-auto max-h-40 rounded">
-                    {debugInfo}
-                  </pre>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-        
-        {/* Mensaje de éxito */}
+
+        {/* Mensaje de éxito/error */}
         {successMessage && (
-          <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded relative" role="alert">
+          <div className={`border px-4 py-3 rounded relative ${
+            successMessage.includes('❌') 
+              ? 'bg-red-50 border-red-200 text-red-800' 
+              : 'bg-green-50 border-green-200 text-green-800'
+          }`} role="alert">
             <span className="block sm:inline">{successMessage}</span>
           </div>
         )}
-        
-        {/* Alerta de modo sin conexión */}
+
+        {/* Alerta de modo offline */}
         {isOfflineMode && (
-          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded relative flex justify-between items-center" role="alert">
-            <div>
-              <span className="font-medium">Modo sin conexión:</span>
-              <span className="ml-1">Trabajando con datos locales. Los cambios se guardarán cuando se restaure la conexión.</span>
-              {pendingChangesCount > 0 && (
-                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-200 text-yellow-800">
-                  {pendingChangesCount} {pendingChangesCount === 1 ? 'cambio pendiente' : 'cambios pendientes'}
-                </span>
-              )}
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded relative">
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="font-medium">⚠️ Modo sin conexión:</span>
+                <span className="ml-1">Trabajando con datos locales o mock.</span>
+              </div>
+              <button 
+                onClick={handleForceReload}
+                className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300"
+              >
+                Reconectar
+              </button>
             </div>
-            <button 
-              onClick={cargarCalles}
-              className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-            >
-              Reintentar conexión
-            </button>
           </div>
         )}
-        
-        {/* Mensajes de error, si hay */}
-        {error && !error.includes('CORS') && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+
+        {/* Mensajes de error */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
             <span className="block sm:inline">{error}</span>
           </div>
         )}
-        
+
         {/* Formulario de calles */}
         <CalleForm
           calleSeleccionada={calleSeleccionada}
-          onGuardar={guardarCalle}
+          onGuardar={async (data) => {
+            try {
+              await guardarCalle(data);
+              showMessage(modoEdicion 
+                ? "✅ Calle actualizada correctamente" 
+                : "✅ Calle creada correctamente");
+            } catch (error: any) {
+              showMessage("❌ Error al guardar: " + error.message, true);
+            }
+          }}
           onNuevo={limpiarSeleccion}
           onEditar={handleEditar}
           loading={loading}
         />
-        
-        {/* Lista de calles */}
-        <CalleList
-          calles={calles}
-          onSelectCalle={seleccionarCalle}
-          onSearch={buscarCalles}
-          searchTerm={searchTerm}
-          loading={loading}
-          onDeleteCalle={eliminarCalle}
-        />
+
+        {/* Lista de calles con debug extra */}
+        {loading ? (
+          <div className="flex justify-center items-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <span className="ml-3 text-gray-600">Cargando calles...</span>
+          </div>
+        ) : (
+          <>
+            <CalleList
+              calles={calles}
+              onSelectCalle={seleccionarCalle}
+              onSearch={buscarCalles}
+              searchTerm={searchTerm}
+              loading={loading}
+              onDeleteCalle={eliminarCalle}
+            />
+            
+            {/* Información adicional de debug */}
+            <div className="bg-gray-50 p-4 rounded-md text-sm text-gray-600">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <span className="font-medium">Total calles:</span>
+                  <span className="ml-2">{calles.length}</span>
+                </div>
+                <div>
+                  <span className="font-medium">Estado:</span>
+                  <span className="ml-2">{isOfflineMode ? '🔴 Offline' : '🟢 Online'}</span>
+                </div>
+                <div>
+                  <span className="font-medium">Seleccionada:</span>
+                  <span className="ml-2">{calleSeleccionada?.nombre || 'Ninguna'}</span>
+                </div>
+                <div>
+                  <span className="font-medium">Búsqueda:</span>
+                  <span className="ml-2">{searchTerm || 'Sin filtro'}</span>
+                </div>
+              </div>
+              
+              {process.env.NODE_ENV === 'development' && calles.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  <div className="text-xs text-gray-500">
+                    🔧 Primera calle: {calles[0]?.nombre} ({calles[0]?.tipoVia})
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </MainLayout>
   );
 };
-
-// Envolvemos el componente con el Error Boundary
-const CallePage: React.FC = () => (
-  <ErrorBoundary>
-    <CallePageContent />
-  </ErrorBoundary>
-);
 
 export default CallePage;

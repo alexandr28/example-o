@@ -1,8 +1,7 @@
-// src/hooks/useSectores.ts - DETECCIÓN DE DATOS REALES CORREGIDA
+// src/hooks/useSectores.ts - CORREGIDO PARA MOSTRAR NOMBRES REALES
 import { useState, useCallback, useEffect } from 'react';
 import { Sector, SectorFormData } from '../models/Sector';
 import SectorService from '../services/sectorService';
-import { connectivityService } from '../services/connectivityService';
 import { MockSectorService } from '../services/mockSectorService';
 
 export const useSectores = () => {
@@ -13,79 +12,42 @@ export const useSectores = () => {
   const [error, setError] = useState<string | null>(null);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
 
-  // 🔧 FUNCIÓN CORREGIDA para detectar datos reales
-  const esDataReal = (data: Sector[]): boolean => {
+  // Función para validar que los datos sean reales y no mock
+  const validarDatosReales = (data: Sector[]): boolean => {
     if (!data || data.length === 0) {
-      console.log('🔍 [useSectores] esDataReal: No hay datos');
+      console.log('🔍 [useSectores] validarDatosReales: No hay datos');
       return false;
     }
     
-    console.log('🔍 [useSectores] Verificando si es data real...');
-    console.log('🔍 [useSectores] Datos a verificar:', data);
+    console.log('🔍 [useSectores] Validando datos recibidos:', data);
     
-    // Lista de nombres que sabemos que son de mock/genéricos
-    const nombresMock = [
-      /^Sector \d+$/,                    // "Sector 1", "Sector 2", etc.
-      /^Sector \d+ \(datos inválidos\)/, // "Sector 1 (datos inválidos)"
-      /^SECTOR JERUSALÉN$/,              // Mock específico
-      /^URB\. MANUEL ARÉVALO II$/,       // Mock específico
-      /^PARQUE INDUSTRIAL$/,             // Mock específico (este podría ser real también)
-      /^SECTOR CENTRAL$/,                // Mock específico (este podría ser real también)
-      /^LOS JARDINES$/                   // Mock específico
-    ];
-    
-    // Verificar cada sector
-    const resultados = data.map((sector, index) => {
-      const nombre = sector.nombre?.trim() || '';
-      console.log(`🔍 [useSectores] Verificando sector ${index}: "${nombre}"`);
-      
-      if (!nombre) {
-        console.log(`❌ [useSectores] Sector ${index} sin nombre`);
+    // Verificar que los sectores tengan nombres reales (no genéricos ni mock)
+    const datosReales = data.filter(sector => {
+      if (!sector || !sector.nombre) {
         return false;
       }
       
-      // Verificar si el nombre coincide con algún patrón de mock
-      const esMock = nombresMock.some(patron => patron.test(nombre));
-      console.log(`🔍 [useSectores] Sector ${index} "${nombre}" es mock: ${esMock}`);
+      const nombre = sector.nombre.trim();
       
-      // Si NO es mock y tiene un nombre válido, es dato real
-      const esReal = !esMock && nombre.length > 3;
-      console.log(`✅ [useSectores] Sector ${index} "${nombre}" es real: ${esReal}`);
+      // Excluir nombres que son claramente mock o genéricos
+      const esMockOGenerico = 
+        nombre.match(/^Sector \d+$/) ||                    // "Sector 1", "Sector 2"
+        nombre.includes('(datos inválidos)') ||            // Sectores marcados como inválidos
+        nombre.includes('(sin nombre)') ||                 // Sectores sin nombre
+        nombre === '' ||                                   // Vacíos
+        nombre.length < 3;                                // Muy cortos
       
-      return esReal;
+      return !esMockOGenerico;
     });
     
-    // Si al menos uno es real, entonces los datos son reales
-    const tieneAlgunReal = resultados.some(esReal => esReal);
+    console.log('🔍 [useSectores] Sectores con datos reales:', datosReales);
+    console.log('🔍 [useSectores] Total reales vs total:', datosReales.length, '/', data.length);
     
-    console.log('🔍 [useSectores] Resultados de verificación:', resultados);
-    console.log('🔍 [useSectores] ¿Tiene algún dato real?:', tieneAlgunReal);
-    
-    // CRITERIO MÁS FLEXIBLE: Si tenemos datos que NO son exactamente los del mock, son reales
-    if (!tieneAlgunReal) {
-      // Verificación adicional: comparar con datos mock conocidos
-      const mockConocidos = [
-        'SECTOR JERUSALÉN',
-        'URB. MANUEL ARÉVALO II', 
-        'PARQUE INDUSTRIAL',
-        'SECTOR CENTRAL',
-        'LOS JARDINES'
-      ];
-      
-      // Si los nombres son diferentes a los mock conocidos, son reales
-      const sonDiferentes = data.some(sector => {
-        const nombre = sector.nombre?.trim() || '';
-        return nombre && !mockConocidos.includes(nombre) && !nombre.match(/^Sector \d+/);
-      });
-      
-      console.log('🔍 [useSectores] ¿Son diferentes a mock conocidos?:', sonDiferentes);
-      return sonDiferentes;
-    }
-    
-    return tieneAlgunReal;
+    // Si tenemos al menos algunos datos reales, considerar como datos reales
+    return datosReales.length > 0;
   };
 
-  // Cargar sectores con detección mejorada
+  // Cargar sectores desde la API
   const cargarSectores = useCallback(async () => {
     try {
       setLoading(true);
@@ -93,91 +55,107 @@ export const useSectores = () => {
       
       console.log('🚀 [useSectores] Iniciando carga de sectores...');
       
-      let data: Sector[];
-      let sourceName = "";
+      let sectoresData: Sector[] = [];
+      let fuenteDatos = '';
       let esApiReal = false;
       
-      // SIEMPRE intentar API primero
+      // Intentar cargar desde API primero
       try {
-        console.log('🔄 [useSectores] Cargando desde API...');
-        data = await SectorService.getAll();
+        console.log('🔄 [useSectores] Intentando cargar desde API...');
+        sectoresData = await SectorService.getAll();
         
-        console.log('📊 [useSectores] Datos recibidos de API:', data);
+        console.log('📊 [useSectores] Datos cargados desde API:', sectoresData);
         
-        // ⚠️ CAMBIO IMPORTANTE: SIEMPRE considerar datos de API como reales
-        // Si la API responde con datos válidos, son reales por definición
-        if (data && Array.isArray(data) && data.length > 0) {
-          // Verificar que los datos tengan estructura válida
-          const datosValidos = data.every(sector => 
-            sector && 
-            typeof sector === 'object' && 
-            sector.nombre && 
-            typeof sector.nombre === 'string' &&
-            sector.nombre.trim() !== ''
-          );
+        // Validar que los datos sean reales
+        if (sectoresData && Array.isArray(sectoresData) && sectoresData.length > 0) {
+          const sonDatosReales = validarDatosReales(sectoresData);
           
-          if (datosValidos) {
+          if (sonDatosReales) {
+            console.log('✅ [useSectores] API devolvió datos REALES');
+            fuenteDatos = 'API Real';
             esApiReal = true;
-            sourceName = "API Real";
             setIsOfflineMode(false);
-            console.log('✅ [useSectores] Datos VÁLIDOS de API confirmados como reales');
           } else {
-            console.warn('⚠️ [useSectores] Datos de API con estructura inválida');
-            throw new Error('Datos de API con estructura inválida');
+            console.warn('⚠️ [useSectores] API devolvió datos mock/genéricos');
+            // Aún así usar los datos de la API, pero marcar como posible problema
+            fuenteDatos = 'API (datos posiblemente mock)';
+            esApiReal = true;
+            setIsOfflineMode(false);
           }
         } else {
           console.warn('⚠️ [useSectores] API devolvió datos vacíos o inválidos');
-          throw new Error('API devolvió datos vacíos');
+          throw new Error('API no devolvió datos válidos');
         }
         
       } catch (apiError: any) {
         console.error('❌ [useSectores] Error al cargar desde API:', apiError);
         
-        // Solo usar mock si hay error de conexión real
-        console.log('🔄 [useSectores] Usando mock como fallback');
-        data = await MockSectorService.getAll();
-        sourceName = "Mock (error de API)";
-        setIsOfflineMode(true);
-        esApiReal = false;
+        // Fallback a mock service solo en caso de error real
+        console.log('🔄 [useSectores] Usando MockService como fallback...');
+        try {
+          sectoresData = await MockSectorService.getAll();
+          fuenteDatos = 'MockService (fallback)';
+          esApiReal = false;
+          setIsOfflineMode(true);
+          console.log('📊 [useSectores] Datos cargados desde MockService:', sectoresData);
+        } catch (mockError) {
+          console.error('❌ [useSectores] Error también en MockService:', mockError);
+          sectoresData = [];
+          fuenteDatos = 'Ninguno (error total)';
+          esApiReal = false;
+          setIsOfflineMode(true);
+        }
       }
       
-      console.log(`📊 [useSectores] Datos finales de ${sourceName}:`, data);
+      console.log(`📈 [useSectores] Resultado final:`);
+      console.log(`📈 [useSectores] - Fuente: ${fuenteDatos}`);
+      console.log(`📈 [useSectores] - Cantidad: ${sectoresData.length}`);
+      console.log(`📈 [useSectores] - Es API real: ${esApiReal}`);
+      console.log(`📈 [useSectores] - Modo offline: ${!esApiReal}`);
+      console.log(`📈 [useSectores] - Datos:`, sectoresData);
       
-      if (!data || !Array.isArray(data)) {
-        console.error('❌ [useSectores] Los datos no son un array válido:', data);
-        data = [];
-      }
+      // Actualizar estado con los datos obtenidos
+      setSectores(sectoresData);
       
-      setSectores(data);
-      
-      // Actualizar estado de conexión
-      if (esApiReal) {
-        setIsOfflineMode(false);
-        console.log('✅ [useSectores] Modo ONLINE confirmado');
-      } else {
-        setIsOfflineMode(true);
-        console.log('⚠️ [useSectores] Modo OFFLINE confirmado');
+      // Guardar en caché si son datos reales
+      if (esApiReal && sectoresData.length > 0) {
+        try {
+          localStorage.setItem('sectores_cache', JSON.stringify(sectoresData));
+          console.log('💾 [useSectores] Datos guardados en caché');
+        } catch (cacheError) {
+          console.warn('⚠️ [useSectores] Error al guardar en caché:', cacheError);
+        }
       }
       
     } catch (err: any) {
-      console.error('❌ [useSectores] Error general:', err);
+      console.error('❌ [useSectores] Error general en cargarSectores:', err);
       setError(err.message || 'Error al cargar los sectores');
       
-      // Último recurso: mock
+      // Último recurso: intentar cargar desde caché
       try {
-        const mockData = await MockSectorService.getAll();
-        setSectores(mockData);
-        setIsOfflineMode(true);
-      } catch (mockError) {
-        console.error('❌ [useSectores] Error con mock service:', mockError);
-        setSectores([]);
+        const cachedData = localStorage.getItem('sectores_cache');
+        if (cachedData) {
+          const parsedCache = JSON.parse(cachedData);
+          if (Array.isArray(parsedCache) && parsedCache.length > 0) {
+            console.log('📦 [useSectores] Usando datos desde caché:', parsedCache);
+            setSectores(parsedCache);
+            setIsOfflineMode(true);
+            return;
+          }
+        }
+      } catch (cacheError) {
+        console.error('❌ [useSectores] Error al cargar desde caché:', cacheError);
       }
+      
+      // Si todo falla, dejar array vacío
+      setSectores([]);
+      setIsOfflineMode(true);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Función para forzar modo online
+  // Función para forzar modo online (reconectar con API)
   const forzarModoOnline = useCallback(async () => {
     console.log('🔄 [useSectores] FORZANDO modo online...');
     
@@ -185,30 +163,34 @@ export const useSectores = () => {
       setLoading(true);
       setError(null);
       
-      // Forzar carga desde API
-      console.log('🚀 [useSectores] Forzando carga desde API...');
-      const data = await SectorService.getAll();
+      // Forzar carga directa desde API sin fallback
+      console.log('🚀 [useSectores] Carga FORZADA desde API...');
+      const sectoresData = await SectorService.getAll();
       
-      console.log('📊 [useSectores] Datos forzados de API:', data);
+      console.log('📊 [useSectores] Datos forzados de API:', sectoresData);
       
-      if (data && Array.isArray(data) && data.length > 0) {
-        setSectores(data);
+      if (sectoresData && Array.isArray(sectoresData) && sectoresData.length > 0) {
+        setSectores(sectoresData);
         setIsOfflineMode(false);
+        
+        // Guardar en caché
+        localStorage.setItem('sectores_cache', JSON.stringify(sectoresData));
+        
         console.log('✅ [useSectores] Modo online FORZADO exitosamente');
       } else {
-        throw new Error('API no devolvió datos válidos');
+        throw new Error('API no devolvió datos válidos al forzar conexión');
       }
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ [useSectores] Error al forzar modo online:', error);
-      setError('Error al forzar modo online');
+      setError('Error al forzar conexión: ' + error.message);
       throw error;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Test de conexión API
+  // Test de conexión con la API
   const testApiConnection = useCallback(async (): Promise<boolean> => {
     try {
       console.log('🧪 [useSectores] Probando conexión con API...');
@@ -232,17 +214,28 @@ export const useSectores = () => {
       
       if (response.ok) {
         const text = await response.text();
-        console.log('🧪 [useSectores] Test content preview:', text.substring(0, 100));
+        console.log('🧪 [useSectores] Test content preview:', text.substring(0, 200));
         
         try {
           const json = JSON.parse(text);
           console.log('🧪 [useSectores] Test data parsed:', json);
           
-          // Si es un array válido con datos, la API funciona
-          const funcionaCorrectamente = Array.isArray(json) && json.length > 0;
-          console.log('🧪 [useSectores] ¿API funciona correctamente?:', funcionaCorrectamente);
+          // Verificar si los datos son válidos y reales
+          if (Array.isArray(json) && json.length > 0) {
+            const hayDatosReales = json.some(item => 
+              item && 
+              typeof item === 'object' && 
+              item.nombre && 
+              typeof item.nombre === 'string' &&
+              item.nombre.trim().length > 0 &&
+              !item.nombre.match(/^Sector \d+$/)
+            );
+            
+            console.log('🧪 [useSectores] ¿API tiene datos reales?:', hayDatosReales);
+            return hayDatosReales;
+          }
           
-          return funcionaCorrectamente;
+          return false;
         } catch (e) {
           console.log('🧪 [useSectores] Test data no es JSON válido');
           return false;
@@ -256,24 +249,19 @@ export const useSectores = () => {
     }
   }, []);
 
-  // Ejecutar test al montar
-  useEffect(() => {
-    testApiConnection().then(isConnected => {
-      console.log('🌐 [useSectores] Test inicial de conexión:', isConnected ? 'CONECTADO' : 'DESCONECTADO');
-    });
-  }, [testApiConnection]);
-
+  // Resto de funciones del hook...
   const seleccionarSector = useCallback((sector: Sector) => {
+    console.log('🎯 [useSectores] Sector seleccionado:', sector);
     setSectorSeleccionado(sector);
     setModoEdicion(true);
   }, []);
 
   const limpiarSeleccion = useCallback(() => {
+    console.log('🧹 [useSectores] Limpiando selección');
     setSectorSeleccionado(null);
     setModoEdicion(false);
   }, []);
 
-  // Guardar sector
   const guardarSector = useCallback(async (data: SectorFormData) => {
     try {
       setLoading(true);
@@ -282,45 +270,35 @@ export const useSectores = () => {
       console.log('💾 [useSectores] Guardando sector:', data);
       
       let result: Sector;
-      let sourceUsed = "";
       
-      // SIEMPRE intentar API primero
-      try {
-        console.log('🔄 [useSectores] Intentando guardar en API...');
-        
-        if (modoEdicion && sectorSeleccionado) {
-          result = await SectorService.update(sectorSeleccionado.id, data);
-        } else {
-          result = await SectorService.create(data);
-        }
-        
-        sourceUsed = "API Real";
-        setIsOfflineMode(false);
-        console.log('✅ [useSectores] Guardado exitoso en API');
-        
-      } catch (apiError: any) {
-        console.error('❌ [useSectores] Error al guardar en API:', apiError);
-        
-        // Solo usar mock en caso de error real
-        if (modoEdicion && sectorSeleccionado) {
-          result = await MockSectorService.update(sectorSeleccionado.id, data);
-        } else {
-          result = await MockSectorService.create(data);
-        }
-        sourceUsed = "MockService (fallback)";
-        setIsOfflineMode(true);
-      }
-      
-      console.log(`✅ [useSectores] Sector guardado con ${sourceUsed}:`, result);
-      
-      // Actualizar estado local
       if (modoEdicion && sectorSeleccionado) {
+        console.log('📝 [useSectores] Modo edición - actualizando sector');
+        result = await SectorService.update(sectorSeleccionado.id, data);
+        
+        // Actualizar en la lista
         setSectores(prev => prev.map(s => s.id === sectorSeleccionado.id ? result : s));
       } else {
+        console.log('➕ [useSectores] Modo creación - creando nuevo sector');
+        result = await SectorService.create(data);
+        
+        // Agregar a la lista
         setSectores(prev => [...prev, result]);
       }
       
+      console.log('✅ [useSectores] Sector guardado exitosamente:', result);
+      
+      // Limpiar selección
       limpiarSeleccion();
+      
+      // Actualizar caché
+      setTimeout(() => {
+        const sectoresActualizados = modoEdicion 
+          ? sectores.map(s => s.id === sectorSeleccionado!.id ? result : s)
+          : [...sectores, result];
+        
+        localStorage.setItem('sectores_cache', JSON.stringify(sectoresActualizados));
+      }, 100);
+      
       return result;
       
     } catch (err: any) {
@@ -330,55 +308,87 @@ export const useSectores = () => {
     } finally {
       setLoading(false);
     }
-  }, [modoEdicion, sectorSeleccionado, limpiarSeleccion]);
+  }, [modoEdicion, sectorSeleccionado, sectores, limpiarSeleccion]);
 
   const eliminarSector = useCallback(async (id: number) => {
     try {
       setLoading(true);
       setError(null);
       
-      try {
-        await SectorService.delete(id);
-        setIsOfflineMode(false);
-        console.log('✅ [useSectores] Eliminado con API');
-      } catch (apiError) {
-        console.error('❌ [useSectores] Error al eliminar en API:', apiError);
-        await MockSectorService.delete(id);
-        setIsOfflineMode(true);
-        console.log('✅ [useSectores] Eliminado con mock');
-      }
+      console.log('🗑️ [useSectores] Eliminando sector ID:', id);
       
+      await SectorService.delete(id);
+      
+      // Remover de la lista
       setSectores(prev => prev.filter(s => s.id !== id));
       
+      // Si el sector eliminado estaba seleccionado, limpiar selección
       if (sectorSeleccionado?.id === id) {
         limpiarSeleccion();
       }
       
+      console.log('✅ [useSectores] Sector eliminado exitosamente');
+      
+      // Actualizar caché
+      setTimeout(() => {
+        const sectoresActualizados = sectores.filter(s => s.id !== id);
+        localStorage.setItem('sectores_cache', JSON.stringify(sectoresActualizados));
+      }, 100);
+      
     } catch (err: any) {
       console.error('❌ [useSectores] Error al eliminar:', err);
       setError(err.message || 'Error al eliminar el sector');
+      throw err;
     } finally {
       setLoading(false);
     }
-  }, [sectorSeleccionado, limpiarSeleccion]);
+  }, [sectorSeleccionado, sectores, limpiarSeleccion]);
 
   const sincronizarManualmente = useCallback(async () => {
-    console.log('🔄 [useSectores] Sincronización manual');
+    console.log('🔄 [useSectores] Sincronización manual iniciada');
+    
+    // Probar conexión primero
     const isConnected = await testApiConnection();
+    
     if (isConnected) {
+      console.log('✅ [useSectores] Conexión OK, recargando datos');
       await cargarSectores();
+    } else {
+      console.warn('⚠️ [useSectores] Sin conexión, manteniendo datos actuales');
+      setError('No se pudo conectar con el servidor para sincronizar');
     }
   }, [testApiConnection, cargarSectores]);
 
+  // Efecto para cargar datos al montar el componente
+  useEffect(() => {
+    console.log('🎬 [useSectores] Hook montado, iniciando carga inicial');
+    cargarSectores();
+  }, [cargarSectores]);
+
+  // Efecto para debug en desarrollo
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 [useSectores] Estado actual:');
+      console.log('- Sectores:', sectores);
+      console.log('- Loading:', loading);
+      console.log('- Error:', error);
+      console.log('- Offline mode:', isOfflineMode);
+      console.log('- Sector seleccionado:', sectorSeleccionado);
+    }
+  }, [sectores, loading, error, isOfflineMode, sectorSeleccionado]);
+
   return {
+    // Estados
     sectores,
     sectorSeleccionado,
     modoEdicion,
     loading,
     error,
     isOfflineMode,
-    hasPendingChanges: false,
-    pendingChangesCount: 0,
+    hasPendingChanges: false, // Simplificado por ahora
+    pendingChangesCount: 0,   // Simplificado por ahora
+    
+    // Funciones
     cargarSectores,
     seleccionarSector,
     limpiarSeleccion,
