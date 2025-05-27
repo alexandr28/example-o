@@ -2,7 +2,7 @@
 import { Sector, SectorFormData } from '../models/Sector';
 
 // URL base para la API de sectores
-const API_URL = 'http://localhost:8080/api/sector';
+const API_URL = 'http://192.168.20.160:8080/api/sector';
 
 /**
  * Función para normalizar datos de sector de la API

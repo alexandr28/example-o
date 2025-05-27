@@ -1,6 +1,6 @@
 // src/config/constants.ts
 // URL base de la API - mantenemos por compatibilidad con código existente
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.20.160:8080';
 export const API_PREFIX = '';
 
 // Definir explícitamente AUTH_ENDPOINTS
@@ -20,18 +20,18 @@ export const API_ENDPOINTS = {
   DIRECCION: `/api/direccion`,
   
   // Contribuyentes (con autenticación)
-  CONTRIBUYENTE: `${API_BASE_URL}/api/contribuyente`,
+  CONTRIBUYENTE: `/api/contribuyente`,
   
   // Predio (con autenticación)
-  PREDIO: `${API_BASE_URL}/predio`,
+  PREDIO: `/api/predio`,
   
   // Autenticación (referencia a AUTH_ENDPOINTS)
   AUTH: `/auth`,
   
   // Otros (con autenticación)
-  ARANCEL: `${API_BASE_URL}/arancel`,
-  VALOR_UNITARIO: `${API_BASE_URL}/valor-unitario`,
-  UIT: `${API_BASE_URL}/uit`,
-  ALCABALA: `${API_BASE_URL}/alcabala`,
-  DEPRECIACION: `${API_BASE_URL}/depreciacion`,
+  ARANCEL: `/api/arancel`,
+  VALOR_UNITARIO: `/api/valor-unitario`,
+  UIT: `/api/uit`,
+  ALCABALA: `/api/alcabala`,
+  DEPRECIACION: `/api/depreciacion`,
 };

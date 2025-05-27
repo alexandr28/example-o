@@ -2,7 +2,7 @@
 import { Calle, CalleFormData } from '../models/Calle';
 
 // URL base para la API
-const API_URL = 'http://localhost:8080/api/via';
+const API_URL = 'http://192.168.20.160:8080/api/via';
 
 /**
  * Función para normalizar los datos de calle que vienen de la API

@@ -5,7 +5,7 @@ import path from 'path';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const API_BASE_URL = env.VITE_API_URL || 'http://localhost:8080';
+  const API_BASE_URL = env.VITE_API_URL || 'http://192.168.20.160:8080';
   
   console.log('🔧 Configurando Vite con API_BASE_URL:', API_BASE_URL);
   

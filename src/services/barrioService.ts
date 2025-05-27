@@ -2,7 +2,7 @@
 
 import { Barrio, BarrioFormData } from '../models/Barrio';
 
-const API_URL = 'http://localhost:8080/api/barrio';
+const API_URL = 'http://192.168.20.160:8080/api/barrio';
 
 /**
  * Función para normalizar los datos de barrio que vienen de la API

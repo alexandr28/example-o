@@ -1,4 +1,4 @@
-// src/components/calles/CalleList.tsx
+// src/components/calles/CalleList.tsx - CORREGIDO CON KEYS ÚNICAS
 import React, { useState, useEffect } from 'react';
 import { Input, Button } from '../';
 import { Calle } from '../../models';
@@ -29,45 +29,66 @@ const CalleList: React.FC<CalleListProps> = ({
     setLocalSearchTerm(searchTerm);
   }, [searchTerm]);
 
+  // Debug: Log para detectar problemas de keys
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && calles.length > 0) {
+      // Verificar IDs duplicados
+      const ids = calles.map(c => c.id).filter(id => id !== undefined);
+      const idsUnicos = new Set(ids);
+      
+      if (ids.length !== idsUnicos.size) {
+        console.warn('⚠️ [CalleList] IDs duplicados detectados:', {
+          totalCalles: calles.length,
+          idsUnicos: idsUnicos.size,
+          duplicados: ids.filter((id, index) => ids.indexOf(id) !== index)
+        });
+        
+        // Mostrar calles con IDs duplicados
+        const duplicatedIds = ids.filter((id, index) => ids.indexOf(id) !== index);
+        duplicatedIds.forEach(dupId => {
+          const callesToDup = calles.filter(c => c.id === dupId);
+          console.warn(`🔍 [CalleList] Calles con ID ${dupId}:`, callesToDup);
+        });
+      }
+    }
+  }, [calles]);
+
   // Formatear el tipo de vía de manera segura
   const formatTipoVia = (tipoVia: string | undefined | null): string => {
-    // Si tipoVia es undefined o null, devolver un valor por defecto
     if (tipoVia === undefined || tipoVia === null) {
       return 'Sin tipo';
     }
     
-    // Ahora que sabemos que tipoVia no es undefined ni null, es seguro usar toLowerCase
     switch (tipoVia.toLowerCase()) {
       case 'avenida': return 'Av.';
       case 'jiron': return 'Jr.';
       case 'pasaje': return 'Psje.';
       case 'calle': return 'Calle';
-      default: return tipoVia; // Devolver el valor original si no coincide con ningún caso
+      case 'malecon': return 'Malecón';
+      case 'plaza': return 'Plaza';
+      case 'parque': return 'Parque';
+      default: return tipoVia;
     }
   };
 
   // Filtrar las calles de manera segura
   const filteredCalles = calles
-    // Primero filtrar calles inválidas
     .filter(calle => {
       if (!calle || typeof calle !== 'object') {
-        console.warn('Calle inválida encontrada:', calle);
+        console.warn('⚠️ [CalleList] Calle inválida encontrada:', calle);
         return false;
       }
       return true;
     })
-    // Luego aplicar el filtro de búsqueda
     .filter(calle => {
       if (!localSearchTerm) return true;
       
       const searchTermLower = localSearchTerm.toLowerCase();
       
-      // Buscar en nombre (asegurándose de que no sea undefined)
       const nombreMatch = calle.nombre 
         ? calle.nombre.toLowerCase().includes(searchTermLower) 
         : false;
       
-      // Buscar en tipo de vía (asegurándose de que no sea undefined)
       const tipoViaMatch = calle.tipoVia 
         ? calle.tipoVia.toLowerCase().includes(searchTermLower) 
         : false;
@@ -89,37 +110,46 @@ const CalleList: React.FC<CalleListProps> = ({
   // Manejar búsqueda
   const handleSearch = () => {
     onSearch(localSearchTerm);
-    setCurrentPage(1); // Resetear a primera página al buscar
+    setCurrentPage(1);
   };
 
-  // Manejar cambio en el input de búsqueda
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setLocalSearchTerm(e.target.value);
   };
 
-  // Manejar tecla Enter en búsqueda
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleSearch();
     }
   };
 
-  // Manejar eliminación de una calle de manera segura
+  // Manejar eliminación de manera segura
   const handleDelete = (e: React.MouseEvent, id: number | undefined) => {
-    e.stopPropagation(); // Evitar que se seleccione la calle al eliminarla
+    e.stopPropagation();
     
-    // Verificar que id no sea undefined
     if (id === undefined) {
-      console.warn('Intentando eliminar una calle sin ID');
+      console.warn('⚠️ [CalleList] Intentando eliminar una calle sin ID');
       return;
     }
     
     if (onDeleteCalle) {
-      // Confirmar antes de eliminar
       if (window.confirm('¿Está seguro de eliminar esta calle?')) {
         onDeleteCalle(id);
       }
     }
+  };
+
+  // Función para generar key única de manera segura
+  const generateUniqueKey = (calle: Calle, index: number): string => {
+    // Prioridad 1: Usar ID si existe y es único
+    if (calle.id !== undefined && calle.id !== null) {
+      return `calle-id-${calle.id}`;
+    }
+    
+    // Prioridad 2: Combinar nombre + tipo + índice para evitar duplicados
+    const nombre = calle.nombre || 'sin-nombre';
+    const tipo = calle.tipoVia || 'sin-tipo';
+    return `calle-${tipo}-${nombre}-${index}`.replace(/\s+/g, '-').toLowerCase();
   };
 
   return (
@@ -127,7 +157,6 @@ const CalleList: React.FC<CalleListProps> = ({
       <div className="px-6 py-4 bg-gray-50 border-b flex justify-between items-center">
         <h2 className="text-lg font-medium text-gray-800">Lista de calles</h2>
         
-        {/* Contador de resultados */}
         <div className="text-sm text-gray-500">
           {filteredCalles.length} {filteredCalles.length === 1 ? 'resultado' : 'resultados'}
         </div>
@@ -188,43 +217,78 @@ const CalleList: React.FC<CalleListProps> = ({
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {currentItems.length > 0 ? (
-                  currentItems.map((calle, index) => (
-                    <tr
-                      key={calle.id ?? `calle-${index}`}
-                      className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => onSelectCalle(calle)}
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {formatTipoVia(calle.tipoVia)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
-                        {calle.nombre || 'Sin nombre'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          className="text-blue-600 hover:text-blue-900 mr-3"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectCalle(calle);
-                          }}
-                        >
-                          Editar
-                        </button>
-                        {onDeleteCalle && (
-                          <button
-                            className="text-red-600 hover:text-red-900"
-                            onClick={(e) => handleDelete(e, calle.id)}
-                          >
-                            Eliminar
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                  currentItems.map((calle, index) => {
+                    // Generar key única para evitar duplicados
+                    const uniqueKey = generateUniqueKey(calle, indexOfFirstItem + index);
+                    
+                    return (
+                      <tr
+                        key={uniqueKey}
+                        className="hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                        onClick={() => onSelectCalle(calle)}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <span className="text-sm font-medium text-gray-900">
+                              {formatTipoVia(calle.tipoVia)}
+                            </span>
+                            {process.env.NODE_ENV === 'development' && (
+                              <span className="ml-2 text-xs text-gray-400">
+                                ({calle.tipoVia})
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {calle.nombre || 'Sin nombre'}
+                            </div>
+                            {process.env.NODE_ENV === 'development' && (
+                              <div className="text-xs text-gray-500">
+                                ID: {calle.id || 'N/A'} | Key: {uniqueKey}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex justify-end space-x-2">
+                            <button
+                              className="text-blue-600 hover:text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-300 rounded-md px-2 py-1 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectCalle(calle);
+                              }}
+                              title="Editar calle"
+                            >
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            
+                            {onDeleteCalle && calle.id !== undefined && (
+                              <button
+                                className="text-red-600 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-300 rounded-md px-2 py-1 transition-colors"
+                                onClick={(e) => handleDelete(e, calle.id)}
+                                title="Eliminar calle"
+                              >
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
                     <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-500">
-                      No se encontraron resultados
+                      {calles.length === 0 
+                        ? 'No hay calles disponibles' 
+                        : 'No se encontraron resultados para la búsqueda'
+                      }
                     </td>
                   </tr>
                 )}
@@ -233,7 +297,22 @@ const CalleList: React.FC<CalleListProps> = ({
           </div>
         )}
         
-        {/* Paginación (código sin cambios) */}
+        {/* Debug info en desarrollo */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 p-3 bg-gray-100 rounded text-xs">
+            <div className="font-semibold mb-1">🔧 Debug Info:</div>
+            <div>📊 Calles recibidas: {calles.length}</div>
+            <div>✅ Calles filtradas: {filteredCalles.length}</div>
+            <div>📄 En página actual: {currentItems.length}</div>
+            <div>🔍 Término búsqueda: "{localSearchTerm}"</div>
+            <div>🔑 Keys únicas: {currentItems.every((_, i) => currentItems.findIndex((c, j) => generateUniqueKey(c, j) === generateUniqueKey(currentItems[i], i)) === i) ? 'Sí' : 'No'}</div>
+            {calles.length > 0 && (
+              <div>🎯 Primera calle: {calles[0]?.nombre || 'Sin nombre'} (ID: {calles[0]?.id || 'N/A'})</div>
+            )}
+          </div>
+        )}
+        
+        {/* Paginación mejorada con keys únicas */}
         {totalPages > 1 && (
           <div className="mt-4 flex justify-between items-center">
             <div className="text-sm text-gray-500">
@@ -242,6 +321,7 @@ const CalleList: React.FC<CalleListProps> = ({
             <nav className="flex space-x-1">
               {currentPage > 1 && (
                 <Button
+                  key="prev-btn"
                   onClick={() => paginate(currentPage - 1)}
                   className="px-3 py-1 rounded bg-gray-100 text-gray-500 hover:bg-gray-200"
                 >
@@ -250,28 +330,23 @@ const CalleList: React.FC<CalleListProps> = ({
               )}
               
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                // Mostrar siempre las páginas alrededor de la actual
                 let pageNum;
                 
                 if (totalPages <= 5) {
-                  // Si hay 5 o menos páginas, mostrar todas
                   pageNum = i + 1;
                 } else if (currentPage <= 3) {
-                  // Si estamos en las primeras 3 páginas
                   pageNum = i + 1;
                 } else if (currentPage >= totalPages - 2) {
-                  // Si estamos en las últimas 3 páginas
                   pageNum = totalPages - 4 + i;
                 } else {
-                  // En el medio
                   pageNum = currentPage - 2 + i;
                 }
                 
                 return (
                   <Button
-                    key={`page-${pageNum}`}
+                    key={`page-btn-${pageNum}`}
                     onClick={() => paginate(pageNum)}
-                    className={`px-3 py-1 rounded ${
+                    className={`px-3 py-1 rounded transition-colors ${
                       currentPage === pageNum
                         ? 'bg-blue-600 text-white'
                         : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
@@ -284,6 +359,7 @@ const CalleList: React.FC<CalleListProps> = ({
               
               {currentPage < totalPages && (
                 <Button
+                  key="next-btn"
                   onClick={() => paginate(currentPage + 1)}
                   className="px-3 py-1 rounded bg-gray-100 text-gray-500 hover:bg-gray-200"
                 >
