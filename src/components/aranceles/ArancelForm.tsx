@@ -177,7 +177,7 @@ const ArancelForm: React.FC<ArancelFormProps> = ({
           {/* Dirección */}
           <div className="border p-4 rounded-md">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="col-span-2">
+              <div className="col-span-4">
                 <div className="mb-1 text-sm font-medium text-gray-700">Vía</div>
                 <div className="flex">
                   <button
@@ -203,41 +203,7 @@ const ArancelForm: React.FC<ArancelFormProps> = ({
                 )}
               </div>
               
-              <div className="col-span-1">
-                <div className="mb-1 text-sm font-medium text-gray-700">Lado</div>
-                <Select
-                  options={ladoOptions}
-                  error={errors.lado?.message}
-                  disabled={loading}
-                  {...register('lado')}
-                />
-              </div>
-              
-              <div className="col-span-1">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <div className="mb-1 text-sm font-medium text-gray-700">Lote inicial</div>
-                    <Input
-                      type="number"
-                      placeholder="Lt. inicial"
-                      error={errors.loteInicial?.message}
-                      disabled={loading}
-                      {...register('loteInicial')}
-                    />
-                  </div>
-                  
-                  <div>
-                    <div className="mb-1 text-sm font-medium text-gray-700">Lote final</div>
-                    <Input
-                      type="number"
-                      placeholder="Lt. final"
-                      error={errors.loteFinal?.message}
-                      disabled={loading}
-                      {...register('loteFinal')}
-                    />
-                  </div>
-                </div>
-              </div>
+             
             </div>
           </div>
           

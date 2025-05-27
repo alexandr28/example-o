@@ -1,6 +1,5 @@
-// src/pages/mantenedores/SectoresPage.tsx - CON DEBUG MEJORADO
-
-import React, { useState, useEffect, useMemo } from 'react';
+// src/pages/mantenedores/SectoresPage.tsx
+import React, { useState, useMemo } from 'react';
 import { MainLayout } from '../../layout';
 import { SectorList, SectorForm, Breadcrumb } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
@@ -14,7 +13,9 @@ const SectoresPage: React.FC = () => {
     loading,
     error,
     isOfflineMode,
+    searchTerm,
     cargarSectores,
+    buscarSectores,
     seleccionarSector,
     limpiarSeleccion,
     guardarSector,
@@ -22,12 +23,12 @@ const SectoresPage: React.FC = () => {
     setModoEdicion,
     forzarModoOnline,
     testApiConnection,
+    sincronizarManualmente,
   } = useSectores();
 
   // Estados locales
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showDebug, setShowDebug] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   // Migas de pan
   const breadcrumbItems: BreadcrumbItem[] = useMemo(() => [
@@ -37,16 +38,10 @@ const SectoresPage: React.FC = () => {
     { label: 'Sectores', active: true }
   ], []);
 
-  // Cargar datos al montar
-  useEffect(() => {
-    console.log('🎬 [SectoresPage] Componente montado');
-    cargarSectores();
-  }, [cargarSectores]);
-
   // Función para mostrar mensaje temporal
-  const showMessage = (message: string, isError = false) => {
+  const showMessage = (message: string, duration = 3000) => {
     setSuccessMessage(message);
-    setTimeout(() => setSuccessMessage(null), 3000);
+    setTimeout(() => setSuccessMessage(null), duration);
   };
 
   // Manejo de edición
@@ -54,105 +49,55 @@ const SectoresPage: React.FC = () => {
     if (sectorSeleccionado) {
       setModoEdicion(true);
     } else {
-      showMessage("Por favor, seleccione un sector para editar");
+      showMessage("⚠️ Por favor, seleccione un sector para editar");
     }
   };
 
-  // Función de debug mejorada
-  const handleDebugInfo = async () => {
-    console.log('🔧 [SectoresPage] Generando información de debug...');
-    
+  // Manejo de guardado
+  const handleGuardar = async (data: { nombre: string }) => {
     try {
-      // Probar conexión API
-      const apiConnected = await testApiConnection();
-      
-      // Hacer petición directa para obtener respuesta cruda
-      let rawApiResponse = null;
-      try {
-        const response = await fetch('http://localhost:8080/api/sector', {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          mode: 'cors',
-          credentials: 'omit'
-        });
-        
-        if (response.ok) {
-          const text = await response.text();
-          try {
-            rawApiResponse = JSON.parse(text);
-          } catch {
-            rawApiResponse = text;
-          }
-        } else {
-          rawApiResponse = `Error ${response.status}: ${response.statusText}`;
-        }
-      } catch (err: any) {
-        rawApiResponse = `Error de conexión: ${err.message}`;
-      }
-      
-      const debug = {
-        timestamp: new Date().toLocaleString(),
-        componente: 'SectoresPage',
-        estado: {
-          sectoresCargados: sectores.length,
-          loading,
-          error,
-          isOfflineMode,
-          sectorSeleccionado: sectorSeleccionado?.nombre || 'Ninguno'
-        },
-        sectores: sectores.map(s => ({
-          id: s.id,
-          nombre: s.nombre,
-          tipoNombre: typeof s.nombre,
-          nombreValido: !!(s.nombre && s.nombre.trim())
-        })),
-        api: {
-          conectada: apiConnected,
-          url: 'http://localhost:8080/api/sector',
-          respuestaCruda: rawApiResponse
-        },
-        navegador: {
-          userAgent: navigator.userAgent,
-          online: navigator.onLine,
-          localStorage: {
-            sectoresCache: localStorage.getItem('sectores_cache') ? 'Presente' : 'Ausente',
-          }
-        }
-      };
-      
-      setDebugInfo(debug);
-      console.log('🔧 [SectoresPage] Debug info:', debug);
-      
-    } catch (err) {
-      console.error('❌ [SectoresPage] Error generando debug:', err);
-      setDebugInfo({ error: 'Error generando información de debug' });
+      await guardarSector(data);
+      showMessage(modoEdicion 
+        ? "✅ Sector actualizado correctamente" 
+        : "✅ Sector creado correctamente");
+    } catch (error: any) {
+      showMessage(`❌ Error al guardar: ${error.message}`);
     }
   };
 
-  // Test rápido de API
+  // Manejo de eliminación
+  const handleEliminar = async (id: number) => {
+    try {
+      await eliminarSector(id);
+      showMessage("✅ Sector eliminado correctamente");
+    } catch (error: any) {
+      showMessage(`❌ Error al eliminar: ${error.message}`);
+    }
+  };
+
+  // Test de API
   const handleTestApi = async () => {
-    showMessage("Probando conexión con API...");
+    showMessage("🧪 Probando conexión con API...");
     
     try {
       const isConnected = await testApiConnection();
       showMessage(isConnected 
         ? "✅ API conectada correctamente" 
-        : "❌ API no responde correctamente"
-      );
+        : "❌ API no responde correctamente");
     } catch (error) {
-      showMessage("❌ Error al probar API", true);
+      showMessage("❌ Error al probar API");
     }
   };
 
-  // Forzar recarga desde API
+  // Forzar recarga
   const handleForceReload = async () => {
-    showMessage("Forzando recarga desde API...");
+    showMessage("🔄 Forzando recarga desde API...");
     
     try {
       await forzarModoOnline();
       showMessage("✅ Datos recargados desde API");
-    } catch (error) {
-      showMessage("❌ Error al forzar recarga", true);
+    } catch (error: any) {
+      showMessage(`❌ Error al forzar recarga: ${error.message}`);
     }
   };
 
@@ -165,7 +110,7 @@ const SectoresPage: React.FC = () => {
   return (
     <MainLayout title="Mantenimiento de Sectores">
       <div className="space-y-4">
-        {/* Header con botones de debug */}
+        {/* Header con botones de acciones */}
         <div className="flex justify-between items-center">
           <Breadcrumb items={breadcrumbItems} />
           
@@ -173,6 +118,7 @@ const SectoresPage: React.FC = () => {
             <button 
               onClick={handleTestApi}
               className="text-purple-600 hover:text-purple-800 flex items-center text-sm px-2 py-1 rounded border border-purple-200 hover:bg-purple-50"
+              disabled={loading}
             >
               🧪 Test API
             </button>
@@ -180,6 +126,7 @@ const SectoresPage: React.FC = () => {
             <button 
               onClick={handleForceReload}
               className="text-blue-600 hover:text-blue-800 flex items-center text-sm px-2 py-1 rounded border border-blue-200 hover:bg-blue-50"
+              disabled={loading}
             >
               🔄 Recargar
             </button>
@@ -191,31 +138,42 @@ const SectoresPage: React.FC = () => {
               🧹 Limpiar Cache
             </button>
             
-            <button 
-              onClick={() => {
-                setShowDebug(!showDebug);
-                if (!showDebug) handleDebugInfo();
-              }}
-              className="text-gray-600 hover:text-gray-800 flex items-center text-sm px-2 py-1 rounded border border-gray-200 hover:bg-gray-50"
-            >
-              🔧 {showDebug ? 'Ocultar' : 'Debug'}
-            </button>
+            {process.env.NODE_ENV === 'development' && (
+              <button 
+                onClick={() => setShowDebug(!showDebug)}
+                className="text-gray-600 hover:text-gray-800 flex items-center text-sm px-2 py-1 rounded border border-gray-200 hover:bg-gray-50"
+                disabled={loading}
+              >
+                🔧 {showDebug ? 'Ocultar' : 'Debug'}
+              </button>
+            )}
           </div>
         </div>
 
         {/* Panel de debug */}
-        {showDebug && debugInfo && (
+        {showDebug && process.env.NODE_ENV === 'development' && (
           <div className="bg-gray-900 text-green-400 p-4 rounded-md font-mono text-xs overflow-auto max-h-96">
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-green-300 font-bold">🔧 INFORMACIÓN DE DEBUG</h3>
               <button 
-                onClick={handleDebugInfo}
+                onClick={sincronizarManualmente}
                 className="text-green-300 hover:text-green-200 px-2 py-1 rounded border border-green-600"
               >
-                Actualizar
+                Sincronizar
               </button>
             </div>
-            <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
+            <pre>{JSON.stringify({
+              totalSectores: sectores.length,
+              sectorSeleccionado: sectorSeleccionado?.nombre || 'Ninguno',
+              modoEdicion,
+              isOfflineMode,
+              loading,
+              error,
+              searchTerm,
+              cache: {
+                sectores: !!localStorage.getItem('sectores_cache')
+              }
+            }, null, 2)}</pre>
           </div>
         )}
 
@@ -224,6 +182,8 @@ const SectoresPage: React.FC = () => {
           <div className={`border px-4 py-3 rounded relative ${
             successMessage.includes('❌') 
               ? 'bg-red-50 border-red-200 text-red-800' 
+              : successMessage.includes('⚠️')
+              ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
               : 'bg-green-50 border-green-200 text-green-800'
           }`} role="alert">
             <span className="block sm:inline">{successMessage}</span>
@@ -236,11 +196,12 @@ const SectoresPage: React.FC = () => {
             <div className="flex justify-between items-center">
               <div>
                 <span className="font-medium">⚠️ Modo sin conexión:</span>
-                <span className="ml-1">Trabajando con datos locales o mock.</span>
+                <span className="ml-1">Trabajando con datos locales.</span>
               </div>
               <button 
                 onClick={handleForceReload}
                 className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300"
+                disabled={loading}
               >
                 Reconectar
               </button>
@@ -258,44 +219,26 @@ const SectoresPage: React.FC = () => {
         {/* Formulario de sectores */}
         <SectorForm
           sectorSeleccionado={sectorSeleccionado}
-          onGuardar={async (data) => {
-            try {
-              await guardarSector(data);
-              showMessage(modoEdicion 
-                ? "✅ Sector actualizado correctamente" 
-                : "✅ Sector creado correctamente");
-            } catch (error: any) {
-              showMessage("❌ Error al guardar: " + error.message, true);
-            }
-          }}
+          onGuardar={handleGuardar}
           onNuevo={limpiarSeleccion}
           onEditar={handleEditar}
+          modoOffline={isOfflineMode}
           loading={loading}
+          isEditMode={modoEdicion}
         />
 
         {/* Lista de sectores */}
-        {loading ? (
-          <div className="flex justify-center items-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-gray-600">Cargando sectores...</span>
-          </div>
-        ) : (
-          <SectorList
-            sectores={sectores}
-            onSelectSector={seleccionarSector}
-            isOfflineMode={isOfflineMode}
-            onEliminar={async (id) => {
-              try {
-                await eliminarSector(id);
-                showMessage("✅ Sector eliminado correctamente");
-              } catch (error: any) {
-                showMessage("❌ Error al eliminar: " + error.message, true);
-              }
-            }}
-          />
-        )}
+        <SectorList
+          sectores={sectores}
+          onSelectSector={seleccionarSector}
+          isOfflineMode={isOfflineMode}
+          onEliminar={handleEliminar}
+          loading={loading}
+          onSearch={buscarSectores}
+          searchTerm={searchTerm}
+        />
 
-        {/* Información adicional en la parte inferior */}
+        {/* Información adicional */}
         <div className="bg-gray-50 p-4 rounded-md text-sm text-gray-600">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
@@ -315,14 +258,6 @@ const SectoresPage: React.FC = () => {
               <span className="ml-2">{modoEdicion ? 'Edición' : 'Vista'}</span>
             </div>
           </div>
-          
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mt-2 pt-2 border-t border-gray-200">
-              <div className="text-xs text-gray-500">
-                🔧 Modo desarrollo activo - Usa los botones de debug para diagnosticar problemas
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </MainLayout>

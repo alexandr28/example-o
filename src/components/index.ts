@@ -58,3 +58,6 @@ export { default as DepreciacionForm } from './depreciacion/DepreciacionForm';
 
 export {default as LoginForm } from './auth/LoginForm'
 export {default as ProtectedRoute} from './auth/ProtectedRoute'
+
+export {  EntityForm } from './EntityForm';
+export { EntityList } from './EntityList';
