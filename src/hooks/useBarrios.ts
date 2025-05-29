@@ -1,134 +1,209 @@
-// src/hooks/useBarrios.ts - versión corregida para debugging
-
-import { useState, useCallback, useEffect } from 'react';
+// src/hooks/useBarrios.ts - REFACTORIZADO
+import { useCallback, useEffect, useState } from 'react';
+import { useCrudEntity } from './useCrudEntity';
 import { Barrio, BarrioFormData, Sector } from '../models/';
-import { BarrioService } from '../services/barrioService';
-import { SectorService } from '../services/sectorService';
+import BarrioService from '../services/barrioService';
+import SectorService from '../services/sectorService';
 
 export const useBarrios = () => {
-  // Estados
-  const [barrios, setBarrios] = useState<Barrio[]>([]);
-  const [sectores, setSectores] = useState<Sector[]>([]);
-  const [barrioSeleccionado, setBarrioSeleccionado] = useState<Barrio | null>(null);
-  const [modoEdicion, setModoEdicion] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState<string>('');
-
-  // Cargar barrios desde la API
-  const cargarBarrios = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      console.log('🔄 Iniciando carga de barrios...');
-      
-      try {
-        const data = await BarrioService.getAll();
-        console.log('✅ Datos de barrios recibidos:', data);
-        console.log('📊 Estructura del primer barrio:', data[0]);
-        console.log('🔢 Cantidad de barrios:', data.length);
-        
-        // Verificar si los datos tienen la estructura correcta
-        if (Array.isArray(data)) {
-          setBarrios(data);
-          localStorage.setItem('cachedBarrios', JSON.stringify(data));
-          console.log(`✅ ${data.length} barrios establecidos en el estado`);
-        } else {
-          console.error('❌ Los datos no son un array:', data);
-          setError('Los datos recibidos no tienen el formato esperado');
-        }
-        
-      } catch (err: any) {
-        console.error('❌ Error al cargar barrios desde API:', err);
-        setError(err.message || 'Error al cargar los barrios');
-        
-        // Modo fallback: usar datos de caché local si existen
-        const cachedBarrios = localStorage.getItem('cachedBarrios');
-        if (cachedBarrios) {
-          console.log('🔄 Utilizando datos de caché local');
-          try {
-            const parsedBarrios = JSON.parse(cachedBarrios);
-            setBarrios(parsedBarrios);
-            console.log('✅ Barrios cargados desde caché:', parsedBarrios.length);
-          } catch (cacheErr) {
-            console.error('❌ Error al cargar barrios desde caché:', cacheErr);
-          }
-        }
-      }
-    } finally {
-      setLoading(false);
+  // Hook genérico para operaciones CRUD de barrios
+  const {
+    items: barrios,
+    selectedItem: barrioSeleccionado,
+    isEditMode: modoEdicion,
+    loading,
+    error,
+    isOfflineMode,
+    searchTerm,
+    lastSyncTime,
+    loadItems: cargarBarrios,
+    searchItems: buscarBarrios,
+    selectItem: seleccionarBarrio,
+    clearSelection: limpiarSeleccion,
+    saveItem: guardarBarrio,
+    deleteItem: eliminarBarrio,
+    setIsEditMode: setModoEdicion,
+    refreshItems: sincronizarManualmente,
+    setError
+  } = useCrudEntity<Barrio, BarrioFormData>({
+    entityName: 'Barrios',
+    service: BarrioService,
+    cacheKey: 'barrios_cache',
+    getItemId: (barrio) => barrio.id,
+    validateData: (data) => {
+      // Validar que tengamos barrios con nombres reales
+      return data.some(barrio => 
+        barrio.nombre && 
+        !barrio.nombre.match(/^Barrio \d+$/) &&
+        barrio.nombre.trim().length > 0 &&
+        barrio.sectorId > 0
+      );
     }
-  }, []);
+  });
 
-  // Cargar sectores desde la API
+  // Estado adicional para sectores
+  const [sectores, setSectores] = useState<Sector[]>([]);
+  const [loadingSectores, setLoadingSectores] = useState(false);
+
+  // Cargar sectores
   const cargarSectores = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
+      setLoadingSectores(true);
+      console.log('🔄 [useBarrios] Cargando sectores...');
       
-      console.log('🔄 Iniciando carga de sectores...');
+      const data = await SectorService.getAll();
+      setSectores(data);
       
-      try {
-        const data = await SectorService.getAll();
-        console.log('✅ Datos de sectores recibidos:', data);
-        console.log('🔢 Cantidad de sectores:', data.length);
-        
-        if (Array.isArray(data)) {
-          setSectores(data);
-          localStorage.setItem('cachedSectores', JSON.stringify(data));
-          console.log(`✅ ${data.length} sectores establecidos en el estado`);
-        } else {
-          console.error('❌ Los datos de sectores no son un array:', data);
-        }
-        
-      } catch (err: any) {
-        console.error('❌ Error al cargar sectores desde API:', err);
-        
-        // Modo fallback
-        const cachedSectores = localStorage.getItem('cachedSectores');
-        if (cachedSectores) {
-          console.log('🔄 Utilizando sectores desde caché local');
-          try {
-            const parsedSectores = JSON.parse(cachedSectores);
-            setSectores(parsedSectores);
-            console.log('✅ Sectores cargados desde caché:', parsedSectores.length);
-          } catch (cacheErr) {
-            console.error('❌ Error al cargar sectores desde caché:', cacheErr);
-          }
-        }
+      // Guardar en caché
+      localStorage.setItem('sectores_cache', JSON.stringify(data));
+      console.log(`✅ [useBarrios] ${data.length} sectores cargados`);
+      
+    } catch (error: any) {
+      console.error('❌ [useBarrios] Error al cargar sectores:', error);
+      
+      // Intentar cargar desde caché
+      const cached = localStorage.getItem('sectores_cache');
+      if (cached) {
+        setSectores(JSON.parse(cached));
+        console.log('📦 [useBarrios] Sectores cargados desde caché');
       }
     } finally {
-      setLoading(false);
+      setLoadingSectores(false);
     }
   }, []);
 
-  // ... resto de funciones sin cambios ...
+  // Cargar sectores al montar
+  useEffect(() => {
+    cargarSectores();
+  }, [cargarSectores]);
+
+  // Funciones adicionales específicas de barrios
+  const forzarModoOnline = useCallback(async () => {
+    console.log('🔄 [useBarrios] Forzando modo online...');
+    try {
+      // Limpiar caché
+      localStorage.removeItem('barrios_cache');
+      localStorage.removeItem('sectores_cache');
+      
+      // Recargar datos
+      await Promise.all([
+        cargarBarrios(),
+        cargarSectores()
+      ]);
+      
+      console.log('✅ [useBarrios] Modo online forzado exitosamente');
+    } catch (error: any) {
+      console.error('❌ [useBarrios] Error al forzar modo online:', error);
+      setError('Error al forzar conexión: ' + error.message);
+      throw error;
+    }
+  }, [cargarBarrios, cargarSectores, setError]);
+
+  const testApiConnection = useCallback(async (): Promise<boolean> => {
+    try {
+      console.log('🧪 [useBarrios] Probando conexión con API...');
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch('http://192.168.20.160:8080/api/barrio', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+        credentials: 'omit',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      console.log('🧪 [useBarrios] Test response:', response.status, response.statusText);
+      
+      if (response.ok) {
+        const text = await response.text();
+        try {
+          const json = JSON.parse(text);
+          
+          // Verificar si los datos son válidos
+          if (Array.isArray(json) && json.length > 0) {
+            const hayDatosReales = json.some(item => 
+              item && 
+              typeof item === 'object' && 
+              (item.nombre || item.nombreBarrio) && 
+              typeof (item.nombre || item.nombreBarrio) === 'string' &&
+              (item.nombre || item.nombreBarrio).trim().length > 0
+            );
+            
+            console.log('🧪 [useBarrios] ¿API tiene datos reales?:', hayDatosReales);
+            return hayDatosReales;
+          }
+          
+          return false;
+        } catch (e) {
+          console.log('🧪 [useBarrios] Test data no es JSON válido');
+          return false;
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('🧪 [useBarrios] Error en test de conexión:', error);
+      return false;
+    }
+  }, []);
+
+  // Obtener nombre del sector
+  const obtenerNombreSector = useCallback((sectorId: number): string => {
+    const sector = sectores.find(s => s.id === sectorId);
+    return sector?.nombre || `Sector ID: ${sectorId}`;
+  }, [sectores]);
+
+  // Información de debug para desarrollo
+  const debugInfo = process.env.NODE_ENV === 'development' ? {
+    totalBarrios: barrios.length,
+    totalSectores: sectores.length,
+    barrioSeleccionado: barrioSeleccionado?.nombre || 'Ninguno',
+    sectorSeleccionado: barrioSeleccionado ? obtenerNombreSector(barrioSeleccionado.sectorId) : 'N/A',
+    modoEdicion,
+    isOfflineMode,
+    ultimaSync: lastSyncTime?.toLocaleTimeString() || 'Nunca',
+    error,
+    searchTerm
+  } : null;
 
   return {
+    // Estados del hook genérico
     barrios,
-    sectores,
     barrioSeleccionado,
     modoEdicion,
     loading,
     error,
+    isOfflineMode,
     searchTerm,
+    lastSyncTime,
+    
+    // Estados adicionales
+    sectores,
+    loadingSectores,
+    
+    // Funciones del hook genérico
     cargarBarrios,
-    cargarSectores,
-    seleccionarBarrio: setBarrioSeleccionado,
-    limpiarSeleccion: () => {
-      setBarrioSeleccionado(null);
-      setModoEdicion(false);
-    },
-    guardarBarrio: async (data: BarrioFormData) => {
-      // ... implementación existente ...
-    },
-    eliminarBarrio: async (id: number) => {
-      // ... implementación existente ...
-    },
-    buscarBarrios: async (term: string) => {
-      // ... implementación existente ...
-    },
+    buscarBarrios,
+    seleccionarBarrio,
+    limpiarSeleccion,
+    guardarBarrio,
+    eliminarBarrio,
     setModoEdicion,
+    sincronizarManualmente,
+    
+    // Funciones adicionales
+    cargarSectores,
+    forzarModoOnline,
+    testApiConnection,
+    obtenerNombreSector,
+    
+    // Debug info
+    debugInfo
   };
 };

@@ -1,5 +1,4 @@
-// src/models/Calle.ts - ACTUALIZADO CON TIPOVIA INTEGRADO
-// Enumeración para tipos de vía
+// src/models/Calle.ts - ACTUALIZADO CON SECTOR Y BARRIO
 export enum TipoVia {
   AVENIDA = 'avenida',
   CALLE = 'calle',
@@ -31,11 +30,18 @@ export const TIPO_VIA_OPTIONS: TipoViaOption[] = [
 // Interfaz para la entidad Calle
 export interface Calle {
   id?: number;
-  codTipoVia?: number; // Campo que viene de la API
+  codTipoVia?: number;
   tipoVia: string;
   nombre: string;
-  nombreVia?: string; // Campo que viene de la API
-  descripTipoVia?: string; // Campo descriptivo de la API
+  nombreVia?: string;
+  descripTipoVia?: string;
+  
+  // NUEVOS CAMPOS
+  sectorId: number;
+  barrioId: number;
+  sector?: any; // Para la relación con sector
+  barrio?: any; // Para la relación con barrio
+  
   estado?: boolean;
   fechaCreacion?: string | Date;
   fechaModificacion?: string | Date;
@@ -43,13 +49,15 @@ export interface Calle {
   usuarioModificacion?: string;
 }
 
-// Tipo para el formulario de Calle
+// Tipo para el formulario de Calle - ACTUALIZADO
 export type CalleFormData = {
+  sectorId: number;
+  barrioId: number;
   tipoVia: string;
   nombre: string;
 };
 
-// Funciones de utilidad para calles
+// Funciones de utilidad
 export const formatearNombreCalle = (calle: Calle): string => {
   const tipoViaOption = TIPO_VIA_OPTIONS.find(opt => opt.value === calle.tipoVia);
   const prefijo = tipoViaOption?.descripcion || '';
@@ -57,24 +65,20 @@ export const formatearNombreCalle = (calle: Calle): string => {
   return prefijo ? `${prefijo} ${calle.nombre}` : calle.nombre;
 };
 
-// Función para obtener la descripción de un tipo de vía
 export const getDescripcionTipoVia = (tipoVia: string): string => {
   const option = TIPO_VIA_OPTIONS.find(opt => opt.value === tipoVia);
   return option?.descripcion || tipoVia;
 };
 
-// Función para validar si un tipo de vía es válido
 export const isValidTipoVia = (tipoVia: string): boolean => {
   return TIPO_VIA_OPTIONS.some(opt => opt.value === tipoVia);
 };
 
-// Función para normalizar tipo de vía desde la API
 export const normalizeTipoViaFromApi = (apiTipoVia: string): string => {
   if (!apiTipoVia) return TipoVia.CALLE;
   
   const normalized = apiTipoVia.toLowerCase().trim();
   
-  // Mapear diferentes variaciones que pueden venir de la API
   const mappings: Record<string, string> = {
     'av': TipoVia.AVENIDA,
     'avenida': TipoVia.AVENIDA,
