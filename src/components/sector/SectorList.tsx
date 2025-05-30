@@ -1,5 +1,5 @@
 // src/components/sector/SectorList.tsx
-import React from 'react';
+import Reac,{useEffect} from 'react';
 import { EntityList } from '../EntityList';
 import { Sector } from '../../models/Sector';
 
@@ -22,7 +22,7 @@ const SectorList: React.FC<SectorListProps> = ({
   onSearch,
   searchTerm = ''
 }) => {
-  // Definir las columnas para la tabla
+ // Definir las columnas para la tabla
   const columns = [
     {
       key: 'nombre',
@@ -42,6 +42,16 @@ const SectorList: React.FC<SectorListProps> = ({
       )
     }
   ];
+  
+  // Log para debug
+  useEffect(() => {
+    console.log('📊 [SectorList] Estado actual:', {
+      sectoresCount: sectores.length,
+      loading,
+      isOfflineMode,
+      primerosItems: sectores.slice(0, 3)
+    });
+  }, [sectores, loading, isOfflineMode]);
 
   return (
     <EntityList<Sector>

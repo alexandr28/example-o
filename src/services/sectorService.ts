@@ -11,6 +11,8 @@ class SectorServiceClass extends BaseApiService<Sector, SectorFormData> {
       },
       {
         normalizeItem: (apiData: any, index: number): Sector => {
+          console.log(`🔍 [SectorService] Normalizando item ${index}:`, apiData);
+          
           // Si el dato es null/undefined, crear uno por defecto
           if (!apiData || typeof apiData !== 'object') {
             console.warn(`⚠️ [SectorService] Dato inválido en índice ${index}:`, apiData);
@@ -47,10 +49,41 @@ class SectorServiceClass extends BaseApiService<Sector, SectorFormData> {
             sectorNombre = `Sector ${sectorId} (sin nombre)`;
           }
           
-          return {
+          const resultado = {
             id: sectorId,
             nombre: sectorNombre
           };
+          
+          console.log(`✅ [SectorService] Sector normalizado:`, resultado);
+          return resultado;
+        },
+        
+        extractArray: (response: any): any[] => {
+          console.log('🔍 [SectorService] Extrayendo array de respuesta:', response);
+          
+          // Si la respuesta ya es un array, devolverlo
+          if (Array.isArray(response)) {
+            return response;
+          }
+          
+          // Intentar extraer de propiedades comunes
+          if (response && typeof response === 'object') {
+            // Buscar en propiedades comunes
+            const possibleArrays = ['data', 'items', 'results', 'content', 'sectores'];
+            
+            for (const prop of possibleArrays) {
+              if (Array.isArray(response[prop])) {
+                console.log(`✅ [SectorService] Array encontrado en propiedad '${prop}'`);
+                return response[prop];
+              }
+            }
+            
+            // Si no encontramos un array, devolver array vacío
+            console.warn('⚠️ [SectorService] No se encontró array en la respuesta');
+            return [];
+          }
+          
+          return [];
         },
         
         validateItem: (sector: Sector): boolean => {

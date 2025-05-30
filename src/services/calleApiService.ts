@@ -1,12 +1,12 @@
-// src/services/calleService.ts - REFACTORIZADO
+// src/services/calleApiService.ts - REFACTORIZADO
 import { BaseApiService } from './BaseApiService';
-import { Calle, CalleFormData, normalizeTipoViaFromApi } from '../models/Calle';
+import { Calle, CalleFormData, normalizeTipoViaFromApi, TIPO_VIA_OPTIONS } from '../models/Calle';
 
 class CalleServiceClass extends BaseApiService<Calle, CalleFormData> {
   constructor() {
     super(
       {
-        baseUrl: 'http://192.168.20.160:8080',
+        baseUrl: '', // Usar proxy de Vite
         endpoint: '/api/via'
       },
       {
@@ -98,6 +98,34 @@ class CalleServiceClass extends BaseApiService<Calle, CalleFormData> {
           return resultado;
         },
         
+        extractArray: (response: any): any[] => {
+          console.log('🔍 [CalleService] Extrayendo array de respuesta:', response);
+          
+          // Si la respuesta ya es un array, devolverlo
+          if (Array.isArray(response)) {
+            return response;
+          }
+          
+          // Intentar extraer de propiedades comunes
+          if (response && typeof response === 'object') {
+            // Buscar en propiedades comunes
+            const possibleArrays = ['data', 'items', 'results', 'content', 'vias', 'calles'];
+            
+            for (const prop of possibleArrays) {
+              if (Array.isArray(response[prop])) {
+                console.log(`✅ [CalleService] Array encontrado en propiedad '${prop}'`);
+                return response[prop];
+              }
+            }
+            
+            // Si no encontramos un array, devolver array vacío
+            console.warn('⚠️ [CalleService] No se encontró array en la respuesta');
+            return [];
+          }
+          
+          return [];
+        },
+        
         validateItem: (calle: Calle): boolean => {
           const esValido = calle.nombre && 
             !calle.nombre.includes('sin nombre') &&
@@ -159,8 +187,6 @@ function isValidTipoVia(tipoVia: string): boolean {
   const validTypes = ['avenida', 'calle', 'jiron', 'pasaje', 'malecon', 'plaza', 'parque'];
   return validTypes.includes(tipoVia.toLowerCase());
 }
-
-import { TIPO_VIA_OPTIONS } from '../models/Calle';
 
 // Exportar instancia singleton
 const CalleService = new CalleServiceClass();

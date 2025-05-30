@@ -1,12 +1,12 @@
-// src/hooks/useBarrios.ts - REFACTORIZADO
-import { useCallback, useEffect, useState } from 'react';
+// src/hooks/useBarrios.ts
+import { useCallback, useEffect, useRef } from 'react';
 import { useCrudEntity } from './useCrudEntity';
-import { Barrio, BarrioFormData, Sector } from '../models/';
+import { Barrio, BarrioFormData } from '../models/Barrio';
 import BarrioService from '../services/barrioService';
-import SectorService from '../services/sectorService';
 
 export const useBarrios = () => {
-  // Hook genérico para operaciones CRUD de barrios
+  const isInitialized = useRef(false);
+  
   const {
     items: barrios,
     selectedItem: barrioSeleccionado,
@@ -32,50 +32,22 @@ export const useBarrios = () => {
     getItemId: (barrio) => barrio.id,
     validateData: (data) => {
       // Validar que tengamos barrios con nombres reales
-      return data.some(barrio => 
+      return Array.isArray(data) && data.length > 0 && data.some(barrio => 
         barrio.nombre && 
         !barrio.nombre.match(/^Barrio \d+$/) &&
-        barrio.nombre.trim().length > 0 &&
-        barrio.sectorId > 0
+        barrio.nombre.trim().length > 0
       );
     }
   });
 
-  // Estado adicional para sectores
-  const [sectores, setSectores] = useState<Sector[]>([]);
-  const [loadingSectores, setLoadingSectores] = useState(false);
-
-  // Cargar sectores
-  const cargarSectores = useCallback(async () => {
-    try {
-      setLoadingSectores(true);
-      console.log('🔄 [useBarrios] Cargando sectores...');
-      
-      const data = await SectorService.getAll();
-      setSectores(data);
-      
-      // Guardar en caché
-      localStorage.setItem('sectores_cache', JSON.stringify(data));
-      console.log(`✅ [useBarrios] ${data.length} sectores cargados`);
-      
-    } catch (error: any) {
-      console.error('❌ [useBarrios] Error al cargar sectores:', error);
-      
-      // Intentar cargar desde caché
-      const cached = localStorage.getItem('sectores_cache');
-      if (cached) {
-        setSectores(JSON.parse(cached));
-        console.log('📦 [useBarrios] Sectores cargados desde caché');
-      }
-    } finally {
-      setLoadingSectores(false);
+  // Cargar datos iniciales solo una vez
+  useEffect(() => {
+    if (!isInitialized.current) {
+      isInitialized.current = true;
+      console.log('🔄 [useBarrios] Carga inicial de datos');
+      cargarBarrios();
     }
   }, []);
-
-  // Cargar sectores al montar
-  useEffect(() => {
-    cargarSectores();
-  }, [cargarSectores]);
 
   // Funciones adicionales específicas de barrios
   const forzarModoOnline = useCallback(async () => {
@@ -83,21 +55,15 @@ export const useBarrios = () => {
     try {
       // Limpiar caché
       localStorage.removeItem('barrios_cache');
-      localStorage.removeItem('sectores_cache');
-      
       // Recargar datos
-      await Promise.all([
-        cargarBarrios(),
-        cargarSectores()
-      ]);
-      
+      await cargarBarrios();
       console.log('✅ [useBarrios] Modo online forzado exitosamente');
     } catch (error: any) {
       console.error('❌ [useBarrios] Error al forzar modo online:', error);
       setError('Error al forzar conexión: ' + error.message);
       throw error;
     }
-  }, [cargarBarrios, cargarSectores, setError]);
+  }, [cargarBarrios, setError]);
 
   const testApiConnection = useCallback(async (): Promise<boolean> => {
     try {
@@ -122,17 +88,21 @@ export const useBarrios = () => {
       
       if (response.ok) {
         const text = await response.text();
+        console.log('🧪 [useBarrios] Test content preview:', text.substring(0, 200));
+        
         try {
           const json = JSON.parse(text);
+          console.log('🧪 [useBarrios] Test data parsed:', json);
           
-          // Verificar si los datos son válidos
+          // Verificar si los datos son válidos y reales
           if (Array.isArray(json) && json.length > 0) {
             const hayDatosReales = json.some(item => 
               item && 
               typeof item === 'object' && 
-              (item.nombre || item.nombreBarrio) && 
-              typeof (item.nombre || item.nombreBarrio) === 'string' &&
-              (item.nombre || item.nombreBarrio).trim().length > 0
+              item.nombre && 
+              typeof item.nombre === 'string' &&
+              item.nombre.trim().length > 0 &&
+              !item.nombre.match(/^Barrio \d+$/)
             );
             
             console.log('🧪 [useBarrios] ¿API tiene datos reales?:', hayDatosReales);
@@ -153,18 +123,10 @@ export const useBarrios = () => {
     }
   }, []);
 
-  // Obtener nombre del sector
-  const obtenerNombreSector = useCallback((sectorId: number): string => {
-    const sector = sectores.find(s => s.id === sectorId);
-    return sector?.nombre || `Sector ID: ${sectorId}`;
-  }, [sectores]);
-
   // Información de debug para desarrollo
   const debugInfo = process.env.NODE_ENV === 'development' ? {
     totalBarrios: barrios.length,
-    totalSectores: sectores.length,
     barrioSeleccionado: barrioSeleccionado?.nombre || 'Ninguno',
-    sectorSeleccionado: barrioSeleccionado ? obtenerNombreSector(barrioSeleccionado.sectorId) : 'N/A',
     modoEdicion,
     isOfflineMode,
     ultimaSync: lastSyncTime?.toLocaleTimeString() || 'Nunca',
@@ -182,14 +144,12 @@ export const useBarrios = () => {
     isOfflineMode,
     searchTerm,
     lastSyncTime,
-    
-    // Estados adicionales
-    sectores,
-    loadingSectores,
+    hasPendingChanges: false, // Por ahora no implementado
+    pendingChangesCount: 0,   // Por ahora no implementado
     
     // Funciones del hook genérico
     cargarBarrios,
-    buscarBarrios,
+    buscarBarrios: (term: string) => buscarBarrios(term), // Wrapper para mantener compatibilidad
     seleccionarBarrio,
     limpiarSeleccion,
     guardarBarrio,
@@ -197,11 +157,9 @@ export const useBarrios = () => {
     setModoEdicion,
     sincronizarManualmente,
     
-    // Funciones adicionales
-    cargarSectores,
+    // Funciones adicionales específicas
     forzarModoOnline,
     testApiConnection,
-    obtenerNombreSector,
     
     // Debug info
     debugInfo

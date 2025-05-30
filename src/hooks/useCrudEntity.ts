@@ -214,8 +214,20 @@ export function useCrudEntity<T, F>({
 
   // Cargar datos al montar
   useEffect(() => {
-    loadItems();
-  }, [loadItems]);
+    let mounted = true;
+    
+    const loadInitialData = async () => {
+      if (mounted && items.length === 0 && !loading) {
+        await loadItems();
+      }
+    };
+    
+    loadInitialData();
+    
+    return () => {
+      mounted = false;
+    };
+  }, []); // Solo ejecutar una vez al montar
 
   return {
     // Estados

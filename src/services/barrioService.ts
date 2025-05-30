@@ -6,11 +6,13 @@ class BarrioServiceClass extends BaseApiService<Barrio, BarrioFormData> {
   constructor() {
     super(
       {
-        baseUrl: 'http://192.168.20.160:8080',
+        baseUrl: '', // Usar proxy de Vite
         endpoint: '/api/barrio'
       },
       {
         normalizeItem: (apiData: any, index: number): Barrio => {
+          console.log(`🔍 [BarrioService] Normalizando item ${index}:`, apiData);
+          
           // Si el dato es null/undefined, crear uno por defecto
           if (!apiData || typeof apiData !== 'object') {
             console.warn(`⚠️ [BarrioService] Dato inválido en índice ${index}:`, apiData);
@@ -74,6 +76,34 @@ class BarrioServiceClass extends BaseApiService<Barrio, BarrioFormData> {
           
           console.log(`✅ [BarrioService] Barrio ${index} normalizado:`, resultado);
           return resultado;
+        },
+        
+        extractArray: (response: any): any[] => {
+          console.log('🔍 [BarrioService] Extrayendo array de respuesta:', response);
+          
+          // Si la respuesta ya es un array, devolverlo
+          if (Array.isArray(response)) {
+            return response;
+          }
+          
+          // Intentar extraer de propiedades comunes
+          if (response && typeof response === 'object') {
+            // Buscar en propiedades comunes
+            const possibleArrays = ['data', 'items', 'results', 'content', 'barrios'];
+            
+            for (const prop of possibleArrays) {
+              if (Array.isArray(response[prop])) {
+                console.log(`✅ [BarrioService] Array encontrado en propiedad '${prop}'`);
+                return response[prop];
+              }
+            }
+            
+            // Si no encontramos un array, devolver array vacío
+            console.warn('⚠️ [BarrioService] No se encontró array en la respuesta');
+            return [];
+          }
+          
+          return [];
         },
         
         validateItem: (barrio: Barrio): boolean => {

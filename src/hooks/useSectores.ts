@@ -1,10 +1,12 @@
 // src/hooks/useSectores.ts
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useCrudEntity } from './useCrudEntity';
 import { Sector, SectorFormData } from '../models/Sector';
 import SectorService from '../services/sectorService';
 
 export const useSectores = () => {
+  const isInitialized = useRef(false);
+  
   const {
     items: sectores,
     selectedItem: sectorSeleccionado,
@@ -30,13 +32,22 @@ export const useSectores = () => {
     getItemId: (sector) => sector.id,
     validateData: (data) => {
       // Validar que tengamos sectores con nombres reales
-      return data.some(sector => 
+      return Array.isArray(data) && data.length > 0 && data.some(sector => 
         sector.nombre && 
         !sector.nombre.match(/^Sector \d+$/) &&
         sector.nombre.trim().length > 0
       );
     }
   });
+
+  // Cargar datos iniciales solo una vez
+  useEffect(() => {
+    if (!isInitialized.current) {
+      isInitialized.current = true;
+      console.log('🔄 [useSectores] Carga inicial de datos');
+      cargarSectores();
+    }
+  }, []);
 
   // Funciones adicionales específicas de sectores
   const forzarModoOnline = useCallback(async () => {
@@ -61,7 +72,7 @@ export const useSectores = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
-      const response = await fetch('http://localhost:8080/api/sector', {
+      const response = await fetch('http://192.168.20.160:8080/api/sector', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
