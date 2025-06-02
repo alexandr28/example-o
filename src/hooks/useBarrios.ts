@@ -1,11 +1,17 @@
-// src/hooks/useBarrios.ts
-import { useCallback, useEffect, useRef } from 'react';
+// src/hooks/useBarrios.ts - CORREGIDO CON SECTORES
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCrudEntity } from './useCrudEntity';
 import { Barrio, BarrioFormData } from '../models/Barrio';
+import { Sector } from '../models/Sector';
 import BarrioService from '../services/barrioService';
+import SectorService from '../services/sectorService';
 
 export const useBarrios = () => {
   const isInitialized = useRef(false);
+  
+  // Estados adicionales para sectores
+  const [sectores, setSectores] = useState<Sector[]>([]);
+  const [loadingSectores, setLoadingSectores] = useState(false);
   
   const {
     items: barrios,
@@ -40,14 +46,54 @@ export const useBarrios = () => {
     }
   });
 
+  // Cargar sectores
+  const cargarSectores = useCallback(async () => {
+    try {
+      setLoadingSectores(true);
+      console.log('🔄 [useBarrios] Cargando sectores...');
+      
+      const data = await SectorService.getAll();
+      setSectores(data);
+      
+      // Guardar en caché
+      localStorage.setItem('sectores_cache', JSON.stringify(data));
+      console.log(`✅ [useBarrios] ${data.length} sectores cargados`);
+      
+    } catch (error: any) {
+      console.error('❌ [useBarrios] Error al cargar sectores:', error);
+      
+      // Intentar cargar desde caché
+      const cached = localStorage.getItem('sectores_cache');
+      if (cached) {
+        setSectores(JSON.parse(cached));
+        console.log('📦 [useBarrios] Sectores cargados desde caché');
+      }
+    } finally {
+      setLoadingSectores(false);
+    }
+  }, []);
+
+  // Obtener nombre del sector
+  const obtenerNombreSector = useCallback((sectorId: number): string => {
+    const sector = sectores.find(s => s.id === sectorId);
+    return sector?.nombre || `Sector ID: ${sectorId}`;
+  }, [sectores]);
+
   // Cargar datos iniciales solo una vez
   useEffect(() => {
     if (!isInitialized.current) {
       isInitialized.current = true;
       console.log('🔄 [useBarrios] Carga inicial de datos');
-      cargarBarrios();
+      
+      // Cargar sectores y barrios en paralelo
+      Promise.all([
+        cargarSectores(),
+        cargarBarrios()
+      ]).catch(error => {
+        console.error('❌ [useBarrios] Error en carga inicial:', error);
+      });
     }
-  }, []);
+  }, [cargarSectores, cargarBarrios]);
 
   // Funciones adicionales específicas de barrios
   const forzarModoOnline = useCallback(async () => {
@@ -55,15 +101,21 @@ export const useBarrios = () => {
     try {
       // Limpiar caché
       localStorage.removeItem('barrios_cache');
+      localStorage.removeItem('sectores_cache');
+      
       // Recargar datos
-      await cargarBarrios();
+      await Promise.all([
+        cargarSectores(),
+        cargarBarrios()
+      ]);
+      
       console.log('✅ [useBarrios] Modo online forzado exitosamente');
     } catch (error: any) {
       console.error('❌ [useBarrios] Error al forzar modo online:', error);
       setError('Error al forzar conexión: ' + error.message);
       throw error;
     }
-  }, [cargarBarrios, setError]);
+  }, [cargarBarrios, cargarSectores, setError]);
 
   const testApiConnection = useCallback(async (): Promise<boolean> => {
     try {
@@ -72,7 +124,8 @@ export const useBarrios = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
-      const response = await fetch('http://192.168.20.160:8080/api/barrio', {
+      // Probar endpoint de barrios
+      const response = await fetch('/api/barrio', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -99,10 +152,10 @@ export const useBarrios = () => {
             const hayDatosReales = json.some(item => 
               item && 
               typeof item === 'object' && 
-              item.nombre && 
-              typeof item.nombre === 'string' &&
-              item.nombre.trim().length > 0 &&
-              !item.nombre.match(/^Barrio \d+$/)
+              (item.nombre || item.nombreBarrio) && 
+              typeof (item.nombre || item.nombreBarrio) === 'string' &&
+              (item.nombre || item.nombreBarrio).trim().length > 0 &&
+              !(item.nombre || item.nombreBarrio).match(/^Barrio \d+$/)
             );
             
             console.log('🧪 [useBarrios] ¿API tiene datos reales?:', hayDatosReales);
@@ -126,6 +179,7 @@ export const useBarrios = () => {
   // Información de debug para desarrollo
   const debugInfo = process.env.NODE_ENV === 'development' ? {
     totalBarrios: barrios.length,
+    totalSectores: sectores.length,
     barrioSeleccionado: barrioSeleccionado?.nombre || 'Ninguno',
     modoEdicion,
     isOfflineMode,
@@ -144,12 +198,14 @@ export const useBarrios = () => {
     isOfflineMode,
     searchTerm,
     lastSyncTime,
-    hasPendingChanges: false, // Por ahora no implementado
-    pendingChangesCount: 0,   // Por ahora no implementado
+    
+    // Estados adicionales
+    sectores,
+    loadingSectores,
     
     // Funciones del hook genérico
     cargarBarrios,
-    buscarBarrios: (term: string) => buscarBarrios(term), // Wrapper para mantener compatibilidad
+    buscarBarrios: (term: string) => buscarBarrios(term),
     seleccionarBarrio,
     limpiarSeleccion,
     guardarBarrio,
@@ -158,8 +214,10 @@ export const useBarrios = () => {
     sincronizarManualmente,
     
     // Funciones adicionales específicas
+    cargarSectores,
     forzarModoOnline,
     testApiConnection,
+    obtenerNombreSector,
     
     // Debug info
     debugInfo

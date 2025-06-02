@@ -1,4 +1,4 @@
-// src/services/calleApiService.ts - REFACTORIZADO
+// src/services/calleApiService.ts - USAR PROXY DE VITE
 import { BaseApiService } from './BaseApiService';
 import { Calle, CalleFormData, normalizeTipoViaFromApi, TIPO_VIA_OPTIONS } from '../models/Calle';
 
@@ -6,8 +6,8 @@ class CalleServiceClass extends BaseApiService<Calle, CalleFormData> {
   constructor() {
     super(
       {
-        baseUrl: '', // Usar proxy de Vite
-        endpoint: '/api/via'
+        baseUrl: '', // ✅ PROXY LOCAL - Vite redirigirá automáticamente
+        endpoint: '/api/via/listarVia' // ✅ Endpoint correcto según Postman
       },
       {
         normalizeItem: (apiData: any, index: number): Calle => {

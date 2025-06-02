@@ -1,4 +1,4 @@
-// src/services/barrioService.ts - REFACTORIZADO
+// src/services/barrioService.ts - USAR PROXY DE VITE
 import { BaseApiService } from './BaseApiService';
 import { Barrio, BarrioFormData } from '../models/Barrio';
 
@@ -6,8 +6,8 @@ class BarrioServiceClass extends BaseApiService<Barrio, BarrioFormData> {
   constructor() {
     super(
       {
-        baseUrl: '', // Usar proxy de Vite
-        endpoint: '/api/barrio'
+        baseUrl: '', // ✅ PROXY LOCAL - Vite redirigirá automáticamente
+        endpoint: '/api/barrio' // ✅ /api/barrio -> http://192.168.20.160:8080/barrio
       },
       {
         normalizeItem: (apiData: any, index: number): Barrio => {

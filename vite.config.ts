@@ -1,4 +1,4 @@
-// vite.config.ts - PROXY DE AUTENTICACIÓN CORREGIDO
+// vite.config.ts - PROXY CORREGIDO Y SIMPLIFICADO
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
@@ -28,247 +28,121 @@ export default defineConfig(({ mode }) => {
       },
       
       proxy: {
-        // 🔐 PROXY PARA AUTENTICACIÓN - CORREGIDO Y PRIORIZADO
+        // 🔐 PROXY PARA AUTENTICACIÓN - PRIORIDAD MÁS ALTA
         '/auth': {
           target: API_BASE_URL,
           changeOrigin: true,
           secure: false,
-          ws: true,
-          timeout: 10000, // 10 segundos de timeout
+          ws: false,
           configure: (proxy, _options) => {
-            proxy.on('error', (err, req, res) => {
-              console.error('🚨 Proxy error en /auth:', err.message);
-              if (!res.headersSent && res.writeHead) {
-                res.writeHead(500, {
-                  'Content-Type': 'application/json',
-                  'Access-Control-Allow-Origin': '*'
-                });
-                res.end(JSON.stringify({ 
-                  error: 'Proxy error', 
-                  message: `No se pudo conectar con el servidor de autenticación: ${err.message}`,
-                  details: 'Verifique que el servidor esté ejecutándose en ' + API_BASE_URL
-                }));
-              }
-            });
-            
             proxy.on('proxyReq', (proxyReq, req, _res) => {
-              console.log(`🔐 Auth request: ${req.method} ${req.url}`);
+              const targetUrl = `${API_BASE_URL}${req.url}`;
+              console.log(`🔐 AUTH PROXY REQUEST: ${req.method} ${req.url} -> ${targetUrl}`);
               
               // Headers específicos para autenticación
-              proxyReq.setHeader('Origin', req.headers.origin || 'http://localhost:3000');
               proxyReq.setHeader('Host', new URL(API_BASE_URL).host);
+              proxyReq.setHeader('Origin', API_BASE_URL);
               
-              // Preservar Content-Type para POST requests
-              if (req.method === 'POST' || req.method === 'PUT') {
-                proxyReq.setHeader('Content-Type', 'application/json');
-              }
-              
-              // Preservar Authorization header si existe
+              // Para auth, preservar todos los headers
               if (req.headers.authorization) {
                 proxyReq.setHeader('Authorization', req.headers.authorization);
               }
-              
-              // Log para debugging
-              console.log('🔐 Auth request headers:', {
-                'Content-Type': proxyReq.getHeader('Content-Type'),
-                'Authorization': proxyReq.getHeader('Authorization') ? 'Present' : 'Not present',
-                'Origin': proxyReq.getHeader('Origin'),
-                'Host': proxyReq.getHeader('Host')
-              });
             });
             
             proxy.on('proxyRes', (proxyRes, req, _res) => {
-              console.log(`🔐 Auth response: ${req.method} ${req.url} - ${proxyRes.statusCode}`);
+              const targetUrl = `${API_BASE_URL}${req.url}`;
+              console.log(`🔐 AUTH PROXY RESPONSE: ${proxyRes.statusCode} ${proxyRes.statusMessage} for ${req.url} (${targetUrl})`);
               
-              // Agregar headers CORS específicos para auth
-              proxyRes.headers['Access-Control-Allow-Origin'] = req.headers.origin || '*';
+              // Headers CORS para auth
+              proxyRes.headers['Access-Control-Allow-Origin'] = '*';
               proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
-              proxyRes.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type, X-Requested-With';
+              proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With';
               proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
-              proxyRes.headers['Access-Control-Max-Age'] = '86400';
               
-              // Log de respuesta para debugging
-              if (proxyRes.statusCode !== 200) {
-                console.warn(`⚠️ Auth response no exitosa: ${proxyRes.statusCode} ${proxyRes.statusMessage}`);
-              }
-              
-              // Para OPTIONS requests, asegurar status 200
               if (req.method === 'OPTIONS') {
                 proxyRes.statusCode = 200;
                 proxyRes.statusMessage = 'OK';
               }
             });
-          }
-        },
-        
-        // Proxy para API de sectores (SIN AUTENTICACIÓN)
-        '/api/sector': {
-          target: API_BASE_URL,
-          changeOrigin: true,
-          secure: false,
-          rewrite: (path) => {
-            const newPath = path.replace(/^\/api\/sector/, '/sector');
-            console.log(`🔄 Reescribiendo sector: ${path} → ${newPath}`);
-            return newPath;
-          },
-          configure: (proxy, _options) => {
+            
             proxy.on('error', (err, req, res) => {
-              console.error('❌ Proxy error en /api/sector:', err);
-              if (!res.headersSent && res.writeHead) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Proxy error', message: err.message }));
-              }
-            });
-            
-            proxy.on('proxyReq', (proxyReq, req, _res) => {
-              console.log(`📡 Sector request: ${req.method} ${req.url}`);
-              
-              // Limpiar headers de autenticación
-              if (proxyReq.hasHeader('Authorization')) proxyReq.removeHeader('Authorization');
-              if (proxyReq.hasHeader('Cookie')) proxyReq.removeHeader('Cookie');
-              
-              proxyReq.setHeader('Host', new URL(API_BASE_URL).host);
-              proxyReq.setHeader('Origin', req.headers.origin || 'http://localhost:3000');
-              proxyReq.setHeader('Content-Type', 'application/json');
-            });
-            
-            proxy.on('proxyRes', (proxyRes, req, _res) => {
-              console.log(`📡 Sector response: ${req.method} ${req.url} - ${proxyRes.statusCode}`);
-              
-              proxyRes.headers['Access-Control-Allow-Origin'] = req.headers.origin || '*';
-              proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
-              proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With';
-              proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
-              
-              if (req.method === 'OPTIONS') {
-                proxyRes.statusCode = 200;
-              }
+              const targetUrl = `${API_BASE_URL}${req.url}`;
+              console.error(`❌ AUTH PROXY ERROR for ${req.url}:`);
+              console.error(`   Target URL: ${targetUrl}`);
+              console.error(`   Error: ${err.message}`);
             });
           }
         },
         
-        // Proxy para API de vías (SIN AUTENTICACIÓN)
-        '/api/via': {
-          target: API_BASE_URL,
-          changeOrigin: true,
-          secure: false,
-          rewrite: (path) => {
-            const newPath = path.replace(/^\/api\/via/, '/via');
-            console.log(`🔄 Reescribiendo via: ${path} → ${newPath}`);
-            return newPath;
-          },
-          configure: (proxy, _options) => {
-            proxy.on('error', (err, req, res) => {
-              console.error('❌ Proxy error en /api/via:', err);
-              if (!res.headersSent && res.writeHead) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Proxy error', message: err.message }));
-              }
-            });
-            
-            proxy.on('proxyReq', (proxyReq, req, _res) => {
-              console.log(`🛣️ Via request: ${req.method} ${req.url}`);
-              
-              // Limpiar headers de autenticación
-              if (proxyReq.hasHeader('Authorization')) proxyReq.removeHeader('Authorization');
-              if (proxyReq.hasHeader('Cookie')) proxyReq.removeHeader('Cookie');
-              
-              proxyReq.setHeader('Host', new URL(API_BASE_URL).host);
-              proxyReq.setHeader('Origin', req.headers.origin || 'http://localhost:3000');
-              proxyReq.setHeader('Content-Type', 'application/json');
-            });
-            
-            proxy.on('proxyRes', (proxyRes, req, _res) => {
-              console.log(`🛣️ Via response: ${req.method} ${req.url} - ${proxyRes.statusCode}`);
-              
-              proxyRes.headers['Access-Control-Allow-Origin'] = req.headers.origin || '*';
-              proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
-              proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With';
-              proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
-              
-              if (req.method === 'OPTIONS') {
-                proxyRes.statusCode = 200;
-              }
-            });
-          }
-        },
-        
-        // Proxy para API de barrios (SIN AUTENTICACIÓN)
-        '/api/barrio': {
-          target: API_BASE_URL,
-          changeOrigin: true,
-          secure: false,
-          rewrite: (path) => {
-            const newPath = path.replace(/^\/api\/barrio/, '/barrio');
-            console.log(`🔄 Reescribiendo barrio: ${path} → ${newPath}`);
-            return newPath;
-          },
-          configure: (proxy, _options) => {
-            proxy.on('proxyReq', (proxyReq, req, _res) => {
-              // Limpiar headers de autenticación
-              if (proxyReq.hasHeader('Authorization')) proxyReq.removeHeader('Authorization');
-              if (proxyReq.hasHeader('Cookie')) proxyReq.removeHeader('Cookie');
-              
-              proxyReq.setHeader('Host', new URL(API_BASE_URL).host);
-              proxyReq.setHeader('Origin', req.headers.origin || 'http://localhost:3000');
-              proxyReq.setHeader('Content-Type', 'application/json');
-            });
-            
-            proxy.on('proxyRes', (proxyRes, req, _res) => {
-              proxyRes.headers['Access-Control-Allow-Origin'] = req.headers.origin || '*';
-              proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
-              proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With';
-              proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
-            });
-          }
-        },
-        
-        // Proxy general para el resto de la API (CON AUTENTICACIÓN)
+        // 🎯 PROXY PARA APIs DE DATOS - SIN REESCRIBIR
         '/api': {
           target: API_BASE_URL,
           changeOrigin: true,
           secure: false,
-          rewrite: (path) => {
-            // No reescribir rutas que ya tienen sus propias reglas
-            if (path.startsWith('/api/sector') || 
-                path.startsWith('/api/via') || 
-                path.startsWith('/api/barrio')) {
-              return path;
-            }
-            // Reescribir otras rutas API
-            const newPath = path.replace(/^\/api/, '');
-            console.log(`🔄 Reescribiendo API general: ${path} → ${newPath}`);
-            return newPath;
-          },
+          ws: false,
+          // ✅ NO REESCRIBIR - Las APIs reales SÍ tienen /api
+          // /api/sector -> http://192.168.20.160:8080/api/sector
+          // /api/barrio -> http://192.168.20.160:8080/api/barrio  
+          // /api/via -> http://192.168.20.160:8080/api/via
           configure: (proxy, _options) => {
-            proxy.on('error', (err, req, res) => {
-              console.error('❌ Proxy error en /api general:', err);
-              if (!res.headersSent && res.writeHead) {
-                res.writeHead(500, {
-                  'Content-Type': 'application/json'
-                });
-                res.end(JSON.stringify({ error: 'Proxy error', message: err.message }));
-              }
-            });
-            
+            // Log de peticiones salientes para APIs de datos
             proxy.on('proxyReq', (proxyReq, req, _res) => {
-              console.log(`🌐 API general request: ${req.method} ${req.url}`);
+              const targetUrl = `${API_BASE_URL}${req.url || ''}`;
+              console.log(`📤 API PROXY REQUEST: ${req.method} ${req.url} -> ${targetUrl}`);
               
-              // Para APIs generales, preservar headers de autorización
-              proxyReq.setHeader('Origin', req.headers.origin || 'http://localhost:3000');
+              // Asegurar headers correctos
+              proxyReq.setHeader('Host', new URL(API_BASE_URL).host);
+              proxyReq.setHeader('Origin', API_BASE_URL);
               
-              if (req.headers.authorization) {
-                proxyReq.setHeader('Authorization', req.headers.authorization);
-              }
+              // Para APIs de datos, NO incluir auth headers
+              proxyReq.removeHeader('Authorization');
+              proxyReq.removeHeader('Cookie');
             });
             
+            // Log de respuestas
             proxy.on('proxyRes', (proxyRes, req, _res) => {
-              proxyRes.headers['Access-Control-Allow-Origin'] = req.headers.origin || '*';
+              const targetUrl = `${API_BASE_URL}${req.url || ''}`;
+              console.log(`📥 API PROXY RESPONSE: ${proxyRes.statusCode} ${proxyRes.statusMessage} for ${req.url} (${targetUrl})`);
+              
+              // Si hay error, mostrar más detalles
+              if (proxyRes.statusCode >= 400) {
+                console.error(`❌ API PROXY ERROR: ${proxyRes.statusCode} for ${req.url}`);
+                console.error(`   Target URL: ${targetUrl}`);
+              }
+              
+              // Agregar headers CORS a la respuesta
+              proxyRes.headers['Access-Control-Allow-Origin'] = '*';
               proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
-              proxyRes.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type, X-Requested-With';
+              proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With';
               proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
               
-              console.log(`🌐 API general response: ${req.method} ${req.url} - ${proxyRes.statusCode}`);
+              // Manejar preflight requests
+              if (req.method === 'OPTIONS') {
+                proxyRes.statusCode = 200;
+                proxyRes.statusMessage = 'OK';
+              }
+            });
+            
+            // Log de errores de proxy
+            proxy.on('error', (err, req, res) => {
+              const targetUrl = `${API_BASE_URL}${req.url || ''}`;
+              console.error(`❌ API PROXY ERROR for ${req.url}:`);
+              console.error(`   Target URL: ${targetUrl}`);
+              console.error(`   Error: ${err.message}`);
+              
+              // Enviar respuesta de error personalizada
+              if (!res.headersSent) {
+                res.writeHead(500, {
+                  'Content-Type': 'application/json',
+                  'Access-Control-Allow-Origin': '*'
+                });
+                res.end(JSON.stringify({
+                  error: 'Proxy Error',
+                  message: `No se pudo conectar con ${targetUrl}`,
+                  details: err.message,
+                  target: targetUrl
+                }));
+              }
             });
           }
         }
@@ -278,7 +152,8 @@ export default defineConfig(({ mode }) => {
     // Variables de entorno disponibles en cliente
     define: {
       'process.env.VITE_DEV_TOKEN': JSON.stringify(env.VITE_DEV_TOKEN || ''),
-      'process.env.NODE_ENV': JSON.stringify(mode)
+      'process.env.NODE_ENV': JSON.stringify(mode),
+      'process.env.VITE_API_URL': JSON.stringify(API_BASE_URL)
     },
     
     // Configuración de construcción para producción

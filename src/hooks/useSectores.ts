@@ -66,62 +66,63 @@ export const useSectores = () => {
   }, [cargarSectores, setError]);
 
   const testApiConnection = useCallback(async (): Promise<boolean> => {
-    try {
-      console.log('🧪 [useSectores] Probando conexión con API...');
+  try {
+    console.log('🧪 [useSectores] Probando conexión con API...');
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    // ✅ USAR URL DIRECTA - NO PROXY
+    const response = await fetch('http://192.168.20.160:8080/sector', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      mode: 'cors',
+      credentials: 'omit',
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    console.log('🧪 [useSectores] Test response:', response.status, response.statusText);
+    
+    if (response.ok) {
+      const text = await response.text();
+      console.log('🧪 [useSectores] Test content preview:', text.substring(0, 200));
       
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch('http://192.168.20.160:8080/api/sector', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        credentials: 'omit',
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      console.log('🧪 [useSectores] Test response:', response.status, response.statusText);
-      
-      if (response.ok) {
-        const text = await response.text();
-        console.log('🧪 [useSectores] Test content preview:', text.substring(0, 200));
+      try {
+        const json = JSON.parse(text);
+        console.log('🧪 [useSectores] Test data parsed:', json);
         
-        try {
-          const json = JSON.parse(text);
-          console.log('🧪 [useSectores] Test data parsed:', json);
+        // Verificar si los datos son válidos y reales
+        if (Array.isArray(json) && json.length > 0) {
+          const hayDatosReales = json.some(item => 
+            item && 
+            typeof item === 'object' && 
+            item.nombre && 
+            typeof item.nombre === 'string' &&
+            item.nombre.trim().length > 0 &&
+            !item.nombre.match(/^Sector \d+$/)
+          );
           
-          // Verificar si los datos son válidos y reales
-          if (Array.isArray(json) && json.length > 0) {
-            const hayDatosReales = json.some(item => 
-              item && 
-              typeof item === 'object' && 
-              item.nombre && 
-              typeof item.nombre === 'string' &&
-              item.nombre.trim().length > 0 &&
-              !item.nombre.match(/^Sector \d+$/)
-            );
-            
-            console.log('🧪 [useSectores] ¿API tiene datos reales?:', hayDatosReales);
-            return hayDatosReales;
-          }
-          
-          return false;
-        } catch (e) {
-          console.log('🧪 [useSectores] Test data no es JSON válido');
-          return false;
+          console.log('🧪 [useSectores] ¿API tiene datos reales?:', hayDatosReales);
+          return hayDatosReales;
         }
+        
+        return false;
+      } catch (e) {
+        console.log('🧪 [useSectores] Test data no es JSON válido');
+        return false;
       }
-      
-      return false;
-    } catch (error) {
-      console.error('🧪 [useSectores] Error en test de conexión:', error);
-      return false;
     }
-  }, []);
+    
+    return false;
+  } catch (error) {
+    console.error('🧪 [useSectores] Error en test de conexión:', error);
+    return false;
+  }
+}, []);
 
   // Información de debug para desarrollo
   const debugInfo = process.env.NODE_ENV === 'development' ? {

@@ -1,28 +1,30 @@
-// src/components/calles/CalleList.tsx - REFACTORIZADO
-import React,{useEffect} from 'react';
+// src/components/calles/CalleList.tsx - CORREGIDO
+import React, { useEffect } from 'react';
 import { EntityList } from '../EntityList';
-import { Calle } from '../../models/';
+import { Calle, formatearNombreCalle } from '../../models/Calle';
 
 interface CalleListProps {
   calles: Calle[];
-  calleSeleccionada: Calle | null;
-  loading: boolean;
-  searchTerm: string;
-  isOfflineMode: boolean;
-  onSelect: (calle: Calle) => void;
-  onSearch: (term: string) => void;
-  onRefresh: () => void;
+  onSelectCalle: (calle: Calle) => void;
+  isOfflineMode?: boolean;
+  onEliminar?: (id: number) => void;
+  loading?: boolean;
+  onSearch?: (term: string) => void;
+  searchTerm?: string;
+  obtenerNombreSector?: (sectorId: number) => string;
+  obtenerNombreBarrio?: (barrioId: number) => string;
 }
 
-const CalleList: React.FC<CalleListProps> = ({ 
-   calles,
-  calleSeleccionada,
-  loading,
-  searchTerm,
-  isOfflineMode,
-  onSelect,
+const CalleList: React.FC<CalleListProps> = ({
+  calles,
+  onSelectCalle,
+  isOfflineMode = false,
+  onEliminar,
+  loading = false,
   onSearch,
-  onRefresh
+  searchTerm = '',
+  obtenerNombreSector,
+  obtenerNombreBarrio
 }) => {
   // Definir las columnas para la tabla
   const columns = [
@@ -33,14 +35,47 @@ const CalleList: React.FC<CalleListProps> = ({
       render: (value: string, calle: Calle) => (
         <div>
           <div className="text-sm font-medium text-gray-900">
-            {value || 'Sin nombre'}
+            {formatearNombreCalle(calle)}
           </div>
           {process.env.NODE_ENV === 'development' && (
             <div className="text-xs text-gray-500">
-              ID: {calle.id || 'N/A'}
+              ID: {calle.id || 'N/A'} | Tipo: {calle.tipoVia}
             </div>
           )}
         </div>
+      )
+    },
+    {
+      key: 'sectorId',
+      label: 'Sector',
+      sortable: true,
+      render: (sectorId: number, calle: Calle) => (
+        <div className="text-sm text-gray-600">
+          {obtenerNombreSector ? obtenerNombreSector(sectorId) : `Sector ID: ${sectorId}`}
+        </div>
+      )
+    },
+    {
+      key: 'barrioId', 
+      label: 'Barrio',
+      sortable: true,
+      render: (barrioId: number, calle: Calle) => (
+        <div className="text-sm text-gray-600">
+          {obtenerNombreBarrio ? obtenerNombreBarrio(barrioId) : `Barrio ID: ${barrioId}`}
+        </div>
+      )
+    },
+    {
+      key: 'estado',
+      label: 'Estado',
+      render: (estado: boolean | undefined) => (
+        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+          estado === false 
+            ? 'bg-red-100 text-red-800' 
+            : 'bg-green-100 text-green-800'
+        }`}>
+          {estado === false ? 'Inactivo' : 'Activo'}
+        </span>
       )
     }
   ];
@@ -55,25 +90,20 @@ const CalleList: React.FC<CalleListProps> = ({
     });
   }, [calles, loading, isOfflineMode]);
 
-
-
   return (
     <EntityList<Calle>
-      title="Calles"
+      title="Lista de calles"
       items={calles}
-      selectedItem={calleSeleccionada}
-      loading={loading}
-      searchTerm={searchTerm}
-      isOfflineMode={isOfflineMode}
       columns={columns}
-      onSelect={onSelect}
+      onSelect={onSelectCalle}
+      onDelete={onEliminar}
       onSearch={onSearch}
-      onRefresh={onRefresh}
-      searchPlaceholder="Buscar por nombre de calle..."
-      emptyStateTitle="No hay calles registradas"
-      emptyStateDescription="Las calles aparecerán aquí cuando se agreguen al sistema."
-      offlineMessage="Modo sin conexión activo - Mostrando datos locales"
-      getItemKey={(calle) => calle.id.toString()}
+      searchPlaceholder="Buscar por nombre de calle"
+      loading={loading}
+      isOfflineMode={isOfflineMode}
+      itemsPerPage={10}
+      getItemId={(calle) => calle.id}
+      searchTerm={searchTerm}
     />
   );
 };

@@ -1,4 +1,4 @@
-// src/services/base/BaseApiService.ts
+// src/services/BaseApiService.ts - CON MANEJO DE CORS
 export interface ApiConfig {
   baseUrl: string;
   endpoint: string;
@@ -27,8 +27,61 @@ export abstract class BaseApiService<T, CreateDTO, UpdateDTO = CreateDTO> {
   protected get headers() {
     return {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      // ✅ Headers para CORS
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Accept',
       ...this.config.headers
     };
+  }
+
+  protected async makeRequest(url: string, options: RequestInit): Promise<any> {
+    console.log(`📡 [${this.constructor.name}] Petición a:`, url);
+    console.log(`📡 [${this.constructor.name}] Opciones:`, options);
+    
+    try {
+      // ✅ Configuración específica para CORS
+      const response = await fetch(url, {
+        ...options,
+        mode: 'cors',
+        credentials: 'omit', // No enviar cookies
+        headers: {
+          ...this.headers,
+          ...options.headers
+        }
+      });
+      
+      return await this.handleResponse(response, options.method || 'GET');
+      
+    } catch (error: any) {
+      console.error(`❌ [${this.constructor.name}] Error de fetch:`, error);
+      
+      // Si es error de CORS o red, intentar sin CORS headers
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        console.log(`🔄 [${this.constructor.name}] Reintentando sin headers CORS...`);
+        
+        try {
+          const simpleResponse = await fetch(url, {
+            method: options.method || 'GET',
+            mode: 'cors',
+            credentials: 'omit',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            ...(options.body && { body: options.body })
+          });
+          
+          return await this.handleResponse(simpleResponse, options.method || 'GET');
+          
+        } catch (retryError) {
+          console.error(`❌ [${this.constructor.name}] Error en reintento:`, retryError);
+          throw retryError;
+        }
+      }
+      
+      throw error;
+    }
   }
 
   protected async handleResponse(response: Response, method: string): Promise<any> {
@@ -149,14 +202,10 @@ export abstract class BaseApiService<T, CreateDTO, UpdateDTO = CreateDTO> {
     try {
       console.log(`📡 [${this.constructor.name}] GET - Iniciando petición a:`, this.url);
       
-      const response = await fetch(this.url, {
-        method: 'GET',
-        headers: this.headers,
-        mode: 'cors',
-        credentials: 'omit'
+      const rawData = await this.makeRequest(this.url, {
+        method: 'GET'
       });
       
-      const rawData = await this.handleResponse(response, 'GET');
       const normalized = this.normalizeArray(rawData);
       
       console.log(`✅ [${this.constructor.name}] GET - ${normalized.length} elementos obtenidos`);
@@ -172,14 +221,10 @@ export abstract class BaseApiService<T, CreateDTO, UpdateDTO = CreateDTO> {
     try {
       console.log(`📡 [${this.constructor.name}] GET ID ${id} - Iniciando petición`);
       
-      const response = await fetch(`${this.url}/${id}`, {
-        method: 'GET',
-        headers: this.headers,
-        mode: 'cors',
-        credentials: 'omit'
+      const rawData = await this.makeRequest(`${this.url}/${id}`, {
+        method: 'GET'
       });
       
-      const rawData = await this.handleResponse(response, `GET ID ${id}`);
       const normalized = this.normalizeOptions.normalizeItem(rawData, 0);
       
       console.log(`✅ [${this.constructor.name}] GET ID ${id} - Éxito`);
@@ -195,15 +240,11 @@ export abstract class BaseApiService<T, CreateDTO, UpdateDTO = CreateDTO> {
     try {
       console.log(`📡 [${this.constructor.name}] POST - Iniciando creación:`, data);
       
-      const response = await fetch(this.url, {
+      const rawData = await this.makeRequest(this.url, {
         method: 'POST',
-        headers: this.headers,
-        body: JSON.stringify(data),
-        mode: 'cors',
-        credentials: 'omit'
+        body: JSON.stringify(data)
       });
       
-      const rawData = await this.handleResponse(response, 'POST');
       const normalized = this.normalizeOptions.normalizeItem(rawData, 0);
       
       console.log(`✅ [${this.constructor.name}] POST - Éxito:`, normalized);
@@ -219,15 +260,11 @@ export abstract class BaseApiService<T, CreateDTO, UpdateDTO = CreateDTO> {
     try {
       console.log(`📡 [${this.constructor.name}] PUT ID ${id} - Iniciando actualización:`, data);
       
-      const response = await fetch(`${this.url}/${id}`, {
+      const rawData = await this.makeRequest(`${this.url}/${id}`, {
         method: 'PUT',
-        headers: this.headers,
-        body: JSON.stringify(data),
-        mode: 'cors',
-        credentials: 'omit'
+        body: JSON.stringify(data)
       });
       
-      const rawData = await this.handleResponse(response, `PUT ID ${id}`);
       const normalized = this.normalizeOptions.normalizeItem(rawData, 0);
       
       console.log(`✅ [${this.constructor.name}] PUT ID ${id} - Éxito:`, normalized);
@@ -243,14 +280,9 @@ export abstract class BaseApiService<T, CreateDTO, UpdateDTO = CreateDTO> {
     try {
       console.log(`📡 [${this.constructor.name}] DELETE ID ${id} - Iniciando eliminación`);
       
-      const response = await fetch(`${this.url}/${id}`, {
-        method: 'DELETE',
-        headers: this.headers,
-        mode: 'cors',
-        credentials: 'omit'
+      await this.makeRequest(`${this.url}/${id}`, {
+        method: 'DELETE'
       });
-      
-      await this.handleResponse(response, `DELETE ID ${id}`);
       
       console.log(`✅ [${this.constructor.name}] DELETE ID ${id} - Éxito`);
       
@@ -266,26 +298,27 @@ export abstract class BaseApiService<T, CreateDTO, UpdateDTO = CreateDTO> {
       
       const searchUrl = `${this.url}/search?q=${encodeURIComponent(term)}`;
       
-      const response = await fetch(searchUrl, {
-        method: 'GET',
-        headers: this.headers,
-        mode: 'cors',
-        credentials: 'omit'
-      });
-      
-      if (!response.ok) {
-        // Si no hay endpoint de búsqueda, buscar localmente
-        console.log('📡 Endpoint de búsqueda no disponible, usando getAll');
-        const allItems = await this.getAll();
-        const termLower = term.toLowerCase();
+      try {
+        const rawData = await this.makeRequest(searchUrl, {
+          method: 'GET'
+        });
         
-        return allItems.filter(item =>
-          JSON.stringify(item).toLowerCase().includes(termLower)
-        );
+        return this.normalizeArray(rawData);
+        
+      } catch (error: any) {
+        // Si no hay endpoint de búsqueda, buscar localmente
+        if (error.message.includes('404') || error.message.includes('Not Found')) {
+          console.log('📡 Endpoint de búsqueda no disponible, usando getAll');
+          const allItems = await this.getAll();
+          const termLower = term.toLowerCase();
+          
+          return allItems.filter(item =>
+            JSON.stringify(item).toLowerCase().includes(termLower)
+          );
+        }
+        
+        throw error;
       }
-      
-      const rawData = await this.handleResponse(response, 'SEARCH');
-      return this.normalizeArray(rawData);
       
     } catch (error) {
       console.error(`❌ [${this.constructor.name}] Error en búsqueda:`, error);

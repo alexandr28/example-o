@@ -1,28 +1,28 @@
-// src/components/barrio/BarrioList.tsx
+// src/components/barrio/BarrioList.tsx - CORREGIDO
 import React, { useEffect } from 'react';
 import { EntityList } from '../EntityList';
 import { Barrio } from '../../models/Barrio';
 
 interface BarrioListProps {
   barrios: Barrio[];
-  barrioSeleccionado: Barrio | null;
-  loading: boolean;
-  searchTerm: string;
-  isOfflineMode: boolean;
-  onSelect: (barrio: Barrio) => void;
-  onSearch: (term: string) => void;
-  onRefresh: () => void;
+  onSelectBarrio: (barrio: Barrio) => void;
+  isOfflineMode?: boolean;
+  onEliminar?: (id: number) => void;
+  loading?: boolean;
+  onSearch?: (term: string) => void;
+  searchTerm?: string;
+  obtenerNombreSector?: (sectorId: number) => string;
 }
 
-export const BarrioList: React.FC<BarrioListProps> = ({
+const BarrioList: React.FC<BarrioListProps> = ({
   barrios,
-  barrioSeleccionado,
-  loading,
-  searchTerm,
-  isOfflineMode,
-  onSelect,
+  onSelectBarrio,
+  isOfflineMode = false,
+  onEliminar,
+  loading = false,
   onSearch,
-  onRefresh
+  searchTerm = '',
+  obtenerNombreSector
 }) => {
   // Definir las columnas para la tabla
   const columns = [
@@ -33,18 +33,41 @@ export const BarrioList: React.FC<BarrioListProps> = ({
       render: (value: string, barrio: Barrio) => (
         <div>
           <div className="text-sm font-medium text-gray-900">
-            {value || 'Sin nombre'}
+            {value || barrio.nombreBarrio || 'Sin nombre'}
           </div>
           {process.env.NODE_ENV === 'development' && (
             <div className="text-xs text-gray-500">
-              ID: {barrio.id || 'N/A'}
+              ID: {barrio.id || 'N/A'} | Código: {barrio.codBarrio || 'N/A'}
             </div>
           )}
         </div>
       )
+    },
+    {
+      key: 'sectorId',
+      label: 'Sector',
+      sortable: true,
+      render: (sectorId: number, barrio: Barrio) => (
+        <div className="text-sm text-gray-600">
+          {obtenerNombreSector ? obtenerNombreSector(sectorId) : `Sector ID: ${sectorId}`}
+        </div>
+      )
+    },
+    {
+      key: 'estado',
+      label: 'Estado',
+      render: (estado: boolean | undefined) => (
+        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+          estado === false 
+            ? 'bg-red-100 text-red-800' 
+            : 'bg-green-100 text-green-800'
+        }`}>
+          {estado === false ? 'Inactivo' : 'Activo'}
+        </span>
+      )
     }
   ];
-  
+
   // Log para debug
   useEffect(() => {
     console.log('📊 [BarrioList] Estado actual:', {
@@ -57,21 +80,18 @@ export const BarrioList: React.FC<BarrioListProps> = ({
 
   return (
     <EntityList<Barrio>
-      title="Barrios"
+      title="Lista de barrios"
       items={barrios}
-      selectedItem={barrioSeleccionado}
-      loading={loading}
-      searchTerm={searchTerm}
-      isOfflineMode={isOfflineMode}
       columns={columns}
-      onSelect={onSelect}
+      onSelect={onSelectBarrio}
+      onDelete={onEliminar}
       onSearch={onSearch}
-      onRefresh={onRefresh}
-      searchPlaceholder="Buscar por nombre de barrio..."
-      emptyStateTitle="No hay barrios registrados"
-      emptyStateDescription="Los barrios aparecerán aquí cuando se agreguen al sistema."
-      offlineMessage="Modo sin conexión activo - Mostrando datos locales"
-      getItemKey={(barrio) => barrio.id.toString()}
+      searchPlaceholder="Buscar por nombre de barrio"
+      loading={loading}
+      isOfflineMode={isOfflineMode}
+      itemsPerPage={10}
+      getItemId={(barrio) => barrio.id}
+      searchTerm={searchTerm}
     />
   );
 };

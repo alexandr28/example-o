@@ -1,4 +1,4 @@
-// src/services/sectorService.ts
+// src/services/sectorService.ts - USAR PROXY DE VITE
 import { BaseApiService } from './BaseApiService';
 import { Sector, SectorFormData } from '../models/Sector';
 
@@ -6,8 +6,8 @@ class SectorServiceClass extends BaseApiService<Sector, SectorFormData> {
   constructor() {
     super(
       {
-        baseUrl: 'http://192.168.20.160:8080',
-        endpoint: '/api/sector'
+        baseUrl: '', // ✅ PROXY LOCAL - Vite redirigirá automáticamente
+        endpoint: '/api/sector' // ✅ /api/sector -> http://192.168.20.160:8080/sector
       },
       {
         normalizeItem: (apiData: any, index: number): Sector => {
