@@ -1,7 +1,7 @@
-// src/hooks/useBarrios.ts - CORREGIDO CON SECTORES
+// src/hooks/useBarrios.ts - CORREGIDO PARA MANEJAR SECTOR NULL
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCrudEntity } from './useCrudEntity';
-import { Barrio, BarrioFormData } from '../models/Barrio';
+import { Barrio, BarrioFormData, getBarrioDisplayName, isBarrioValid, DEFAULT_SECTOR_ID } from '../models/Barrio';
 import { Sector } from '../models/Sector';
 import BarrioService from '../services/barrioService';
 import SectorService from '../services/sectorService';
@@ -37,27 +37,52 @@ export const useBarrios = () => {
     cacheKey: 'barrios_cache',
     getItemId: (barrio) => barrio.id,
     validateData: (data) => {
-      // Validar que tengamos barrios con nombres reales
-      return Array.isArray(data) && data.length > 0 && data.some(barrio => 
-        barrio.nombre && 
-        !barrio.nombre.match(/^Barrio \d+$/) &&
-        barrio.nombre.trim().length > 0
-      );
+      // 🔥 VALIDACIÓN MÁS PERMISIVA
+      console.log('🔍 [useBarrios] Validando datos:', data);
+      
+      if (!Array.isArray(data)) {
+        console.warn('⚠️ [useBarrios] Los datos no son un array');
+        return false;
+      }
+      
+      if (data.length === 0) {
+        console.warn('⚠️ [useBarrios] Array vacío');
+        return false;
+      }
+      
+      // Contar barrios válidos
+      const barriosValidos = data.filter(barrio => isBarrioValid(barrio));
+      const porcentajeValidos = (barriosValidos.length / data.length) * 100;
+      
+      console.log(`📊 [useBarrios] ${barriosValidos.length}/${data.length} barrios válidos (${porcentajeValidos.toFixed(1)}%)`);
+      
+      // Aceptar si al menos el 50% son válidos (más permisivo)
+      return porcentajeValidos >= 50;
     }
   });
 
-  // Cargar sectores
+  // Cargar sectores con mejor manejo de errores
   const cargarSectores = useCallback(async () => {
     try {
       setLoadingSectores(true);
       console.log('🔄 [useBarrios] Cargando sectores...');
       
       const data = await SectorService.getAll();
+      
+      // 🔥 ASEGURAR QUE EXISTE UN SECTOR POR DEFECTO
+      const sectorDefault = { id: DEFAULT_SECTOR_ID, nombre: 'Sin Sector Asignado' };
+      const tieneDefault = data.some(s => s.id === DEFAULT_SECTOR_ID);
+      
+      if (!tieneDefault) {
+        console.log('➕ [useBarrios] Agregando sector por defecto');
+        data.unshift(sectorDefault);
+      }
+      
       setSectores(data);
       
       // Guardar en caché
       localStorage.setItem('sectores_cache', JSON.stringify(data));
-      console.log(`✅ [useBarrios] ${data.length} sectores cargados`);
+      console.log(`✅ [useBarrios] ${data.length} sectores cargados (incluye sector default)`);
       
     } catch (error: any) {
       console.error('❌ [useBarrios] Error al cargar sectores:', error);
@@ -65,16 +90,26 @@ export const useBarrios = () => {
       // Intentar cargar desde caché
       const cached = localStorage.getItem('sectores_cache');
       if (cached) {
-        setSectores(JSON.parse(cached));
+        const cachedSectores = JSON.parse(cached);
+        setSectores(cachedSectores);
         console.log('📦 [useBarrios] Sectores cargados desde caché');
+      } else {
+        // Si no hay caché, crear al menos el sector por defecto
+        const sectorDefault = { id: DEFAULT_SECTOR_ID, nombre: 'Sin Sector Asignado' };
+        setSectores([sectorDefault]);
+        console.log('🆘 [useBarrios] Usando solo sector por defecto');
       }
     } finally {
       setLoadingSectores(false);
     }
   }, []);
 
-  // Obtener nombre del sector
+  // Obtener nombre del sector con mejor manejo
   const obtenerNombreSector = useCallback((sectorId: number): string => {
+    if (!sectorId || sectorId === 0) {
+      return 'Sin Sector';
+    }
+    
     const sector = sectores.find(s => s.id === sectorId);
     return sector?.nombre || `Sector ID: ${sectorId}`;
   }, [sectores]);
@@ -85,11 +120,10 @@ export const useBarrios = () => {
       isInitialized.current = true;
       console.log('🔄 [useBarrios] Carga inicial de datos');
       
-      // Cargar sectores y barrios en paralelo
-      Promise.all([
-        cargarSectores(),
-        cargarBarrios()
-      ]).catch(error => {
+      // Cargar sectores primero, luego barrios
+      cargarSectores().then(() => {
+        return cargarBarrios();
+      }).catch(error => {
         console.error('❌ [useBarrios] Error en carga inicial:', error);
       });
     }
@@ -104,10 +138,8 @@ export const useBarrios = () => {
       localStorage.removeItem('sectores_cache');
       
       // Recargar datos
-      await Promise.all([
-        cargarSectores(),
-        cargarBarrios()
-      ]);
+      await cargarSectores();
+      await cargarBarrios();
       
       console.log('✅ [useBarrios] Modo online forzado exitosamente');
     } catch (error: any) {
@@ -122,7 +154,7 @@ export const useBarrios = () => {
       console.log('🧪 [useBarrios] Probando conexión con API...');
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       
       // Probar endpoint de barrios
       const response = await fetch('/api/barrio', {
@@ -145,21 +177,19 @@ export const useBarrios = () => {
         
         try {
           const json = JSON.parse(text);
-          console.log('🧪 [useBarrios] Test data parsed:', json);
+          console.log('🧪 [useBarrios] Test data parsed - count:', Array.isArray(json) ? json.length : 'no array');
           
-          // Verificar si los datos son válidos y reales
+          // Verificar si tenemos datos válidos
           if (Array.isArray(json) && json.length > 0) {
-            const hayDatosReales = json.some(item => 
+            // Contar elementos con datos válidos
+            const validItems = json.filter(item => 
               item && 
               typeof item === 'object' && 
-              (item.nombre || item.nombreBarrio) && 
-              typeof (item.nombre || item.nombreBarrio) === 'string' &&
-              (item.nombre || item.nombreBarrio).trim().length > 0 &&
-              !(item.nombre || item.nombreBarrio).match(/^Barrio \d+$/)
+              (item.nombreBarrio || item.nombre)
             );
             
-            console.log('🧪 [useBarrios] ¿API tiene datos reales?:', hayDatosReales);
-            return hayDatosReales;
+            console.log('🧪 [useBarrios] Items válidos encontrados:', validItems.length);
+            return validItems.length > 0;
           }
           
           return false;
@@ -180,12 +210,14 @@ export const useBarrios = () => {
   const debugInfo = process.env.NODE_ENV === 'development' ? {
     totalBarrios: barrios.length,
     totalSectores: sectores.length,
-    barrioSeleccionado: barrioSeleccionado?.nombre || 'Ninguno',
+    barrioSeleccionado: barrioSeleccionado ? getBarrioDisplayName(barrioSeleccionado) : 'Ninguno',
     modoEdicion,
     isOfflineMode,
     ultimaSync: lastSyncTime?.toLocaleTimeString() || 'Nunca',
     error,
-    searchTerm
+    searchTerm,
+    barriosConSectorNull: barrios.filter(b => !b.sector).length,
+    barriosConSectorValido: barrios.filter(b => b.sectorId > 0).length
   } : null;
 
   return {

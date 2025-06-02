@@ -1,4 +1,4 @@
-// src/hooks/useCalles.ts - REFACTORIZADO
+// src/hooks/useCalles.ts - CORREGIDO PARA API REAL
 import { useCallback, useEffect, useState } from 'react';
 import { useCrudEntity } from './useCrudEntity';
 import { Calle, CalleFormData, TipoViaOption, TIPO_VIA_OPTIONS } from '../models/Calle';
@@ -33,12 +33,34 @@ export const useCalles = () => {
     cacheKey: 'calles_cache',
     getItemId: (calle) => calle.id,
     validateData: (data) => {
-      // Validar que tengamos calles con datos reales
-      return data.some(calle => 
-        calle.nombre && 
-        !calle.nombre.includes('sin nombre') &&
-        calle.nombre.trim().length > 0
+      // 🔥 VALIDACIÓN MÁS PERMISIVA PARA CALLES
+      console.log('🔍 [useCalles] Validando datos:', data);
+      
+      if (!Array.isArray(data)) {
+        console.warn('⚠️ [useCalles] Los datos no son un array');
+        return false;
+      }
+      
+      if (data.length === 0) {
+        console.warn('⚠️ [useCalles] Array vacío');
+        return true; // ✅ Aceptar array vacío como válido
+      }
+      
+      // Contar calles que tienen al menos nombre
+      const callesConNombre = data.filter(calle => 
+        calle && 
+        typeof calle === 'object' && 
+        (calle.nombre || calle.nombreVia) &&
+        typeof (calle.nombre || calle.nombreVia) === 'string' &&
+        (calle.nombre || calle.nombreVia).trim().length > 0
       );
+      
+      const porcentajeValidas = data.length > 0 ? (callesConNombre.length / data.length) * 100 : 100;
+      
+      console.log(`📊 [useCalles] ${callesConNombre.length}/${data.length} calles con nombre válido (${porcentajeValidas.toFixed(1)}%)`);
+      
+      // ✅ Aceptar si al menos el 30% tienen nombre válido (muy permisivo)
+      return porcentajeValidas >= 30;
     }
   });
 
@@ -51,13 +73,23 @@ export const useCalles = () => {
   const [loadingBarrios, setLoadingBarrios] = useState(false);
   const [loadingTiposVia, setLoadingTiposVia] = useState(false);
 
-  // Cargar sectores
+  // Cargar sectores con sector por defecto
   const cargarSectores = useCallback(async () => {
     try {
       setLoadingSectores(true);
       console.log('🔄 [useCalles] Cargando sectores...');
       
       const data = await SectorService.getAll();
+      
+      // Asegurar que existe un sector por defecto
+      const sectorDefault = { id: 1, nombre: 'Sin Sector Asignado' };
+      const tieneDefault = data.some(s => s.id === 1);
+      
+      if (!tieneDefault) {
+        console.log('➕ [useCalles] Agregando sector por defecto');
+        data.unshift(sectorDefault);
+      }
+      
       setSectores(data);
       
       // Guardar en caché
@@ -72,19 +104,32 @@ export const useCalles = () => {
       if (cached) {
         setSectores(JSON.parse(cached));
         console.log('📦 [useCalles] Sectores cargados desde caché');
+      } else {
+        // Solo sector por defecto
+        setSectores([{ id: 1, nombre: 'Sin Sector Asignado' }]);
       }
     } finally {
       setLoadingSectores(false);
     }
   }, []);
 
-  // Cargar barrios
+  // Cargar barrios con barrio por defecto
   const cargarBarrios = useCallback(async () => {
     try {
       setLoadingBarrios(true);
       console.log('🔄 [useCalles] Cargando barrios...');
       
       const data = await BarrioService.getAll();
+      
+      // Asegurar que existe un barrio por defecto
+      const barrioDefault = { id: 1, nombre: 'Sin Barrio Asignado', sectorId: 1 };
+      const tieneDefault = data.some(b => b.id === 1);
+      
+      if (!tieneDefault) {
+        console.log('➕ [useCalles] Agregando barrio por defecto');
+        data.unshift(barrioDefault);
+      }
+      
       setBarrios(data);
       
       // Guardar en caché
@@ -99,6 +144,9 @@ export const useCalles = () => {
       if (cached) {
         setBarrios(JSON.parse(cached));
         console.log('📦 [useCalles] Barrios cargados desde caché');
+      } else {
+        // Solo barrio por defecto
+        setBarrios([{ id: 1, nombre: 'Sin Barrio Asignado', sectorId: 1 }]);
       }
     } finally {
       setLoadingBarrios(false);
@@ -123,6 +171,9 @@ export const useCalles = () => {
         }));
         
         console.log('✅ [useCalles] Tipos de vía cargados:', tiposFromApi.length);
+      } else {
+        console.log('📦 [useCalles] Usando tipos de vía predefinidos');
+        setTiposVia(TIPO_VIA_OPTIONS);
       }
       
     } catch (error: any) {
@@ -153,17 +204,23 @@ export const useCalles = () => {
   // Cargar datos iniciales
   useEffect(() => {
     const cargarDatosIniciales = async () => {
-      // Cargar en paralelo para mejor performance
-      await Promise.all([
-        cargarCalles(),
-        cargarSectores(),
-        cargarBarrios(),
-        cargarTiposVia()
-      ]);
+      console.log('🚀 [useCalles] Iniciando carga de datos...');
+      
+      try {
+        // Cargar en secuencia para evitar problemas de dependencias
+        await cargarSectores();
+        await cargarBarrios();
+        await cargarTiposVia();
+        await cargarCalles();
+        
+        console.log('✅ [useCalles] Carga inicial completada');
+      } catch (error) {
+        console.error('❌ [useCalles] Error en carga inicial:', error);
+      }
     };
     
     cargarDatosIniciales();
-  }, [cargarCalles, cargarSectores, cargarBarrios, cargarTiposVia]);
+  }, []); // Solo ejecutar una vez
 
   // Funciones adicionales específicas
   const forzarModoOnline = useCallback(async () => {
@@ -177,10 +234,10 @@ export const useCalles = () => {
       
       // Recargar datos
       await Promise.all([
-        cargarCalles(),
         cargarSectores(),
         cargarBarrios(),
-        cargarTiposVia()
+        cargarTiposVia(),
+        cargarCalles()
       ]);
       
       console.log('✅ [useCalles] Modo online forzado exitosamente');
@@ -196,9 +253,9 @@ export const useCalles = () => {
       console.log('🧪 [useCalles] Probando conexión con API...');
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       
-      const response = await fetch('http://192.168.20.160:8080/api/via', {
+      const response = await fetch('/api/via/listarVia', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -217,16 +274,16 @@ export const useCalles = () => {
         try {
           const json = JSON.parse(text);
           
-          if (Array.isArray(json) && json.length > 0) {
-            const hayDatosReales = json.some(item => 
+          // Verificar estructura esperada: {success: true, data: [...]}
+          if (json.success === true && Array.isArray(json.data)) {
+            const validItems = json.data.filter(item => 
               item && 
               typeof item === 'object' && 
-              (item.nombre || item.nombreVia) && 
-              typeof (item.nombre || item.nombreVia) === 'string'
+              (item.nombreVia || item.nombre)
             );
             
-            console.log('🧪 [useCalles] ¿API tiene datos reales?:', hayDatosReales);
-            return hayDatosReales;
+            console.log('🧪 [useCalles] Items válidos encontrados:', validItems.length);
+            return validItems.length > 0;
           }
           
           return false;
@@ -251,7 +308,7 @@ export const useCalles = () => {
 
   const obtenerNombreBarrio = useCallback((barrioId: number): string => {
     const barrio = barrios.find(b => b.id === barrioId);
-    return barrio?.nombre || `Barrio ID: ${barrioId}`;
+    return barrio?.nombre || barrio?.nombreBarrio || `Barrio ID: ${barrioId}`;
   }, [barrios]);
 
   // Información de debug
@@ -265,7 +322,8 @@ export const useCalles = () => {
     isOfflineMode,
     ultimaSync: lastSyncTime?.toLocaleTimeString() || 'Nunca',
     error,
-    searchTerm
+    searchTerm,
+    barriosFiltrados: barriosFiltrados.length
   } : null;
 
   return {

@@ -1,5 +1,5 @@
-// src/components/sector/SectorList.tsx
-import Reac,{useEffect} from 'react';
+// src/components/sector/SectorList.tsx - CORREGIDO
+import React, { useEffect } from 'react';
 import { EntityList } from '../EntityList';
 import { Sector } from '../../models/Sector';
 
@@ -22,7 +22,7 @@ const SectorList: React.FC<SectorListProps> = ({
   onSearch,
   searchTerm = ''
 }) => {
- // Definir las columnas para la tabla
+  // Definir las columnas para la tabla
   const columns = [
     {
       key: 'nombre',

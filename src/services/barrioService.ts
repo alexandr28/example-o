@@ -1,4 +1,4 @@
-// src/services/barrioService.ts - USAR PROXY DE VITE
+// src/services/barrioService.ts - CORREGIDO PARA MANEJAR SECTOR NULL
 import { BaseApiService } from './BaseApiService';
 import { Barrio, BarrioFormData } from '../models/Barrio';
 
@@ -7,7 +7,7 @@ class BarrioServiceClass extends BaseApiService<Barrio, BarrioFormData> {
     super(
       {
         baseUrl: '', // ✅ PROXY LOCAL - Vite redirigirá automáticamente
-        endpoint: '/api/barrio' // ✅ /api/barrio -> http://192.168.20.160:8080/barrio
+        endpoint: '/api/barrio' // ✅ /api/barrio -> http://192.168.20.160:8080/api/barrio
       },
       {
         normalizeItem: (apiData: any, index: number): Barrio => {
@@ -23,41 +23,38 @@ class BarrioServiceClass extends BaseApiService<Barrio, BarrioFormData> {
             };
           }
           
-          // Intentar extraer el ID de diferentes campos posibles
+          // Extraer ID - usar codBarrio como ID principal
           let barrioId: number;
           if (typeof apiData.codBarrio === 'number') {
             barrioId = apiData.codBarrio;
           } else if (typeof apiData.id === 'number') {
             barrioId = apiData.id;
-          } else if (typeof apiData.codigo === 'number') {
-            barrioId = apiData.codigo;
           } else {
             barrioId = index + 1;
           }
           
-          // Intentar extraer el nombre de diferentes campos posibles
+          // Extraer nombre
           let barrioNombre: string;
-          if (typeof apiData.nombre === 'string' && apiData.nombre.trim()) {
-            barrioNombre = apiData.nombre.trim();
-          } else if (typeof apiData.nombreBarrio === 'string' && apiData.nombreBarrio.trim()) {
+          if (typeof apiData.nombreBarrio === 'string' && apiData.nombreBarrio.trim()) {
             barrioNombre = apiData.nombreBarrio.trim();
-          } else if (typeof apiData.name === 'string' && apiData.name.trim()) {
-            barrioNombre = apiData.name.trim();
-          } else if (typeof apiData.descripcion === 'string' && apiData.descripcion.trim()) {
-            barrioNombre = apiData.descripcion.trim();
+          } else if (typeof apiData.nombre === 'string' && apiData.nombre.trim()) {
+            barrioNombre = apiData.nombre.trim();
           } else {
-            console.warn(`⚠️ [BarrioService] No se encontró nombre válido para barrio ${index}:`, apiData);
-            barrioNombre = `Barrio ${barrioId} (sin nombre)`;
+            console.warn(`⚠️ [BarrioService] No se encontró nombre válido para barrio ${barrioId}`);
+            barrioNombre = `Barrio ${barrioId}`;
           }
           
-          // Extraer el sectorId
-          let sectorId: number = 0;
-          if (typeof apiData.sectorId === 'number') {
-            sectorId = apiData.sectorId;
-          } else if (apiData.sector && typeof apiData.sector.id === 'number') {
+          // 🔥 MANEJO ESPECIAL PARA SECTOR NULL/UNDEFINED
+          let sectorId: number = 1; // ✅ Valor por defecto si no hay sector
+          
+          if (apiData.sector && typeof apiData.sector === 'object' && apiData.sector.id) {
             sectorId = apiData.sector.id;
-          } else if (typeof apiData.codSector === 'number') {
-            sectorId = apiData.codSector;
+          } else if (typeof apiData.sectorId === 'number' && apiData.sectorId > 0) {
+            sectorId = apiData.sectorId;
+          } else {
+            // Si sector es null, asignar a un sector por defecto
+            console.warn(`⚠️ [BarrioService] Sector null para barrio ${barrioNombre}, asignando sector por defecto`);
+            sectorId = 1; // O el ID del sector "Sin Sector" que deberías crear
           }
           
           const resultado: Barrio = {
@@ -66,8 +63,8 @@ class BarrioServiceClass extends BaseApiService<Barrio, BarrioFormData> {
             nombre: barrioNombre,
             nombreBarrio: apiData.nombreBarrio,
             sectorId: sectorId,
-            sector: apiData.sector,
-            estado: apiData.estado,
+            sector: apiData.sector, // Puede ser null, no importa
+            estado: apiData.estado !== false, // ✅ Por defecto true si no está definido
             fechaCreacion: apiData.fechaCreacion,
             fechaModificacion: apiData.fechaModificacion,
             usuarioCreacion: apiData.usuarioCreacion,
@@ -83,43 +80,48 @@ class BarrioServiceClass extends BaseApiService<Barrio, BarrioFormData> {
           
           // Si la respuesta ya es un array, devolverlo
           if (Array.isArray(response)) {
+            console.log(`✅ [BarrioService] Respuesta es array con ${response.length} elementos`);
             return response;
           }
           
           // Intentar extraer de propiedades comunes
           if (response && typeof response === 'object') {
-            // Buscar en propiedades comunes
             const possibleArrays = ['data', 'items', 'results', 'content', 'barrios'];
             
             for (const prop of possibleArrays) {
               if (Array.isArray(response[prop])) {
-                console.log(`✅ [BarrioService] Array encontrado en propiedad '${prop}'`);
+                console.log(`✅ [BarrioService] Array encontrado en propiedad '${prop}' con ${response[prop].length} elementos`);
                 return response[prop];
               }
             }
-            
-            // Si no encontramos un array, devolver array vacío
-            console.warn('⚠️ [BarrioService] No se encontró array en la respuesta');
-            return [];
           }
           
+          console.warn('⚠️ [BarrioService] No se encontró array válido, devolviendo array vacío');
           return [];
         },
         
         validateItem: (barrio: Barrio): boolean => {
-          // Validar que el barrio tenga datos reales
-          const esValido = barrio.nombre && 
+          // 🔥 VALIDACIÓN MÁS PERMISIVA
+          const tieneNombreValido = barrio.nombre && 
             !barrio.nombre.includes('(datos inválidos)') &&
-            !barrio.nombre.includes('(sin nombre)') &&
-            !barrio.nombre.match(/^Barrio \d+$/) &&
-            barrio.nombre.trim().length > 0 &&
-            barrio.sectorId > 0;
+            barrio.nombre.trim().length > 0;
+          
+          const tieneSectorValido = barrio.sectorId > 0; // Solo verificar que sea mayor a 0
+          
+          const esValido = tieneNombreValido && tieneSectorValido;
           
           if (!esValido) {
-            console.warn(`⚠️ [BarrioService] Barrio inválido filtrado:`, barrio);
+            console.warn(`⚠️ [BarrioService] Barrio inválido:`, {
+              nombre: barrio.nombre,
+              sectorId: barrio.sectorId,
+              tieneNombreValido,
+              tieneSectorValido
+            });
+          } else {
+            console.log(`✅ [BarrioService] Barrio válido: ${barrio.nombre} (Sector: ${barrio.sectorId})`);
           }
           
-          return !!esValido;
+          return esValido;
         }
       }
     );
@@ -128,20 +130,22 @@ class BarrioServiceClass extends BaseApiService<Barrio, BarrioFormData> {
   // Override del método create para mapear correctamente los campos
   async create(data: BarrioFormData): Promise<Barrio> {
     const requestData = {
-      nombreBarrio: data.nombre, // Mapear nombre a nombreBarrio para la API
+      nombreBarrio: data.nombre,
       sectorId: data.sectorId
     };
     
+    console.log('📤 [BarrioService] Creando barrio:', requestData);
     return super.create(requestData as any);
   }
   
   // Override del método update para mapear correctamente los campos
   async update(id: number, data: BarrioFormData): Promise<Barrio> {
     const requestData = {
-      nombreBarrio: data.nombre, // Mapear nombre a nombreBarrio para la API
+      nombreBarrio: data.nombre,
       sectorId: data.sectorId
     };
     
+    console.log(`📤 [BarrioService] Actualizando barrio ${id}:`, requestData);
     return super.update(id, requestData as any);
   }
 }
@@ -149,6 +153,3 @@ class BarrioServiceClass extends BaseApiService<Barrio, BarrioFormData> {
 // Exportar instancia singleton
 const BarrioService = new BarrioServiceClass();
 export default BarrioService;
-
-// Exportar también la clase para casos donde se necesite múltiples instancias
-export { BarrioServiceClass };

@@ -1,5 +1,5 @@
-// src/components/calles/CalleForm.tsx - REFACTORIZADO CON SELECCIÓN JERÁRQUICA
-import React, { useEffect, useState } from 'react';
+// src/components/calles/CalleForm.tsx - CORREGIDO PARA SELECT DE SECTORES
+import React, { useEffect } from 'react';
 import { z } from 'zod';
 import { EntityForm } from '../EntityForm';
 import { Input, Select } from '../';
@@ -55,21 +55,39 @@ const CalleForm: React.FC<CalleFormProps> = ({
   isEditMode = false,
   isOfflineMode = false,
 }) => {
-  // Estado local para controlar el formulario
-  const [sectorSeleccionado, setSectorSeleccionado] = useState<string>('');
-  const [barrioSeleccionado, setBarrioSeleccionado] = useState<string>('');
-  const [tipoViaSeleccionado, setTipoViaSeleccionado] = useState<string>('');
+  // 🔥 PREPARAR OPCIONES CON VALIDACIÓN
+  const sectorOptions = sectores
+    .filter(sector => sector.id && sector.nombre) // Filtrar sectores válidos
+    .map(sector => ({
+      value: sector.id!.toString(),
+      label: sector.nombre!
+    }));
 
-  // Preparar opciones para los selects
-  const sectorOptions = sectores.map(sector => ({
-    value: sector.id?.toString() || '',
-    label: sector.nombre
-  }));
-
-  const barrioOptions = barriosFiltrados.map(barrio => ({
-    value: barrio.id?.toString() || '',
-    label: barrio.nombre || ''
-  }));
+  // Opciones de barrio con manejo inteligente
+  const barrioOptions = (() => {
+    if (barriosFiltrados.length === 0) {
+      return [
+        { 
+          value: 'auto-create', 
+          label: '✨ Crear barrio automáticamente' 
+        }
+      ];
+    }
+    
+    const options = barriosFiltrados
+      .filter(barrio => barrio.id && (barrio.nombre || barrio.nombreBarrio))
+      .map(barrio => ({
+        value: barrio.id!.toString(),
+        label: (barrio.nombre || barrio.nombreBarrio)!
+      }));
+    
+    options.push({
+      value: 'auto-create',
+      label: '✨ Crear nuevo barrio para este sector'
+    });
+    
+    return options;
+  })();
 
   const tipoViaOptions = tiposVia.map(tipo => ({
     value: tipo.value,
@@ -78,22 +96,22 @@ const CalleForm: React.FC<CalleFormProps> = ({
 
   // Manejar el submit del formulario
   const handleSave = (data: CalleFormDataValidated) => {
+    let barrioIdFinal: number;
+    
+    if (data.barrioId === 'auto-create') {
+      barrioIdFinal = 999; // ID especial para auto-crear
+      console.log('🆕 [CalleForm] Creando barrio automáticamente para sector:', data.sectorId);
+    } else {
+      barrioIdFinal = parseInt(data.barrioId);
+    }
+    
     onGuardar({
       sectorId: parseInt(data.sectorId),
-      barrioId: parseInt(data.barrioId),
+      barrioId: barrioIdFinal,
       tipoVia: data.tipoVia,
       nombre: data.nombre
     });
   };
-
-  // Efecto para manejar cambio de sector
-  useEffect(() => {
-    if (sectorSeleccionado) {
-      onSectorChange(parseInt(sectorSeleccionado));
-      // Resetear barrio cuando cambia el sector
-      setBarrioSeleccionado('');
-    }
-  }, [sectorSeleccionado, onSectorChange]);
 
   return (
     <EntityForm<CalleFormDataValidated>
@@ -108,8 +126,8 @@ const CalleForm: React.FC<CalleFormProps> = ({
       selectedItem={calleSeleccionada ? {
         sectorId: calleSeleccionada.sectorId?.toString() || '',
         barrioId: calleSeleccionada.barrioId?.toString() || '',
-        tipoVia: calleSeleccionada.tipoVia,
-        nombre: calleSeleccionada.nombre
+        tipoVia: calleSeleccionada.tipoVia || '',
+        nombre: calleSeleccionada.nombre || ''
       } : null}
       onSave={handleSave}
       onNew={onNuevo}
@@ -119,163 +137,312 @@ const CalleForm: React.FC<CalleFormProps> = ({
       isOfflineMode={isOfflineMode}
     >
       {({ register, errors, watch, setValue, formState }) => {
-        // Observar cambios en el formulario
+        // Observar cambios en los campos
         const watchedSectorId = watch('sectorId');
         const watchedBarrioId = watch('barrioId');
         const watchedTipoVia = watch('tipoVia');
         const watchedNombre = watch('nombre');
 
-        // Actualizar estado local cuando cambian los valores del form
+        // 🔥 LOGGING DETALLADO PARA DEBUG
         useEffect(() => {
-          if (watchedSectorId !== sectorSeleccionado) {
-            setSectorSeleccionado(watchedSectorId);
-          }
-        }, [watchedSectorId]);
+          console.log('🔍 [CalleForm] Estado actual:', {
+            watchedSectorId,
+            watchedBarrioId,
+            watchedTipoVia,
+            watchedNombre,
+            sectorOptions: sectorOptions.length,
+            barrioOptions: barrioOptions.length,
+            loadingSectores,
+            loadingBarrios
+          });
+        }, [watchedSectorId, watchedBarrioId, watchedTipoVia, watchedNombre, sectorOptions.length, barrioOptions.length, loadingSectores, loadingBarrios]);
 
+        // Efecto para manejar cambio de sector
         useEffect(() => {
-          if (watchedBarrioId !== barrioSeleccionado) {
-            setBarrioSeleccionado(watchedBarrioId);
+          if (watchedSectorId && watchedSectorId !== '') {
+            const sectorIdNum = parseInt(watchedSectorId);
+            console.log('🔍 [CalleForm] Sector cambió a:', sectorIdNum);
+            
+            onSectorChange(sectorIdNum);
+            
+            // Resetear campos dependientes
+            if (watchedBarrioId && watchedBarrioId !== 'auto-create') {
+              console.log('🧹 [CalleForm] Reseteando barrio porque cambió el sector');
+              setValue('barrioId', '');
+            }
+            if (watchedTipoVia) {
+              console.log('🧹 [CalleForm] Reseteando tipo de vía porque cambió el sector');
+              setValue('tipoVia', '');
+            }
+            if (watchedNombre) {
+              console.log('🧹 [CalleForm] Reseteando nombre porque cambió el sector');
+              setValue('nombre', '');
+            }
+          } else {
+            onSectorChange(0);
           }
-        }, [watchedBarrioId]);
+        }, [watchedSectorId, onSectorChange, setValue, watchedBarrioId, watchedTipoVia, watchedNombre]);
 
+        // Auto-seleccionar barrio si no hay opciones
         useEffect(() => {
-          if (watchedTipoVia !== tipoViaSeleccionado) {
-            setTipoViaSeleccionado(watchedTipoVia);
+          if (watchedSectorId && !watchedBarrioId && barriosFiltrados.length === 0) {
+            console.log('🤖 [CalleForm] Auto-seleccionando barrio por defecto');
+            setValue('barrioId', 'auto-create');
           }
-        }, [watchedTipoVia]);
+        }, [watchedSectorId, watchedBarrioId, barriosFiltrados.length, setValue]);
+
+        // Resetear campos cuando cambia barrio
+        useEffect(() => {
+          if (!watchedBarrioId) {
+            if (watchedTipoVia) {
+              console.log('🧹 [CalleForm] Reseteando tipo de vía');
+              setValue('tipoVia', '');
+            }
+            if (watchedNombre) {
+              console.log('🧹 [CalleForm] Reseteando nombre');
+              setValue('nombre', '');
+            }
+          }
+        }, [watchedBarrioId, setValue, watchedTipoVia, watchedNombre]);
+
+        // Resetear nombre cuando cambia tipo de vía
+        useEffect(() => {
+          if (!watchedTipoVia && watchedNombre) {
+            console.log('🧹 [CalleForm] Reseteando nombre porque se quitó tipo de vía');
+            setValue('nombre', '');
+          }
+        }, [watchedTipoVia, setValue, watchedNombre]);
+
+        // Estados de habilitación
+        const isSectorSelected = watchedSectorId && watchedSectorId !== '';
+        const isBarrioSelected = watchedBarrioId && watchedBarrioId !== '';
+        const isTipoViaSelected = watchedTipoVia && watchedTipoVia !== '';
+        
+        const isBarrioEnabled = isSectorSelected;
+        const isTipoViaEnabled = isBarrioSelected;
+        const isNombreEnabled = isTipoViaSelected;
 
         return (
           <div className="space-y-6">
+            {/* Estado de carga y debug inicial */}
+            {(loadingSectores || loadingBarrios) && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="text-sm text-blue-700">
+                  {loadingSectores && '⏳ Cargando sectores...'}
+                  {loadingBarrios && '⏳ Cargando barrios...'}
+                </div>
+              </div>
+            )}
+
+            {/* Información de sectores disponibles */}
+            {!loadingSectores && sectorOptions.length === 0 && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                <div className="text-sm text-red-700">
+                  ❌ No hay sectores disponibles. Verifique la conexión con el API.
+                </div>
+              </div>
+            )}
+
             {/* Primera fila: Sector y Barrio */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* 1. Select de Sector */}
-              <Select
-                label="Sector"
-                options={sectorOptions}
-                error={errors.sectorId?.message}
-                disabled={loadingSectores || formState.disabled}
-                placeholder={loadingSectores ? "Cargando sectores..." : "Seleccione un sector"}
-                {...register('sectorId')}
-              />
+              <div>
+                <Select
+                  label={`Sector ${sectorOptions.length > 0 ? `(${sectorOptions.length} disponibles)` : ''}`}
+                  options={sectorOptions}
+                  error={errors.sectorId?.message}
+                  disabled={loadingSectores || formState.isSubmitting || sectorOptions.length === 0}
+                  placeholder={
+                    loadingSectores 
+                      ? "⏳ Cargando sectores..." 
+                      : sectorOptions.length === 0
+                      ? "❌ No hay sectores disponibles"
+                      : "📍 Seleccione un sector"
+                  }
+                  value={watchedSectorId || ''}
+                  {...register('sectorId')}
+                />
+                
+                {/* Info adicional sobre sectores */}
+                {!loadingSectores && sectorOptions.length > 0 && (
+                  <div className="text-xs text-green-600 mt-1">
+                    ✅ {sectorOptions.length} sectores cargados correctamente
+                  </div>
+                )}
+                
+                {/* Debug info para sector */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="text-xs text-gray-500 mt-1 bg-gray-100 p-1 rounded">
+                    Valor: "{watchedSectorId}" | Opciones: {sectorOptions.length} | Loading: {loadingSectores}
+                  </div>
+                )}
+              </div>
               
-              {/* 2. Select de Barrio (se activa cuando hay un sector seleccionado) */}
-              <Select
-                label="Barrio"
-                options={barrioOptions}
-                error={errors.barrioId?.message}
-                disabled={!watchedSectorId || loadingBarrios || formState.disabled}
-                placeholder={
-                  !watchedSectorId 
-                    ? "Primero seleccione un sector" 
-                    : loadingBarrios 
-                    ? "Cargando barrios..." 
-                    : barrioOptions.length === 0
-                    ? "No hay barrios para este sector"
-                    : "Seleccione un barrio"
-                }
-                {...register('barrioId')}
-              />
+              {/* 2. Select de Barrio */}
+              <div>
+                <Select
+                  label={`Barrio ${barrioOptions.length > 0 ? `(${barriosFiltrados.length} del sector)` : ''}`}
+                  options={barrioOptions}
+                  error={errors.barrioId?.message}
+                  disabled={!isBarrioEnabled || loadingBarrios || formState.isSubmitting}
+                  placeholder={
+                    !isSectorSelected 
+                      ? "🔒 Primero seleccione un sector" 
+                      : loadingBarrios 
+                      ? "⏳ Cargando barrios..." 
+                      : "🏘️ Seleccione un barrio"
+                  }
+                  value={watchedBarrioId || ''}
+                  {...register('barrioId')}
+                />
+                
+                {/* Info sobre barrios */}
+                {isSectorSelected && barriosFiltrados.length === 0 && !loadingBarrios && (
+                  <div className="text-xs text-amber-600 mt-1 flex items-center">
+                    ⚠️ Este sector no tiene barrios. Se creará automáticamente.
+                  </div>
+                )}
+                
+                {/* Debug info para barrio */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="text-xs text-gray-500 mt-1 bg-gray-100 p-1 rounded">
+                    Valor: "{watchedBarrioId}" | Filtrados: {barriosFiltrados.length} | Opciones: {barrioOptions.length}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Segunda fila: Tipo de Vía y Nombre */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* 3. Select de Tipo de Vía (se activa cuando hay un barrio seleccionado) */}
-              <Select
-                label="Tipo de vía"
-                options={tipoViaOptions}
-                error={errors.tipoVia?.message}
-                disabled={!watchedBarrioId || loadingTiposVia || formState.disabled}
-                placeholder={
-                  !watchedBarrioId
-                    ? "Primero seleccione un barrio"
-                    : loadingTiposVia
-                    ? "Cargando tipos de vía..."
-                    : "Seleccione tipo de vía"
-                }
-                {...register('tipoVia')}
-              />
+              {/* 3. Select de Tipo de Vía */}
+              <div>
+                <Select
+                  label={`Tipo de vía ${tipoViaOptions.length > 0 ? `(${tipoViaOptions.length} tipos)` : ''}`}
+                  options={tipoViaOptions}
+                  error={errors.tipoVia?.message}
+                  disabled={!isTipoViaEnabled || loadingTiposVia || formState.isSubmitting}
+                  placeholder={
+                    !isBarrioSelected
+                      ? "🔒 Primero seleccione un barrio"
+                      : loadingTiposVia
+                      ? "⏳ Cargando tipos..."
+                      : "🛣️ Seleccione tipo de vía"
+                  }
+                  value={watchedTipoVia || ''}
+                  {...register('tipoVia')}
+                />
+                
+                {/* Debug info para tipo de vía */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="text-xs text-gray-500 mt-1 bg-gray-100 p-1 rounded">
+                    Valor: "{watchedTipoVia}" | Habilitado: {isTipoViaEnabled}
+                  </div>
+                )}
+              </div>
               
-              {/* 4. Input de Nombre (se activa cuando hay un tipo de vía seleccionado) */}
-              <Input
-                label="Nombre"
-                error={errors.nombre?.message}
-                disabled={!watchedTipoVia || formState.disabled}
-                placeholder={
-                  !watchedTipoVia
-                    ? "Primero seleccione tipo de vía"
-                    : "Ingrese nombre de la vía"
-                }
-                {...register('nombre')}
-              />
+              {/* 4. Input de Nombre */}
+              <div>
+                <Input
+                  label="Nombre de la vía"
+                  error={errors.nombre?.message}
+                  disabled={!isNombreEnabled || formState.isSubmitting}
+                  placeholder={
+                    !isTipoViaSelected
+                      ? "🔒 Primero seleccione tipo de vía"
+                      : "✏️ Ingrese nombre de la vía"
+                  }
+                  value={watchedNombre || ''}
+                  {...register('nombre')}
+                />
+                
+                {/* Debug info para nombre */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="text-xs text-gray-500 mt-1 bg-gray-100 p-1 rounded">
+                    Valor: "{watchedNombre}" | Habilitado: {isNombreEnabled}
+                  </div>
+                )}
+              </div>
             </div>
 
+            {/* Alerta especial para barrios auto-creados */}
+            {watchedBarrioId === 'auto-create' && isSectorSelected && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-md">
+                <h4 className="text-sm font-medium text-amber-900 mb-2">🆕 Creación automática de barrio</h4>
+                <div className="text-sm text-amber-700">
+                  <p>Se creará automáticamente un barrio para este sector:</p>
+                  <p className="font-medium mt-1">
+                    "Barrio Principal - {sectores.find(s => s.id?.toString() === watchedSectorId)?.nombre || 'Sector'}"
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Preview de la dirección completa */}
-            {watchedSectorId && watchedBarrioId && watchedTipoVia && watchedNombre && (
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
-                <h4 className="text-sm font-medium text-blue-900 mb-2">Vista previa de la calle:</h4>
+            {isSectorSelected && isBarrioSelected && isTipoViaSelected && watchedNombre && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                <h4 className="text-sm font-medium text-blue-900 mb-2">🎯 Vista previa de la calle:</h4>
                 <div className="text-sm text-blue-700 space-y-1">
                   <div>
-                    <span className="font-medium">Ubicación:</span> {' '}
+                    <span className="font-medium">📍 Ubicación:</span> {' '}
                     {sectores.find(s => s.id?.toString() === watchedSectorId)?.nombre || 'N/A'} - {' '}
-                    {barriosFiltrados.find(b => b.id?.toString() === watchedBarrioId)?.nombre || 'N/A'}
+                    {watchedBarrioId === 'auto-create' 
+                      ? `Barrio Principal - ${sectores.find(s => s.id?.toString() === watchedSectorId)?.nombre || 'Sector'}`
+                      : barriosFiltrados.find(b => b.id?.toString() === watchedBarrioId)?.nombre || 
+                        barriosFiltrados.find(b => b.id?.toString() === watchedBarrioId)?.nombreBarrio || 'N/A'}
                   </div>
                   <div>
-                    <span className="font-medium">Calle completa:</span> {' '}
-                    {tiposVia.find(t => t.value === watchedTipoVia)?.descripcion || watchedTipoVia} {watchedNombre}
+                    <span className="font-medium">🛣️ Calle completa:</span> {' '}
+                    {tiposVia.find(t => t.value === watchedTipoVia)?.descripcion || 
+                     tiposVia.find(t => t.value === watchedTipoVia)?.label || watchedTipoVia} {watchedNombre}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Información adicional en modo ver */}
-            {!isEditMode && calleSeleccionada && (
-              <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-md">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Información adicional:</h4>
-                <div className="text-sm text-gray-600 space-y-1">
-                  <div><span className="font-medium">ID:</span> {calleSeleccionada.id}</div>
-                  {calleSeleccionada.codTipoVia && (
-                    <div><span className="font-medium">Código tipo vía:</span> {calleSeleccionada.codTipoVia}</div>
-                  )}
-                  {calleSeleccionada.estado !== undefined && (
-                    <div>
-                      <span className="font-medium">Estado:</span> {' '}
-                      <span className={calleSeleccionada.estado ? 'text-green-600' : 'text-red-600'}>
-                        {calleSeleccionada.estado ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </div>
-                  )}
-                  {calleSeleccionada.fechaCreacion && (
-                    <div>
-                      <span className="font-medium">Creado:</span> {' '}
-                      {new Date(calleSeleccionada.fechaCreacion).toLocaleString()}
-                    </div>
-                  )}
+            {/* Progreso del formulario */}
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+              <h4 className="text-sm font-medium text-gray-900 mb-2">📋 Progreso del formulario:</h4>
+              <div className="grid grid-cols-4 gap-2 text-xs">
+                <div className={`flex items-center p-2 rounded ${isSectorSelected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
+                  {isSectorSelected ? '✅' : '1️⃣'} Sector
+                </div>
+                <div className={`flex items-center p-2 rounded ${isBarrioSelected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
+                  {isBarrioSelected ? '✅' : '2️⃣'} Barrio
+                </div>
+                <div className={`flex items-center p-2 rounded ${isTipoViaSelected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
+                  {isTipoViaSelected ? '✅' : '3️⃣'} Tipo
+                </div>
+                <div className={`flex items-center p-2 rounded ${watchedNombre ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
+                  {watchedNombre ? '✅' : '4️⃣'} Nombre
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Instrucciones de ayuda */}
-            {isEditMode && !calleSeleccionada && (
-              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
-                <h4 className="text-sm font-medium text-green-900 mb-1">💡 Instrucciones:</h4>
-                <ol className="text-xs text-green-700 list-decimal list-inside space-y-1">
-                  <li>Seleccione primero el <strong>Sector</strong> donde se ubica la calle</li>
-                  <li>Luego seleccione el <strong>Barrio</strong> específico dentro del sector</li>
-                  <li>Elija el <strong>Tipo de vía</strong> (Avenida, Calle, Jirón, etc.)</li>
-                  <li>Finalmente ingrese el <strong>Nombre</strong> de la vía (sin incluir el tipo)</li>
-                </ol>
-              </div>
-            )}
-
-            {/* Debug info en desarrollo */}
+            {/* Debug completo en desarrollo */}
             {process.env.NODE_ENV === 'development' && (
-              <div className="mt-4 p-3 bg-gray-800 text-green-400 text-xs rounded font-mono">
-                <div>🔧 Debug - Estado del formulario:</div>
-                <div>Sector: {watchedSectorId || 'No seleccionado'}</div>
-                <div>Barrio: {watchedBarrioId || 'No seleccionado'} (Opciones: {barrioOptions.length})</div>
-                <div>Tipo vía: {watchedTipoVia || 'No seleccionado'}</div>
-                <div>Nombre: {watchedNombre || 'Vacío'}</div>
-                <div>Formulario válido: {formState.isValid ? 'Sí' : 'No'}</div>
+              <div className="p-3 bg-gray-800 text-green-400 text-xs rounded font-mono">
+                <div className="text-green-300 font-bold mb-2">🔧 DEBUG COMPLETO:</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>sectores.length: {sectores.length}</div>
+                  <div>sectorOptions.length: {sectorOptions.length}</div>
+                  <div>barriosFiltrados.length: {barriosFiltrados.length}</div>
+                  <div>barrioOptions.length: {barrioOptions.length}</div>
+                  <div>loadingSectores: {loadingSectores.toString()}</div>
+                  <div>loadingBarrios: {loadingBarrios.toString()}</div>
+                  <div>formState.isValid: {formState.isValid.toString()}</div>
+                  <div>formState.isSubmitting: {formState.isSubmitting.toString()}</div>
+                </div>
+                <div className="mt-2 text-yellow-400">
+                  <div>watchedSectorId: "{watchedSectorId}"</div>
+                  <div>watchedBarrioId: "{watchedBarrioId}"</div>
+                  <div>watchedTipoVia: "{watchedTipoVia}"</div>
+                  <div>watchedNombre: "{watchedNombre}"</div>
+                </div>
+                {Object.keys(errors).length > 0 && (
+                  <div className="mt-2 text-red-400">
+                    Errores: {JSON.stringify(errors, null, 2)}
+                  </div>
+                )}
               </div>
             )}
           </div>
