@@ -137,6 +137,13 @@ const PersonaForm: React.FC<PersonaFormProps> = ({
 
         {/* Este espacio se puede usar para mantener la cuadrícula alineada si falta una celda */}
         {!isRepresentante ? null : <div />}
+        <div className="flex space-x-2">
+          <Button
+            type="submit"
+            variant="danger">
+            Eliminar
+          </Button>
+        </div>
       </div>
 
       <div className="mt-2">

@@ -2,7 +2,7 @@ import React from 'react';
 import classNames from 'classnames';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'accent';
+  variant?: 'primary' | 'secondary' | 'accent' | 'danger';
   fullWidth?: boolean;
 }
 
@@ -21,6 +21,7 @@ const Button: React.FC<ButtonProps> = ({
           'btn-primary': variant === 'primary',
           'btn-secondary': variant === 'secondary',
           'btn-accent': variant === 'accent',
+          'btn-danger': variant === 'danger',
           'w-full': fullWidth,
         },
         className

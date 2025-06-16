@@ -1,7 +1,8 @@
-// src/pages/mantenedores/CallesPage.tsx - REFACTORIZADO
+// src/pages/mantenedores/CallesPage.tsx - CON ERROR BOUNDARY
 import React, { useState, useMemo } from 'react';
 import { MainLayout } from '../../layout';
 import { CalleList, CalleForm, Breadcrumb } from '../../components';
+import FormErrorBoundary from '../../components/utils/FormErrorBoundary';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useCalles } from '../../hooks/useCalles';
 
@@ -68,6 +69,12 @@ const CallesPage: React.FC = () => {
     setTimeout(() => setSuccessMessage(null), duration);
   };
 
+  // 🔥 MANEJAR ERRORES DE FORMULARIO
+  const handleFormError = (error: Error) => {
+    console.error('❌ [CallesPage] Error en formulario:', error);
+    showMessage(`❌ Error en formulario: ${error.message}`);
+  };
+
   // Manejo de edición
   const handleEditar = () => {
     if (calleSeleccionada) {
@@ -77,9 +84,28 @@ const CallesPage: React.FC = () => {
     }
   };
 
-  // Manejo de guardado
+  // 🔥 MANEJO DE GUARDADO CON MEJOR VALIDACIÓN
   const handleGuardar = async (data: { sectorId: number; barrioId: number; tipoVia: string; nombre: string }) => {
     try {
+      console.log('💾 [CallesPage] Iniciando guardado:', data);
+      
+      // Validaciones adicionales
+      if (!data.sectorId || data.sectorId <= 0) {
+        throw new Error('Debe seleccionar un sector válido');
+      }
+      
+      if (!data.barrioId || data.barrioId <= 0) {
+        throw new Error('Debe seleccionar un barrio válido');
+      }
+      
+      if (!data.tipoVia || data.tipoVia.trim() === '') {
+        throw new Error('Debe seleccionar un tipo de vía');
+      }
+      
+      if (!data.nombre || data.nombre.trim().length < 2) {
+        throw new Error('El nombre de la calle debe tener al menos 2 caracteres');
+      }
+      
       await guardarCalle(data);
       showMessage(modoEdicion 
         ? "✅ Calle actualizada correctamente" 
@@ -88,6 +114,7 @@ const CallesPage: React.FC = () => {
       // Recargar datos
       await cargarCalles();
     } catch (error: any) {
+      console.error('❌ [CallesPage] Error al guardar:', error);
       showMessage(`❌ Error al guardar: ${error.message}`);
     }
   };
@@ -336,37 +363,47 @@ const CallesPage: React.FC = () => {
           </div>
         )}
 
-        {/* Formulario de calles */}
-        <CalleForm
-          calleSeleccionada={calleSeleccionada}
-          sectores={sectores}
-          barrios={barrios}
-          barriosFiltrados={barriosFiltrados}
-          tiposVia={tiposVia}
-          onGuardar={handleGuardar}
-          onNuevo={limpiarSeleccion}
-          onEditar={handleEditar}
-          onSectorChange={filtrarBarriosPorSector}
-          loading={loading}
-          loadingSectores={loadingSectores}
-          loadingBarrios={loadingBarrios}
-          loadingTiposVia={loadingTiposVia}
-          isEditMode={modoEdicion}
-          isOfflineMode={isOfflineMode}
-        />
+        {/* 🔥 FORMULARIO DE CALLES CON ERROR BOUNDARY */}
+        <FormErrorBoundary 
+          formName="Calles" 
+          onError={handleFormError}
+        >
+          <CalleForm
+            calleSeleccionada={calleSeleccionada}
+            sectores={sectores}
+            barrios={barrios}
+            barriosFiltrados={barriosFiltrados}
+            tiposVia={tiposVia}
+            onGuardar={handleGuardar}
+            onNuevo={limpiarSeleccion}
+            onEditar={handleEditar}
+            onSectorChange={filtrarBarriosPorSector}
+            loading={loading}
+            loadingSectores={loadingSectores}
+            loadingBarrios={loadingBarrios}
+            loadingTiposVia={loadingTiposVia}
+            isEditMode={modoEdicion}
+            isOfflineMode={isOfflineMode}
+          />
+        </FormErrorBoundary>
 
-        {/* Lista de calles */}
-        <CalleList
-          calles={calles}
-          onSelectCalle={seleccionarCalle}
-          isOfflineMode={isOfflineMode}
-          onEliminar={handleEliminar}
-          loading={loading}
-          onSearch={buscarCalles}
-          searchTerm={searchTerm}
-          obtenerNombreSector={obtenerNombreSector}
-          obtenerNombreBarrio={obtenerNombreBarrio}
-        />
+        {/* 🔥 LISTA DE CALLES CON ERROR BOUNDARY */}
+        <FormErrorBoundary 
+          formName="Lista de Calles"
+          onError={handleFormError}
+        >
+          <CalleList
+            calles={calles}
+            onSelectCalle={seleccionarCalle}
+            isOfflineMode={isOfflineMode}
+            onEliminar={handleEliminar}
+            loading={loading}
+            onSearch={buscarCalles}
+            searchTerm={searchTerm}
+            obtenerNombreSector={obtenerNombreSector}
+            obtenerNombreBarrio={obtenerNombreBarrio}
+          />
+        </FormErrorBoundary>
 
         {/* Información adicional */}
         <div className="bg-gray-50 p-4 rounded-md text-sm text-gray-600">

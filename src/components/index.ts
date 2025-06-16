@@ -23,6 +23,7 @@ export {default as FormSecction }from './utils/FormSecction';
 // Calle
 export { default as CalleForm } from './calles/CalleForm';
 export {default as CalleList} from  './calles/CalleList';
+
 // Sector
 export { default as SectorForm } from './sector/SectorForm';
 export { default as SectorList } from './sector/SectorList';
@@ -61,3 +62,4 @@ export {default as ProtectedRoute} from './auth/ProtectedRoute'
 
 export {  EntityForm } from './EntityForm';
 export { EntityList } from './EntityList';
+export { default as FormErrorBoundary } from './utils/FormErrorBoundary';
