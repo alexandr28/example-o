@@ -1,16 +1,16 @@
-// src/services/barrioService.ts - VERSIÓN CON PROXY
+// src/services/barrioService.ts - VERSIÓN INDEPENDIENTE CON URL CORRECTA
 import { Barrio, BarrioFormData } from '../models/Barrio';
 import { NotificationService } from '../components/utils/Notification';
 
-class BarrioService {
-  // URL base para el servicio - Usar URL relativa para el proxy
-  private readonly API_BASE = '/api/barrio';
-    
+class BarrioServiceClass {
+  // URL base - usar URL completa directamente
+  private readonly API_BASE = 'http://192.168.20.160:8080/api/barrio';
   private readonly cacheKey = 'barrios_cache';
 
   constructor() {
-    console.log('🔧 [BarrioService] Inicializado con URL relativa:', this.API_BASE);
-    console.log('🔧 [BarrioService] Las peticiones serán redirigidas por el proxy de Vite');
+    console.log('🔧 [BarrioService] Inicializado');
+    console.log('📍 [BarrioService] Endpoint directo:', this.API_BASE);
+    console.log('🌐 [BarrioService] Conexión directa al backend (sin proxy)');
   }
 
   /**
@@ -18,7 +18,7 @@ class BarrioService {
    */
   private getAuthToken(): string | null {
     const token = localStorage.getItem('auth_token');
-    console.log(`🔑 [BarrioService] Token obtenido:`, token ? 'Presente' : 'No encontrado');
+    console.log(`🔑 [BarrioService] Token:`, token ? 'Presente' : 'No encontrado');
     return token;
   }
 
@@ -33,6 +33,7 @@ class BarrioService {
       throw new Error(`Barrio en posición ${index} no es válido`);
     }
     
+    // Extraer campos con múltiples posibles nombres
     const id = item.id || item.barrioId || item.barrio_id || item.codBarrio;
     const nombre = item.nombre || item.nombreBarrio || item.barrio_nombre || '';
     const sectorId = item.sectorId || item.sector_id || item.codSector || null;
@@ -43,15 +44,15 @@ class BarrioService {
       throw new Error(`Barrio sin ID en posición ${index}`);
     }
     
-    const normalizedBarrio: Barrio = {
+    const normalized: Barrio = {
       id: Number(id),
       nombre: String(nombre).trim(),
       sectorId: sectorId ? Number(sectorId) : null,
       estado: Number(estado)
     };
     
-    console.log(`✅ [BarrioService] Item normalizado:`, normalizedBarrio);
-    return normalizedBarrio;
+    console.log(`✅ [BarrioService] Item normalizado:`, normalized);
+    return normalized;
   }
 
   /**
@@ -65,31 +66,27 @@ class BarrioService {
       return [];
     }
     
+    // Manejar diferentes formatos de respuesta
     const array = Array.isArray(data) ? data : 
                  (data.data ? data.data : 
                  (data.content ? data.content :
-                 (data.result ? data.result :
-                 (data.items ? data.items :
-                 (data.barrios ? data.barrios : [data])))));
+                 (data.result ? data.result : [])));
     
     if (!Array.isArray(array)) {
-      console.warn(`⚠️ [BarrioService] No es un array:`, array);
+      console.warn(`⚠️ [BarrioService] No se pudo extraer array de los datos`);
       return [];
     }
     
-    console.log(`📋 [BarrioService] Procesando ${array.length} elementos`);
-    
-    const normalized: Barrio[] = [];
-    for (let i = 0; i < array.length; i++) {
+    const normalized = array.map((item, index) => {
       try {
-        const item = this.normalizeItem(array[i], i);
-        normalized.push(item);
+        return this.normalizeItem(item, index);
       } catch (error) {
-        console.error(`❌ [BarrioService] Error al normalizar elemento ${i}:`, error);
+        console.error(`❌ [BarrioService] Error al normalizar item ${index}:`, error);
+        return null;
       }
-    }
+    }).filter(item => item !== null) as Barrio[];
     
-    console.log(`✅ [BarrioService] Normalizados ${normalized.length} barrios`);
+    console.log(`✅ [BarrioService] ${normalized.length} barrios normalizados`);
     return normalized;
   }
 
@@ -98,58 +95,43 @@ class BarrioService {
    */
   private saveToCache(data: Barrio[]): void {
     try {
-      const cacheData = {
-        timestamp: Date.now(),
-        data: data
-      };
-      localStorage.setItem(this.cacheKey, JSON.stringify(cacheData));
+      localStorage.setItem(this.cacheKey, JSON.stringify(data));
+      localStorage.setItem(`${this.cacheKey}_timestamp`, new Date().toISOString());
+      console.log(`💾 [BarrioService] ${data.length} barrios guardados en caché`);
     } catch (error) {
       console.error(`❌ [BarrioService] Error al guardar en caché:`, error);
     }
   }
 
   /**
-   * Carga datos desde caché
+   * Carga datos del caché
    */
   private loadFromCache(): Barrio[] | null {
     try {
       const cached = localStorage.getItem(this.cacheKey);
-      if (!cached) return null;
-      
-      const cacheData = JSON.parse(cached);
-      const isExpired = Date.now() - cacheData.timestamp > 24 * 60 * 60 * 1000; // 24 horas
-      
-      if (isExpired) {
-        localStorage.removeItem(this.cacheKey);
-        return null;
+      if (cached) {
+        const data = JSON.parse(cached);
+        const timestamp = localStorage.getItem(`${this.cacheKey}_timestamp`);
+        console.log(`💾 [BarrioService] Datos cargados del caché (${timestamp})`);
+        return data;
       }
-      
-      return cacheData.data;
     } catch (error) {
-      console.error(`❌ [BarrioService] Error al cargar caché:`, error);
-      return null;
+      console.error(`❌ [BarrioService] Error al cargar del caché:`, error);
     }
+    return null;
   }
 
   /**
    * Limpia el caché
    */
   private clearCache(): void {
-    localStorage.removeItem(this.cacheKey);
-  }
-
-  /**
-   * Obtiene datos por defecto
-   */
-  private getDefaultBarrios(): Barrio[] {
-    return [
-      { id: 1, nombre: 'BARRIO 1', sectorId: 1, estado: 1 },
-      { id: 2, nombre: 'BARRIO 2', sectorId: 1, estado: 1 },
-      { id: 3, nombre: 'BARRIO 3', sectorId: 1, estado: 1 },
-      { id: 4, nombre: 'BARRIO 4', sectorId: 2, estado: 1 },
-      { id: 5, nombre: 'BARRIO 5', sectorId: 2, estado: 1 },
-      { id: 6, nombre: 'BARRIO 6', sectorId: 3, estado: 1 },
-    ];
+    try {
+      localStorage.removeItem(this.cacheKey);
+      localStorage.removeItem(`${this.cacheKey}_timestamp`);
+      console.log(`🧹 [BarrioService] Caché limpiado`);
+    } catch (error) {
+      console.error(`❌ [BarrioService] Error al limpiar caché:`, error);
+    }
   }
 
   /**
@@ -158,23 +140,16 @@ class BarrioService {
   async getAll(): Promise<Barrio[]> {
     try {
       console.log(`📡 [BarrioService] GET - Obteniendo todos los barrios`);
-      console.log(`🌐 [BarrioService] URL: ${this.API_BASE} (será redirigida por proxy)`);
-      
-      // Primero intentar cargar desde caché
-      const cachedData = this.loadFromCache();
-      if (cachedData && cachedData.length > 0) {
-        console.log(`💾 [BarrioService] Usando ${cachedData.length} barrios del caché`);
-        // Actualizar en background
-        this.updateInBackground();
-        return cachedData;
-      }
+      console.log(`📍 [BarrioService] URL: ${this.API_BASE}`);
       
       const response = await fetch(this.API_BASE, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
-        }
+        },
+        mode: 'cors',
+        credentials: 'include'
       });
       
       console.log(`📊 [BarrioService] Respuesta: ${response.status} ${response.statusText}`);
@@ -184,13 +159,11 @@ class BarrioService {
       }
       
       const data = await response.json();
-      console.log(`📦 [BarrioService] Datos recibidos:`, data);
-      
       const normalized = this.normalizeArray(data);
       
+      // Guardar en caché
       if (normalized.length > 0) {
         this.saveToCache(normalized);
-        console.log(`💾 [BarrioService] ${normalized.length} barrios guardados en caché`);
       }
       
       return normalized;
@@ -201,44 +174,11 @@ class BarrioService {
       // Intentar usar caché como fallback
       const cachedData = this.loadFromCache();
       if (cachedData && cachedData.length > 0) {
-        console.log(`✅ [BarrioService] Recuperados ${cachedData.length} barrios del caché`);
+        console.log(`✅ [BarrioService] Usando ${cachedData.length} barrios del caché`);
+        NotificationService.warning('Sin conexión. Mostrando datos guardados.');
         return cachedData;
       }
       
-      // Si no hay caché, devolver datos por defecto
-      if (error.message.includes('Failed to fetch') || error.message.includes('network')) {
-        console.log(`📋 [BarrioService] Sin conexión, usando datos de ejemplo`);
-        return this.getDefaultBarrios();
-      }
-      
-      throw error;
-    }
-  }
-
-  /**
-   * Obtiene un barrio por ID
-   */
-  async getById(id: number): Promise<Barrio> {
-    try {
-      console.log(`📡 [BarrioService] GET - Obteniendo barrio ${id}`);
-      
-      const response = await fetch(`${this.API_BASE}/${id}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      return this.normalizeItem(data, 0);
-      
-    } catch (error) {
-      console.error(`❌ [BarrioService] Error al obtener barrio ${id}:`, error);
       throw error;
     }
   }
@@ -249,24 +189,23 @@ class BarrioService {
   async create(data: BarrioFormData): Promise<Barrio> {
     try {
       console.log(`📡 [BarrioService] POST - Creando barrio:`, data);
-      console.log(`🌐 [BarrioService] URL: ${this.API_BASE}`);
+      console.log(`📍 [BarrioService] URL: ${this.API_BASE}`);
       
       // Verificar token
       const token = this.getAuthToken();
       if (!token) {
         NotificationService.error('Debe iniciar sesión para crear barrios');
-        throw new Error('No hay token de autenticación. Por favor, inicie sesión.');
+        throw new Error('No hay token de autenticación');
       }
       
-      // Formato esperado por la API
-      const apiData = {
-        nombreBarrio: data.nombre,
+      // Preparar datos para la API
+      const requestData = {
+        nombreBarrio: data.nombre.trim(),
         sectorId: data.sectorId,
         estado: data.estado || 1
       };
       
-      console.log(`📤 [BarrioService] Enviando datos:`, apiData);
-      console.log(`🔑 [BarrioService] Con token: Bearer ${token.substring(0, 20)}...`);
+      console.log(`📤 [BarrioService] Enviando:`, requestData);
       
       const response = await fetch(this.API_BASE, {
         method: 'POST',
@@ -275,63 +214,47 @@ class BarrioService {
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(apiData)
+        mode: 'cors',
+        credentials: 'include',
+        body: JSON.stringify(requestData)
       });
       
       console.log(`📊 [BarrioService] Respuesta: ${response.status} ${response.statusText}`);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`❌ [BarrioService] Error en POST:`, errorText);
+        console.error(`❌ [BarrioService] Error:`, errorText);
         
         if (response.status === 403) {
           NotificationService.error('No tiene permisos para crear barrios');
-          throw new Error('No tiene permisos para crear barrios. Verifique su rol de usuario.');
+          throw new Error('Sin permisos para crear barrios');
         } else if (response.status === 401) {
-          NotificationService.error('Sesión expirada. Por favor, inicie sesión nuevamente');
-          throw new Error('Token inválido o expirado. Por favor, inicie sesión nuevamente.');
+          NotificationService.error('Sesión expirada');
+          throw new Error('Token inválido o expirado');
         }
         
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
       
-      const responseText = await response.text();
-      console.log(`📄 [BarrioService] Respuesta raw:`, responseText);
+      const responseData = await response.json();
+      console.log(`✅ [BarrioService] Barrio creado:`, responseData);
       
-      let barrioCreado: Barrio;
-      
-      try {
-        const responseData = JSON.parse(responseText);
-        console.log(`📦 [BarrioService] Respuesta parseada:`, responseData);
-        
-        barrioCreado = this.normalizeItem(responseData, 0);
-      } catch (e) {
-        // Si no es JSON o hay error, crear barrio temporal
-        console.log(`⚠️ [BarrioService] Error al parsear respuesta, creando barrio temporal`);
-        barrioCreado = {
-          id: Date.now(),
-          nombre: data.nombre,
-          sectorId: data.sectorId,
-          estado: data.estado || 1
-        };
-      }
+      const barrioCreado = this.normalizeItem(responseData, 0);
       
       // Limpiar caché para forzar recarga
       this.clearCache();
       NotificationService.success('Barrio creado exitosamente');
-      console.log(`✅ [BarrioService] Barrio creado:`, barrioCreado);
       
       return barrioCreado;
       
     } catch (error: any) {
       console.error(`❌ [BarrioService] Error al crear:`, error);
-      NotificationService.error(error.message || 'Error al crear el barrio');
       throw error;
     }
   }
 
   /**
-   * Actualiza un barrio existente
+   * Actualiza un barrio
    */
   async update(id: number, data: BarrioFormData): Promise<Barrio> {
     try {
@@ -339,19 +262,19 @@ class BarrioService {
       
       const token = this.getAuthToken();
       if (!token) {
-        NotificationService.error('Debe iniciar sesión para actualizar barrios');
-        throw new Error('No hay token de autenticación.');
+        NotificationService.error('Debe iniciar sesión para actualizar');
+        throw new Error('No hay token de autenticación');
       }
       
-      const apiData = {
+      const requestData = {
         barrioId: id,
-        nombreBarrio: data.nombre,
+        nombreBarrio: data.nombre.trim(),
         sectorId: data.sectorId,
         estado: data.estado || 1
       };
       
       const url = `${this.API_BASE}/${id}`;
-      console.log(`📤 [BarrioService] PUT a: ${url}`);
+      console.log(`📍 [BarrioService] URL: ${url}`);
       
       const response = await fetch(url, {
         method: 'PUT',
@@ -360,44 +283,32 @@ class BarrioService {
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(apiData)
+        mode: 'cors',
+        credentials: 'include',
+        body: JSON.stringify(requestData)
       });
       
       if (!response.ok) {
         if (response.status === 403) {
-          NotificationService.error('No tiene permisos para actualizar barrios');
-          throw new Error('No tiene permisos para actualizar barrios.');
+          NotificationService.error('Sin permisos para actualizar');
+          throw new Error('Sin permisos');
         } else if (response.status === 401) {
           NotificationService.error('Sesión expirada');
-          throw new Error('Token inválido o expirado.');
+          throw new Error('Token inválido');
         }
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
+        throw new Error(`Error ${response.status}`);
       }
       
-      const responseText = await response.text();
-      let barrioActualizado: Barrio;
-      
-      try {
-        const responseData = JSON.parse(responseText);
-        barrioActualizado = this.normalizeItem(responseData, 0);
-      } catch (e) {
-        barrioActualizado = {
-          id: id,
-          nombre: data.nombre,
-          sectorId: data.sectorId,
-          estado: data.estado || 1
-        };
-      }
+      const responseData = await response.json();
+      const barrioActualizado = this.normalizeItem(responseData, 0);
       
       this.clearCache();
-      NotificationService.success('Barrio actualizado exitosamente');
-      console.log(`✅ [BarrioService] Barrio actualizado:`, barrioActualizado);
+      NotificationService.success('Barrio actualizado');
       
       return barrioActualizado;
       
     } catch (error: any) {
       console.error(`❌ [BarrioService] Error al actualizar:`, error);
-      NotificationService.error(error.message || 'Error al actualizar el barrio');
       throw error;
     }
   }
@@ -411,159 +322,53 @@ class BarrioService {
       
       const token = this.getAuthToken();
       if (!token) {
-        NotificationService.error('Debe iniciar sesión para eliminar barrios');
-        throw new Error('No hay token de autenticación.');
+        NotificationService.error('Debe iniciar sesión');
+        throw new Error('No hay token');
       }
       
       const url = `${this.API_BASE}/${id}`;
-      console.log(`📤 [BarrioService] DELETE a: ${url}`);
-      
       const response = await fetch(url, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        mode: 'cors',
+        credentials: 'include'
       });
       
       if (!response.ok) {
         if (response.status === 403) {
-          NotificationService.error('No tiene permisos para eliminar barrios');
-          throw new Error('No tiene permisos para eliminar barrios.');
-        } else if (response.status === 401) {
-          NotificationService.error('Sesión expirada');
-          throw new Error('Token inválido o expirado.');
+          NotificationService.error('Sin permisos');
+          throw new Error('Sin permisos');
         }
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
+        throw new Error(`Error ${response.status}`);
       }
       
       this.clearCache();
-      NotificationService.success('Barrio eliminado exitosamente');
-      console.log(`✅ [BarrioService] Barrio ${id} eliminado`);
+      NotificationService.success('Barrio eliminado');
       
     } catch (error: any) {
       console.error(`❌ [BarrioService] Error al eliminar:`, error);
-      NotificationService.error(error.message || 'Error al eliminar el barrio');
       throw error;
     }
   }
 
   /**
-   * Busca barrios por término
+   * Obtiene barrios por sector
    */
-  async search(term: string): Promise<Barrio[]> {
+  async getBySector(sectorId: number): Promise<Barrio[]> {
     try {
-      console.log(`📡 [BarrioService] SEARCH - Buscando:`, term);
-      
-      const response = await fetch(`${this.API_BASE}/search?q=${encodeURIComponent(term)}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      return this.normalizeArray(data);
-      
-    } catch (error) {
-      console.error(`❌ [BarrioService] Error en búsqueda:`, error);
-      // Si falla la búsqueda, buscar localmente
       const allBarrios = await this.getAll();
-      return allBarrios.filter(barrio => 
-        barrio.nombre.toLowerCase().includes(term.toLowerCase())
-      );
-    }
-  }
-
-  /**
-   * Verifica la conectividad con el endpoint
-   */
-  async checkConnection(): Promise<boolean> {
-    try {
-      console.log(`🔍 [BarrioService] Verificando conexión con: ${this.API_BASE}`);
-      
-      const response = await fetch(this.API_BASE, {
-        method: 'HEAD'
-      });
-      
-      console.log(`✅ [BarrioService] Conexión exitosa`);
-      return response.ok;
-      
+      return allBarrios.filter(barrio => barrio.sectorId === sectorId);
     } catch (error) {
-      console.error(`❌ [BarrioService] Sin conexión:`, error);
-      return false;
+      console.error(`❌ [BarrioService] Error:`, error);
+      throw error;
     }
-  }
-
-  /**
-   * Actualiza los datos en background
-   */
-  private async updateInBackground(): Promise<void> {
-    try {
-      const response = await fetch(this.API_BASE, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const normalized = this.normalizeArray(data);
-        if (normalized.length > 0) {
-          this.saveToCache(normalized);
-          console.log(`🔄 [BarrioService] Caché actualizado en background`);
-        }
-      }
-    } catch (error) {
-      console.log(`⚠️ [BarrioService] No se pudo actualizar en background:`, error);
-    }
-  }
-
-  /**
-   * Carga datos desde el servidor con reintentos
-   */
-  private async loadFromServer(): Promise<Barrio[]> {
-    const maxRetries = 3;
-    let lastError: any;
-    
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        const response = await fetch(this.API_BASE, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          return this.normalizeArray(data);
-        }
-        
-        lastError = new Error(`HTTP ${response.status}`);
-      } catch (error) {
-        lastError = error;
-        console.log(`⚠️ [BarrioService] Intento ${i + 1} falló:`, error);
-        
-        if (i < maxRetries - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-        }
-      }
-    }
-    
-    throw lastError;
   }
 }
 
-// Exportar una única instancia
-const barrioService = new BarrioService();
+// Exportar instancia singleton
+const barrioService = new BarrioServiceClass();
 export default barrioService;

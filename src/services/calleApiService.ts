@@ -1,33 +1,31 @@
-// src/services/calleApiService.ts - CORREGIDO PARA MANEJAR NULL VALORES
+// src/services/calleApiService.ts - CORREGIDO
 import { BaseApiService } from './BaseApiService';
 import { Calle, CalleFormData, TIPO_VIA_OPTIONS } from '../models/Calle';
 
 class CalleServiceClass extends BaseApiService<Calle, CalleFormData> {
   constructor() {
+    // Llamar al constructor de BaseApiService con los parámetros correctos
     super(
+      '', // baseURL vacío para usar proxy de Vite
+      '/api/via', // endpoint base para CRUD
       {
-        baseUrl: '', // ✅ PROXY LOCAL - Vite redirigirá automáticamente
-        endpoint: '/api/via/listarVia' // ✅ Endpoint correcto según Postman
-      },
-      {
+        // Función para normalizar cada item de la API
         normalizeItem: (apiData: any, index: number): Calle => {
           console.log(`🔍 [CalleService] Normalizando calle ${index}:`, apiData);
           
-          // ✅ VALIDACIÓN MÁS ROBUSTA PARA VALORES NULL
+          // Validación robusta para valores null
           if (!apiData || typeof apiData !== 'object') {
             console.warn(`⚠️ [CalleService] Dato inválido en índice ${index}:`, apiData);
             return {
               id: index + 1000,
               tipoVia: 'calle',
               nombre: `Calle sin nombre ${index + 1}`,
-              sectorId: 1, // Sector por defecto
-              barrioId: 1  // Barrio por defecto
+              sectorId: 1,
+              barrioId: 1
             };
           }
           
-          // 🔥 EXTRAER CAMPOS CON VERIFICACIÓN DE NULL/UNDEFINED
-          
-          // ID de la vía
+          // Extraer ID con verificación de null
           let calleId: number;
           if (typeof apiData.codVia === 'number' && apiData.codVia > 0) {
             calleId = apiData.codVia;
@@ -37,13 +35,12 @@ class CalleServiceClass extends BaseApiService<Calle, CalleFormData> {
             calleId = index + 1;
           }
           
-          // Tipo de vía - mapear desde codTipoVia con verificación de null
+          // Mapear tipo de vía desde código numérico
           let tipoVia: string = 'calle';
-          if (apiData.codTipoVia !== null && apiData.codTipoVia !== undefined && typeof apiData.codTipoVia === 'number') {
-            // Mapear códigos numéricos a tipos de vía
+          if (apiData.codTipoVia !== null && apiData.codTipoVia !== undefined) {
             const tipoViaMap: { [key: number]: string } = {
               1: 'calle',
-              2: 'avenida', 
+              2: 'avenida',
               3: 'jiron',
               4: 'pasaje',
               5: 'malecon',
@@ -51,176 +48,96 @@ class CalleServiceClass extends BaseApiService<Calle, CalleFormData> {
               7: 'parque'
             };
             tipoVia = tipoViaMap[apiData.codTipoVia] || 'calle';
-          } else if (apiData.descripTipoVia && typeof apiData.descripTipoVia === 'string' && apiData.descripTipoVia.trim() !== '') {
-            // Mapear desde descripción si existe
-            const descripcion = apiData.descripTipoVia.toLowerCase();
-            if (descripcion.includes('avenida') || descripcion.includes('av')) tipoVia = 'avenida';
-            else if (descripcion.includes('jiron') || descripcion.includes('jr')) tipoVia = 'jiron';
-            else if (descripcion.includes('pasaje')) tipoVia = 'pasaje';
-            else if (descripcion.includes('malecon')) tipoVia = 'malecon';
-            else if (descripcion.includes('plaza')) tipoVia = 'plaza';
-            else if (descripcion.includes('parque')) tipoVia = 'parque';
           }
           
-          // Nombre de la vía con verificación de null
-          let nombreVia: string;
-          if (apiData.nombreVia && typeof apiData.nombreVia === 'string' && apiData.nombreVia.trim() !== '') {
+          // Extraer nombre con validación
+          let nombreVia: string = 'Sin nombre';
+          if (apiData.nombreVia && typeof apiData.nombreVia === 'string') {
             nombreVia = apiData.nombreVia.trim();
-          } else if (apiData.nombre && typeof apiData.nombre === 'string' && apiData.nombre.trim() !== '') {
+          } else if (apiData.nombre && typeof apiData.nombre === 'string') {
             nombreVia = apiData.nombre.trim();
-          } else {
-            console.warn(`⚠️ [CalleService] No se encontró nombre válido para calle ${calleId}`);
-            nombreVia = `Calle ${calleId}`;
           }
           
-          // 🔥 SECTOR Y BARRIO - MANEJAR NULL/UNDEFINED
-          let sectorId: number = 1; // Valor por defecto
-          let barrioId: number = 1; // Valor por defecto
+          // Extraer IDs de sector y barrio
+          const sectorId = (typeof apiData.codSector === 'number' && apiData.codSector > 0) 
+            ? apiData.codSector 
+            : 1;
+            
+          const barrioId = (typeof apiData.codBarrio === 'number' && apiData.codBarrio > 0) 
+            ? apiData.codBarrio 
+            : 1;
           
-          // Intentar extraer sectorId - con verificación de null
-          if (apiData.codSector !== null && apiData.codSector !== undefined && typeof apiData.codSector === 'number' && apiData.codSector > 0) {
-            sectorId = apiData.codSector;
-          } else if (apiData.sectorId !== null && apiData.sectorId !== undefined && typeof apiData.sectorId === 'number' && apiData.sectorId > 0) {
-            sectorId = apiData.sectorId;
-          } else if (apiData.sector && typeof apiData.sector === 'object' && apiData.sector !== null && typeof apiData.sector.id === 'number' && apiData.sector.id > 0) {
-            sectorId = apiData.sector.id;
-          }
-          
-          // Intentar extraer barrioId - con verificación de null
-          if (apiData.codBarrio !== null && apiData.codBarrio !== undefined && typeof apiData.codBarrio === 'number' && apiData.codBarrio > 0) {
-            barrioId = apiData.codBarrio;
-          } else if (apiData.barrioId !== null && apiData.barrioId !== undefined && typeof apiData.barrioId === 'number' && apiData.barrioId > 0) {
-            barrioId = apiData.barrioId;
-          } else if (apiData.barrio && typeof apiData.barrio === 'object' && apiData.barrio !== null && typeof apiData.barrio.id === 'number' && apiData.barrio.id > 0) {
-            barrioId = apiData.barrio.id;
-          }
-          
-          // ✅ CONSTRUIR RESULTADO CON VALORES SEGUROS
-          const resultado: Calle = {
+          // Construir objeto normalizado
+          const normalized: Calle = {
             id: calleId,
-            codTipoVia: (apiData.codTipoVia !== null && apiData.codTipoVia !== undefined) ? apiData.codTipoVia : undefined,
             tipoVia: tipoVia,
             nombre: nombreVia,
-            nombreVia: (apiData.nombreVia && typeof apiData.nombreVia === 'string') ? apiData.nombreVia : undefined,
-            descripTipoVia: (apiData.descripTipoVia && typeof apiData.descripTipoVia === 'string') ? apiData.descripTipoVia : undefined,
             sectorId: sectorId,
-            barrioId: barrioId,
-            estado: apiData.estado !== false, // Por defecto true, solo false si explícitamente es false
-            fechaCreacion: apiData.fechaCreacion || undefined,
-            fechaModificacion: apiData.fechaModificacion || undefined,
-            usuarioCreacion: (apiData.usuarioCreacion && typeof apiData.usuarioCreacion === 'string') ? apiData.usuarioCreacion : undefined,
-            usuarioModificacion: (apiData.usuarioModificacion && typeof apiData.usuarioModificacion === 'string') ? apiData.usuarioModificacion : undefined
+            barrioId: barrioId
           };
           
-          console.log(`✅ [CalleService] Calle ${index} normalizada:`, resultado);
-          return resultado;
+          console.log(`✅ [CalleService] Calle normalizada:`, normalized);
+          return normalized;
         },
         
-        extractArray: (response: any): any[] => {
-          console.log('🔍 [CalleService] Extrayendo array de respuesta:', response);
-          
-          // 🔥 MANEJAR ESTRUCTURA ESPECÍFICA DEL API: {success, message, data}
-          if (response && typeof response === 'object' && response !== null) {
-            // Verificar si tiene la estructura esperada del API
-            if (response.success === true && Array.isArray(response.data)) {
-              console.log(`✅ [CalleService] Array encontrado en 'data' con ${response.data.length} elementos`);
-              return response.data.filter(item => item !== null && item !== undefined); // ✅ Filtrar nulls
-            }
-            
-            // Si no, buscar en otras propiedades comunes
-            const possibleArrays = ['data', 'items', 'results', 'content', 'vias', 'calles'];
-            for (const prop of possibleArrays) {
-              if (Array.isArray(response[prop])) {
-                console.log(`✅ [CalleService] Array encontrado en propiedad '${prop}' con ${response[prop].length} elementos`);
-                return response[prop].filter(item => item !== null && item !== undefined); // ✅ Filtrar nulls
-              }
-            }
-          }
-          
-          // Si la respuesta ya es un array, devolverlo (filtrado)
-          if (Array.isArray(response)) {
-            console.log(`✅ [CalleService] Respuesta es array directo con ${response.length} elementos`);
-            return response.filter(item => item !== null && item !== undefined); // ✅ Filtrar nulls
-          }
-          
-          console.warn('⚠️ [CalleService] No se encontró array válido en la respuesta');
-          return [];
-        },
-        
-        validateItem: (calle: Calle): boolean => {
-          // 🔥 VALIDACIÓN MÁS PERMISIVA PERO SEGURA
-          try {
-            const tieneNombreValido = calle && 
-              calle.nombre && 
-              typeof calle.nombre === 'string' &&
-              calle.nombre.trim().length > 0 &&
-              !calle.nombre.includes('sin nombre');
-            
-            const tieneTipoViValido = calle && 
-              calle.tipoVia && 
-              typeof calle.tipoVia === 'string' &&
-              calle.tipoVia.trim().length > 0;
-            
-            const tieneSectorValido = calle && 
-              typeof calle.sectorId === 'number' && 
-              calle.sectorId > 0;
-            
-            const tieneBarrioValido = calle && 
-              typeof calle.barrioId === 'number' && 
-              calle.barrioId > 0;
-            
-            const esValido = tieneNombreValido && tieneTipoViValido && tieneSectorValido && tieneBarrioValido;
-            
-            if (!esValido) {
-              console.warn(`⚠️ [CalleService] Calle inválida:`, {
-                nombre: calle?.nombre || 'null/undefined',
-                tipoVia: calle?.tipoVia || 'null/undefined',
-                sectorId: calle?.sectorId || 'null/undefined',
-                barrioId: calle?.barrioId || 'null/undefined',
-                tieneNombreValido,
-                tieneTipoViValido,
-                tieneSectorValido,
-                tieneBarrioValido
-              });
-            } else {
-              console.log(`✅ [CalleService] Calle válida: ${calle.tipoVia} ${calle.nombre}`);
-            }
-            
-            return esValido;
-          } catch (error) {
-            console.error('❌ [CalleService] Error al validar calle:', error, calle);
-            return false;
-          }
+        // Función opcional para validar items
+        validateItem: (item: Calle): boolean => {
+          return item.id > 0 && 
+                 item.nombre.length > 0 && 
+                 item.sectorId > 0 && 
+                 item.barrioId > 0;
         }
-      }
+      },
+      'calles_cache' // cacheKey
     );
   }
   
-  // Override del método create para mapear correctamente los campos
+  // Override del método getAll para usar el endpoint correcto de listado
+  async getAll(): Promise<Calle[]> {
+    try {
+      console.log('📡 [CalleService] GET - Obteniendo lista de calles');
+      
+      // Para listar, usar el endpoint específico
+      const response = await this.makeRequest('/api/via/listarVia', {
+        method: 'GET'
+      });
+      
+      const normalized = this.normalizeArray(response);
+      console.log(`✅ [CalleService] ${normalized.length} calles obtenidas`);
+      
+      return normalized;
+      
+    } catch (error) {
+      console.error('❌ [CalleService] Error al obtener calles:', error);
+      throw error;
+    }
+  }
+  
+  // Override del método create para usar el endpoint correcto y mapear los campos
   async create(data: CalleFormData): Promise<Calle> {
     try {
-      // ✅ VALIDACIÓN PREVIA ANTES DE ENVIAR
+      // Validación previa
       if (!data || typeof data !== 'object') {
         throw new Error('Datos de calle inválidos');
       }
       
       if (!data.sectorId || data.sectorId <= 0) {
-        throw new Error('Debe proporcionar un sectorId válido');
+        throw new Error('Debe seleccionar un sector');
       }
       
       if (!data.barrioId || data.barrioId <= 0) {
-        throw new Error('Debe proporcionar un barrioId válido');
+        throw new Error('Debe seleccionar un barrio');
       }
       
-      if (!data.tipoVia || typeof data.tipoVia !== 'string' || data.tipoVia.trim() === '') {
-        throw new Error('Debe proporcionar un tipo de vía válido');
+      if (!data.tipoVia || data.tipoVia.trim() === '') {
+        throw new Error('Debe seleccionar un tipo de vía');
       }
       
-      if (!data.nombre || typeof data.nombre !== 'string' || data.nombre.trim() === '') {
-        throw new Error('Debe proporcionar un nombre válido');
+      if (!data.nombre || data.nombre.trim() === '') {
+        throw new Error('Debe ingresar el nombre de la vía');
       }
       
-      // Mapear el tipo de vía a código numérico si es necesario
+      // Mapear tipo de vía a código numérico
       const tipoViaToCode: { [key: string]: number } = {
         'calle': 1,
         'avenida': 2,
@@ -231,6 +148,7 @@ class CalleServiceClass extends BaseApiService<Calle, CalleFormData> {
         'parque': 7
       };
       
+      // Preparar datos para la API
       const requestData = {
         codTipoVia: tipoViaToCode[data.tipoVia] || 1,
         nombreVia: data.nombre.trim(),
@@ -238,8 +156,23 @@ class CalleServiceClass extends BaseApiService<Calle, CalleFormData> {
         codBarrio: data.barrioId
       };
       
-      console.log('📤 [CalleService] Creando calle:', requestData);
-      return super.create(requestData as any);
+      console.log('📤 [CalleService] Creando calle con endpoint insertarVias:', requestData);
+      
+      // Usar el endpoint específico para insertar
+      const response = await this.makeRequest('/api/via/insertarVias', {
+        method: 'POST',
+        body: JSON.stringify(requestData)
+      });
+      
+      // Normalizar la respuesta
+      const normalized = this.normalizeOptions.normalizeItem(response, 0);
+      
+      // Limpiar caché para forzar recarga
+      this.clearCache();
+      
+      console.log('✅ [CalleService] Calle creada:', normalized);
+      return normalized;
+      
     } catch (error) {
       console.error('❌ [CalleService] Error en create:', error);
       throw error;
@@ -249,7 +182,7 @@ class CalleServiceClass extends BaseApiService<Calle, CalleFormData> {
   // Override del método update para mapear correctamente los campos
   async update(id: number, data: CalleFormData): Promise<Calle> {
     try {
-      // ✅ VALIDACIÓN PREVIA ANTES DE ENVIAR
+      // Validaciones
       if (!id || id <= 0) {
         throw new Error('ID de calle inválido');
       }
@@ -258,6 +191,7 @@ class CalleServiceClass extends BaseApiService<Calle, CalleFormData> {
         throw new Error('Datos de calle inválidos');
       }
       
+      // Mapear tipo de vía a código numérico
       const tipoViaToCode: { [key: string]: number } = {
         'calle': 1,
         'avenida': 2,
@@ -268,6 +202,7 @@ class CalleServiceClass extends BaseApiService<Calle, CalleFormData> {
         'parque': 7
       };
       
+      // Preparar datos para la API
       const requestData = {
         codTipoVia: tipoViaToCode[data.tipoVia] || 1,
         nombreVia: data.nombre.trim(),
@@ -276,49 +211,65 @@ class CalleServiceClass extends BaseApiService<Calle, CalleFormData> {
       };
       
       console.log(`📤 [CalleService] Actualizando calle ${id}:`, requestData);
+      
+      // Llamar al método update de la clase base
       return super.update(id, requestData as any);
+      
     } catch (error) {
       console.error(`❌ [CalleService] Error en update ${id}:`, error);
       throw error;
     }
   }
   
-  // Método adicional para obtener tipos de vía desde la API
+  // Método adicional para obtener tipos de vía
   async getTiposVia(): Promise<any[]> {
     try {
       console.log('🎨 [CalleService] Obteniendo tipos de vía...');
-      
-      // Por ahora devolver los tipos predefinidos
-      // En el futuro se podría crear un endpoint específico
       return TIPO_VIA_OPTIONS;
-      
     } catch (error) {
       console.error('❌ [CalleService] Error al obtener tipos de vía:', error);
-      return TIPO_VIA_OPTIONS; // Fallback a tipos predefinidos
+      return TIPO_VIA_OPTIONS;
     }
   }
   
-  // ✅ MÉTODO ADICIONAL PARA LIMPIAR DATOS ANTES DE PROCESAR
-  private cleanApiData(data: any): any {
-    if (!data || typeof data !== 'object') {
-      return null;
+  // Método para obtener calles por sector
+  async getBySector(sectorId: number): Promise<Calle[]> {
+    try {
+      console.log(`📡 [CalleService] Obteniendo calles del sector ${sectorId}`);
+      
+      // Primero obtener todas las calles
+      const allCalles = await this.getAll();
+      
+      // Filtrar por sector
+      const callesSector = allCalles.filter(calle => calle.sectorId === sectorId);
+      
+      console.log(`✅ [CalleService] ${callesSector.length} calles encontradas para sector ${sectorId}`);
+      return callesSector;
+      
+    } catch (error) {
+      console.error(`❌ [CalleService] Error al obtener calles del sector ${sectorId}:`, error);
+      throw error;
     }
-    
-    // Crear copia limpia del objeto
-    const cleaned: any = {};
-    
-    for (const key in data) {
-      if (data.hasOwnProperty(key)) {
-        const value = data[key];
-        
-        // Solo asignar si no es null/undefined
-        if (value !== null && value !== undefined) {
-          cleaned[key] = value;
-        }
-      }
+  }
+  
+  // Método para obtener calles por barrio
+  async getByBarrio(barrioId: number): Promise<Calle[]> {
+    try {
+      console.log(`📡 [CalleService] Obteniendo calles del barrio ${barrioId}`);
+      
+      // Primero obtener todas las calles
+      const allCalles = await this.getAll();
+      
+      // Filtrar por barrio
+      const callesBarrio = allCalles.filter(calle => calle.barrioId === barrioId);
+      
+      console.log(`✅ [CalleService] ${callesBarrio.length} calles encontradas para barrio ${barrioId}`);
+      return callesBarrio;
+      
+    } catch (error) {
+      console.error(`❌ [CalleService] Error al obtener calles del barrio ${barrioId}:`, error);
+      throw error;
     }
-    
-    return cleaned;
   }
 }
 
