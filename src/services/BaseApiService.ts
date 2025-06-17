@@ -1,171 +1,230 @@
-// src/services/BaseApiService.ts - CON MANEJO DE CORS
-export interface ApiConfig {
-  baseUrl: string;
-  endpoint: string;
-  headers?: Record<string, string>;
+// src/services/BaseApiService.ts - VERSIÓN CON AUTENTICACIÓN BEARER TOKEN
+import { connectivityService } from './connectivityService';
+import { NotificationService } from '../components/utils/Notification';
+
+// Tipos base para los servicios
+export interface NormalizeOptions<T> {
+  normalizeItem: (item: any, index: number) => T;
+  validateItem?: (item: T, index: number) => boolean;
 }
 
-export interface NormalizeOptions<T, R = any> {
-  normalizeItem: (data: R, index: number) => T;
-  extractArray?: (response: any) => R[];
-  validateItem?: (item: T) => boolean;
-}
-
-export abstract class BaseApiService<T, CreateDTO, UpdateDTO = CreateDTO> {
-  protected config: ApiConfig;
+// Clase base para todos los servicios de API
+export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
+  protected baseUrl: string;
+  protected endpoint: string;
   protected normalizeOptions: NormalizeOptions<T>;
-
-  constructor(config: ApiConfig, normalizeOptions: NormalizeOptions<T>) {
-    this.config = config;
+  protected cacheKey: string;
+  
+  // URL completa del servicio
+  protected get url(): string {
+    return `${this.baseUrl}${this.endpoint}`;
+  }
+  
+  constructor(
+    baseUrl: string,
+    endpoint: string,
+    normalizeOptions: NormalizeOptions<T>,
+    cacheKey: string
+  ) {
+    this.baseUrl = baseUrl;
+    this.endpoint = endpoint;
     this.normalizeOptions = normalizeOptions;
+    this.cacheKey = cacheKey;
+    
+    console.log(`🔧 [${this.constructor.name}] Inicializado con URL:`, this.url);
   }
 
-  protected get url() {
-    return `${this.config.baseUrl}${this.config.endpoint}`;
+  /**
+   * Obtiene el token de autenticación del localStorage
+   */
+  protected getAuthToken(): string | null {
+    const token = localStorage.getItem('auth_token');
+    console.log(`🔑 [${this.constructor.name}] Token obtenido:`, token ? 'Presente' : 'No encontrado');
+    return token;
   }
 
-  protected get headers() {
-    return {
+  /**
+   * Prepara las cabeceras con el token de autenticación
+   */
+  protected getAuthHeaders(): HeadersInit {
+    const token = this.getAuthToken();
+    const headers: HeadersInit = {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      // ✅ Headers para CORS
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Accept',
-      ...this.config.headers
     };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log(`🔐 [${this.constructor.name}] Añadiendo Bearer token a las cabeceras`);
+    } else {
+      console.warn(`⚠️ [${this.constructor.name}] No hay token disponible para autenticación`);
+    }
+
+    return headers;
   }
 
-  protected async makeRequest(url: string, options: RequestInit): Promise<any> {
-    console.log(`📡 [${this.constructor.name}] Petición a:`, url);
-    console.log(`📡 [${this.constructor.name}] Opciones:`, options);
+  /**
+   * Realiza una petición HTTP con reintentos y manejo de errores mejorado
+   */
+  protected async makeRequest(url: string, options: RequestInit, retries = 3): Promise<any> {
+    console.log(`📡 [${this.constructor.name}] ${options.method || 'GET'} - ${url}`);
     
-    try {
-      // ✅ Configuración específica para CORS
-      const response = await fetch(url, {
-        ...options,
-        mode: 'cors',
-        credentials: 'omit', // No enviar cookies
-        headers: {
-          ...this.headers,
-          ...options.headers
-        }
-      });
+    // Solo añadir token de autenticación para POST, PUT, DELETE
+    const requiresAuth = ['POST', 'PUT', 'DELETE'].includes(options.method || 'GET');
+    
+    if (requiresAuth) {
+      console.log(`🔐 [${this.constructor.name}] Método ${options.method} requiere autenticación`);
+      const token = this.getAuthToken();
       
-      return await this.handleResponse(response, options.method || 'GET');
-      
-    } catch (error: any) {
-      console.error(`❌ [${this.constructor.name}] Error de fetch:`, error);
-      
-      // Si es error de CORS o red, intentar sin CORS headers
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        console.log(`🔄 [${this.constructor.name}] Reintentando sin headers CORS...`);
-        
-        try {
-          const simpleResponse = await fetch(url, {
-            method: options.method || 'GET',
-            mode: 'cors',
-            credentials: 'omit',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            ...(options.body && { body: options.body })
-          });
-          
-          return await this.handleResponse(simpleResponse, options.method || 'GET');
-          
-        } catch (retryError) {
-          console.error(`❌ [${this.constructor.name}] Error en reintento:`, retryError);
-          throw retryError;
-        }
+      if (!token) {
+        console.error(`❌ [${this.constructor.name}] NO HAY TOKEN para ${options.method}`);
+        throw new Error('No hay token de autenticación');
       }
       
-      throw error;
-    }
-  }
-
-  protected async handleResponse(response: Response, method: string): Promise<any> {
-    console.log(`📡 [${this.constructor.name}] ${method} - Respuesta:`, response.status, response.statusText);
-    
-    if (!response.ok) {
-      let errorMessage = `Error HTTP: ${response.status} - ${response.statusText}`;
+      // Construir headers con token
+      options.headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        ...options.headers,
+      };
       
+      console.log(`🔑 [${this.constructor.name}] Token añadido: Bearer ${token.substring(0, 20)}...`);
+    } else {
+      console.log(`🔓 [${this.constructor.name}] Método ${options.method} no requiere autenticación`);
+      // Solo agregar Content-Type para GET
+      options.headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...options.headers,
+      };
+    }
+
+    // Log detallado de la petición
+    console.log(`📋 [${this.constructor.name}] Petición completa:`, {
+      url,
+      method: options.method,
+      headers: options.headers,
+      body: options.body
+    });
+    
+    // Verificar conectividad antes de hacer la petición
+    const isOnline = connectivityService.getStatus();
+    if (!isOnline) {
+      console.warn(`⚠️ [${this.constructor.name}] Sin conexión a Internet`);
+      NotificationService.warning('Sin conexión a Internet. Trabajando en modo offline.');
+      throw new Error('Sin conexión a Internet');
+    }
+    
+    for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        const errorText = await response.text();
-        console.error(`📡 [${this.constructor.name}] ${method} - Error detallado:`, errorText);
+        console.log(`🔄 [${this.constructor.name}] Intento ${attempt} de ${retries}`);
         
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.message || errorJson.error || errorMessage;
-        } catch {
-          if (errorText) {
-            errorMessage += ` - ${errorText}`;
-          }
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos
+        
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        console.log(`📊 [${this.constructor.name}] Respuesta: ${response.status} ${response.statusText}`);
+        
+        // Manejar errores de autenticación
+        if (response.status === 401) {
+          console.error(`🚫 [${this.constructor.name}] Error 401: No autorizado`);
+          NotificationService.error('Sesión expirada. Por favor, inicie sesión nuevamente.');
+          
+          // Limpiar datos de autenticación y redirigir al login
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_user');
+          localStorage.removeItem('auth_token_expiry');
+          
+          // Redirigir al login después de un breve delay
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 2000);
+          
+          throw new Error('No autorizado. Sesión expirada.');
         }
-      } catch (e) {
-        console.error('No se pudo leer el cuerpo del error');
+        
+        if (response.status === 403) {
+          console.error(`🚫 [${this.constructor.name}] Error 403: Prohibido`);
+          NotificationService.error('No tiene permisos para realizar esta acción.');
+          throw new Error('No tiene permisos para realizar esta acción.');
+        }
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`❌ [${this.constructor.name}] Error HTTP ${response.status}:`, errorText);
+          throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          console.log(`✅ [${this.constructor.name}] Respuesta JSON recibida`);
+          return data;
+        } else {
+          const text = await response.text();
+          console.log(`✅ [${this.constructor.name}] Respuesta de texto recibida`);
+          return text;
+        }
+        
+      } catch (error: any) {
+        console.error(`❌ [${this.constructor.name}] Error en intento ${attempt}:`, error);
+        
+        if (error.name === 'AbortError') {
+          console.error(`⏱️ [${this.constructor.name}] Timeout en la petición`);
+          NotificationService.error('La petición tardó demasiado tiempo. Intente nuevamente.');
+        }
+        
+        // Si es el último intento o es un error de autenticación, lanzar el error
+        if (attempt === retries || error.message.includes('No autorizado') || error.message.includes('No tiene permisos')) {
+          throw error;
+        }
+        
+        // Esperar antes de reintentar (backoff exponencial)
+        const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        console.log(`⏳ [${this.constructor.name}] Esperando ${waitTime}ms antes de reintentar...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
       }
-      
-      throw new Error(errorMessage);
     }
     
-    const responseText = await response.text();
-    console.log(`📡 [${this.constructor.name}] ${method} - Respuesta (preview):`, responseText.substring(0, 200));
-    
-    if (!responseText) {
-      console.log(`📡 [${this.constructor.name}] ${method} - Respuesta vacía, devolviendo array vacío`);
-      return [];
-    }
-    
-    try {
-      const data = JSON.parse(responseText);
-      console.log(`📡 [${this.constructor.name}] ${method} - JSON parseado correctamente, tipo:`, Array.isArray(data) ? 'Array' : typeof data);
-      return data;
-    } catch (e) {
-      console.error('❌ Respuesta no es JSON válido:', responseText);
-      throw new Error('La respuesta no es un JSON válido');
-    }
+    throw new Error(`No se pudo completar la petición después de ${retries} intentos`);
   }
 
-  protected normalizeArray(rawData: any): T[] {
-    console.log(`🔄 [${this.constructor.name}] normalizeArray - Tipo de datos recibidos:`, typeof rawData);
-    console.log(`🔄 [${this.constructor.name}] normalizeArray - Es array:`, Array.isArray(rawData));
-    
-    let dataArray: any[] = [];
-    
-    if (Array.isArray(rawData)) {
-      console.log(`✅ [${this.constructor.name}] normalizeArray - Los datos ya son un array con ${rawData.length} elementos`);
-      dataArray = rawData;
-    } else if (rawData && typeof rawData === 'object') {
-      console.log(`🔍 [${this.constructor.name}] normalizeArray - Buscando array en objeto...`);
+  /**
+   * Normaliza y valida un array de elementos
+   */
+  protected normalizeArray(data: any): T[] {
+    if (!Array.isArray(data)) {
+      console.warn(`⚠️ [${this.constructor.name}] Los datos no son un array, intentando extraer array`);
       
-      // Intentar extraer array usando función personalizada
-      if (this.normalizeOptions.extractArray) {
-        dataArray = this.normalizeOptions.extractArray(rawData);
-        console.log(`🔄 [${this.constructor.name}] normalizeArray - extractArray devolvió ${dataArray.length} elementos`);
-      } else {
-        // Intentar extraer de propiedades comunes
-        const possibleProps = ['data', 'items', 'results', 'content'];
-        for (const prop of possibleProps) {
-          if (rawData[prop] && Array.isArray(rawData[prop])) {
-            dataArray = rawData[prop];
-            console.log(`✅ [${this.constructor.name}] normalizeArray - Array encontrado en propiedad '${prop}' con ${dataArray.length} elementos`);
+      // Intentar extraer array de la respuesta
+      if (data && typeof data === 'object') {
+        const possibleArrayKeys = ['data', 'items', 'results', 'records'];
+        for (const key of possibleArrayKeys) {
+          if (Array.isArray(data[key])) {
+            console.log(`✅ [${this.constructor.name}] Array encontrado en data.${key}`);
+            data = data[key];
             break;
           }
         }
-        
-        if (dataArray.length === 0) {
-          console.warn(`⚠️ [${this.constructor.name}] normalizeArray - No se encontró array en el objeto, devolviendo array vacío`);
-        }
       }
-    } else {
-      console.warn(`⚠️ [${this.constructor.name}] normalizeArray - Datos no válidos, devolviendo array vacío`);
+      
+      // Si aún no es un array, devolver array vacío
+      if (!Array.isArray(data)) {
+        console.error(`❌ [${this.constructor.name}] No se pudo extraer un array de los datos`);
+        return [];
+      }
     }
     
-    console.log(`🔄 [${this.constructor.name}] normalizeArray - Normalizando ${dataArray.length} elementos...`);
+    console.log(`📊 [${this.constructor.name}] normalizeArray - ${data.length} elementos recibidos`);
     
     // Normalizar cada elemento
-    const normalized = dataArray.map((item, index) => {
+    const normalized = data.map((item, index) => {
       try {
         return this.normalizeOptions.normalizeItem(item, index);
       } catch (error) {
@@ -174,13 +233,13 @@ export abstract class BaseApiService<T, CreateDTO, UpdateDTO = CreateDTO> {
       }
     }).filter(item => item !== null);
     
-    console.log(`✅ [${this.constructor.name}] normalizeArray - ${normalized.length} elementos normalizados exitosamente`);
+    console.log(`✅ [${this.constructor.name}] normalizeArray - ${normalized.length} elementos normalizados`);
     
-    // Validar elementos si se proporciona función de validación
+    // Validar si se proporcionó una función de validación
     if (this.normalizeOptions.validateItem) {
       const validatedItems = normalized.filter((item, index) => {
         try {
-          const isValid = this.normalizeOptions.validateItem!(item as T);
+          const isValid = this.normalizeOptions.validateItem!(item as T, index);
           if (!isValid) {
             console.log(`🚫 [${this.constructor.name}] Elemento ${index} no pasó la validación`);
           }
@@ -240,6 +299,13 @@ export abstract class BaseApiService<T, CreateDTO, UpdateDTO = CreateDTO> {
     try {
       console.log(`📡 [${this.constructor.name}] POST - Iniciando creación:`, data);
       
+      // Verificar token antes de crear
+      const token = this.getAuthToken();
+      if (!token) {
+        NotificationService.error('Debe iniciar sesión para guardar datos');
+        throw new Error('No hay token de autenticación');
+      }
+      
       const rawData = await this.makeRequest(this.url, {
         method: 'POST',
         body: JSON.stringify(data)
@@ -248,10 +314,23 @@ export abstract class BaseApiService<T, CreateDTO, UpdateDTO = CreateDTO> {
       const normalized = this.normalizeOptions.normalizeItem(rawData, 0);
       
       console.log(`✅ [${this.constructor.name}] POST - Éxito:`, normalized);
+      NotificationService.success('Registro creado exitosamente');
       return normalized;
       
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ [${this.constructor.name}] Error al crear:`, error);
+      
+      // Mostrar mensaje de error más específico
+      if (error.message.includes('No autorizado')) {
+        NotificationService.error('Sesión expirada. Por favor, inicie sesión nuevamente.');
+      } else if (error.message.includes('No tiene permisos')) {
+        NotificationService.error('No tiene permisos para crear registros.');
+      } else if (error.message.includes('Sin conexión')) {
+        NotificationService.error('Sin conexión a Internet.');
+      } else {
+        NotificationService.error(`Error al crear: ${error.message}`);
+      }
+      
       throw error;
     }
   }
@@ -259,6 +338,13 @@ export abstract class BaseApiService<T, CreateDTO, UpdateDTO = CreateDTO> {
   async update(id: number, data: UpdateDTO): Promise<T> {
     try {
       console.log(`📡 [${this.constructor.name}] PUT ID ${id} - Iniciando actualización:`, data);
+      
+      // Verificar token antes de actualizar
+      const token = this.getAuthToken();
+      if (!token) {
+        NotificationService.error('Debe iniciar sesión para actualizar datos');
+        throw new Error('No hay token de autenticación');
+      }
       
       const rawData = await this.makeRequest(`${this.url}/${id}`, {
         method: 'PUT',
@@ -268,10 +354,23 @@ export abstract class BaseApiService<T, CreateDTO, UpdateDTO = CreateDTO> {
       const normalized = this.normalizeOptions.normalizeItem(rawData, 0);
       
       console.log(`✅ [${this.constructor.name}] PUT ID ${id} - Éxito:`, normalized);
+      NotificationService.success('Registro actualizado exitosamente');
       return normalized;
       
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ [${this.constructor.name}] Error al actualizar ID ${id}:`, error);
+      
+      // Mostrar mensaje de error más específico
+      if (error.message.includes('No autorizado')) {
+        NotificationService.error('Sesión expirada. Por favor, inicie sesión nuevamente.');
+      } else if (error.message.includes('No tiene permisos')) {
+        NotificationService.error('No tiene permisos para actualizar registros.');
+      } else if (error.message.includes('Sin conexión')) {
+        NotificationService.error('Sin conexión a Internet.');
+      } else {
+        NotificationService.error(`Error al actualizar: ${error.message}`);
+      }
+      
       throw error;
     }
   }
@@ -280,49 +379,79 @@ export abstract class BaseApiService<T, CreateDTO, UpdateDTO = CreateDTO> {
     try {
       console.log(`📡 [${this.constructor.name}] DELETE ID ${id} - Iniciando eliminación`);
       
+      // Verificar token antes de eliminar
+      const token = this.getAuthToken();
+      if (!token) {
+        NotificationService.error('Debe iniciar sesión para eliminar datos');
+        throw new Error('No hay token de autenticación');
+      }
+      
       await this.makeRequest(`${this.url}/${id}`, {
         method: 'DELETE'
       });
       
       console.log(`✅ [${this.constructor.name}] DELETE ID ${id} - Éxito`);
+      NotificationService.success('Registro eliminado exitosamente');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ [${this.constructor.name}] Error al eliminar ID ${id}:`, error);
+      
+      // Mostrar mensaje de error más específico
+      if (error.message.includes('No autorizado')) {
+        NotificationService.error('Sesión expirada. Por favor, inicie sesión nuevamente.');
+      } else if (error.message.includes('No tiene permisos')) {
+        NotificationService.error('No tiene permisos para eliminar registros.');
+      } else if (error.message.includes('Sin conexión')) {
+        NotificationService.error('Sin conexión a Internet.');
+      } else {
+        NotificationService.error(`Error al eliminar: ${error.message}`);
+      }
+      
       throw error;
     }
   }
 
+  /**
+   * Busca elementos por término
+   */
   async search(term: string): Promise<T[]> {
     try {
-      console.log(`📡 [${this.constructor.name}] SEARCH - Término:`, term);
+      console.log(`📡 [${this.constructor.name}] SEARCH - Buscando:`, term);
       
-      const searchUrl = `${this.url}/search?q=${encodeURIComponent(term)}`;
+      const rawData = await this.makeRequest(`${this.url}/search?q=${encodeURIComponent(term)}`, {
+        method: 'GET'
+      });
       
-      try {
-        const rawData = await this.makeRequest(searchUrl, {
-          method: 'GET'
-        });
-        
-        return this.normalizeArray(rawData);
-        
-      } catch (error: any) {
-        // Si no hay endpoint de búsqueda, buscar localmente
-        if (error.message.includes('404') || error.message.includes('Not Found')) {
-          console.log('📡 Endpoint de búsqueda no disponible, usando getAll');
-          const allItems = await this.getAll();
-          const termLower = term.toLowerCase();
-          
-          return allItems.filter(item =>
-            JSON.stringify(item).toLowerCase().includes(termLower)
-          );
-        }
-        
-        throw error;
-      }
+      const normalized = this.normalizeArray(rawData);
+      
+      console.log(`✅ [${this.constructor.name}] SEARCH - ${normalized.length} resultados encontrados`);
+      return normalized;
       
     } catch (error) {
       console.error(`❌ [${this.constructor.name}] Error en búsqueda:`, error);
       throw error;
     }
   }
+
+  /**
+   * Verifica la conectividad con el endpoint
+   */
+  async checkConnection(): Promise<boolean> {
+    try {
+      console.log(`🔍 [${this.constructor.name}] Verificando conexión con:`, this.url);
+      
+      await this.makeRequest(this.url, {
+        method: 'HEAD'
+      }, 1); // Solo 1 intento para verificación rápida
+      
+      console.log(`✅ [${this.constructor.name}] Conexión exitosa`);
+      return true;
+      
+    } catch (error) {
+      console.error(`❌ [${this.constructor.name}] Sin conexión:`, error);
+      return false;
+    }
+  }
 }
+
+export default BaseApiService;

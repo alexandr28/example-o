@@ -1,137 +1,170 @@
-// src/components/barrio/BarrioForm.tsx - REFACTORIZADO
-import React from 'react';
-import { z } from 'zod';
-import { EntityForm } from '../EntityForm';
-import { Input, Select } from '../';
-import { Barrio, Sector } from '../../models/';
-
-// Schema de validación para el formulario
-const barrioSchema = z.object({
-  sectorId: z.string().min(1, 'Debe seleccionar un sector'),
-  nombre: z.string()
-    .min(1, 'El nombre del barrio es requerido')
-    .min(3, 'El nombre debe tener al menos 3 caracteres')
-    .max(100, 'El nombre no puede exceder los 100 caracteres')
-});
-
-type BarrioFormData = z.infer<typeof barrioSchema>;
+// src/components/barrio/BarrioForm.tsx
+import React, { FC, useEffect, useState } from 'react';
+import { BarrioFormData } from '../../models/Barrio';
+import { Sector } from '../../models/Sector';
 
 interface BarrioFormProps {
-  barrioSeleccionado?: Barrio | null;
+  initialData?: BarrioFormData;
   sectores: Sector[];
-  onGuardar: (data: { nombre: string, sectorId: number }) => void;
-  onNuevo: () => void;
-  onEditar: () => void;
+  onSubmit: (data: BarrioFormData) => void;
+  onCancel: () => void;
   loading?: boolean;
-  loadingSectores?: boolean;
-  isEditMode?: boolean;
-  isOfflineMode?: boolean;
 }
 
-const BarrioForm: React.FC<BarrioFormProps> = ({
-  barrioSeleccionado,
+const BarrioForm: FC<BarrioFormProps> = ({
+  initialData,
   sectores,
-  onGuardar,
-  onNuevo,
-  onEditar,
-  loading = false,
-  loadingSectores = false,
-  isEditMode = false,
-  isOfflineMode = false,
+  onSubmit,
+  onCancel,
+  loading = false
 }) => {
-  // Convertir sectores al formato requerido para el Select
-  const sectorOptions = sectores.map(sector => ({
-    value: sector.id?.toString() || '',
-    label: sector.nombre
-  }));
+  // Estados del formulario
+  const [formData, setFormData] = useState<BarrioFormData>({
+    nombre: '',
+    sectorId: null,
+    estado: 1
+  });
+  
+  // Estado para el sector seleccionado (para debugging)
+  const [selectedSectorId, setSelectedSectorId] = useState<string>('');
 
-  // Manejar el submit del formulario
-  const handleSave = (data: BarrioFormData) => {
-    onGuardar({
-      nombre: data.nombre,
-      sectorId: parseInt(data.sectorId)
-    });
+  // Inicializar con datos si es edición
+  useEffect(() => {
+    if (initialData) {
+      setFormData(initialData);
+      setSelectedSectorId(initialData.sectorId?.toString() || '');
+    }
+  }, [initialData]);
+
+  // Manejar cambios en los inputs
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
+  // Manejar cambio en el select de sector
+  const handleSectorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    console.log('🔄 Sector seleccionado:', value);
+    
+    setSelectedSectorId(value);
+    setFormData(prev => ({
+      ...prev,
+      sectorId: value ? Number(value) : null
+    }));
+  };
+
+  // Manejar submit
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.nombre.trim()) {
+      alert('El nombre del barrio es requerido');
+      return;
+    }
+    
+    if (!formData.sectorId) {
+      alert('Debe seleccionar un sector');
+      return;
+    }
+    
+    console.log('📤 Enviando datos del barrio:', formData);
+    onSubmit(formData);
+  };
+
+  // Obtener el nombre del sector seleccionado
+  const sectorSeleccionado = sectores.find(s => s.id === formData.sectorId);
+
   return (
-    <EntityForm<BarrioFormData>
-      title="Datos del barrio"
-      schema={barrioSchema}
-      defaultValues={{ 
-        sectorId: '', 
-        nombre: '' 
-      }}
-      selectedItem={barrioSeleccionado ? {
-        sectorId: barrioSeleccionado.sectorId.toString(),
-        nombre: barrioSeleccionado.nombre || ''
-      } : null}
-      onSave={handleSave}
-      onNew={onNuevo}
-      onEdit={onEditar}
-      loading={loading || loadingSectores}
-      isEditMode={isEditMode}
-      isOfflineMode={isOfflineMode}
-    >
-      {({ register, errors, watch, formState }) => (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Select
-            label="Sector"
-            options={sectorOptions}
-            error={errors.sectorId?.message}
-            disabled={loadingSectores}
-            placeholder={loadingSectores ? "Cargando sectores..." : "Seleccione un sector"}
-            {...register('sectorId')}
-          />
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-semibold mb-4">
+          {initialData ? 'Editar Barrio' : 'Nuevo Barrio'}
+        </h3>
+        
+        {/* Campo Sector */}
+        <div className="mb-4">
+          <label htmlFor="sector" className="block text-sm font-medium text-gray-700 mb-2">
+            Sector <span className="text-red-500">*</span>
+            {sectores.length > 0 && <span className="text-gray-500 text-xs ml-2">({sectores.length} opciones)</span>}
+          </label>
           
-          <Input
-            label="Nombre"
-            error={errors.nombre?.message}
-            placeholder="Ingrese nombre del barrio"
-            {...register('nombre')}
-          />
+          <select
+            id="sector"
+            name="sectorId"
+            value={selectedSectorId}
+            onChange={handleSectorChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={loading || sectores.length === 0}
+            required
+          >
+            <option value="">Seleccione un sector</option>
+            {sectores.map(sector => (
+              <option key={sector.id} value={sector.id.toString()}>
+                {sector.nombre}
+              </option>
+            ))}
+          </select>
           
-          {/* Mostrar información del sector seleccionado */}
-          {watch('sectorId') && !isEditMode && (
-            <div className="col-span-2 mt-2">
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                <p className="text-sm text-blue-700">
-                  <span className="font-medium">Sector seleccionado:</span> {' '}
-                  {sectores.find(s => s.id?.toString() === watch('sectorId'))?.nombre || 'N/A'}
-                </p>
-              </div>
-            </div>
-          )}
-          
-          {/* Información adicional en modo ver */}
-          {!isEditMode && barrioSeleccionado && (
-            <div className="col-span-2 mt-2">
-              <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-                <div className="text-sm text-gray-600 space-y-1">
-                  <div><span className="font-medium">ID:</span> {barrioSeleccionado.id}</div>
-                  {barrioSeleccionado.codBarrio && (
-                    <div><span className="font-medium">Código:</span> {barrioSeleccionado.codBarrio}</div>
-                  )}
-                  {barrioSeleccionado.fechaCreacion && (
-                    <div>
-                      <span className="font-medium">Creado:</span> {' '}
-                      {new Date(barrioSeleccionado.fechaCreacion).toLocaleString()}
-                    </div>
-                  )}
-                  {barrioSeleccionado.estado !== undefined && (
-                    <div>
-                      <span className="font-medium">Estado:</span> {' '}
-                      <span className={barrioSeleccionado.estado ? 'text-green-600' : 'text-red-600'}>
-                        {barrioSeleccionado.estado ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
+          {/* Debug info */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="text-xs text-gray-500 mt-1">
+              <div>Valor actual: {selectedSectorId || 'ninguno'}</div>
+              <div>Opciones: {sectores.map(s => `${s.id}:${s.nombre}`).join(', ')}</div>
             </div>
           )}
         </div>
-      )}
-    </EntityForm>
+        
+        {/* Mostrar sector seleccionado */}
+        {sectorSeleccionado && (
+          <div className="mb-4 p-3 bg-blue-50 rounded">
+            <span className="text-sm text-blue-700">
+              Sector seleccionado: {sectorSeleccionado.nombre}
+            </span>
+          </div>
+        )}
+        
+        {/* Campo Nombre */}
+        <div className="mb-4">
+          <label htmlFor="nombre" className="block text-sm font-medium text-gray-700 mb-2">
+            Nombre del Barrio <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            id="nombre"
+            name="nombre"
+            value={formData.nombre}
+            onChange={handleInputChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Ingrese nombre del barrio"
+            disabled={loading}
+            required
+          />
+        </div>
+        
+        {/* Botones */}
+        <div className="flex justify-end space-x-2 mt-6">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            disabled={loading}
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+            disabled={loading || !formData.nombre || !formData.sectorId}
+          >
+            {loading ? 'Guardando...' : (initialData ? 'Actualizar' : 'Guardar')}
+          </button>
+        </div>
+      </div>
+    </form>
   );
 };
 

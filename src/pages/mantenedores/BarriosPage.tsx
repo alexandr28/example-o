@@ -1,9 +1,10 @@
-// src/pages/mantenedores/BarriosPage.tsx - REFACTORIZADO
+// src/pages/mantenedores/BarriosPage.tsx - CORREGIDO
 import React, { useState, useMemo } from 'react';
 import { MainLayout } from '../../layout';
 import { BarrioList, BarrioForm, Breadcrumb } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useBarrios } from '../../hooks/useBarrios';
+import { BarrioFormData } from '../../models/Barrio';
 
 const BarriosPage: React.FC = () => {
   const {
@@ -66,23 +67,35 @@ const BarriosPage: React.FC = () => {
     }
   };
 
-  // Manejo de guardado
-  const handleGuardar = async (data: { nombre: string, sectorId: number }) => {
+  // Manejo de guardado - IMPORTANTE: Recibe BarrioFormData completo
+  const handleGuardar = async (data: BarrioFormData) => {
     try {
-      await guardarBarrio(data);
-      showMessage(modoEdicion 
-        ? "✅ Barrio actualizado correctamente" 
-        : "✅ Barrio creado correctamente");
+      console.log('📤 [BarriosPage] Guardando barrio:', data);
       
-      // Recargar datos
-      await cargarBarrios();
+      const exito = await guardarBarrio(data);
+      
+      if (exito) {
+        showMessage(modoEdicion 
+          ? "✅ Barrio actualizado correctamente" 
+          : "✅ Barrio creado correctamente");
+        
+        // Recargar datos después de un pequeño delay
+        setTimeout(async () => {
+          await cargarBarrios();
+        }, 500);
+      }
     } catch (error: any) {
+      console.error('❌ [BarriosPage] Error al guardar:', error);
       showMessage(`❌ Error al guardar: ${error.message}`);
     }
   };
 
   // Manejo de eliminación
   const handleEliminar = async (id: number) => {
+    if (!confirm('¿Está seguro de eliminar este barrio?')) {
+      return;
+    }
+    
     try {
       await eliminarBarrio(id);
       showMessage("✅ Barrio eliminado correctamente");
@@ -285,11 +298,11 @@ const BarriosPage: React.FC = () => {
           </div>
         )}
 
-        {/* Formulario de barrios */}
+        {/* Formulario de barrios - CORREGIDO: Cambiar onGuardar por onSubmit */}
         <BarrioForm
           barrioSeleccionado={barrioSeleccionado}
           sectores={sectores}
-          onGuardar={handleGuardar}
+          onSubmit={handleGuardar}  /* CAMBIO IMPORTANTE: onGuardar -> onSubmit */
           onNuevo={limpiarSeleccion}
           onEditar={handleEditar}
           loading={loading}
