@@ -1,315 +1,365 @@
+// src/hooks/useDirecciones.ts
 import { useState, useCallback, useEffect } from 'react';
+import { direccionService } from '../services/direcionService';
+import  sectorService  from '../services/sectorService';
+import  barrioService  from '../services/barrioService';
+import  calleApiService  from '../services/calleApiService';
 import { Direccion, DireccionFormData, Sector, Barrio, Calle, LadoDireccion } from '../models';
+import { NotificationService } from '../components/utils/Notification';
 
-// Datos de ejemplo para pruebas
-const direccionesIniciales: Direccion[] = [
-  { id: 1, sectorId: 1, barrioId: 1, calleId: 1, cuadra: '1', lado: LadoDireccion.NINGUNO, loteInicial: 0, loteFinal: 0, descripcion: 'Sector + Barrio + Calle / Mz + Cuadra' },
-  { id: 2, sectorId: 1, barrioId: 1, calleId: 1, cuadra: '1', lado: LadoDireccion.IZQUIERDO, loteInicial: 1, loteFinal: 60, descripcion: 'Sector + Barrio + Calle / Mz + Cuadra' },
-  { id: 3, sectorId: 1, barrioId: 1, calleId: 1, cuadra: '1', lado: LadoDireccion.PAR, loteInicial: 1, loteFinal: 100, descripcion: 'Sector + Barrio + Calle / Mz + Cuadra' },
-];
-
-// Sectores para el selector
-const sectoresIniciales: Sector[] = [
-  { id: 1, nombre: 'SECTOR CENTRAL' },
-  { id: 2, nombre: 'SECTOR JERUSALÉN' },
-  { id: 3, nombre: 'URB. MANUEL ARÉVALO II' },
-  { id: 4, nombre: 'PARQUE INDUSTRIAL' },
-];
-
-// Barrios para el selector (filtrados por sector)
-const barriosIniciales: Barrio[] = [
-  { id: 1, nombre: 'BARRIO 1', sectorId: 1 },
-  { id: 2, nombre: 'BARRIO 2', sectorId: 1 },
-  { id: 3, nombre: 'BARRIO 3', sectorId: 1 },
-  { id: 4, nombre: 'BARRIO 4', sectorId: 2 },
-  { id: 5, nombre: 'BARRIO 5', sectorId: 2 },
-  { id: 6, nombre: 'BARRIO 6', sectorId: 3 },
-];
-
-// Calles para el selector
-const callesIniciales: Calle[] = [
-  { id: 1, tipoVia: 'avenida', nombre: 'Gran Chimú' },
-  { id: 2, tipoVia: 'calle', nombre: 'Los Álamos' },
-  { id: 3, tipoVia: 'jiron', nombre: 'Carabobo' },
-];
-
-// Opciones para el selector de lado
-const ladosOpciones = [
-  { value: LadoDireccion.NINGUNO, label: 'Ninguno' },
-  { value: LadoDireccion.IZQUIERDO, label: 'Izquierdo' },
-  { value: LadoDireccion.DERECHO, label: 'Derecho' },
-  { value: LadoDireccion.PAR, label: 'Par' },
-  { value: LadoDireccion.IMPAR, label: 'Impar' },
-];
-
-/**
- * Hook personalizado para la gestión de direcciones
- * 
- * Proporciona funcionalidades para listar, crear, actualizar y eliminar direcciones
- * Incluye la gestión de dependencias como sectores, barrios y calles
- */
-export const useDirecciones = () => {
+interface UseDireccionesReturn {
   // Estados
-  const [direcciones, setDirecciones] = useState<Direccion[]>(direccionesIniciales);
-  const [sectores, setSectores] = useState<Sector[]>(sectoresIniciales);
-  const [barrios, setBarrios] = useState<Barrio[]>(barriosIniciales);
-  const [barriosFiltrados, setBarriosFiltrados] = useState<Barrio[]>([]);
-  const [calles, setCalles] = useState<Calle[]>(callesIniciales);
-  const [lados] = useState(ladosOpciones);
+  direcciones: Direccion[];
+  sectores: Sector[];
+  barrios: Barrio[];
+  barriosFiltrados: Barrio[];
+  calles: Calle[];
+  callesFiltradas: Calle[];
+  lados: { value: string; label: string }[];
+  direccionSeleccionada: Direccion | null;
+  sectorSeleccionado: number | null;
+  barrioSeleccionado: number | null;
+  modoEdicion: boolean;
+  loading: boolean;
+  error: string | null;
+  searchTerm: string;
   
+  // Métodos
+  cargarDirecciones: () => Promise<void>;
+  cargarDependencias: () => Promise<void>;
+  buscarDirecciones: (term: string) => Promise<void>;
+  buscarPorTipoVia: (parametros: string) => Promise<void>;
+  buscarPorNombreVia: (nombre?: string, sectorId?: number, barrioId?: number) => Promise<void>;
+  seleccionarDireccion: (direccion: Direccion) => void;
+  handleSectorChange: (sectorId: number) => void;
+  handleBarrioChange: (barrioId: number) => void;
+  limpiarSeleccion: () => void;
+  guardarDireccion: (data: DireccionFormData) => Promise<void>;
+  eliminarDireccion: (id: number) => Promise<void>;
+  setModoEdicion: (modo: boolean) => void;
+  setSearchTerm: (term: string) => void;
+}
+
+export const useDirecciones = (): UseDireccionesReturn => {
+  // Estados principales
+  const [direcciones, setDirecciones] = useState<Direccion[]>([]);
+  const [sectores, setSectores] = useState<Sector[]>([]);
+  const [barrios, setBarrios] = useState<Barrio[]>([]);
+  const [calles, setCalles] = useState<Calle[]>([]);
+  
+  // Estados de filtrado
+  const [barriosFiltrados, setBarriosFiltrados] = useState<Barrio[]>([]);
+  const [callesFiltradas, setCallesFiltradas] = useState<Calle[]>([]);
+  
+  // Estados de selección
   const [direccionSeleccionada, setDireccionSeleccionada] = useState<Direccion | null>(null);
   const [sectorSeleccionado, setSectorSeleccionado] = useState<number | null>(null);
+  const [barrioSeleccionado, setBarrioSeleccionado] = useState<number | null>(null);
+  
+  // Estados de UI
   const [modoEdicion, setModoEdicion] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Filtrar barrios cuando cambia el sector seleccionado
-  useEffect(() => {
-    if (sectorSeleccionado) {
-      const filtrados = barrios.filter(barrio => barrio.sectorId === sectorSeleccionado);
-      setBarriosFiltrados(filtrados);
-    } else {
-      setBarriosFiltrados([]);
-    }
-  }, [sectorSeleccionado, barrios]);
-
-  // Cargar direcciones (simula una petición a API)
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Opciones de lados
+  const lados = [
+    { value: LadoDireccion.NINGUNO, label: 'Ninguno' },
+    { value: LadoDireccion.IZQUIERDO, label: 'Izquierdo' },
+    { value: LadoDireccion.DERECHO, label: 'Derecho' },
+    { value: LadoDireccion.PAR, label: 'Par' },
+    { value: LadoDireccion.IMPAR, label: 'Impar' }
+  ];
+  
+  /**
+   * Cargar todas las direcciones
+   */
   const cargarDirecciones = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+      console.log('🔄 [useDirecciones] Cargando direcciones...');
       
-      // Aquí iría la petición a la API
-      // const response = await fetch('/api/direcciones');
-      // const data = await response.json();
-      // setDirecciones(data);
+      const data = await direccionService.getAll();
+      setDirecciones(data);
       
-      // Simulamos un retardo
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setDirecciones(direccionesIniciales);
-    } catch (err) {
-      setError('Error al cargar las direcciones');
-      console.error(err);
+      console.log(`✅ [useDirecciones] ${data.length} direcciones cargadas`);
+    } catch (err: any) {
+      console.error('❌ [useDirecciones] Error al cargar direcciones:', err);
+      setError(err.message || 'Error al cargar direcciones');
+      NotificationService.error('Error al cargar direcciones');
     } finally {
       setLoading(false);
     }
   }, []);
-
-  // Cargar dependencias (sectores, barrios, calles)
-  const cargarDependencias = useCallback(async () => {
+  
+  /**
+   * Buscar direcciones por tipo de vía
+   */
+  const buscarPorTipoVia = useCallback(async (parametros: string) => {
     try {
       setLoading(true);
       setError(null);
+      console.log('🔍 [useDirecciones] Buscando por tipo de vía:', parametros);
       
-      // Aquí irían las peticiones a la API
-      // const [sectoresRes, barriosRes, callesRes] = await Promise.all([
-      //   fetch('/api/sectores'),
-      //   fetch('/api/barrios'),
-      //   fetch('/api/calles')
-      // ]);
-      // 
-      // const sectoresData = await sectoresRes.json();
-      // const barriosData = await barriosRes.json();
-      // const callesData = await callesRes.json();
-      // 
-      // setSectores(sectoresData);
-      // setBarrios(barriosData);
-      // setCalles(callesData);
+      const data = await direccionService.buscarPorTipoVia({
+        parametrosBusqueda: parametros,
+        codUsuario: 1
+      });
       
-      // Simulamos un retardo
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setSectores(sectoresIniciales);
-      setBarrios(barriosIniciales);
-      setCalles(callesIniciales);
-    } catch (err) {
-      setError('Error al cargar las dependencias');
-      console.error(err);
+      setDirecciones(data);
+      console.log(`✅ [useDirecciones] ${data.length} direcciones encontradas`);
+    } catch (err: any) {
+      console.error('❌ [useDirecciones] Error en búsqueda por tipo de vía:', err);
+      setError(err.message || 'Error al buscar direcciones');
+      NotificationService.error('Error al buscar direcciones');
     } finally {
       setLoading(false);
     }
   }, []);
-
-  // Seleccionar una dirección para editar
-  const seleccionarDireccion = useCallback((direccion: Direccion) => {
-    setDireccionSeleccionada(direccion);
-    setSectorSeleccionado(direccion.sectorId);
-    setModoEdicion(true);
+  
+  /**
+   * Buscar direcciones por nombre de vía
+   */
+  const buscarPorNombreVia = useCallback(async (nombre?: string, sectorId?: number, barrioId?: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+      console.log('🔍 [useDirecciones] Buscando por nombre de vía:', { nombre, sectorId, barrioId });
+      
+      const data = await direccionService.buscarPorNombreVia({
+        nombreVia: nombre,
+        codSector: sectorId,
+        codBarrio: barrioId
+      });
+      
+      setDirecciones(data);
+      console.log(`✅ [useDirecciones] ${data.length} direcciones encontradas`);
+    } catch (err: any) {
+      console.error('❌ [useDirecciones] Error en búsqueda por nombre de vía:', err);
+      setError(err.message || 'Error al buscar direcciones');
+      NotificationService.error('Error al buscar direcciones');
+    } finally {
+      setLoading(false);
+    }
   }, []);
-
-  // Manejar cambio de sector
+  
+  /**
+   * Buscar direcciones genérico
+   */
+  const buscarDirecciones = useCallback(async (term: string) => {
+    if (!term.trim()) {
+      await cargarDirecciones();
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError(null);
+      console.log('🔍 [useDirecciones] Buscando direcciones:', term);
+      
+      const data = await direccionService.search(term);
+      setDirecciones(data);
+      
+      console.log(`✅ [useDirecciones] ${data.length} direcciones encontradas`);
+    } catch (err: any) {
+      console.error('❌ [useDirecciones] Error en búsqueda:', err);
+      setError(err.message || 'Error al buscar direcciones');
+    } finally {
+      setLoading(false);
+    }
+  }, [cargarDirecciones]);
+  
+  /**
+   * Cargar dependencias (sectores, barrios, calles)
+   */
+  const cargarDependencias = useCallback(async () => {
+    try {
+      console.log('🔄 [useDirecciones] Cargando dependencias...');
+      
+      const [sectoresData, barriosData, callesData] = await Promise.all([
+        sectorService.getAll(),
+        barrioService.getAll(),
+        calleApiService.getAll()
+      ]);
+      
+      setSectores(sectoresData);
+      setBarrios(barriosData);
+      setCalles(callesData);
+      
+      console.log('✅ [useDirecciones] Dependencias cargadas');
+    } catch (err: any) {
+      console.error('❌ [useDirecciones] Error al cargar dependencias:', err);
+      setError('Error al cargar datos auxiliares');
+    }
+  }, []);
+  
+  /**
+   * Manejar cambio de sector
+   */
   const handleSectorChange = useCallback((sectorId: number) => {
+    console.log('🔄 [useDirecciones] Sector seleccionado:', sectorId);
     setSectorSeleccionado(sectorId);
-  }, []);
-
-  // Limpiar selección
+    
+    // Filtrar barrios por sector
+    const barriosFiltrados = barrios.filter(b => b.sectorId === sectorId);
+    setBarriosFiltrados(barriosFiltrados);
+    
+    // Limpiar barrio seleccionado si no pertenece al nuevo sector
+    if (barrioSeleccionado && !barriosFiltrados.some(b => b.id === barrioSeleccionado)) {
+      setBarrioSeleccionado(null);
+      setCallesFiltradas([]);
+    }
+  }, [barrios, barrioSeleccionado]);
+  
+  /**
+   * Manejar cambio de barrio
+   */
+  const handleBarrioChange = useCallback((barrioId: number) => {
+    console.log('🔄 [useDirecciones] Barrio seleccionado:', barrioId);
+    setBarrioSeleccionado(barrioId);
+    
+    // Filtrar calles por barrio
+    const callesFiltradas = calles.filter(c => c.barrioId === barrioId);
+    setCallesFiltradas(callesFiltradas);
+  }, [calles]);
+  
+  /**
+   * Seleccionar una dirección
+   */
+  const seleccionarDireccion = useCallback((direccion: Direccion) => {
+    console.log('📍 [useDirecciones] Dirección seleccionada:', direccion);
+    setDireccionSeleccionada(direccion);
+    setModoEdicion(false);
+    
+    // Actualizar sector y barrio seleccionados
+    if (direccion.sectorId) {
+      handleSectorChange(direccion.sectorId);
+    }
+    if (direccion.barrioId) {
+      handleBarrioChange(direccion.barrioId);
+    }
+  }, [handleSectorChange, handleBarrioChange]);
+  
+  /**
+   * Limpiar selección
+   */
   const limpiarSeleccion = useCallback(() => {
+    console.log('🧹 [useDirecciones] Limpiando selección');
     setDireccionSeleccionada(null);
     setSectorSeleccionado(null);
+    setBarrioSeleccionado(null);
+    setBarriosFiltrados([]);
+    setCallesFiltradas([]);
     setModoEdicion(false);
   }, []);
-
-  // Generar descripción de la dirección
-  const generarDescripcion = useCallback((data: DireccionFormData): string => {
-    const sector = sectores.find(s => s.id === data.sectorId);
-    const barrio = barrios.find(b => b.id === data.barrioId);
-    const calle = calles.find(c => c.id === data.calleId);
-    
-    return `${sector?.nombre || ''} + ${barrio?.nombre || ''} + ${calle?.nombre || ''} / Mz + ${data.cuadra}`;
-  }, [sectores, barrios, calles]);
-
-  // Guardar una dirección (crear o actualizar)
+  
+  /**
+   * Guardar dirección (crear o actualizar)
+   */
   const guardarDireccion = useCallback(async (data: DireccionFormData) => {
     try {
       setLoading(true);
       setError(null);
       
-      // Generar descripción
-      const descripcion = generarDescripcion(data);
-      
-      // Validaciones básicas
-      if (data.loteInicial > data.loteFinal) {
-        throw new Error('El lote inicial no puede ser mayor que el lote final');
-      }
-      
       if (modoEdicion && direccionSeleccionada) {
-        // Actualizar dirección existente
-        // Aquí iría la petición a la API para actualizar
-        // await fetch(`/api/direcciones/${direccionSeleccionada.id}`, {
-        //   method: 'PUT',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({...data, descripcion}),
-        // });
-        
-        // Asegurarse de que lado sea del tipo correcto (LadoDireccion)
-        // Podemos verificar que el valor esté en el enum antes de asignarlo
-        let ladoValue: LadoDireccion;
-        
-        // Verificar si el lado proporcionado es válido para LadoDireccion
-        if (Object.values(LadoDireccion).includes(data.lado as LadoDireccion)) {
-          ladoValue = data.lado as LadoDireccion;
-        } else {
-          // Si no es válido, usar un valor por defecto
-          ladoValue = LadoDireccion.NINGUNO;
-        }
-        
-        // Crear un objeto que cumpla con el tipo Direccion
-        const direccionActualizada: Direccion = {
-          ...direccionSeleccionada,
-          sectorId: data.sectorId,
-          barrioId: data.barrioId,
-          calleId: data.calleId,
-          cuadra: data.cuadra,
-          lado: ladoValue,
-          loteInicial: data.loteInicial,
-          loteFinal: data.loteFinal,
-          descripcion,
-          sector: sectores.find(s => s.id === data.sectorId),
-          barrio: barrios.find(b => b.id === data.barrioId),
-          calle: calles.find(c => c.id === data.calleId)
-        };
-        
-        // Actualizar estado local con tipado correcto
-        setDirecciones(prev => 
-          prev.map(dir => 
-            dir.id === direccionSeleccionada.id ? direccionActualizada : dir
-          )
-        );
+        console.log('📝 [useDirecciones] Actualizando dirección:', direccionSeleccionada.id);
+        await direccionService.update(direccionSeleccionada.id, data);
       } else {
-        // Asegurarse de que lado sea del tipo correcto (LadoDireccion)
-        let ladoValue: LadoDireccion;
-        
-        // Verificar si el lado proporcionado es válido para LadoDireccion
-        if (Object.values(LadoDireccion).includes(data.lado as LadoDireccion)) {
-          ladoValue = data.lado as LadoDireccion;
-        } else {
-          // Si no es válido, usar un valor por defecto
-          ladoValue = LadoDireccion.NINGUNO;
-        }
-        
-        // Crear nueva dirección
-        // Aquí iría la petición a la API para crear
-        // const response = await fetch('/api/direcciones', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({...data, descripcion}),
-        // });
-        // const nuevaDireccion = await response.json();
-        
-        // Simulamos la creación con un ID nuevo - con tipado correcto
-        const nuevaDireccion: Direccion = {
-          id: Math.max(0, ...direcciones.map(d => d.id)) + 1,
-          sectorId: data.sectorId,
-          barrioId: data.barrioId,
-          calleId: data.calleId,
-          cuadra: data.cuadra,
-          lado: ladoValue,
-          loteInicial: data.loteInicial,
-          loteFinal: data.loteFinal,
-          descripcion,
-          sector: sectores.find(s => s.id === data.sectorId),
-          barrio: barrios.find(b => b.id === data.barrioId),
-          calle: calles.find(c => c.id === data.calleId)
-        };
-        
-        // Actualizar estado local
-        setDirecciones(prev => [...prev, nuevaDireccion]);
+        console.log('➕ [useDirecciones] Creando nueva dirección');
+        await direccionService.create(data);
       }
       
-      // Resetear estados
+      // Recargar direcciones y limpiar formulario
+      await cargarDirecciones();
       limpiarSeleccion();
+      
     } catch (err: any) {
-      setError(err.message || 'Error al guardar la dirección');
-      console.error(err);
+      console.error('❌ [useDirecciones] Error al guardar dirección:', err);
+      setError(err.message || 'Error al guardar dirección');
     } finally {
       setLoading(false);
     }
-  }, [direcciones, direccionSeleccionada, modoEdicion, sectores, barrios, calles, limpiarSeleccion, generarDescripcion]);
-
-  // Eliminar una dirección
+  }, [modoEdicion, direccionSeleccionada, cargarDirecciones, limpiarSeleccion]);
+  
+  /**
+   * Eliminar dirección
+   */
   const eliminarDireccion = useCallback(async (id: number) => {
     try {
+      const confirmar = window.confirm('¿Está seguro de eliminar esta dirección?');
+      if (!confirmar) return;
+      
       setLoading(true);
       setError(null);
       
-      // Aquí iría la petición a la API para eliminar
-      // await fetch(`/api/direcciones/${id}`, {
-      //   method: 'DELETE',
-      // });
+      console.log('🗑️ [useDirecciones] Eliminando dirección:', id);
+      await direccionService.delete(id);
       
-      // Actualizar estado local
-      setDirecciones(prev => prev.filter(dir => dir.id !== id));
+      // Recargar direcciones y limpiar selección
+      await cargarDirecciones();
+      limpiarSeleccion();
       
-      // Si la dirección eliminada estaba seleccionada, limpiar selección
-      if (direccionSeleccionada?.id === id) {
-        limpiarSeleccion();
-      }
-    } catch (err) {
-      setError('Error al eliminar la dirección');
-      console.error(err);
+      NotificationService.success('Dirección eliminada exitosamente');
+    } catch (err: any) {
+      console.error('❌ [useDirecciones] Error al eliminar dirección:', err);
+      setError(err.message || 'Error al eliminar dirección');
+      NotificationService.error('Error al eliminar dirección');
     } finally {
       setLoading(false);
     }
-  }, [direccionSeleccionada, limpiarSeleccion]);
-
+  }, [cargarDirecciones, limpiarSeleccion]);
+  
+  // Efecto para filtrar barrios cuando cambia el sector
+  useEffect(() => {
+    if (sectorSeleccionado) {
+      const filtrados = barrios.filter(b => b.sectorId === sectorSeleccionado);
+      setBarriosFiltrados(filtrados);
+    } else {
+      setBarriosFiltrados([]);
+    }
+  }, [sectorSeleccionado, barrios]);
+  
+  // Efecto para filtrar calles cuando cambia el barrio
+  useEffect(() => {
+    if (barrioSeleccionado) {
+      const filtradas = calles.filter(c => c.barrioId === barrioSeleccionado);
+      setCallesFiltradas(filtradas);
+    } else {
+      setCallesFiltradas([]);
+    }
+  }, [barrioSeleccionado, calles]);
+  
   return {
+    // Estados
     direcciones,
     sectores,
     barrios,
     barriosFiltrados,
     calles,
+    callesFiltradas,
     lados,
     direccionSeleccionada,
     sectorSeleccionado,
+    barrioSeleccionado,
     modoEdicion,
     loading,
     error,
+    searchTerm,
+    
+    // Métodos
     cargarDirecciones,
     cargarDependencias,
+    buscarDirecciones,
+    buscarPorTipoVia,
+    buscarPorNombreVia,
     seleccionarDireccion,
     handleSectorChange,
+    handleBarrioChange,
     limpiarSeleccion,
     guardarDireccion,
     eliminarDireccion,
     setModoEdicion,
+    setSearchTerm
   };
 };
