@@ -1,366 +1,187 @@
-// src/services/direccionService.ts
-import { BaseApiService } from './BaseApiService';
-import { Direccion, DireccionFormData } from '../models';
-import { NotificationService } from '../components/utils/Notification';
+// src/components/utils/Notification.tsx
+import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 
-/**
- * Configuración de normalización para direcciones
- */
-const direccionNormalizeOptions = {
-  normalizeItem: (item: any): Direccion => {
-    return {
-      id: item.direccionId || item.id || 0,
-      sectorId: item.sectorId || item.codSector || 0,
-      barrioId: item.barrioId || item.codBarrio || 0,
-      calleId: item.calleId || item.codCalle || 0,
-      cuadra: item.cuadra || '',
-      lado: item.lado || '-',
-      loteInicial: item.loteInicial || 0,
-      loteFinal: item.loteFinal || 0,
-      descripcion: item.descripcion || item.nombreCompleto || '',
-      estado: item.estado === 1 || item.estado === true,
-      // Relaciones opcionales
-      sector: item.sector || undefined,
-      barrio: item.barrio || undefined,
-      calle: item.calle || undefined
+// Tipos para la notificación
+export type NotificationType = 'success' | 'error' | 'info' | 'warning';
+
+interface Notification {
+  id: string;
+  message: string;
+  type: NotificationType;
+}
+
+// Función para generar un ID único
+const generateId = (): string => {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+};
+
+// Almacén global de notificaciones
+let notifications: Notification[] = [];
+let listeners: (() => void)[] = [];
+
+// Función para notificar a los listeners
+const notifyListeners = () => {
+  listeners.forEach(listener => listener());
+};
+
+// API de notificaciones
+export const NotificationService = {
+  // Añadir una nueva notificación
+  show: (message: string, type: NotificationType = 'info'): string => {
+    const id = generateId();
+    notifications.push({ id, message, type });
+    notifyListeners();
+    
+    // Auto-eliminar después de 5 segundos
+    setTimeout(() => {
+      NotificationService.remove(id);
+    }, 5000);
+    
+    return id;
+  },
+  
+  // Mostrar una notificación de éxito
+  success: (message: string): string => {
+    return NotificationService.show(message, 'success');
+  },
+  
+  // Mostrar una notificación de error
+  error: (message: string): string => {
+    return NotificationService.show(message, 'error');
+  },
+  
+  // Mostrar una notificación de información
+  info: (message: string): string => {
+    return NotificationService.show(message, 'info');
+  },
+  
+  // Mostrar una notificación de advertencia
+  warning: (message: string): string => {
+    return NotificationService.show(message, 'warning');
+  },
+  
+  // Eliminar una notificación
+  remove: (id: string): void => {
+    notifications = notifications.filter(n => n.id !== id);
+    notifyListeners();
+  },
+  
+  // Limpiar todas las notificaciones
+  clear: (): void => {
+    notifications = [];
+    notifyListeners();
+  },
+  
+  // Suscribirse a cambios
+  subscribe: (listener: () => void): () => void => {
+    listeners.push(listener);
+    return () => {
+      listeners = listeners.filter(l => l !== listener);
     };
+  },
+  
+  // Obtener todas las notificaciones
+  getAll: (): Notification[] => {
+    return [...notifications];
   }
 };
 
-/**
- * Interfaz para parámetros de búsqueda por tipo de vía
- */
-interface BusquedaPorTipoViaParams {
-  parametrosBusqueda: string;
-  codUsuario?: number;
-}
+// Componente de notificación individual
+const NotificationItem: React.FC<Notification & { onClose: (id: string) => void }> = ({ id, message, type, onClose }) => {
+  const [isExiting, setIsExiting] = useState(false);
+  
+  // Iniciar animación de salida antes de cerrar
+  const handleClose = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      onClose(id);
+    }, 300); // Duración de la animación
+  };
+  
+  return (
+    <div 
+      className={`
+        flex items-center p-4 mb-2 rounded-md shadow-md transition-all duration-300
+        ${isExiting ? 'opacity-0 transform translate-x-full' : 'opacity-100'}
+        ${type === 'success' ? 'bg-green-100 border-l-4 border-green-500' : ''}
+        ${type === 'error' ? 'bg-red-100 border-l-4 border-red-500' : ''}
+        ${type === 'info' ? 'bg-blue-100 border-l-4 border-blue-500' : ''}
+        ${type === 'warning' ? 'bg-yellow-100 border-l-4 border-yellow-500' : ''}
+      `}
+    >
+      <div className="mr-3">
+        {type === 'success' && (
+          <svg className="w-6 h-6 text-green-500" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+            <path d="M5 13l4 4L19 7"></path>
+          </svg>
+        )}
+        {type === 'error' && (
+          <svg className="w-6 h-6 text-red-500" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+            <path d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        )}
+        {type === 'info' && (
+          <svg className="w-6 h-6 text-blue-500" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+            <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        )}
+        {type === 'warning' && (
+          <svg className="w-6 h-6 text-yellow-500" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+            <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+          </svg>
+        )}
+      </div>
+      
+      <div className="flex-1 text-sm">
+        {message}
+      </div>
+      
+      <button 
+        className="text-gray-500 hover:text-gray-700 focus:outline-none"
+        onClick={handleClose}
+      >
+        <svg className="w-4 h-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+          <path d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+  );
+};
 
-/**
- * Interfaz para parámetros de búsqueda por nombre de vía
- */
-interface BusquedaPorNombreViaParams {
-  nombreVia?: string;
-  codSector?: number;
-  codBarrio?: number;
-}
+// Componente contenedor de notificaciones
+const NotificationContainer: React.FC = () => {
+  const [localNotifications, setLocalNotifications] = useState<Notification[]>([]);
+  
+  useEffect(() => {
+    // Suscribirse a cambios en las notificaciones
+    const unsubscribe = NotificationService.subscribe(() => {
+      setLocalNotifications(NotificationService.getAll());
+    });
+    
+    // Cargar notificaciones iniciales
+    setLocalNotifications(NotificationService.getAll());
+    
+    return unsubscribe;
+  }, []);
+  
+  // Si no hay notificaciones, no renderizar nada
+  if (localNotifications.length === 0) {
+    return null;
+  }
+  
+  return ReactDOM.createPortal(
+    <div className="fixed top-4 right-4 z-50 w-80 max-w-full">
+      {localNotifications.map(notification => (
+        <NotificationItem
+          key={notification.id}
+          {...notification}
+          onClose={NotificationService.remove}
+        />
+      ))}
+    </div>,
+    document.body
+  );
+};
 
-/**
- * Servicio para manejar las operaciones de direcciones
- */
-export class DireccionService extends BaseApiService<Direccion, DireccionFormData> {
-  private static instance: DireccionService;
-  
-  constructor() {
-    super('direccion', direccionNormalizeOptions);
-  }
-  
-  /**
-   * Obtiene la instancia singleton del servicio
-   */
-  static getInstance(): DireccionService {
-    if (!DireccionService.instance) {
-      DireccionService.instance = new DireccionService();
-    }
-    return DireccionService.instance;
-  }
-  
-  /**
-   * Busca direcciones por tipo de vía
-   */
-  async buscarPorTipoVia(params: BusquedaPorTipoViaParams): Promise<Direccion[]> {
-    try {
-      console.log('🔍 [DireccionService] Buscando direcciones por tipo de vía:', params);
-      
-      const queryParams = new URLSearchParams({
-        parametrosBusqueda: params.parametrosBusqueda,
-        ...(params.codUsuario && { codUsuario: params.codUsuario.toString() })
-      });
-      
-      const url = `${this.API_BASE}/listarDireccionPorTipoVia?${queryParams}`;
-      
-      const response = await this.makeRequest(url, {
-        method: 'GET'
-      });
-      
-      if (!Array.isArray(response)) {
-        console.warn('⚠️ [DireccionService] La respuesta no es un array:', response);
-        return [];
-      }
-      
-      const direcciones = response.map((item: any, index: number) => 
-        this.normalizeOptions.normalizeItem(item, index)
-      );
-      
-      console.log(`✅ [DireccionService] ${direcciones.length} direcciones encontradas por tipo de vía`);
-      return direcciones;
-      
-    } catch (error: any) {
-      console.error('❌ [DireccionService] Error al buscar por tipo de vía:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Busca direcciones por nombre de vía
-   */
-  async buscarPorNombreVia(params?: BusquedaPorNombreViaParams): Promise<Direccion[]> {
-    try {
-      console.log('🔍 [DireccionService] Buscando direcciones por nombre de vía:', params);
-      
-      let url = `${this.API_BASE}/listarDireccionPorNombreVia`;
-      
-      if (params) {
-        const queryParams = new URLSearchParams();
-        if (params.nombreVia) queryParams.append('nombreVia', params.nombreVia);
-        if (params.codSector) queryParams.append('codSector', params.codSector.toString());
-        if (params.codBarrio) queryParams.append('codBarrio', params.codBarrio.toString());
-        
-        if (queryParams.toString()) {
-          url += `?${queryParams}`;
-        }
-      }
-      
-      const response = await this.makeRequest(url, {
-        method: 'GET'
-      });
-      
-      if (!Array.isArray(response)) {
-        console.warn('⚠️ [DireccionService] La respuesta no es un array:', response);
-        return [];
-      }
-      
-      const direcciones = response.map((item: any, index: number) => 
-        this.normalizeOptions.normalizeItem(item, index)
-      );
-      
-      console.log(`✅ [DireccionService] ${direcciones.length} direcciones encontradas por nombre de vía`);
-      return direcciones;
-      
-    } catch (error: any) {
-      console.error('❌ [DireccionService] Error al buscar por nombre de vía:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Sobrescribe el método getAll para usar el endpoint por nombre de vía
-   */
-  async getAll(): Promise<Direccion[]> {
-    try {
-      // Por defecto, listar todas las direcciones usando el endpoint por nombre de vía
-      return await this.buscarPorNombreVia();
-    } catch (error) {
-      console.error('❌ [DireccionService] Error al obtener todas las direcciones:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Crea una nueva dirección (requiere Bearer Token)
-   */
-  async create(data: DireccionFormData): Promise<Direccion> {
-    try {
-      console.log('📤 [DireccionService] Creando nueva dirección:', data);
-      
-      const token = this.getAuthToken();
-      if (!token) {
-        NotificationService.error('Debe iniciar sesión para crear direcciones');
-        throw new Error('No hay token de autenticación');
-      }
-      
-      // Mapear los datos al formato esperado por la API
-      const requestData = {
-        sectorId: data.sectorId,
-        barrioId: data.barrioId,
-        calleId: data.calleId,
-        cuadra: data.cuadra,
-        lado: data.lado,
-        loteInicial: data.loteInicial,
-        loteFinal: data.loteFinal,
-        estado: 1 // Por defecto activo
-      };
-      
-      const response = await fetch(this.API_BASE, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        mode: 'cors',
-        credentials: 'include',
-        body: JSON.stringify(requestData)
-      });
-      
-      if (!response.ok) {
-        if (response.status === 401) {
-          NotificationService.error('Sesión expirada. Por favor, inicie sesión nuevamente.');
-          throw new Error('No autorizado');
-        }
-        if (response.status === 403) {
-          NotificationService.error('No tiene permisos para crear direcciones');
-          throw new Error('Sin permisos');
-        }
-        const errorText = await response.text();
-        throw new Error(`Error ${response.status}: ${errorText}`);
-      }
-      
-      const responseData = await response.json();
-      console.log('✅ [DireccionService] Dirección creada:', responseData);
-      
-      const direccionCreada = this.normalizeOptions.normalizeItem(responseData, 0);
-      
-      // Limpiar caché para forzar recarga
-      this.clearCache();
-      NotificationService.success('Dirección creada exitosamente');
-      
-      return direccionCreada;
-      
-    } catch (error: any) {
-      console.error('❌ [DireccionService] Error al crear dirección:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Actualiza una dirección existente (requiere Bearer Token)
-   */
-  async update(id: number, data: DireccionFormData): Promise<Direccion> {
-    try {
-      console.log(`📤 [DireccionService] Actualizando dirección ${id}:`, data);
-      
-      const token = this.getAuthToken();
-      if (!token) {
-        NotificationService.error('Debe iniciar sesión para actualizar direcciones');
-        throw new Error('No hay token de autenticación');
-      }
-      
-      // Mapear los datos al formato esperado por la API
-      const requestData = {
-        direccionId: id,
-        sectorId: data.sectorId,
-        barrioId: data.barrioId,
-        calleId: data.calleId,
-        cuadra: data.cuadra,
-        lado: data.lado,
-        loteInicial: data.loteInicial,
-        loteFinal: data.loteFinal,
-        estado: 1
-      };
-      
-      const url = `${this.API_BASE}/${id}`;
-      
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        mode: 'cors',
-        credentials: 'include',
-        body: JSON.stringify(requestData)
-      });
-      
-      if (!response.ok) {
-        if (response.status === 401) {
-          NotificationService.error('Sesión expirada. Por favor, inicie sesión nuevamente.');
-          throw new Error('No autorizado');
-        }
-        if (response.status === 403) {
-          NotificationService.error('No tiene permisos para actualizar direcciones');
-          throw new Error('Sin permisos');
-        }
-        const errorText = await response.text();
-        throw new Error(`Error ${response.status}: ${errorText}`);
-      }
-      
-      const responseData = await response.json();
-      console.log(`✅ [DireccionService] Dirección ${id} actualizada:`, responseData);
-      
-      const direccionActualizada = this.normalizeOptions.normalizeItem(responseData, 0);
-      
-      // Limpiar caché para forzar recarga
-      this.clearCache();
-      NotificationService.success('Dirección actualizada exitosamente');
-      
-      return direccionActualizada;
-      
-    } catch (error: any) {
-      console.error(`❌ [DireccionService] Error al actualizar dirección ${id}:`, error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Busca direcciones por término de búsqueda
-   */
-  async search(term: string): Promise<Direccion[]> {
-    try {
-      console.log('🔍 [DireccionService] Buscando direcciones con término:', term);
-      
-      // Usar el método de búsqueda por tipo de vía para búsquedas generales
-      return await this.buscarPorTipoVia({
-        parametrosBusqueda: term,
-        codUsuario: 1 // Valor por defecto, ajustar según necesidad
-      });
-      
-    } catch (error) {
-      console.error('❌ [DireccionService] Error en búsqueda:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Obtiene el texto descriptivo completo de una dirección
-   */
-  static getDescripcionCompleta(direccion: Direccion): string {
-    if (!direccion) return '';
-    
-    const partes: string[] = [];
-    
-    // Agregar información de la calle si existe
-    if (direccion.calle) {
-      partes.push(`${direccion.calle.tipoVia || ''} ${direccion.calle.nombre || ''}`);
-    }
-    
-    // Agregar cuadra
-    if (direccion.cuadra) {
-      partes.push(`Cdra. ${direccion.cuadra}`);
-    }
-    
-    // Agregar lado
-    if (direccion.lado && direccion.lado !== '-') {
-      const ladoTexto = {
-        'I': 'Izquierdo',
-        'D': 'Derecho',
-        'P': 'Par',
-        'IM': 'Impar'
-      }[direccion.lado] || direccion.lado;
-      partes.push(`Lado ${ladoTexto}`);
-    }
-    
-    // Agregar lotes
-    if (direccion.loteInicial && direccion.loteFinal) {
-      if (direccion.loteInicial === direccion.loteFinal) {
-        partes.push(`Lote ${direccion.loteInicial}`);
-      } else {
-        partes.push(`Lotes ${direccion.loteInicial}-${direccion.loteFinal}`);
-      }
-    }
-    
-    // Agregar barrio y sector si existen
-    if (direccion.barrio) {
-      partes.push(`${direccion.barrio.nombre}`);
-    }
-    
-    if (direccion.sector) {
-      partes.push(`${direccion.sector.nombre}`);
-    }
-    
-    return partes.join(', ');
-  }
-}
-
-// Exportar instancia singleton
-export const direccionService = DireccionService.getInstance();
+export default NotificationContainer;
