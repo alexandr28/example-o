@@ -1,17 +1,16 @@
-// src/services/barrioService.ts
+// src/services/barrioService.ts - VERSIÓN CON PROXY
 import { Barrio, BarrioFormData } from '../models/Barrio';
 import { NotificationService } from '../components/utils/Notification';
 
 class BarrioService {
-  // URL base para el servicio - SIEMPRE incluir /api
-  private readonly API_BASE = import.meta.env.DEV 
-    ? 'http://192.168.30.200:3000/api/barrio'  // URL completa en desarrollo
-    : 'http://192.168.20.160:8080/api/barrio'; // URL completa en producción
+  // URL base para el servicio - Usar URL relativa para el proxy
+  private readonly API_BASE = '/api/barrio';
     
   private readonly cacheKey = 'barrios_cache';
 
   constructor() {
-    console.log('🔧 [BarrioService] Inicializado con URL:', this.API_BASE);
+    console.log('🔧 [BarrioService] Inicializado con URL relativa:', this.API_BASE);
+    console.log('🔧 [BarrioService] Las peticiones serán redirigidas por el proxy de Vite');
   }
 
   /**
@@ -51,7 +50,7 @@ class BarrioService {
       estado: Number(estado)
     };
     
-    console.log(`✅ [BarrioService] Barrio normalizado:`, normalizedBarrio);
+    console.log(`✅ [BarrioService] Item normalizado:`, normalizedBarrio);
     return normalizedBarrio;
   }
 
@@ -59,21 +58,98 @@ class BarrioService {
    * Normaliza un array de barrios
    */
   private normalizeArray(data: any): Barrio[] {
-    if (!Array.isArray(data)) {
-      console.error(`❌ [BarrioService] Los datos no son un array:`, data);
+    console.log(`🔍 [BarrioService] Normalizando array:`, data);
+    
+    if (!data) {
+      console.warn(`⚠️ [BarrioService] Datos vacíos o nulos`);
       return [];
     }
     
-    return data
-      .map((item, index) => {
-        try {
-          return this.normalizeItem(item, index);
-        } catch (error) {
-          console.error(`❌ [BarrioService] Error al normalizar elemento ${index}:`, error);
-          return null;
-        }
-      })
-      .filter(item => item !== null) as Barrio[];
+    const array = Array.isArray(data) ? data : 
+                 (data.data ? data.data : 
+                 (data.content ? data.content :
+                 (data.result ? data.result :
+                 (data.items ? data.items :
+                 (data.barrios ? data.barrios : [data])))));
+    
+    if (!Array.isArray(array)) {
+      console.warn(`⚠️ [BarrioService] No es un array:`, array);
+      return [];
+    }
+    
+    console.log(`📋 [BarrioService] Procesando ${array.length} elementos`);
+    
+    const normalized: Barrio[] = [];
+    for (let i = 0; i < array.length; i++) {
+      try {
+        const item = this.normalizeItem(array[i], i);
+        normalized.push(item);
+      } catch (error) {
+        console.error(`❌ [BarrioService] Error al normalizar elemento ${i}:`, error);
+      }
+    }
+    
+    console.log(`✅ [BarrioService] Normalizados ${normalized.length} barrios`);
+    return normalized;
+  }
+
+  /**
+   * Guarda datos en caché
+   */
+  private saveToCache(data: Barrio[]): void {
+    try {
+      const cacheData = {
+        timestamp: Date.now(),
+        data: data
+      };
+      localStorage.setItem(this.cacheKey, JSON.stringify(cacheData));
+    } catch (error) {
+      console.error(`❌ [BarrioService] Error al guardar en caché:`, error);
+    }
+  }
+
+  /**
+   * Carga datos desde caché
+   */
+  private loadFromCache(): Barrio[] | null {
+    try {
+      const cached = localStorage.getItem(this.cacheKey);
+      if (!cached) return null;
+      
+      const cacheData = JSON.parse(cached);
+      const isExpired = Date.now() - cacheData.timestamp > 24 * 60 * 60 * 1000; // 24 horas
+      
+      if (isExpired) {
+        localStorage.removeItem(this.cacheKey);
+        return null;
+      }
+      
+      return cacheData.data;
+    } catch (error) {
+      console.error(`❌ [BarrioService] Error al cargar caché:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Limpia el caché
+   */
+  private clearCache(): void {
+    localStorage.removeItem(this.cacheKey);
+  }
+
+  /**
+   * Obtiene datos por defecto
+   */
+  private getDefaultBarrios(): Barrio[] {
+    return [
+      { id: 1, nombre: 'BARRIO 1', sectorId: 1, estado: 1 },
+      { id: 2, nombre: 'BARRIO 2', sectorId: 1, estado: 1 },
+      { id: 3, nombre: 'BARRIO 3', sectorId: 1, estado: 1 },
+      { id: 4, nombre: 'BARRIO 4', sectorId: 2, estado: 1 },
+      { id: 5, nombre: 'BARRIO 5', sectorId: 2, estado: 1 },
+      { id: 6, nombre: 'BARRIO 6', sectorId: 3, estado: 1 },
+    ];
   }
 
   /**
@@ -81,9 +157,10 @@ class BarrioService {
    */
   async getAll(): Promise<Barrio[]> {
     try {
-      console.log(`📡 [BarrioService] GET - Obteniendo barrios desde: ${this.API_BASE}`);
+      console.log(`📡 [BarrioService] GET - Obteniendo todos los barrios`);
+      console.log(`🌐 [BarrioService] URL: ${this.API_BASE} (será redirigida por proxy)`);
       
-      // Intentar cargar desde caché primero
+      // Primero intentar cargar desde caché
       const cachedData = this.loadFromCache();
       if (cachedData && cachedData.length > 0) {
         console.log(`💾 [BarrioService] Usando ${cachedData.length} barrios del caché`);
@@ -451,56 +528,42 @@ class BarrioService {
   }
 
   /**
-   * Carga datos desde el caché
+   * Carga datos desde el servidor con reintentos
    */
-  private loadFromCache(): Barrio[] | null {
-    try {
-      const cached = localStorage.getItem(this.cacheKey);
-      if (!cached) return null;
-      
-      const parsedCache = JSON.parse(cached);
-      return parsedCache.data || null;
-    } catch (e) {
-      return null;
+  private async loadFromServer(): Promise<Barrio[]> {
+    const maxRetries = 3;
+    let lastError: any;
+    
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const response = await fetch(this.API_BASE, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          return this.normalizeArray(data);
+        }
+        
+        lastError = new Error(`HTTP ${response.status}`);
+      } catch (error) {
+        lastError = error;
+        console.log(`⚠️ [BarrioService] Intento ${i + 1} falló:`, error);
+        
+        if (i < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+        }
+      }
     }
-  }
-
-  /**
-   * Guarda datos en el caché
-   */
-  private saveToCache(data: Barrio[]): void {
-    try {
-      localStorage.setItem(this.cacheKey, JSON.stringify({
-        data,
-        timestamp: Date.now()
-      }));
-    } catch (e) {
-      console.error(`❌ [BarrioService] Error al guardar caché:`, e);
-    }
-  }
-
-  /**
-   * Limpia el caché
-   */
-  clearCache(): void {
-    localStorage.removeItem(this.cacheKey);
-    console.log(`🧹 [BarrioService] Caché limpiado`);
-  }
-
-  /**
-   * Obtiene barrios por defecto para modo offline
-   */
-  private getDefaultBarrios(): Barrio[] {
-    return [
-      { id: 1, nombre: 'CENTRO HISTÓRICO', sectorId: 1, estado: 1 },
-      { id: 2, nombre: 'BUENOS AIRES', sectorId: 1, estado: 1 },
-      { id: 3, nombre: 'CHICAGO', sectorId: 2, estado: 1 },
-      { id: 4, nombre: 'FLORENCIA DE MORA', sectorId: 2, estado: 1 },
-      { id: 5, nombre: 'LA ESPERANZA', sectorId: 3, estado: 1 }
-    ];
+    
+    throw lastError;
   }
 }
 
-// Exportar instancia única
+// Exportar una única instancia
 const barrioService = new BarrioService();
 export default barrioService;
