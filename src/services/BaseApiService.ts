@@ -1,4 +1,4 @@
-// src/services/BaseApiService.ts - VERSIÓN CON AUTENTICACIÓN BEARER TOKEN
+// src/services/BaseApiService.ts - VERSIÓN CORREGIDA
 import { connectivityService } from './connectivityService';
 import { NotificationService } from '../components/utils/Notification';
 
@@ -10,28 +10,47 @@ export interface NormalizeOptions<T> {
 
 // Clase base para todos los servicios de API
 export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
-  protected baseUrl: string;
+  protected baseURL: string;
   protected endpoint: string;
   protected normalizeOptions: NormalizeOptions<T>;
   protected cacheKey: string;
   
-  // URL completa del servicio
+  // URL completa del servicio - CORREGIDA
   protected get url(): string {
-    return `${this.baseUrl}${this.endpoint}`;
+    // En desarrollo, asegurar que no se pierda el /api
+    if (import.meta.env.DEV && this.baseURL === '') {
+      return this.endpoint; // Solo devolver el endpoint que ya incluye /api
+    }
+    return `${this.baseURL}${this.endpoint}`;
   }
   
   constructor(
-    baseUrl: string,
+    baseURL: string,
     endpoint: string,
     normalizeOptions: NormalizeOptions<T>,
     cacheKey: string
   ) {
-    this.baseUrl = baseUrl;
+    this.baseURL = baseURL;
     this.endpoint = endpoint;
     this.normalizeOptions = normalizeOptions;
     this.cacheKey = cacheKey;
     
-    console.log(`🔧 [${this.constructor.name}] Inicializado con URL:`, this.url);
+    console.log(`🔧 [${this.constructor.name}] Inicializado:`);
+    console.log(`  - BaseURL: "${this.baseURL}"`);
+    console.log(`  - Endpoint: "${this.endpoint}"`);
+    console.log(`  - URL completa: "${this.url}"`);
+  }
+
+  /**
+   * Construye una URL completa con path adicional
+   */
+  protected buildUrl(path?: string | number): string {
+    const baseUrl = this.url;
+    if (!path) return baseUrl;
+    
+    // Asegurar que siempre haya un / entre la URL base y el path
+    const separator = baseUrl.endsWith('/') ? '' : '/';
+    return `${baseUrl}${separator}${path}`;
   }
 
   /**
@@ -41,25 +60,6 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
     const token = localStorage.getItem('auth_token');
     console.log(`🔑 [${this.constructor.name}] Token obtenido:`, token ? 'Presente' : 'No encontrado');
     return token;
-  }
-
-  /**
-   * Prepara las cabeceras con el token de autenticación
-   */
-  protected getAuthHeaders(): HeadersInit {
-    const token = this.getAuthToken();
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      console.log(`🔐 [${this.constructor.name}] Añadiendo Bearer token a las cabeceras`);
-    } else {
-      console.warn(`⚠️ [${this.constructor.name}] No hay token disponible para autenticación`);
-    }
-
-    return headers;
   }
 
   /**
@@ -257,6 +257,43 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
     return normalized as T[];
   }
 
+  // Métodos de caché
+  protected saveToCache(data: T[]): void {
+    try {
+      localStorage.setItem(this.cacheKey, JSON.stringify(data));
+      localStorage.setItem(`${this.cacheKey}_timestamp`, new Date().toISOString());
+      console.log(`💾 [${this.constructor.name}] Datos guardados en caché`);
+    } catch (error) {
+      console.error(`❌ [${this.constructor.name}] Error al guardar en caché:`, error);
+    }
+  }
+
+  protected loadFromCache(): T[] | null {
+    try {
+      const cached = localStorage.getItem(this.cacheKey);
+      if (cached) {
+        const data = JSON.parse(cached);
+        const timestamp = localStorage.getItem(`${this.cacheKey}_timestamp`);
+        console.log(`💾 [${this.constructor.name}] Datos cargados del caché (${timestamp})`);
+        return data;
+      }
+    } catch (error) {
+      console.error(`❌ [${this.constructor.name}] Error al cargar del caché:`, error);
+    }
+    return null;
+  }
+
+  protected clearCache(): void {
+    try {
+      localStorage.removeItem(this.cacheKey);
+      localStorage.removeItem(`${this.cacheKey}_timestamp`);
+      console.log(`🧹 [${this.constructor.name}] Caché limpiado`);
+    } catch (error) {
+      console.error(`❌ [${this.constructor.name}] Error al limpiar caché:`, error);
+    }
+  }
+
+  // Métodos CRUD
   async getAll(): Promise<T[]> {
     try {
       console.log(`📡 [${this.constructor.name}] GET - Iniciando petición a:`, this.url);
@@ -278,9 +315,10 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
 
   async getById(id: number): Promise<T> {
     try {
-      console.log(`📡 [${this.constructor.name}] GET ID ${id} - Iniciando petición`);
+      const url = this.buildUrl(id);
+      console.log(`📡 [${this.constructor.name}] GET ID ${id} - Iniciando petición a: ${url}`);
       
-      const rawData = await this.makeRequest(`${this.url}/${id}`, {
+      const rawData = await this.makeRequest(url, {
         method: 'GET'
       });
       
@@ -298,6 +336,7 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
   async create(data: CreateDTO): Promise<T> {
     try {
       console.log(`📡 [${this.constructor.name}] POST - Iniciando creación:`, data);
+      console.log(`📍 [${this.constructor.name}] URL: ${this.url}`);
       
       // Verificar token antes de crear
       const token = this.getAuthToken();
@@ -315,6 +354,7 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
       
       console.log(`✅ [${this.constructor.name}] POST - Éxito:`, normalized);
       NotificationService.success('Registro creado exitosamente');
+      this.clearCache(); // Limpiar caché después de crear
       return normalized;
       
     } catch (error: any) {
@@ -337,7 +377,9 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
 
   async update(id: number, data: UpdateDTO): Promise<T> {
     try {
+      const url = this.buildUrl(id);
       console.log(`📡 [${this.constructor.name}] PUT ID ${id} - Iniciando actualización:`, data);
+      console.log(`📍 [${this.constructor.name}] URL: ${url}`);
       
       // Verificar token antes de actualizar
       const token = this.getAuthToken();
@@ -346,7 +388,7 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
         throw new Error('No hay token de autenticación');
       }
       
-      const rawData = await this.makeRequest(`${this.url}/${id}`, {
+      const rawData = await this.makeRequest(url, {
         method: 'PUT',
         body: JSON.stringify(data)
       });
@@ -355,6 +397,7 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
       
       console.log(`✅ [${this.constructor.name}] PUT ID ${id} - Éxito:`, normalized);
       NotificationService.success('Registro actualizado exitosamente');
+      this.clearCache(); // Limpiar caché después de actualizar
       return normalized;
       
     } catch (error: any) {
@@ -377,7 +420,9 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
 
   async delete(id: number): Promise<void> {
     try {
+      const url = this.buildUrl(id);
       console.log(`📡 [${this.constructor.name}] DELETE ID ${id} - Iniciando eliminación`);
+      console.log(`📍 [${this.constructor.name}] URL: ${url}`);
       
       // Verificar token antes de eliminar
       const token = this.getAuthToken();
@@ -386,12 +431,13 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
         throw new Error('No hay token de autenticación');
       }
       
-      await this.makeRequest(`${this.url}/${id}`, {
+      await this.makeRequest(url, {
         method: 'DELETE'
       });
       
       console.log(`✅ [${this.constructor.name}] DELETE ID ${id} - Éxito`);
       NotificationService.success('Registro eliminado exitosamente');
+      this.clearCache(); // Limpiar caché después de eliminar
       
     } catch (error: any) {
       console.error(`❌ [${this.constructor.name}] Error al eliminar ID ${id}:`, error);

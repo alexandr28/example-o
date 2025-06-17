@@ -1,11 +1,12 @@
-// src/hooks/useCalles.ts - CORREGIDO PARA API REAL
+// src/hooks/useCalles.ts - IMPORTACIONES DIRECTAS
 import { useCallback, useEffect, useState } from 'react';
 import { useCrudEntity } from './useCrudEntity';
 import { Calle, CalleFormData, TipoViaOption, TIPO_VIA_OPTIONS } from '../models/Calle';
-import { Sector, Barrio } from '../models/';
-import CalleService from '../services/calleApiService';
-import SectorService from '../services/sectorService';
-import BarrioService from '../services/barrioService';
+import { Sector, Barrio } from '../models';
+// Importar servicios directamente
+import calleService from '../services/calleApiService';
+import sectorService from '../services/sectorService';
+import barrioService from '../services/barrioService';
 
 export const useCalles = () => {
   // Hook genérico para operaciones CRUD de calles
@@ -29,7 +30,7 @@ export const useCalles = () => {
     setError
   } = useCrudEntity<Calle, CalleFormData>({
     entityName: 'Calles',
-    service: CalleService,
+    service: calleService,
     cacheKey: 'calles_cache',
     getItemId: (calle) => calle.id,
     validateData: (data) => {
@@ -55,16 +56,17 @@ export const useCalles = () => {
         (calle.nombre || calle.nombreVia).trim().length > 0
       );
       
-      const porcentajeValidas = data.length > 0 ? (callesConNombre.length / data.length) * 100 : 100;
+      const porcentajeValidas = data.length > 0 ?
+        (callesConNombre.length / data.length) * 100 : 0;
       
-      console.log(`📊 [useCalles] ${callesConNombre.length}/${data.length} calles con nombre válido (${porcentajeValidas.toFixed(1)}%)`);
+      console.log(`📊 [useCalles] ${callesConNombre.length}/${data.length} calles válidas (${porcentajeValidas.toFixed(1)}%)`);
       
-      // ✅ Aceptar si al menos el 30% tienen nombre válido (muy permisivo)
-      return porcentajeValidas >= 30;
+      // ✅ Aceptar si al menos el 50% son válidas
+      return porcentajeValidas >= 50;
     }
   });
 
-  // Estados adicionales
+  // Estados adicionales para sectores, barrios y tipos de vía
   const [sectores, setSectores] = useState<Sector[]>([]);
   const [barrios, setBarrios] = useState<Barrio[]>([]);
   const [barriosFiltrados, setBarriosFiltrados] = useState<Barrio[]>([]);
@@ -73,23 +75,13 @@ export const useCalles = () => {
   const [loadingBarrios, setLoadingBarrios] = useState(false);
   const [loadingTiposVia, setLoadingTiposVia] = useState(false);
 
-  // Cargar sectores con sector por defecto
+  // Cargar sectores
   const cargarSectores = useCallback(async () => {
     try {
       setLoadingSectores(true);
       console.log('🔄 [useCalles] Cargando sectores...');
       
-      const data = await SectorService.getAll();
-      
-      // Asegurar que existe un sector por defecto
-      const sectorDefault = { id: 1, nombre: 'Sin Sector Asignado' };
-      const tieneDefault = data.some(s => s.id === 1);
-      
-      if (!tieneDefault) {
-        console.log('➕ [useCalles] Agregando sector por defecto');
-        data.unshift(sectorDefault);
-      }
-      
+      const data = await sectorService.getAll();
       setSectores(data);
       
       // Guardar en caché
@@ -104,25 +96,22 @@ export const useCalles = () => {
       if (cached) {
         setSectores(JSON.parse(cached));
         console.log('📦 [useCalles] Sectores cargados desde caché');
-      } else {
-        // Solo sector por defecto
-        setSectores([{ id: 1, nombre: 'Sin Sector Asignado' }]);
       }
     } finally {
       setLoadingSectores(false);
     }
   }, []);
 
-  // Cargar barrios con barrio por defecto
+  // Cargar barrios
   const cargarBarrios = useCallback(async () => {
     try {
       setLoadingBarrios(true);
       console.log('🔄 [useCalles] Cargando barrios...');
       
-      const data = await BarrioService.getAll();
+      const data = await barrioService.getAll();
       
       // Asegurar que existe un barrio por defecto
-      const barrioDefault = { id: 1, nombre: 'Sin Barrio Asignado', sectorId: 1 };
+      const barrioDefault = { id: 1, nombre: 'Sin Barrio Asignado', sectorId: 1, estado: 1 };
       const tieneDefault = data.some(b => b.id === 1);
       
       if (!tieneDefault) {
@@ -146,7 +135,7 @@ export const useCalles = () => {
         console.log('📦 [useCalles] Barrios cargados desde caché');
       } else {
         // Solo barrio por defecto
-        setBarrios([{ id: 1, nombre: 'Sin Barrio Asignado', sectorId: 1 }]);
+        setBarrios([{ id: 1, nombre: 'Sin Barrio Asignado', sectorId: 1, estado: 1 }]);
       }
     } finally {
       setLoadingBarrios(false);
@@ -159,7 +148,7 @@ export const useCalles = () => {
       setLoadingTiposVia(true);
       console.log('🎨 [useCalles] Cargando tipos de vía...');
       
-      const tiposFromApi = await CalleService.getTiposVia();
+      const tiposFromApi = await calleService.getTiposVia();
       
       if (tiposFromApi && Array.isArray(tiposFromApi) && tiposFromApi.length > 0) {
         setTiposVia(tiposFromApi);
@@ -178,6 +167,19 @@ export const useCalles = () => {
       
     } catch (error: any) {
       console.error('❌ [useCalles] Error al cargar tipos de vía:', error);
+      
+      // Intentar desde caché
+      const cached = localStorage.getItem('tipos_via_cache');
+      if (cached) {
+        try {
+          const { tipos } = JSON.parse(cached);
+          setTiposVia(tipos);
+          console.log('📦 [useCalles] Tipos de vía cargados desde caché');
+          return;
+        } catch (e) {
+          console.error('❌ [useCalles] Error al parsear caché:', e);
+        }
+      }
       
       // Usar tipos predefinidos como fallback
       setTiposVia(TIPO_VIA_OPTIONS);
@@ -248,83 +250,40 @@ export const useCalles = () => {
     }
   }, [cargarCalles, cargarSectores, cargarBarrios, cargarTiposVia, setError]);
 
-  const testApiConnection = useCallback(async (): Promise<boolean> => {
+  const testApiConnection = useCallback(async () => {
+    console.log('🔍 [useCalles] Probando conexión con la API...');
     try {
-      console.log('🧪 [useCalles] Probando conexión con API...');
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-      
-      const response = await fetch('/api/via/listarVia', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        credentials: 'omit',
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      console.log('🧪 [useCalles] Test response:', response.status, response.statusText);
-      
-      if (response.ok) {
-        const text = await response.text();
-        try {
-          const json = JSON.parse(text);
-          
-          // Verificar estructura esperada: {success: true, data: [...]}
-          if (json.success === true && Array.isArray(json.data)) {
-            const validItems = json.data.filter(item => 
-              item && 
-              typeof item === 'object' && 
-              (item.nombreVia || item.nombre)
-            );
-            
-            console.log('🧪 [useCalles] Items válidos encontrados:', validItems.length);
-            return validItems.length > 0;
-          }
-          
-          return false;
-        } catch (e) {
-          console.log('🧪 [useCalles] Test data no es JSON válido');
-          return false;
-        }
-      }
-      
-      return false;
+      const isConnected = await calleService.checkConnection();
+      console.log(`✅ [useCalles] Estado de conexión: ${isConnected ? 'ONLINE' : 'OFFLINE'}`);
+      return isConnected;
     } catch (error) {
-      console.error('🧪 [useCalles] Error en test de conexión:', error);
+      console.error('❌ [useCalles] Error al probar conexión:', error);
       return false;
     }
   }, []);
 
-  // Obtener nombres
-  const obtenerNombreSector = useCallback((sectorId: number): string => {
+  // Funciones helper para obtener nombres
+  const obtenerNombreSector = useCallback((sectorId: number | null): string => {
+    if (!sectorId) return 'Sin sector';
     const sector = sectores.find(s => s.id === sectorId);
-    return sector?.nombre || `Sector ID: ${sectorId}`;
+    return sector?.nombre || `Sector ${sectorId}`;
   }, [sectores]);
 
-  const obtenerNombreBarrio = useCallback((barrioId: number): string => {
+  const obtenerNombreBarrio = useCallback((barrioId: number | null): string => {
+    if (!barrioId) return 'Sin barrio';
     const barrio = barrios.find(b => b.id === barrioId);
-    return barrio?.nombre || barrio?.nombreBarrio || `Barrio ID: ${barrioId}`;
+    return barrio?.nombre || `Barrio ${barrioId}`;
   }, [barrios]);
 
-  // Información de debug
-  const debugInfo = process.env.NODE_ENV === 'development' ? {
+  // Debug info
+  const debugInfo = {
     totalCalles: calles.length,
     totalSectores: sectores.length,
     totalBarrios: barrios.length,
     totalTiposVia: tiposVia.length,
-    calleSeleccionada: calleSeleccionada?.nombre || 'Ninguna',
-    modoEdicion,
     isOfflineMode,
-    ultimaSync: lastSyncTime?.toLocaleTimeString() || 'Nunca',
-    error,
-    searchTerm,
-    barriosFiltrados: barriosFiltrados.length
-  } : null;
+    lastSyncTime
+  };
 
   return {
     // Estados principales
@@ -366,7 +325,7 @@ export const useCalles = () => {
     obtenerNombreSector,
     obtenerNombreBarrio,
     
-    // Debug info
+    // Debug
     debugInfo
   };
 };
