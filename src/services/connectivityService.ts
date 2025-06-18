@@ -1,3 +1,4 @@
+// src/services/connectivityService.ts - VERSIÓN CORREGIDA PARA USAR PROXY
 import { getAuthToken } from '../api/authClient';
 
 /**
@@ -127,75 +128,84 @@ class ConnectivityService {
    * Comprueba la disponibilidad de un endpoint específico
    * Primero sin autenticación y luego con autenticación si hay token
    */
-private async checkEndpoint(endpoint: string): Promise<boolean> {
-  const apiName = this.getApiNameFromEndpoint(endpoint);
-  
-  try {
-    // Para sectores, vías y barrios, no verificar autenticación
-    const noAuthApis = ['sector', 'via', 'barrio'];
-    const requiresAuth = !noAuthApis.includes(apiName);
+  private async checkEndpoint(endpoint: string): Promise<boolean> {
+    const apiName = this.getApiNameFromEndpoint(endpoint);
     
-    // Si no requiere autenticación o no hay conexión general a internet
-    if (!requiresAuth || !navigator.onLine) {
-      // Verificar disponibilidad básica sin autenticación
+    try {
+      // Para sectores, vías y barrios, no verificar autenticación
+      const noAuthApis = ['sector', 'via', 'barrio', 'direccion'];
+      const requiresAuth = !noAuthApis.includes(apiName);
+      
+      // Si no requiere autenticación o no hay conexión general a internet
+      if (!requiresAuth || !navigator.onLine) {
+        // Verificar disponibilidad básica sin autenticación
+        const isAvailable = await this.checkBasicEndpoint(endpoint);
+        this.apiStatus[apiName] = isAvailable;
+        this.authStatus[apiName] = isAvailable; // Consideramos igual autenticación y disponibilidad
+        
+        return isAvailable;
+      }
+      
+      // Para otras APIs que sí requieren autenticación
+      // Verificar disponibilidad básica primero
       const isAvailable = await this.checkBasicEndpoint(endpoint);
       this.apiStatus[apiName] = isAvailable;
-      this.authStatus[apiName] = isAvailable; // Consideramos igual autenticación y disponibilidad
       
-      return isAvailable;
-    }
-    
-    // Para otras APIs que sí requieren autenticación
-    // Verificar disponibilidad básica primero
-    const isAvailable = await this.checkBasicEndpoint(endpoint);
-    this.apiStatus[apiName] = isAvailable;
-    
-    // Si está disponible, verificar autenticación
-    if (isAvailable) {
-      const token = localStorage.getItem('auth_token');
-      if (token) {
-        const isAuthValid = await this.checkAuthenticatedEndpoint(endpoint, token);
-        this.authStatus[apiName] = isAuthValid;
+      // Si está disponible, verificar autenticación
+      if (isAvailable) {
+        const token = localStorage.getItem('auth_token');
+        if (token) {
+          const isAuthValid = await this.checkAuthenticatedEndpoint(endpoint, token);
+          this.authStatus[apiName] = isAuthValid;
+        } else {
+          this.authStatus[apiName] = false;
+        }
       } else {
         this.authStatus[apiName] = false;
       }
-    } else {
+      
+      return this.apiStatus[apiName];
+    } catch (error) {
+      console.warn(`API ${apiName} no disponible:`, error);
+      this.apiStatus[apiName] = false;
       this.authStatus[apiName] = false;
+      
+      // Notificar específico para esta API
+      this.notifyListeners(apiName);
+      
+      return false;
     }
-    
-    return this.apiStatus[apiName];
-  } catch (error) {
-    console.warn(`API ${apiName} no disponible:`, error);
-    this.apiStatus[apiName] = false;
-    this.authStatus[apiName] = false;
-    
-    // Notificar específico para esta API
-    this.notifyListeners(apiName);
-    
-    return false;
   }
-}
 
   /**
    * Verifica la disponibilidad básica de un endpoint (sin autenticación)
+   * CORREGIDO: Usa rutas relativas para aprovechar el proxy de Vite
    */
   private async checkBasicEndpoint(endpoint: string): Promise<boolean> {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
-      // Intentar hacer una petición OPTIONS (preflight check)
+      // IMPORTANTE: Usar la ruta relativa para que pase por el proxy
+      // En desarrollo esto será interceptado por Vite y redirigido a http://192.168.20.160:8080
       const response = await fetch(endpoint, {
-        method: 'OPTIONS',
+        method: 'GET', // Cambiado de OPTIONS a GET para mejor compatibilidad
         signal: controller.signal,
-        credentials: 'omit'
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin' // Cambiado de 'omit' a 'same-origin'
       });
       
       clearTimeout(timeoutId);
       
-      return response.ok || response.status === 204; // OPTIONS suele devolver 204 No Content
+      // Considerar exitoso si:
+      // - Status 200-299 (éxito)
+      // - Status 401/403 (API disponible pero requiere auth)
+      return response.ok || response.status === 401 || response.status === 403;
     } catch (error) {
-      // Si OPTIONS falla, intentar con HEAD
+      // Si el GET falla, intentar con HEAD
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -203,13 +213,17 @@ private async checkEndpoint(endpoint: string): Promise<boolean> {
         const response = await fetch(endpoint, {
           method: 'HEAD',
           signal: controller.signal,
-          credentials: 'omit'
+          headers: {
+            'Accept': 'application/json'
+          },
+          credentials: 'same-origin'
         });
         
         clearTimeout(timeoutId);
         
-        return response.ok;
+        return response.ok || response.status === 401 || response.status === 403;
       } catch (headError) {
+        // Si ambos fallan, la API no está disponible
         return false;
       }
     }
@@ -217,37 +231,39 @@ private async checkEndpoint(endpoint: string): Promise<boolean> {
 
   /**
    * Verifica la disponibilidad del endpoint con autenticación
+   * CORREGIDO: Usa rutas relativas para aprovechar el proxy
    */
   private async checkAuthenticatedEndpoint(endpoint: string, token: string): Promise<boolean> {
     try {
-      // En lugar de obtener el token con getAuthToken, lo recibe como parámetro
-      // o simplemente puede obtenerlo directamente de localStorage:
-      // const token = localStorage.getItem('auth_token');
-      
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
-      // Intentar hacer una petición autenticada
+      // IMPORTANTE: Usar la ruta relativa
       const response = await fetch(endpoint, {
-        method: 'HEAD',
+        method: 'GET', // Cambiado de HEAD a GET
         signal: controller.signal,
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include' // Para incluir cookies si las hay
       });
       
       clearTimeout(timeoutId);
       
-      // Si recibimos 401, podría ser que el token esté caducado
+      // Si recibimos 401, el token está caducado
       if (response.status === 401) {
         return false;
       }
       
+      // Considerar exitoso si status es 200-299
       return response.ok;
     } catch (error) {
       return false;
     }
   }
+
   /**
    * Notifica a todos los listeners sobre cambios en el estado
    */

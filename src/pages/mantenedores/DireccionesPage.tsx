@@ -32,7 +32,6 @@ const DireccionesPage: React.FC = () => {
     guardarDireccion,
     setModoEdicion
   } = useDirecciones();
-
   // Cargar datos iniciales
   useEffect(() => {
     cargarDependencias();
@@ -60,12 +59,7 @@ const DireccionesPage: React.FC = () => {
         {/* Navegación de migas de pan */}
         <Breadcrumb items={breadcrumbItems} />
         
-        {/* Mensajes de error, si hay */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
-            <span className="block sm:inline">{error}</span>
-          </div>
-        )}
+        
         
         {/* Formulario de direcciones */}
         <DireccionForm

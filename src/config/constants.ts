@@ -17,7 +17,7 @@ export const API_ENDPOINTS = {
   SECTOR: `/api/sector`,
   VIA: `/api/via`,
   CALLE: `/api/calle`,
-  DIRECCION: `/api/direccion`,
+  DIRECCION: `/api/direccion/listarDireccionPorNombreVia`,
   
   // Contribuyentes (con autenticación)
   CONTRIBUYENTE: `/api/contribuyente`,

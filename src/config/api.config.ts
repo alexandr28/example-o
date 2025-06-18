@@ -30,11 +30,10 @@ export const API_CONFIG = {
     sectores: '/api/sector',
     barrios: '/api/barrio',    // Corregido: era /api/barrio
     vias: '/api/via',
-    calles: '/api/calle',
-    direcciones: '/api/direccion',
-    
-    // Módulos principales (requieren auth)
+    direcciones: '/api/direccion/listarDireccionPorNombreVia',
     contribuyentes: '/api/contribuyente',
+    // Módulos principales (requieren auth)
+    
     predios: '/api/predio',
     
     // Otros endpoints (requieren auth)
@@ -71,7 +70,8 @@ export const API_CONFIG = {
     '/api/barrio', 
     '/api/via',
     '/api/calle',
-    '/api/direccion'
+    '/api/direccion/listarDireccionPorNombreVia',
+    '/api/contribuyente',
   ],
   
   // Métodos que requieren autenticación

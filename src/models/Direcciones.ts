@@ -1,7 +1,7 @@
+// src/models/Direcciones.ts - ACTUALIZADO
 import { Sector } from './Sector';
 import { Barrio } from './Barrio';
 import { Calle } from './Calle';
-
 
 // Enum para los lados de una dirección
 export enum LadoDireccion {
@@ -31,6 +31,19 @@ export interface Direccion {
   fechaModificacion?: Date;
   usuarioCreacion?: string;
   usuarioModificacion?: string;
+  
+  // Campos adicionales del API
+  nombreSector?: string;
+  nombreBarrio?: string;
+  nombreVia?: string;
+  nombreTipoVia?: string;
+  parametroBusqueda?: string;
+  codDireccion?: number;
+  codBarrioVia?: number;
+  codSector?: number;
+  codBarrio?: number;
+  codVia?: number;
+  codUsuario?: number;
 }
 
 // Tipo para el formulario de Dirección

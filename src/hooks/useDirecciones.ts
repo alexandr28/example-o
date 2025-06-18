@@ -1,4 +1,4 @@
-// src/hooks/useDirecciones.ts
+// src/hooks/useDirecciones.ts - VERSIÓN ORIGINAL
 import { useState, useCallback, useEffect } from 'react';
 import { direccionService } from '../services/direcionService';
 import  sectorService  from '../services/sectorService';
@@ -187,10 +187,14 @@ export const useDirecciones = (): UseDireccionesReturn => {
       setBarrios(barriosData);
       setCalles(callesData);
       
-      console.log('✅ [useDirecciones] Dependencias cargadas');
+      console.log('✅ [useDirecciones] Dependencias cargadas:', {
+        sectores: sectoresData.length,
+        barrios: barriosData.length,
+        calles: callesData.length
+      });
     } catch (err: any) {
       console.error('❌ [useDirecciones] Error al cargar dependencias:', err);
-      setError('Error al cargar datos auxiliares');
+      setError('Error al cargar datos necesarios');
     }
   }, []);
   
@@ -198,15 +202,15 @@ export const useDirecciones = (): UseDireccionesReturn => {
    * Manejar cambio de sector
    */
   const handleSectorChange = useCallback((sectorId: number) => {
-    console.log('🔄 [useDirecciones] Sector seleccionado:', sectorId);
+    console.log('🔄 [useDirecciones] Sector cambiado:', sectorId);
     setSectorSeleccionado(sectorId);
     
-    // Filtrar barrios por sector
-    const barriosFiltrados = barrios.filter(b => b.sectorId === sectorId);
-    setBarriosFiltrados(barriosFiltrados);
+    // Filtrar barrios del sector
+    const barriosDelSector = barrios.filter(b => b.sectorId === sectorId);
+    setBarriosFiltrados(barriosDelSector);
     
-    // Limpiar barrio seleccionado si no pertenece al nuevo sector
-    if (barrioSeleccionado && !barriosFiltrados.some(b => b.id === barrioSeleccionado)) {
+    // Limpiar selección de barrio si no pertenece al nuevo sector
+    if (barrioSeleccionado && !barriosDelSector.find(b => b.id === barrioSeleccionado)) {
       setBarrioSeleccionado(null);
       setCallesFiltradas([]);
     }
@@ -216,16 +220,16 @@ export const useDirecciones = (): UseDireccionesReturn => {
    * Manejar cambio de barrio
    */
   const handleBarrioChange = useCallback((barrioId: number) => {
-    console.log('🔄 [useDirecciones] Barrio seleccionado:', barrioId);
+    console.log('🔄 [useDirecciones] Barrio cambiado:', barrioId);
     setBarrioSeleccionado(barrioId);
     
-    // Filtrar calles por barrio
-    const callesFiltradas = calles.filter(c => c.barrioId === barrioId);
-    setCallesFiltradas(callesFiltradas);
+    // Filtrar calles del barrio
+    const callesDelBarrio = calles.filter(c => c.barrioId === barrioId);
+    setCallesFiltradas(callesDelBarrio);
   }, [calles]);
   
   /**
-   * Seleccionar una dirección
+   * Seleccionar dirección
    */
   const seleccionarDireccion = useCallback((direccion: Direccion) => {
     console.log('📍 [useDirecciones] Dirección seleccionada:', direccion);

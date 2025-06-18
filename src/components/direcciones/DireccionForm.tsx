@@ -1,21 +1,32 @@
-// src/components/direcciones/DireccionForm.tsx - VERSIÓN SIN RESTRICCIONES
+// src/components/direcciones/DireccionForm.tsx - VERSIÓN CORREGIDA
 import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Button from '../ui/Button';
-import Input from '../ui/Input';
 import { Direccion, Sector, Barrio, Calle, LadoDireccion } from '../../models';
+import { DireccionFormData } from '../../models/Direccion';
 
-// Schema de validación simplificado
+// Schema de validación
 const direccionSchema = z.object({
   sectorId: z.string().min(1, 'Debe seleccionar un sector'),
   barrioId: z.string().min(1, 'Debe seleccionar un barrio'),
   calleId: z.string().min(1, 'Debe seleccionar una calle'),
   cuadra: z.string().min(1, 'La cuadra es requerida'),
   lado: z.nativeEnum(LadoDireccion),
-  loteInicial: z.string().refine(val => parseInt(val) >= 0, 'Debe ser mayor o igual a 0'),
-  loteFinal: z.string().refine(val => parseInt(val) >= 0, 'Debe ser mayor o igual a 0'),
+  loteInicial: z.string()
+    .min(1, 'El lote inicial es requerido')
+    .refine(val => !isNaN(parseInt(val)) && parseInt(val) >= 0, 'Debe ser un número mayor o igual a 0'),
+  loteFinal: z.string()
+    .min(1, 'El lote final es requerido')
+    .refine(val => !isNaN(parseInt(val)) && parseInt(val) >= 0, 'Debe ser un número mayor o igual a 0'),
+}).refine(data => {
+  const loteInicial = parseInt(data.loteInicial);
+  const loteFinal = parseInt(data.loteFinal);
+  return loteFinal >= loteInicial;
+}, {
+  message: "El lote final debe ser mayor o igual al lote inicial",
+  path: ["loteFinal"],
 });
 
 type FormValues = z.infer<typeof direccionSchema>;
@@ -28,7 +39,7 @@ interface DireccionFormProps {
   lados: { value: string, label: string }[];
   sectorSeleccionado: number | null;
   onSectorChange: (sectorId: number) => void;
-  onGuardar: (data: any) => void;
+  onGuardar: (data: DireccionFormData) => void;
   onNuevo: () => void;
   onEditar: () => void;
   loading?: boolean;
@@ -55,13 +66,13 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
       calleId: '',
       cuadra: '',
       lado: LadoDireccion.NINGUNO,
-      loteInicial: '0',
-      loteFinal: '0',
+      loteInicial: '1',
+      loteFinal: '1',
     }
   });
 
   // Estados locales
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(true);
   const [barriosFiltrados, setBarriosFiltrados] = useState<Barrio[]>([]);
   const [callesFiltradas, setCallesFiltradas] = useState<Calle[]>([]);
 
@@ -69,15 +80,39 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
   const watchedSectorId = watch('sectorId');
   const watchedBarrioId = watch('barrioId');
 
-  // NO FILTRAR - Mostrar todos los barrios disponibles
+  // Filtrar barrios según el sector seleccionado
   useEffect(() => {
-    setBarriosFiltrados(barrios);
-  }, [barrios]);
+    if (watchedSectorId) {
+      const filtered = barrios.filter(b => b.sectorId === parseInt(watchedSectorId));
+      setBarriosFiltrados(filtered);
+      
+      // Si el barrio actual no pertenece al sector, limpiar selección
+      const currentBarrioId = watch('barrioId');
+      if (currentBarrioId && !filtered.find(b => b.id.toString() === currentBarrioId)) {
+        setValue('barrioId', '');
+      }
+    } else {
+      setBarriosFiltrados([]);
+      setValue('barrioId', '');
+    }
+  }, [watchedSectorId, barrios, setValue, watch]);
 
-  // NO FILTRAR - Mostrar todas las calles disponibles
+  // Filtrar calles según el barrio seleccionado
   useEffect(() => {
-    setCallesFiltradas(calles);
-  }, [calles]);
+    if (watchedBarrioId) {
+      const filtered = calles.filter(c => c.barrioId === parseInt(watchedBarrioId));
+      setCallesFiltradas(filtered);
+      
+      // Si la calle actual no pertenece al barrio, limpiar selección
+      const currentCalleId = watch('calleId');
+      if (currentCalleId && !filtered.find(c => c.id.toString() === currentCalleId)) {
+        setValue('calleId', '');
+      }
+    } else {
+      setCallesFiltradas([]);
+      setValue('calleId', '');
+    }
+  }, [watchedBarrioId, calles, setValue, watch]);
 
   // Notificar cambio de sector al padre
   useEffect(() => {
@@ -103,7 +138,7 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
   }, [direccionSeleccionada, setValue]);
 
   const onSubmit = (data: FormValues) => {
-    const formattedData = {
+    const formattedData: DireccionFormData = {
       sectorId: parseInt(data.sectorId),
       barrioId: parseInt(data.barrioId),
       calleId: parseInt(data.calleId),
@@ -114,9 +149,6 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
     };
     
     onGuardar(formattedData);
-    if (!isEditMode) {
-      reset();
-    }
   };
 
   const handleNuevo = () => {
@@ -154,7 +186,7 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
                   disabled={isFormDisabled}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 >
-                  <option value="">Ingrese nombre del sector</option>
+                  <option value="">Seleccione un sector</option>
                   {sectores.map(sector => (
                     <option key={sector.id} value={sector.id.toString()}>
                       {sector.nombre}
@@ -166,9 +198,6 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
             {errors.sectorId && (
               <p className="mt-1 text-sm text-red-600">{errors.sectorId.message}</p>
             )}
-            <p className="text-xs text-gray-500 mt-1">
-              Valor: "{watchedSectorId}" | Válido: {watchedSectorId ? '✅' : '❌'}
-            </p>
           </div>
 
           {/* Barrio */}
@@ -182,10 +211,10 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
               render={({ field }) => (
                 <select
                   {...field}
-                  disabled={isFormDisabled}
+                  disabled={isFormDisabled || !watchedSectorId}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 >
-                  <option value="">Ingrese nombre del barrio (anidado de sector)</option>
+                  <option value="">Seleccione un barrio</option>
                   {barriosFiltrados.map(barrio => (
                     <option key={barrio.id} value={barrio.id.toString()}>
                       {barrio.nombre}
@@ -197,12 +226,9 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
             {errors.barrioId && (
               <p className="mt-1 text-sm text-red-600">{errors.barrioId.message}</p>
             )}
-            <p className="text-xs text-gray-500 mt-1">
-              Valor: "{watchedBarrioId}" | Válido: {watchedBarrioId ? '✅' : '❌'}
-            </p>
           </div>
 
-          {/* Calle */}
+          {/* Calle / Mz */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Calle / Mz <span className="text-red-500">*</span>
@@ -213,13 +239,13 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
               render={({ field }) => (
                 <select
                   {...field}
-                  disabled={isFormDisabled}
+                  disabled={isFormDisabled || !watchedBarrioId}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 >
-                  <option value="">Ingrese nombre del barrio (anidado de sector)</option>
+                  <option value="">Seleccione una calle</option>
                   {callesFiltradas.map(calle => (
                     <option key={calle.id} value={calle.id.toString()}>
-                      {calle.tipoVia === 'avenida' ? 'Av. ' : ''}{calle.nombre}
+                      {calle.tipoVia} {calle.nombre}
                     </option>
                   ))}
                 </select>
@@ -233,7 +259,7 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
           {/* Cuadra */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Cuadra
+              Cuadra <span className="text-red-500">*</span>
             </label>
             <Controller
               name="cuadra"
@@ -243,7 +269,7 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
                   {...field}
                   type="text"
                   disabled={isFormDisabled}
-                  placeholder="12"
+                  placeholder="Ej: 20"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 />
               )}
@@ -267,7 +293,6 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
                   disabled={isFormDisabled}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 >
-                  <option value="">Seleccione</option>
                   {lados.map(lado => (
                     <option key={lado.value} value={lado.value}>
                       {lado.label}
@@ -279,15 +304,12 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
             {errors.lado && (
               <p className="mt-1 text-sm text-red-600">{errors.lado.message}</p>
             )}
-            <p className="text-xs text-gray-500 mt-1">
-              Valor: "{watch('lado')}" | Válido: {watch('lado') ? '✅' : '❌'}
-            </p>
           </div>
 
           {/* Lote inicial */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Lote inicial
+              Lote inicial <span className="text-red-500">*</span>
             </label>
             <Controller
               name="loteInicial"
@@ -296,8 +318,9 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
                 <input
                   {...field}
                   type="number"
+                  min="0"
                   disabled={isFormDisabled}
-                  placeholder="10"
+                  placeholder="1"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 />
               )}
@@ -310,7 +333,7 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
           {/* Lote final */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Lote final
+              Lote final <span className="text-red-500">*</span>
             </label>
             <Controller
               name="loteFinal"
@@ -319,8 +342,9 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
                 <input
                   {...field}
                   type="number"
+                  min="0"
                   disabled={isFormDisabled}
-                  placeholder="20"
+                  placeholder="10"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 />
               )}
@@ -360,33 +384,6 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
           </Button>
         </div>
       </form>
-
-      {/* Panel de Debug */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mt-6 p-4 bg-gray-100 rounded text-xs">
-          <h3 className="font-bold mb-2">🐛 Debug Info:</h3>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <strong>Formulario:</strong>
-              <ul>
-                <li>isEditMode: {isEditMode ? 'SÍ' : 'NO'}</li>
-                <li>isFormDisabled: {isFormDisabled ? 'SÍ' : 'NO'}</li>
-                <li>direccionSeleccionada: {direccionSeleccionada ? `ID ${direccionSeleccionada.id}` : 'null'}</li>
-              </ul>
-            </div>
-            <div>
-              <strong>Datos disponibles:</strong>
-              <ul>
-                <li>Sectores: {sectores.length}</li>
-                <li>Barrios (todos): {barrios.length}</li>
-                <li>Barrios (filtrados): {barriosFiltrados.length}</li>
-                <li>Calles (todas): {calles.length}</li>
-                <li>Calles (filtradas): {callesFiltradas.length}</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
