@@ -2,51 +2,202 @@
 import { BaseApiService } from './BaseApiService';
 import { NotificationService } from '../components/utils/Notification';
 
-// Interfaces para Contribuyente
+// Interfaces actualizadas según la estructura de la API
 export interface Contribuyente {
+  // IDs principales
+  codPersona: number;
+  codContribuyente: number;
+  
+  // Datos personales
+  codTipoContribuyente: string | null;
+  codTipopersona: string;
+  codTipoDocumento: string;
+  numerodocumento: string;
+  nombres: string;
+  apellidopaterno: string;
+  apellidomaterno: string;
+  direccion: string;
+  fechanacimiento: number; // timestamp
+  codestadocivil: string;
+  codsexo: string;
+  telefono: string;
+  lote: string | null;
+  otros: string | null;
+  codestado: string | null;
+  codDireccion: number | null;
+  
+  // Datos del cónyuge
+  codConyuge: number | null;
+  conyugeTipoDocumento: string | null;
+  conyugeNumeroDocumento: string | null;
+  conyugeNombres: string | null;
+  conyugeApellidopaterno: string | null;
+  conyugeApellidomaterno: string | null;
+  conyugeEstadocivil: string | null;
+  conyugeSexo: string | null;
+  conyugeTelefono: string | null;
+  conyugeFechanacimiento: number | null;
+  conyugeDireccion: string | null;
+  conyugeCoddireccion: number | null;
+  conyugeLote: string | null;
+  conyugeOtros: string | null;
+  
+  // Datos del representante legal
+  codRepresentanteLegal: number | null;
+  repreTipoDocumento: string | null;
+  repreNumeroDocumento: string | null;
+  repreNombres: string | null;
+  repreApellidopaterno: string | null;
+  repreApellidomaterno: string | null;
+  repreEstadocivil: string | null;
+  repreSexo: string | null;
+  repreTelefono: string | null;
+  repreFechanacimiento: number | null;
+  repreDireccion: string | null;
+  repreCoddireccion: number | null;
+  repreLote: string | null;
+  repreOtros: string | null;
+}
+
+// Interfaz simplificada para mostrar en listas
+export interface ContribuyenteListItem {
   id: number;
+  codigo: string;
   tipoDocumento: string;
   numeroDocumento: string;
-  nombreRazonSocial: string;
-  direccion?: string;
-  telefono?: string;
-  email?: string;
-  estado: boolean;
-  fechaRegistro?: string;
-  tipoContribuyente?: string;
+  nombreCompleto: string;
+  direccion: string;
+  telefono: string;
+  estado: string;
+  tieneConyugue: boolean;
+  tieneRepresentante: boolean;
 }
 
+// Datos para crear/actualizar contribuyente
 export interface ContribuyenteFormData {
-  tipoDocumento: string;
-  numeroDocumento: string;
-  nombreRazonSocial: string;
+  // Datos principales
+  codTipoContribuyente?: string;
+  codTipopersona: string;
+  codTipoDocumento: string;
+  numerodocumento: string;
+  nombres: string;
+  apellidopaterno: string;
+  apellidomaterno: string;
   direccion?: string;
+  fechanacimiento?: Date | string;
+  codestadocivil?: string;
+  codsexo?: string;
   telefono?: string;
-  email?: string;
-  tipoContribuyente?: string;
+  codDireccion?: number;
+  
+  // Datos del cónyuge (opcional)
+  conyuge?: {
+    tipoDocumento?: string;
+    numeroDocumento?: string;
+    nombres?: string;
+    apellidopaterno?: string;
+    apellidomaterno?: string;
+    telefono?: string;
+    direccion?: string;
+    codDireccion?: number;
+  };
+  
+  // Datos del representante (opcional)
+  representante?: {
+    tipoDocumento?: string;
+    numeroDocumento?: string;
+    nombres?: string;
+    apellidopaterno?: string;
+    apellidomaterno?: string;
+    telefono?: string;
+    direccion?: string;
+    codDireccion?: number;
+  };
 }
 
-export interface FiltroContribuyente {
-  tipo: 'dni' | 'ruc' | 'nombre' | 'todos';
-  termino: string;
-}
+// Mapeo de códigos a descripciones
+const TIPO_DOCUMENTO_MAP: { [key: string]: string } = {
+  '4101': 'DNI',
+  '4102': 'RUC',
+  '4103': 'PASAPORTE',
+  '4104': 'CARNET EXT.'
+};
+
+const TIPO_PERSONA_MAP: { [key: string]: string } = {
+  '0301': 'NATURAL',
+  '0302': 'JURIDICA'
+};
+
+const ESTADO_CIVIL_MAP: { [key: string]: string } = {
+  '0801': 'SOLTERO(A)',
+  '0802': 'CASADO(A)',
+  '0803': 'DIVORCIADO(A)',
+  '0804': 'VIUDO(A)',
+  '0805': 'CONVIVIENTE'
+};
+
+const SEXO_MAP: { [key: string]: string } = {
+  '0701': 'MASCULINO',
+  '0702': 'FEMENINO'
+};
 
 /**
  * Configuración de normalización para contribuyentes
  */
 const contribuyenteNormalizeOptions = {
   normalizeItem: (item: any): Contribuyente => {
+    // Retornar el objeto tal como viene de la API
     return {
-      id: item.id || item.contribuyenteId || 0,
-      tipoDocumento: item.tipoDocumento || '',
-      numeroDocumento: item.numeroDocumento || '',
-      nombreRazonSocial: item.nombreRazonSocial || item.nombre || '',
+      codPersona: item.codPersona || 0,
+      codContribuyente: item.codContribuyente || 0,
+      codTipoContribuyente: item.codTipoContribuyente,
+      codTipopersona: item.codTipopersona || '',
+      codTipoDocumento: item.codTipoDocumento || '',
+      numerodocumento: item.numerodocumento || '',
+      nombres: item.nombres || '',
+      apellidopaterno: item.apellidopaterno || '',
+      apellidomaterno: item.apellidomaterno || '',
       direccion: item.direccion || '',
+      fechanacimiento: item.fechanacimiento || 0,
+      codestadocivil: item.codestadocivil || '',
+      codsexo: item.codsexo || '',
       telefono: item.telefono || '',
-      email: item.email || '',
-      estado: item.estado === 1 || item.estado === true,
-      fechaRegistro: item.fechaRegistro || '',
-      tipoContribuyente: item.tipoContribuyente || 'NATURAL'
+      lote: item.lote,
+      otros: item.otros,
+      codestado: item.codestado,
+      codDireccion: item.codDireccion,
+      
+      // Cónyuge
+      codConyuge: item.codConyuge,
+      conyugeTipoDocumento: item.conyugeTipoDocumento,
+      conyugeNumeroDocumento: item.conyugeNumeroDocumento,
+      conyugeNombres: item.conyugeNombres,
+      conyugeApellidopaterno: item.conyugeApellidopaterno,
+      conyugeApellidomaterno: item.conyugeApellidomaterno,
+      conyugeEstadocivil: item.conyugeEstadocivil,
+      conyugeSexo: item.conyugeSexo,
+      conyugeTelefono: item.conyugeTelefono,
+      conyugeFechanacimiento: item.conyugeFechanacimiento,
+      conyugeDireccion: item.conyugeDireccion,
+      conyugeCoddireccion: item.conyugeCoddireccion,
+      conyugeLote: item.conyugeLote,
+      conyugeOtros: item.conyugeOtros,
+      
+      // Representante
+      codRepresentanteLegal: item.codRepresentanteLegal,
+      repreTipoDocumento: item.repreTipoDocumento,
+      repreNumeroDocumento: item.repreNumeroDocumento,
+      repreNombres: item.repreNombres,
+      repreApellidopaterno: item.repreApellidopaterno,
+      repreApellidomaterno: item.repreApellidomaterno,
+      repreEstadocivil: item.repreEstadocivil,
+      repreSexo: item.repreSexo,
+      repreTelefono: item.repreTelefono,
+      repreFechanacimiento: item.repreFechanacimiento,
+      repreDireccion: item.repreDireccion,
+      repreCoddireccion: item.repreCoddireccion,
+      repreLote: item.repreLote,
+      repreOtros: item.repreOtros
     };
   }
 };
@@ -58,19 +209,20 @@ export class ContribuyenteService extends BaseApiService<Contribuyente, Contribu
   private static instance: ContribuyenteService;
   
   constructor() {
-    // Usar 4 parámetros como los otros servicios
+    // En desarrollo, usar la URL completa
+    const baseURL = import.meta.env.DEV 
+      ? (import.meta.env.VITE_API_URL || 'http://192.168.20.160:8080')
+      : '';
+      
     super(
-      '', // baseURL vacío para usar proxy
-      '/api/contribuyente', // endpoint
-      contribuyenteNormalizeOptions, // opciones de normalización
-      'contribuyentes_cache' // clave de caché
+      baseURL,
+      '/api/contribuyente',
+      contribuyenteNormalizeOptions,
+      'contribuyentes_cache'
     );
   }
-  
-  /**
-   * Obtiene la instancia singleton del servicio
-   */
-  static getInstance(): ContribuyenteService {
+
+  public static getInstance(): ContribuyenteService {
     if (!ContribuyenteService.instance) {
       ContribuyenteService.instance = new ContribuyenteService();
     }
@@ -78,68 +230,129 @@ export class ContribuyenteService extends BaseApiService<Contribuyente, Contribu
   }
   
   /**
-   * Busca contribuyentes con filtros
+   * Override del método getAll para manejar la estructura de respuesta de la API
    */
-  async buscarConFiltro(filtro: FiltroContribuyente): Promise<Contribuyente[]> {
+  async getAll(): Promise<Contribuyente[]> {
     try {
-      console.log('🔍 [ContribuyenteService] Buscando con filtro:', filtro);
+      console.log('📡 [ContribuyenteService] GET - Obteniendo todos los contribuyentes');
       
-      let url = '/api/contribuyente';
-      const queryParams = new URLSearchParams();
-      
-      // Construir parámetros según el tipo de búsqueda
-      switch (filtro.tipo) {
-        case 'dni':
-          queryParams.append('tipoDoc', 'DNI');
-          queryParams.append('numeroDoc', filtro.termino);
-          break;
-        case 'ruc':
-          queryParams.append('tipoDoc', 'RUC');
-          queryParams.append('numeroDoc', filtro.termino);
-          break;
-        case 'nombre':
-          queryParams.append('nombre', filtro.termino);
-          break;
-        case 'todos':
-          // Sin filtros específicos
-          break;
-      }
-      
-      if (queryParams.toString()) {
-        url += `?${queryParams}`;
-      }
-      
-      const response = await this.makeRequest(url, {
-        method: 'GET'
+      // Primero intentar sin autenticación
+      const response = await fetch(`${this.baseURL}${this.endpoint}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
       });
       
-      // Manejar diferentes formatos de respuesta
-      let dataArray: any[] = [];
+      if (!response.ok) {
+        // Si falla, intentar con el método del padre que incluye autenticación
+        console.log('⚠️ [ContribuyenteService] Intentando con autenticación...');
+        return await super.getAll();
+      }
       
-      if (Array.isArray(response)) {
-        dataArray = response;
-      } else if (response && typeof response === 'object') {
-        if (Array.isArray(response.data)) {
-          dataArray = response.data;
-        } else if (Array.isArray(response.content)) {
-          dataArray = response.content;
-        } else if (Array.isArray(response.contribuyentes)) {
-          dataArray = response.contribuyentes;
-        } else {
-          console.warn('⚠️ [ContribuyenteService] Respuesta no es array:', response);
-          dataArray = [];
+      const result = await response.json();
+      
+      // La API devuelve { success, message, data: [...] }
+      if (result.success && Array.isArray(result.data)) {
+        const normalized = result.data.map((item: any, index: number) => 
+          this.normalizeOptions.normalizeItem(item, index)
+        );
+        
+        console.log(`✅ [ContribuyenteService] ${normalized.length} contribuyentes obtenidos`);
+        
+        // Guardar en caché si hay resultados
+        if (normalized.length > 0) {
+          this.saveToCache(normalized);
+        }
+        
+        return normalized;
+      }
+      
+      console.warn('⚠️ [ContribuyenteService] Respuesta inesperada:', result);
+      return [];
+      
+    } catch (error: any) {
+      console.error('❌ [ContribuyenteService] Error al obtener contribuyentes:', error);
+      
+      // Intentar devolver del caché
+      const cached = this.loadFromCache();
+      if (cached && cached.length > 0) {
+        console.log(`📦 [ContribuyenteService] Devolviendo ${cached.length} contribuyentes del caché`);
+        return cached;
+      }
+      
+      return [];
+    }
+  }
+  
+  /**
+   * Convierte un contribuyente completo a un item de lista simplificado
+   */
+  private toListItem(contribuyente: Contribuyente): ContribuyenteListItem {
+    const nombreCompleto = `${contribuyente.apellidopaterno} ${contribuyente.apellidomaterno} ${contribuyente.nombres}`.trim();
+    
+    return {
+      id: contribuyente.codContribuyente,
+      codigo: `CONT-${String(contribuyente.codContribuyente).padStart(6, '0')}`,
+      tipoDocumento: TIPO_DOCUMENTO_MAP[contribuyente.codTipoDocumento] || contribuyente.codTipoDocumento,
+      numeroDocumento: contribuyente.numerodocumento,
+      nombreCompleto: nombreCompleto,
+      direccion: contribuyente.direccion || 'Sin dirección',
+      telefono: contribuyente.telefono || '-',
+      estado: contribuyente.codestado || 'ACTIVO',
+      tieneConyugue: !!contribuyente.codConyuge,
+      tieneRepresentante: !!contribuyente.codRepresentanteLegal
+    };
+  }
+  
+  /**
+   * Obtiene todos los contribuyentes como items de lista
+   */
+  async getAllAsListItems(): Promise<ContribuyenteListItem[]> {
+    try {
+      console.log('📡 [ContribuyenteService] Obteniendo lista de contribuyentes...');
+      
+      // Hacer la petición directamente sin autenticación para GET
+      const response = await fetch(`${this.baseURL}${this.endpoint}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log('📥 [ContribuyenteService] Respuesta recibida:', result);
+      
+      // La API devuelve { success, message, data: [...] }
+      if (result.success && Array.isArray(result.data)) {
+        const contribuyentes = result.data.map((item: any) => this.normalizeOptions.normalizeItem(item));
+        return contribuyentes.map(c => this.toListItem(c));
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('❌ [ContribuyenteService] Error al obtener contribuyentes:', error);
+      
+      // Si es error 403, es probable que requiera autenticación
+      if (error instanceof Error && error.message.includes('403')) {
+        console.warn('⚠️ [ContribuyenteService] El endpoint requiere autenticación');
+        // Intentar con el método padre que incluye autenticación
+        try {
+          const contribuyentes = await super.getAll();
+          return contribuyentes.map(c => this.toListItem(c));
+        } catch (authError) {
+          console.error('❌ [ContribuyenteService] Error con autenticación:', authError);
+          NotificationService.error('No tiene permisos para ver contribuyentes');
+          return [];
         }
       }
       
-      const contribuyentes = dataArray.map((item: any, index: number) => 
-        this.normalizeOptions.normalizeItem(item, index)
-      );
-      
-      console.log(`✅ [ContribuyenteService] ${contribuyentes.length} contribuyentes encontrados`);
-      return contribuyentes;
-      
-    } catch (error: any) {
-      console.error('❌ [ContribuyenteService] Error al buscar contribuyentes:', error);
       throw error;
     }
   }
@@ -147,70 +360,86 @@ export class ContribuyenteService extends BaseApiService<Contribuyente, Contribu
   /**
    * Busca contribuyente por número de documento
    */
-  async buscarPorDocumento(tipoDoc: string, numeroDoc: string): Promise<Contribuyente | null> {
+  async buscarPorDocumento(numeroDoc: string): Promise<Contribuyente | null> {
     try {
-      console.log('🔍 [ContribuyenteService] Buscando por documento:', { tipoDoc, numeroDoc });
+      console.log('🔍 [ContribuyenteService] Buscando por documento:', numeroDoc);
       
-      const url = `/api/contribuyente/documento/${tipoDoc}/${numeroDoc}`;
+      const todos = await this.getAll();
+      const encontrado = todos.find(c => c.numerodocumento === numeroDoc);
       
-      const response = await this.makeRequest(url, {
-        method: 'GET'
-      });
-      
-      if (!response) {
-        return null;
+      if (encontrado) {
+        console.log('✅ [ContribuyenteService] Contribuyente encontrado');
+        return encontrado;
       }
       
-      const contribuyente = this.normalizeOptions.normalizeItem(response, 0);
-      console.log('✅ [ContribuyenteService] Contribuyente encontrado:', contribuyente);
-      
-      return contribuyente;
+      console.log('ℹ️ [ContribuyenteService] Contribuyente no encontrado');
+      return null;
       
     } catch (error: any) {
-      if (error.message.includes('404')) {
-        console.log('ℹ️ [ContribuyenteService] Contribuyente no encontrado');
-        return null;
-      }
       console.error('❌ [ContribuyenteService] Error al buscar por documento:', error);
       throw error;
     }
   }
   
   /**
-   * Crea un nuevo contribuyente (requiere Bearer Token)
+   * Crea un nuevo contribuyente
    */
   async create(data: ContribuyenteFormData): Promise<Contribuyente> {
     try {
-      console.log('📤 [ContribuyenteService] Creando nuevo contribuyente:', data);
+      console.log('📤 [ContribuyenteService] Creando contribuyente:', data);
       
-      const token = this.getAuthToken();
-      if (!token) {
-        NotificationService.error('Debe iniciar sesión para crear contribuyentes');
-        throw new Error('No se encontró token de autenticación');
+      // Preparar datos para la API
+      const apiData: any = {
+        codTipopersona: data.codTipopersona,
+        codTipoDocumento: data.codTipoDocumento,
+        numerodocumento: data.numerodocumento,
+        nombres: data.nombres,
+        apellidopaterno: data.apellidopaterno,
+        apellidomaterno: data.apellidomaterno,
+        direccion: data.direccion || '',
+        telefono: data.telefono || '',
+        codestadocivil: data.codestadocivil,
+        codsexo: data.codsexo,
+        codDireccion: data.codDireccion
+      };
+      
+      // Convertir fecha si existe
+      if (data.fechanacimiento) {
+        const fecha = new Date(data.fechanacimiento);
+        apiData.fechanacimiento = fecha.getTime();
       }
       
-      const response = await this.makeRequest(this.url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      });
+      // Agregar datos del cónyuge si existen
+      if (data.conyuge && data.conyuge.numeroDocumento) {
+        apiData.conyugeTipoDocumento = data.conyuge.tipoDocumento;
+        apiData.conyugeNumeroDocumento = data.conyuge.numeroDocumento;
+        apiData.conyugeNombres = data.conyuge.nombres;
+        apiData.conyugeApellidopaterno = data.conyuge.apellidopaterno;
+        apiData.conyugeApellidomaterno = data.conyuge.apellidomaterno;
+        apiData.conyugeTelefono = data.conyuge.telefono;
+        apiData.conyugeDireccion = data.conyuge.direccion;
+        apiData.conyugeCoddireccion = data.conyuge.codDireccion;
+      }
       
-      const contribuyente = this.normalizeOptions.normalizeItem(response, 0);
+      // Agregar datos del representante si existen
+      if (data.representante && data.representante.numeroDocumento) {
+        apiData.repreTipoDocumento = data.representante.tipoDocumento;
+        apiData.repreNumeroDocumento = data.representante.numeroDocumento;
+        apiData.repreNombres = data.representante.nombres;
+        apiData.repreApellidopaterno = data.representante.apellidopaterno;
+        apiData.repreApellidomaterno = data.representante.apellidomaterno;
+        apiData.repreTelefono = data.representante.telefono;
+        apiData.repreDireccion = data.representante.direccion;
+        apiData.repreCoddireccion = data.representante.codDireccion;
+      }
       
-      NotificationService.success('Contribuyente creado exitosamente');
-      console.log('✅ [ContribuyenteService] Contribuyente creado:', contribuyente);
-      
-      this.clearCache();
-      return contribuyente;
+      return await super.create(apiData);
       
     } catch (error: any) {
-      console.error('❌ [ContribuyenteService] Error al crear contribuyente:', error);
+      console.error('❌ [ContribuyenteService] Error al crear:', error);
       
-      if (error.message.includes('ya existe')) {
-        NotificationService.error('El contribuyente ya existe con ese número de documento');
+      if (error.message?.includes('ya existe')) {
+        NotificationService.error('Ya existe un contribuyente con ese número de documento');
       } else {
         NotificationService.error(error.message || 'Error al crear contribuyente');
       }
@@ -220,65 +449,20 @@ export class ContribuyenteService extends BaseApiService<Contribuyente, Contribu
   }
   
   /**
-   * Actualiza un contribuyente existente (requiere Bearer Token)
+   * Obtiene las opciones para los selects
    */
-  async update(id: number, data: ContribuyenteFormData): Promise<Contribuyente> {
-    try {
-      console.log('📤 [ContribuyenteService] Actualizando contribuyente:', id, data);
-      
-      const token = this.getAuthToken();
-      if (!token) {
-        NotificationService.error('Debe iniciar sesión para actualizar contribuyentes');
-        throw new Error('No se encontró token de autenticación');
-      }
-      
-      const response = await this.makeRequest(`${this.url}/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      });
-      
-      const contribuyente = this.normalizeOptions.normalizeItem(response, 0);
-      
-      NotificationService.success('Contribuyente actualizado exitosamente');
-      console.log('✅ [ContribuyenteService] Contribuyente actualizado:', contribuyente);
-      
-      this.clearCache();
-      return contribuyente;
-      
-    } catch (error: any) {
-      console.error('❌ [ContribuyenteService] Error al actualizar contribuyente:', error);
-      NotificationService.error(error.message || 'Error al actualizar contribuyente');
-      throw error;
-    }
-  }
-  
-  /**
-   * Obtiene estadísticas de contribuyentes
-   */
-  async obtenerEstadisticas(): Promise<any> {
-    try {
-      console.log('📊 [ContribuyenteService] Obteniendo estadísticas');
-      
-      const response = await this.makeRequest('/api/contribuyente/estadisticas', {
-        method: 'GET'
-      });
-      
-      console.log('✅ [ContribuyenteService] Estadísticas obtenidas:', response);
-      return response;
-      
-    } catch (error: any) {
-      console.error('❌ [ContribuyenteService] Error al obtener estadísticas:', error);
-      throw error;
-    }
+  static getOptions() {
+    return {
+      tiposDocumento: Object.entries(TIPO_DOCUMENTO_MAP).map(([value, label]) => ({ value, label })),
+      tiposPersona: Object.entries(TIPO_PERSONA_MAP).map(([value, label]) => ({ value, label })),
+      estadosCiviles: Object.entries(ESTADO_CIVIL_MAP).map(([value, label]) => ({ value, label })),
+      sexos: Object.entries(SEXO_MAP).map(([value, label]) => ({ value, label }))
+    };
   }
 }
 
 // Exportar instancia singleton
 export const contribuyenteService = ContribuyenteService.getInstance();
 
-// Exportar también la clase para testing
-export default ContribuyenteService;
+// Exportar mapeos para uso en componentes
+export { TIPO_DOCUMENTO_MAP, TIPO_PERSONA_MAP, ESTADO_CIVIL_MAP, SEXO_MAP };

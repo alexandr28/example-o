@@ -1,9 +1,9 @@
-// src/hooks/useDirecciones.ts - VERSIÓN ORIGINAL
+// src/hooks/useDirecciones.ts - VERSIÓN ACTUALIZADA
 import { useState, useCallback, useEffect } from 'react';
 import { direccionService } from '../services/direcionService';
-import  sectorService  from '../services/sectorService';
-import  barrioService  from '../services/barrioService';
-import  calleApiService  from '../services/calleApiService';
+import sectorService from '../services/sectorService';
+import barrioService from '../services/barrioService';
+import calleApiService from '../services/calleApiService';
 import { Direccion, DireccionFormData, Sector, Barrio, Calle, LadoDireccion } from '../models';
 import { NotificationService } from '../components/utils/Notification';
 
@@ -29,7 +29,7 @@ interface UseDireccionesReturn {
   cargarDependencias: () => Promise<void>;
   buscarDirecciones: (term: string) => Promise<void>;
   buscarPorTipoVia: (parametros: string) => Promise<void>;
-  buscarPorNombreVia: (nombre?: string, sectorId?: number, barrioId?: number) => Promise<void>;
+  buscarPorNombreVia: (nombre?: string) => Promise<void>;
   seleccionarDireccion: (direccion: Direccion) => void;
   handleSectorChange: (sectorId: number) => void;
   handleBarrioChange: (barrioId: number) => void;
@@ -104,7 +104,7 @@ export const useDirecciones = (): UseDireccionesReturn => {
       
       const data = await direccionService.buscarPorTipoVia({
         parametrosBusqueda: parametros,
-        codUsuario: 1
+        codUsuario: 1 // Siempre enviar codUsuario: 1
       });
       
       setDirecciones(data);
@@ -120,17 +120,17 @@ export const useDirecciones = (): UseDireccionesReturn => {
   
   /**
    * Buscar direcciones por nombre de vía
+   * ACTUALIZADO: Solo usa nombreVia y codUsuario según la API
    */
-  const buscarPorNombreVia = useCallback(async (nombre?: string, sectorId?: number, barrioId?: number) => {
+  const buscarPorNombreVia = useCallback(async (nombre?: string) => {
     try {
       setLoading(true);
       setError(null);
-      console.log('🔍 [useDirecciones] Buscando por nombre de vía:', { nombre, sectorId, barrioId });
+      console.log('🔍 [useDirecciones] Buscando por nombre de vía:', nombre);
       
       const data = await direccionService.buscarPorNombreVia({
-        nombreVia: nombre,
-        codSector: sectorId,
-        codBarrio: barrioId
+        nombreVia: nombre || 'a', // Valor por defecto 'a' si no se especifica
+        codUsuario: 1 // Siempre enviar codUsuario: 1
       });
       
       setDirecciones(data);
@@ -158,17 +158,16 @@ export const useDirecciones = (): UseDireccionesReturn => {
       setError(null);
       console.log('🔍 [useDirecciones] Buscando direcciones:', term);
       
-      const data = await direccionService.search(term);
-      setDirecciones(data);
+      // Usar buscarPorNombreVia con el término de búsqueda
+      await buscarPorNombreVia(term);
       
-      console.log(`✅ [useDirecciones] ${data.length} direcciones encontradas`);
     } catch (err: any) {
       console.error('❌ [useDirecciones] Error en búsqueda:', err);
       setError(err.message || 'Error al buscar direcciones');
     } finally {
       setLoading(false);
     }
-  }, [cargarDirecciones]);
+  }, [cargarDirecciones, buscarPorNombreVia]);
   
   /**
    * Cargar dependencias (sectores, barrios, calles)

@@ -1,151 +1,168 @@
+// src/hooks/useContribuyentes.ts
 import { useState, useCallback, useEffect } from 'react';
-import { Contribuyente, FiltroContribuyente } from '../models/Contribuyente';
+import { contribuyenteService, ContribuyenteListItem, ContribuyenteFormData } from '../services/contribuyenteService';
+import { NotificationService } from '../components/utils/Notification';
 
-/**
- * Hook personalizado para la gestión de contribuyentes
- * 
- * Proporciona funcionalidades para listar, buscar, crear, actualizar y eliminar contribuyentes
- */
-export const useContribuyentes = () => {
+interface UseContribuyentesReturn {
   // Estados
-  const [contribuyentes, setContribuyentes] = useState<Contribuyente[]>([]);
-  const [filtro, setFiltro] = useState<FiltroContribuyente>({
-    tipoContribuyente: '',
-    busqueda: ''
-  });
+  contribuyentes: ContribuyenteListItem[];
+  contribuyenteSeleccionado: ContribuyenteListItem | null;
+  loading: boolean;
+  error: string | null;
+  searchTerm: string;
+  
+  // Métodos
+  cargarContribuyentes: () => Promise<void>;
+  buscarContribuyentes: (term: string) => Promise<void>;
+  seleccionarContribuyente: (contribuyente: ContribuyenteListItem) => void;
+  crearContribuyente: (data: ContribuyenteFormData) => Promise<void>;
+  actualizarContribuyente: (id: number, data: ContribuyenteFormData) => Promise<void>;
+  setSearchTerm: (term: string) => void;
+}
+
+export const useContribuyentes = (): UseContribuyentesReturn => {
+  const [contribuyentes, setContribuyentes] = useState<ContribuyenteListItem[]>([]);
+  const [contribuyenteSeleccionado, setContribuyenteSeleccionado] = useState<ContribuyenteListItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pagina, setPagina] = useState(1);
-  const [porPagina] = useState(10);
-  const [total, setTotal] = useState(0);
-
-  // Cargar contribuyentes iniciales
-  useEffect(() => {
-    cargarContribuyentes();
-  }, []);
-
-  // Cargar contribuyentes con filtros
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  /**
+   * Cargar todos los contribuyentes
+   */
   const cargarContribuyentes = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+      console.log('🔄 [useContribuyentes] Cargando contribuyentes...');
       
-      // En un caso real, esto sería una petición a la API
-      // const response = await fetch(`/api/contribuyentes?tipoContribuyente=${filtro.tipoContribuyente}&busqueda=${filtro.busqueda}&pagina=${pagina}&porPagina=${porPagina}`);
-      // const data = await response.json();
-      // setContribuyentes(data.contribuyentes);
-      // setTotal(data.total);
+      const data = await contribuyenteService.getAllAsListItems();
+      setContribuyentes(data);
       
-      // Simulamos una carga con timeout
-      setTimeout(() => {
-        // Datos de ejemplo
-        const contribuyentesMock: Contribuyente[] = [
-          { 
-            codigo: '0000001', 
-            nombre: 'Nombre del contribuyente 1', 
-            documento: '12345678', 
-            direccion: 'Dirección fiscal del contribuyente 1',
-            tipo: 'natural',
-            estado: 'activo'
-          },
-          { 
-            codigo: '0000002', 
-            nombre: 'Nombre del contribuyente 2', 
-            documento: '20705557433', 
-            direccion: 'Dirección fiscal del contribuyente 2',
-            tipo: 'juridica',
-            estado: 'activo'
-          },
-        ];
-        
-        // Filtrar si hay criterios de búsqueda
-        let filtrados = contribuyentesMock;
-        
-        if (filtro.tipoContribuyente) {
-          filtrados = filtrados.filter(c => c.tipo === filtro.tipoContribuyente);
-        }
-        
-        if (filtro.busqueda) {
-          const busqueda = filtro.busqueda.toLowerCase();
-          filtrados = filtrados.filter(c => 
-            c.nombre.toLowerCase().includes(busqueda) || 
-            c.documento.toLowerCase().includes(busqueda) || 
-            c.direccion.toLowerCase().includes(busqueda)
-          );
-        }
-        
-        setContribuyentes(filtrados);
-        setTotal(filtrados.length);
-        setLoading(false);
-      }, 500);
-      
+      console.log(`✅ [useContribuyentes] ${data.length} contribuyentes cargados`);
     } catch (err: any) {
+      console.error('❌ [useContribuyentes] Error al cargar contribuyentes:', err);
       setError(err.message || 'Error al cargar contribuyentes');
+      NotificationService.error('Error al cargar contribuyentes');
+    } finally {
       setLoading(false);
     }
-  }, [filtro, pagina, porPagina]);
-
-  // Actualizar filtros y recargar
-  const buscarContribuyentes = useCallback((nuevoFiltro: FiltroContribuyente) => {
-    setFiltro(nuevoFiltro);
-    setPagina(1); // Resetear a primera página
+  }, []);
+  
+  /**
+   * Buscar contribuyentes por término
+   */
+  const buscarContribuyentes = useCallback(async (term: string) => {
+    if (!term.trim()) {
+      await cargarContribuyentes();
+      return;
+    }
     
-    // Disparar la carga con los nuevos filtros
-    cargarContribuyentes();
+    try {
+      setLoading(true);
+      setError(null);
+      console.log('🔍 [useContribuyentes] Buscando:', term);
+      
+      // Filtrar localmente por ahora
+      const todos = await contribuyenteService.getAllAsListItems();
+      const filtrados = todos.filter(c => 
+        c.nombreCompleto.toLowerCase().includes(term.toLowerCase()) ||
+        c.numeroDocumento.includes(term) ||
+        c.codigo.includes(term)
+      );
+      
+      setContribuyentes(filtrados);
+      console.log(`✅ [useContribuyentes] ${filtrados.length} resultados encontrados`);
+      
+    } catch (err: any) {
+      console.error('❌ [useContribuyentes] Error en búsqueda:', err);
+      setError(err.message || 'Error al buscar contribuyentes');
+    } finally {
+      setLoading(false);
+    }
   }, [cargarContribuyentes]);
-
-  // Obtener un contribuyente por su código
-  const obtenerContribuyente = useCallback(async (codigo: string) => {
+  
+  /**
+   * Seleccionar un contribuyente
+   */
+  const seleccionarContribuyente = useCallback((contribuyente: ContribuyenteListItem) => {
+    console.log('📌 [useContribuyentes] Contribuyente seleccionado:', contribuyente);
+    setContribuyenteSeleccionado(contribuyente);
+  }, []);
+  
+  /**
+   * Crear nuevo contribuyente
+   */
+  const crearContribuyente = useCallback(async (data: ContribuyenteFormData) => {
     try {
       setLoading(true);
       setError(null);
       
-      // En un caso real, esto sería una petición a la API
-      // const response = await fetch(`/api/contribuyentes/${codigo}`);
-      // const data = await response.json();
-      // return data;
+      console.log('➕ [useContribuyentes] Creando contribuyente...');
+      await contribuyenteService.create(data);
       
-      // Simulamos una carga con timeout
-      return new Promise<Contribuyente>((resolve) => {
-        setTimeout(() => {
-          const contribuyente = contribuyentes.find(c => c.codigo === codigo);
-          
-          if (contribuyente) {
-            resolve(contribuyente);
-          } else {
-            setError('Contribuyente no encontrado');
-          }
-          
-          setLoading(false);
-        }, 300);
-      });
+      NotificationService.success('Contribuyente creado exitosamente');
+      await cargarContribuyentes();
       
     } catch (err: any) {
-      setError(err.message || 'Error al obtener contribuyente');
+      console.error('❌ [useContribuyentes] Error al crear:', err);
+      setError(err.message || 'Error al crear contribuyente');
+      throw err; // Re-lanzar para que el formulario pueda manejarlo
+    } finally {
       setLoading(false);
-      throw err;
     }
-  }, [contribuyentes]);
-
-  // Cambiar de página
-  const cambiarPagina = useCallback((nuevaPagina: number) => {
-    setPagina(nuevaPagina);
+  }, [cargarContribuyentes]);
+  
+  /**
+   * Actualizar contribuyente existente
+   */
+  const actualizarContribuyente = useCallback(async (id: number, data: ContribuyenteFormData) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('📝 [useContribuyentes] Actualizando contribuyente:', id);
+      await contribuyenteService.update(id, data);
+      
+      NotificationService.success('Contribuyente actualizado exitosamente');
+      await cargarContribuyentes();
+      
+    } catch (err: any) {
+      console.error('❌ [useContribuyentes] Error al actualizar:', err);
+      setError(err.message || 'Error al actualizar contribuyente');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [cargarContribuyentes]);
+  
+  // Cargar contribuyentes al iniciar
+  useEffect(() => {
     cargarContribuyentes();
   }, [cargarContribuyentes]);
-
+  
+  // Buscar cuando cambia el término
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchTerm !== '') {
+        buscarContribuyentes(searchTerm);
+      }
+    }, 500); // Debounce de 500ms
+    
+    return () => clearTimeout(timer);
+  }, [searchTerm, buscarContribuyentes]);
+  
   return {
     contribuyentes,
-    filtro,
+    contribuyenteSeleccionado,
     loading,
     error,
-    pagina,
-    porPagina,
-    total,
-    buscarContribuyentes,
+    searchTerm,
     cargarContribuyentes,
-    obtenerContribuyente,
-    cambiarPagina
+    buscarContribuyentes,
+    seleccionarContribuyente,
+    crearContribuyente,
+    actualizarContribuyente,
+    setSearchTerm
   };
 };
-
-export default useContribuyentes;
