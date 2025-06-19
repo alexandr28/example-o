@@ -1,38 +1,107 @@
 // src/hooks/useContribuyenteAPI.ts
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { personaService } from '../services/personaService';
+import { personaService, PersonaData } from '../services/personaService';
 import { NotificationService } from '../components/utils/Notification';
 
 /**
- * Hook para integrar el ContribuyenteForm con las APIs de persona y contribuyente
- * 
- * Este hook intercepta las llamadas del formulario y las redirige a las APIs correctas
+ * Mapea el tipo de documento del formulario al código de la API
+ */
+const mapearTipoDocumento = (tipo: string): string => {
+  const mapeo: Record<string, string> = {
+    'DNI': '1',
+    'RUC': '2',
+    'Carnet de Extranjería': '4',
+    'Pasaporte': '5',
+    'Partida de Nacimiento': '6',
+    'Otros': '7'
+  };
+  return mapeo[tipo] || '1';
+};
+
+/**
+ * Mapea el estado civil al código de la API
+ */
+const mapearEstadoCivil = (estado: string): number => {
+  const mapeo: Record<string, number> = {
+    'Soltero/a': 1,
+    'Casado/a': 2,
+    'Divorciado/a': 3,
+    'Viudo/a': 4,
+    'Conviviente': 5
+  };
+  return mapeo[estado] || 1;
+};
+
+/**
+ * Mapea el sexo al código de la API
+ */
+const mapearSexo = (sexo: string): number => {
+  return sexo === 'Masculino' ? 1 : 2;
+};
+
+/**
+ * Formatea la fecha al formato esperado por la API
+ */
+const formatearFecha = (fecha: any): string => {
+  if (!fecha) return '';
+  
+  // Si es un objeto Date
+  if (fecha instanceof Date) {
+    return fecha.toISOString().split('T')[0];
+  }
+  
+  // Si es una cadena, intentar parsearla
+  if (typeof fecha === 'string') {
+    const date = new Date(fecha);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+  }
+  
+  return '';
+};
+
+/**
+ * Hook para integrar el ContribuyenteForm con las APIs reales
  */
 export const useContribuyenteAPI = () => {
   const navigate = useNavigate();
   
   /**
-   * Guarda un contribuyente usando las APIs de persona y contribuyente
+   * Guarda un contribuyente usando la API de persona
    */
   const guardarContribuyente = useCallback(async (formData: any) => {
     try {
       console.log('🚀 [useContribuyenteAPI] Procesando datos del formulario:', formData);
       
-      // 1. Determinar el tipo de contribuyente
-      const tipoContribuyente = formData.esPersonaJuridica ? 'PERSONA_JURIDICA' : 'PERSONA_NATURAL';
+      // Validar que tengamos los datos mínimos requeridos
+      if (!formData.numeroDocumento) {
+        throw new Error('El número de documento es requerido');
+      }
       
-      // 2. Preparar datos de la persona principal
-      const personaPrincipalData = {
-        codTipopersona: tipoContribuyente === 'PERSONA_JURIDICA' ? '0302' : '0301',
+      if (!formData.esPersonaJuridica && !formData.nombres) {
+        throw new Error('El nombre es requerido para personas naturales');
+      }
+      
+      if (formData.esPersonaJuridica && !formData.razonSocial) {
+        throw new Error('La razón social es requerida para personas jurídicas');
+      }
+      
+      // 1. Preparar datos de la persona principal
+      const personaPrincipalData: PersonaData = {
+        codPersona: null,
+        codTipopersona: formData.esPersonaJuridica ? "0302" : "0301",
         codTipoDocumento: mapearTipoDocumento(formData.tipoDocumento),
-        numerodocumento: formData.numeroDocumento,
-        nombres: (formData.nombres || formData.razonSocial || '').toUpperCase(),
-        apellidopaterno: formData.apellidoPaterno?.toUpperCase() || '',
-        apellidomaterno: formData.apellidoMaterno?.toUpperCase() || '',
-        fechanacimiento: formatearFecha(formData.fechaNacimiento),
-        codestadocivil: mapearEstadoCivil(formData.estadoCivil),
-        codsexo: mapearSexo(formData.sexo),
+        numerodocumento: formData.numeroDocumento.toString(),
+        nombres: formData.esPersonaJuridica 
+          ? (formData.razonSocial || '').toUpperCase()
+          : (formData.nombres || '').toUpperCase(),
+        apellidopaterno: !formData.esPersonaJuridica ? (formData.apellidoPaterno || '').toUpperCase() : '',
+        apellidomaterno: !formData.esPersonaJuridica ? (formData.apellidoMaterno || '').toUpperCase() : '',
+        fechanacimiento: !formData.esPersonaJuridica ? formatearFecha(formData.fechaNacimiento) : '',
+        codestadocivil: !formData.esPersonaJuridica ? mapearEstadoCivil(formData.estadoCivil) : 1,
+        codsexo: !formData.esPersonaJuridica ? mapearSexo(formData.sexo) : 1,
         telefono: formData.telefono || '',
         codDireccion: formData.direccion?.id || 1,
         lote: formData.nFinca || null,
@@ -41,28 +110,28 @@ export const useContribuyenteAPI = () => {
         codUsuario: 1
       };
       
-      // 3. Crear la persona principal
-      console.log('📤 [useContribuyenteAPI] Creando persona principal...');
+      // 2. Crear la persona principal
+      console.log('📤 [useContribuyenteAPI] Enviando a API:', personaPrincipalData);
       const personaCreada = await personaService.crear(personaPrincipalData);
       
       if (!personaCreada.codPersona) {
         throw new Error('No se pudo crear la persona principal');
       }
       
-      // 4. Crear cónyuge/representante si existe
-      let codRelacionado: number | null = null;
+      console.log('✅ [useContribuyenteAPI] Persona creada con código:', personaCreada.codPersona);
+      
+      // 3. Si tiene cónyuge/representante, crearlo también
       if (formData.tieneConyugeRepresentante && formData.conyugeRepresentante?.numeroDocumento) {
-        console.log('👥 [useContribuyenteAPI] Creando cónyuge/representante...');
-        
-        const relacionadoData = {
-          codTipopersona: '0301', // Siempre persona natural
+        const personaRelacionadaData: PersonaData = {
+          codPersona: null,
+          codTipopersona: "0301", // Siempre persona natural para cónyuge/representante
           codTipoDocumento: mapearTipoDocumento(formData.conyugeRepresentante.tipoDocumento),
-          numerodocumento: formData.conyugeRepresentante.numeroDocumento,
-          nombres: formData.conyugeRepresentante.nombres?.toUpperCase() || '',
-          apellidopaterno: formData.conyugeRepresentante.apellidoPaterno?.toUpperCase() || '',
-          apellidomaterno: formData.conyugeRepresentante.apellidoMaterno?.toUpperCase() || '',
+          numerodocumento: formData.conyugeRepresentante.numeroDocumento.toString(),
+          nombres: (formData.conyugeRepresentante.nombres || '').toUpperCase(),
+          apellidopaterno: (formData.conyugeRepresentante.apellidoPaterno || '').toUpperCase(),
+          apellidomaterno: (formData.conyugeRepresentante.apellidoMaterno || '').toUpperCase(),
           fechanacimiento: formatearFecha(formData.conyugeRepresentante.fechaNacimiento),
-          codestadocivil: tipoContribuyente === 'PERSONA_NATURAL' ? 2 : 1, // Casado para cónyuge, soltero para representante
+          codestadocivil: mapearEstadoCivil(formData.conyugeRepresentante.estadoCivil),
           codsexo: mapearSexo(formData.conyugeRepresentante.sexo),
           telefono: formData.conyugeRepresentante.telefono || '',
           codDireccion: formData.conyugeRepresentante.direccion?.id || 1,
@@ -72,50 +141,25 @@ export const useContribuyenteAPI = () => {
           codUsuario: 1
         };
         
-        const relacionadoCreado = await personaService.crear(relacionadoData);
-        codRelacionado = relacionadoCreado.codPersona || null;
+        console.log('📤 [useContribuyenteAPI] Creando cónyuge/representante...');
+        const personaRelacionada = await personaService.crear(personaRelacionadaData);
+        
+        console.log('✅ [useContribuyenteAPI] Cónyuge/representante creado:', personaRelacionada.codPersona);
       }
       
-      // 5. Crear el contribuyente
-      const contribuyenteData = {
-        codPersona: personaCreada.codPersona,
-        codConyuge: tipoContribuyente === 'PERSONA_NATURAL' ? codRelacionado : null,
-        codRepresentanteLegal: tipoContribuyente === 'PERSONA_JURIDICA' ? codRelacionado : null,
-        codestado: "2152", // Activo
-        codUsuario: 1
-      };
-      
-      console.log('📤 [useContribuyenteAPI] Creando contribuyente:', contribuyenteData);
-      
-      // Llamar directamente a la API de contribuyente
-      const response = await fetch('http://192.168.20.160:8080/api/contribuyente', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
-        body: JSON.stringify(contribuyenteData)
-      });
-      
-      if (!response.ok) {
-        throw new Error('Error al crear contribuyente');
-      }
-      
-      const result = await response.json();
-      console.log('✅ [useContribuyenteAPI] Contribuyente creado:', result);
-      
+      // 4. Mostrar notificación de éxito
       NotificationService.success('Contribuyente registrado correctamente');
       
-      // Redirigir después de un breve delay
+      // 5. Navegar a la lista de contribuyentes después de 2 segundos
       setTimeout(() => {
         navigate('/contribuyente/consulta');
-      }, 1500);
+      }, 2000);
       
-      return result;
+      return personaCreada;
       
     } catch (error: any) {
-      console.error('❌ [useContribuyenteAPI] Error:', error);
-      NotificationService.error(error.message || 'Error al guardar el contribuyente');
+      console.error('❌ [useContribuyenteAPI] Error al guardar:', error);
+      NotificationService.error(error.message || 'Error al registrar contribuyente');
       throw error;
     }
   }, [navigate]);
@@ -124,52 +168,3 @@ export const useContribuyenteAPI = () => {
     guardarContribuyente
   };
 };
-
-// Funciones auxiliares de mapeo
-function mapearTipoDocumento(tipo?: string): number {
-  const mapa: Record<string, number> = {
-    'DNI': 1,
-    'RUC': 4,
-    'PASAPORTE': 2,
-    'CARNET_EXTRANJERIA': 3
-  };
-  return mapa[tipo || 'DNI'] || 1;
-}
-
-function mapearSexo(sexo?: string): number {
-  const mapa: Record<string, number> = {
-    'Masculino': 1,
-    'Femenino': 2
-  };
-  return mapa[sexo || 'Masculino'] || 1;
-}
-
-function mapearEstadoCivil(estadoCivil?: string): number {
-  const mapa: Record<string, number> = {
-    'Soltero/a': 1,
-    'Casado/a': 2,
-    'Divorciado/a': 3,
-    'Viudo/a': 4,
-    'Conviviente': 5
-  };
-  return mapa[estadoCivil || 'Soltero/a'] || 1;
-}
-
-function formatearFecha(fecha?: any): string | undefined {
-  if (!fecha) return undefined;
-  
-  if (fecha instanceof Date) {
-    return fecha.toISOString().split('T')[0];
-  }
-  
-  if (typeof fecha === 'string') {
-    // Si viene en formato DD/MM/YYYY, convertir a YYYY-MM-DD
-    const partes = fecha.split('/');
-    if (partes.length === 3) {
-      return `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`;
-    }
-    return fecha;
-  }
-  
-  return undefined;
-}

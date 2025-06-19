@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthContext } from '../../context/AuthContext';
 
 interface ProtectedRouteProps {
@@ -14,11 +14,14 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { isAuthenticated, loading } = useAuthContext();
   const location = useLocation();
-  const navigate = useNavigate();
-  // Mientras se verifica la autenticación, muestra un indicador de carga
+  
   // Para depuración
   useEffect(() => {
-    console.log('ProtectedRoute rendered', { isAuthenticated, loading, pathname: location.pathname });
+    console.log('ProtectedRoute rendered', { 
+      isAuthenticated, 
+      loading, 
+      pathname: location.pathname 
+    });
   }, [isAuthenticated, loading, location.pathname]);
   
   // Mientras se verifica la autenticación, muestra un indicador de carga
@@ -39,8 +42,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   
   // Si está autenticado, mostrar el contenido protegido
   console.log('Autenticado, mostrando contenido protegido');
-  return <>{children}</>;
+  
+  // IMPORTANTE: Asegurarse de que children sea un elemento React válido
+  // Envolver en un Fragment para evitar problemas con props booleanas
+  return <React.Fragment>{children}</React.Fragment>;
 };
-
 
 export default ProtectedRoute;

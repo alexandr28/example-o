@@ -1,10 +1,7 @@
-import { FC, ReactNode, memo, useEffect } from 'react';
+import React, { FC, ReactNode, memo, useEffect } from 'react';
 import AppSidebar from './AppSidebar';
 import Header from './Header';
-import { SidebarProvider } from '../context/SidebarContext';
-import { ThemeProvider } from '../context/ThemeContext';
 import { useAuthContext } from '../context/AuthContext';
-// import AuthDebug from '../components/debug/AuthDebug'; // Descomentar para depuración
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -31,28 +28,21 @@ const MainLayout: FC<MainLayoutProps> = memo(({
   }
 
   return (
-    <ThemeProvider>
-      <SidebarProvider>
-        <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-          {/* Barra lateral */}
-          <AppSidebar />
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Barra lateral */}
+      <AppSidebar />
 
-          {/* Contenido principal */}
-          <div className="flex flex-col flex-1 overflow-hidden">
-            {/* Encabezado */}
-            <Header title={title} />
+      {/* Contenido principal */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Encabezado */}
+        <Header title={title} />
 
-            {/* Contenido */}
-            <main className="flex-1 overflow-y-auto p-6">
-              {children}
-            </main>
-          </div>
-          
-          {/* Componente de depuración */}
-          {/* <AuthDebug /> */}
-        </div>
-      </SidebarProvider>
-    </ThemeProvider>
+        {/* Contenido - Envuelto en React.Fragment para evitar problemas de props */}
+        <main className="flex-1 overflow-y-auto p-6">
+          <React.Fragment>{children}</React.Fragment>
+        </main>
+      </div>
+    </div>
   );
 });
 

@@ -13,7 +13,8 @@ ValoresUnitariosPage,
 ConsultaContribuyente,
 UitPage,
 AlcabalaPage,
-DepreciacionPage
+DepreciacionPage,
+NuevoPredio
 } 
   from  '../pages'
 import { SidebarProvider } from '../context/SidebarContext';
@@ -63,7 +64,7 @@ const AppRouter: React.FC = () => {
               {/* Rutas de predio */}
               <Route path="/predio/nuevo" element={
                 <ProtectedRoute>
-                  <DemoPage />
+                  <NuevoPredio />
                 </ProtectedRoute>
               } />
               <Route path="/predio/buscar" element={
