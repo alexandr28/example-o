@@ -1,65 +1,13 @@
 // src/services/contribuyenteService.ts
 import { BaseApiService } from './BaseApiService';
+import {  ContribuyenteFormData } from '../schemas/contribuyenteSchemas';
+import {Contribuyente} from '../models'
 import { NotificationService } from '../components/utils/Notification';
 
-// Interfaces actualizadas según la estructura de la API
-export interface Contribuyente {
-  // IDs principales
-  codPersona: number;
-  codContribuyente: number;
-  
-  // Datos personales
-  codTipoContribuyente: string | null;
-  codTipopersona: string;
-  codTipoDocumento: string;
-  numerodocumento: string;
-  nombres: string;
-  apellidopaterno: string;
-  apellidomaterno: string;
-  direccion: string;
-  fechanacimiento: number; // timestamp
-  codestadocivil: string;
-  codsexo: string;
-  telefono: string;
-  lote: string | null;
-  otros: string | null;
-  codestado: string | null;
-  codDireccion: number | null;
-  
-  // Datos del cónyuge
-  codConyuge: number | null;
-  conyugeTipoDocumento: string | null;
-  conyugeNumeroDocumento: string | null;
-  conyugeNombres: string | null;
-  conyugeApellidopaterno: string | null;
-  conyugeApellidomaterno: string | null;
-  conyugeEstadocivil: string | null;
-  conyugeSexo: string | null;
-  conyugeTelefono: string | null;
-  conyugeFechanacimiento: number | null;
-  conyugeDireccion: string | null;
-  conyugeCoddireccion: number | null;
-  conyugeLote: string | null;
-  conyugeOtros: string | null;
-  
-  // Datos del representante legal
-  codRepresentanteLegal: number | null;
-  repreTipoDocumento: string | null;
-  repreNumeroDocumento: string | null;
-  repreNombres: string | null;
-  repreApellidopaterno: string | null;
-  repreApellidomaterno: string | null;
-  repreEstadocivil: string | null;
-  repreSexo: string | null;
-  repreTelefono: string | null;
-  repreFechanacimiento: number | null;
-  repreDireccion: string | null;
-  repreCoddireccion: number | null;
-  repreLote: string | null;
-  repreOtros: string | null;
-}
 
-// Interfaz simplificada para mostrar en listas
+/**
+ * Interfaz para item de lista de contribuyente
+ */
 export interface ContribuyenteListItem {
   id: number;
   codigo: string;
@@ -73,70 +21,40 @@ export interface ContribuyenteListItem {
   tieneRepresentante: boolean;
 }
 
-// Datos para crear/actualizar contribuyente
-export interface ContribuyenteFormData {
-  // Datos principales
-  codTipoContribuyente?: string;
-  codTipopersona: string;
-  codTipoDocumento: string;
-  numerodocumento: string;
-  nombres: string;
-  apellidopaterno: string;
-  apellidomaterno: string;
-  direccion?: string;
-  fechanacimiento?: Date | string;
-  codestadocivil?: string;
-  codsexo?: string;
-  telefono?: string;
-  codDireccion?: number;
-  
-  // Datos del cónyuge (opcional)
-  conyuge?: {
-    tipoDocumento?: string;
-    numeroDocumento?: string;
-    nombres?: string;
-    apellidopaterno?: string;
-    apellidomaterno?: string;
-    telefono?: string;
-    direccion?: string;
-    codDireccion?: number;
-  };
-  
-  // Datos del representante (opcional)
-  representante?: {
-    tipoDocumento?: string;
-    numeroDocumento?: string;
-    nombres?: string;
-    apellidopaterno?: string;
-    apellidomaterno?: string;
-    telefono?: string;
-    direccion?: string;
-    codDireccion?: number;
-  };
+/**
+ * Interfaz para parámetros de búsqueda
+ */
+interface BusquedaContribuyenteParams {
+  codigoContribuyente?: number;
+  codigoPersona?: number;
+  numeroDocumento?: string;
+  nombres?: string;
+  codUsuario?: number;
 }
 
-// Mapeo de códigos a descripciones
-const TIPO_DOCUMENTO_MAP: { [key: string]: string } = {
+// Mapeos de códigos a etiquetas
+const TIPO_DOCUMENTO_MAP: Record<string, string> = {
   '4101': 'DNI',
   '4102': 'RUC',
   '4103': 'PASAPORTE',
-  '4104': 'CARNET EXT.'
+  '4104': 'CARNET EXTRANJERIA',
+  '4105': 'OTROS'
 };
 
-const TIPO_PERSONA_MAP: { [key: string]: string } = {
+const TIPO_PERSONA_MAP: Record<string, string> = {
   '0301': 'NATURAL',
   '0302': 'JURIDICA'
 };
 
-const ESTADO_CIVIL_MAP: { [key: string]: string } = {
+const ESTADO_CIVIL_MAP: Record<string, string> = {
   '0801': 'SOLTERO(A)',
   '0802': 'CASADO(A)',
-  '0803': 'DIVORCIADO(A)',
-  '0804': 'VIUDO(A)',
+  '0803': 'VIUDO(A)',
+  '0804': 'DIVORCIADO(A)',
   '0805': 'CONVIVIENTE'
 };
 
-const SEXO_MAP: { [key: string]: string } = {
+const SEXO_MAP: Record<string, string> = {
   '0701': 'MASCULINO',
   '0702': 'FEMENINO'
 };
@@ -146,21 +64,21 @@ const SEXO_MAP: { [key: string]: string } = {
  */
 const contribuyenteNormalizeOptions = {
   normalizeItem: (item: any): Contribuyente => {
-    // Retornar el objeto tal como viene de la API
     return {
-      codPersona: item.codPersona || 0,
-      codContribuyente: item.codContribuyente || 0,
+      // Datos principales
+      codContribuyente: item.codContribuyente || item.id,
+      codPersona: item.codPersona,
       codTipoContribuyente: item.codTipoContribuyente,
-      codTipopersona: item.codTipopersona || '',
-      codTipoDocumento: item.codTipoDocumento || '',
-      numerodocumento: item.numerodocumento || '',
-      nombres: item.nombres || '',
-      apellidopaterno: item.apellidopaterno || '',
-      apellidomaterno: item.apellidomaterno || '',
-      direccion: item.direccion || '',
-      fechanacimiento: item.fechanacimiento || 0,
-      codestadocivil: item.codestadocivil || '',
-      codsexo: item.codsexo || '',
+      codTipopersona: item.codTipopersona,
+      codTipoDocumento: item.codTipoDocumento,
+      numerodocumento: item.numerodocumento,
+      nombres: item.nombres,
+      apellidopaterno: item.apellidopaterno,
+      apellidomaterno: item.apellidomaterno,
+      direccion: item.direccion,
+      fechanacimiento: item.fechanacimiento,
+      codestadocivil: item.codestadocivil,
+      codsexo: item.codsexo,
       telefono: item.telefono || '',
       lote: item.lote,
       otros: item.otros,
@@ -207,12 +125,11 @@ const contribuyenteNormalizeOptions = {
  */
 export class ContribuyenteService extends BaseApiService<Contribuyente, ContribuyenteFormData> {
   private static instance: ContribuyenteService;
+  private cacheKey: string = 'contribuyentes_cache';
   
   constructor() {
-    // En desarrollo, usar la URL completa
-    const baseURL = import.meta.env.DEV 
-      ? (import.meta.env.VITE_API_URL || 'http://192.168.20.160:8080')
-      : '';
+    // SIEMPRE usar la URL completa del backend
+    const baseURL = 'http://192.168.20.160:8080';
       
     super(
       baseURL,
@@ -220,6 +137,8 @@ export class ContribuyenteService extends BaseApiService<Contribuyente, Contribu
       contribuyenteNormalizeOptions,
       'contribuyentes_cache'
     );
+    
+    console.log('🔧 [ContribuyenteService] Inicializado con baseURL:', baseURL);
   }
 
   public static getInstance(): ContribuyenteService {
@@ -230,50 +149,53 @@ export class ContribuyenteService extends BaseApiService<Contribuyente, Contribu
   }
   
   /**
-   * Override del método getAll para manejar la estructura de respuesta de la API
+   * Busca contribuyentes con parámetros
+   * Usa GET con query parameters como muestra Postman
    */
-  async getAll(): Promise<Contribuyente[]> {
+  async buscarContribuyentes(params: BusquedaContribuyenteParams = {}): Promise<Contribuyente[]> {
     try {
-      console.log('📡 [ContribuyenteService] GET - Obteniendo todos los contribuyentes');
+      console.log('🔍 [ContribuyenteService] Buscando contribuyentes:', params);
       
-      // Primero intentar sin autenticación
-      const response = await fetch(`${this.baseURL}${this.endpoint}`, {
+      // Construir query parameters - SIEMPRE incluir valores por defecto
+      const queryParams = new URLSearchParams();
+      
+      // Siempre enviar estos parámetros como muestra Postman
+      queryParams.append('codigoContribuyente', (params.codigoContribuyente || 2).toString());
+      queryParams.append('codigoPersona', (params.codigoPersona || 0).toString());
+      
+      if (params.numeroDocumento) {
+        queryParams.append('numeroDocumento', params.numeroDocumento);
+      }
+      if (params.nombres) {
+        queryParams.append('nombres', params.nombres);
+      }
+      
+      // TEMPORAL: Usar siempre la URL completa hasta que se arregle el proxy
+      const url = `${this.baseURL}${this.endpoint}?${queryParams.toString()}`;
+        
+      console.log('📡 [ContribuyenteService] URL de búsqueda:', url);
+      
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
         }
       });
       
+      console.log('📥 [ContribuyenteService] Respuesta:', response.status, response.statusText);
+      
       if (!response.ok) {
-        // Si falla, intentar con el método del padre que incluye autenticación
-        console.log('⚠️ [ContribuyenteService] Intentando con autenticación...');
-        return await super.getAll();
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
       
       const result = await response.json();
+      console.log('📥 [ContribuyenteService] Datos recibidos:', result);
       
-      // La API devuelve { success, message, data: [...] }
-      if (result.success && Array.isArray(result.data)) {
-        const normalized = result.data.map((item: any, index: number) => 
-          this.normalizeOptions.normalizeItem(item, index)
-        );
-        
-        console.log(`✅ [ContribuyenteService] ${normalized.length} contribuyentes obtenidos`);
-        
-        // Guardar en caché si hay resultados
-        if (normalized.length > 0) {
-          this.saveToCache(normalized);
-        }
-        
-        return normalized;
-      }
-      
-      console.warn('⚠️ [ContribuyenteService] Respuesta inesperada:', result);
-      return [];
+      return this.processResponse(result);
       
     } catch (error: any) {
-      console.error('❌ [ContribuyenteService] Error al obtener contribuyentes:', error);
+      console.error('❌ [ContribuyenteService] Error al buscar contribuyentes:', error);
       
       // Intentar devolver del caché
       const cached = this.loadFromCache();
@@ -287,23 +209,66 @@ export class ContribuyenteService extends BaseApiService<Contribuyente, Contribu
   }
   
   /**
-   * Convierte un contribuyente completo a un item de lista simplificado
+   * Procesa la respuesta de la API
    */
-  private toListItem(contribuyente: Contribuyente): ContribuyenteListItem {
-    const nombreCompleto = `${contribuyente.apellidopaterno} ${contribuyente.apellidomaterno} ${contribuyente.nombres}`.trim();
+  private processResponse(result: any): Contribuyente[] {
+    // La API devuelve { success, message, data: [...] }
+    if (result.success && Array.isArray(result.data)) {
+      const normalized = result.data.map((item: any, index: number) => 
+        this.normalizeOptions.normalizeItem(item, index)
+      );
+      
+      console.log(`✅ [ContribuyenteService] ${normalized.length} contribuyentes encontrados`);
+      
+      // Guardar en caché si hay resultados
+      if (normalized.length > 0) {
+        this.saveToCache(normalized);
+      }
+      
+      return normalized;
+    }
     
-    return {
-      id: contribuyente.codContribuyente,
-      codigo: `CONT-${String(contribuyente.codContribuyente).padStart(6, '0')}`,
-      tipoDocumento: TIPO_DOCUMENTO_MAP[contribuyente.codTipoDocumento] || contribuyente.codTipoDocumento,
-      numeroDocumento: contribuyente.numerodocumento,
-      nombreCompleto: nombreCompleto,
-      direccion: contribuyente.direccion || 'Sin dirección',
-      telefono: contribuyente.telefono || '-',
-      estado: contribuyente.codestado || 'ACTIVO',
-      tieneConyugue: !!contribuyente.codConyuge,
-      tieneRepresentante: !!contribuyente.codRepresentanteLegal
-    };
+    console.warn('⚠️ [ContribuyenteService] Respuesta inesperada:', result);
+    return [];
+  }
+  
+  /**
+   * Override del método getAll para usar buscarContribuyentes
+   */
+  async getAll(): Promise<Contribuyente[]> {
+    return this.buscarContribuyentes();
+  }
+  
+  /**
+   * Busca contribuyente por código
+   */
+  async buscarPorCodigo(codigo: number): Promise<Contribuyente | null> {
+    try {
+      const contribuyentes = await this.buscarContribuyentes({ 
+        codigoContribuyente: codigo 
+      });
+      
+      return contribuyentes.length > 0 ? contribuyentes[0] : null;
+    } catch (error) {
+      console.error('❌ [ContribuyenteService] Error al buscar por código:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Busca contribuyente por número de documento
+   */
+  async buscarPorDocumento(numeroDoc: string): Promise<Contribuyente | null> {
+    try {
+      const contribuyentes = await this.buscarContribuyentes({ 
+        numeroDocumento: numeroDoc 
+      });
+      
+      return contribuyentes.length > 0 ? contribuyentes[0] : null;
+    } catch (error) {
+      console.error('❌ [ContribuyenteService] Error al buscar por documento:', error);
+      return null;
+    }
   }
   
   /**
@@ -313,139 +278,291 @@ export class ContribuyenteService extends BaseApiService<Contribuyente, Contribu
     try {
       console.log('📡 [ContribuyenteService] Obteniendo lista de contribuyentes...');
       
-      // Hacer la petición directamente sin autenticación para GET
-      const response = await fetch(`${this.baseURL}${this.endpoint}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
+      // Llamar directamente a buscarContribuyentes sin parámetros
+      const contribuyentes = await this.buscarContribuyentes();
       
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
+      // Convertir a items de lista
+      const listItems = contribuyentes.map(c => this.toListItem(c));
       
-      const result = await response.json();
-      console.log('📥 [ContribuyenteService] Respuesta recibida:', result);
+      console.log(`✅ [ContribuyenteService] ${listItems.length} items de lista generados`);
+      return listItems;
       
-      // La API devuelve { success, message, data: [...] }
-      if (result.success && Array.isArray(result.data)) {
-        const contribuyentes = result.data.map((item: any) => this.normalizeOptions.normalizeItem(item));
-        return contribuyentes.map(c => this.toListItem(c));
+    } catch (error) {
+      console.error('❌ [ContribuyenteService] Error al obtener lista:', error);
+      
+      // Intentar cargar del caché si hay error
+      const cached = this.loadFromCache();
+      if (cached && cached.length > 0) {
+        console.log(`📦 [ContribuyenteService] Usando caché con ${cached.length} items`);
+        return cached.map(c => this.toListItem(c));
       }
       
       return [];
-    } catch (error) {
-      console.error('❌ [ContribuyenteService] Error al obtener contribuyentes:', error);
-      
-      // Si es error 403, es probable que requiera autenticación
-      if (error instanceof Error && error.message.includes('403')) {
-        console.warn('⚠️ [ContribuyenteService] El endpoint requiere autenticación');
-        // Intentar con el método padre que incluye autenticación
-        try {
-          const contribuyentes = await super.getAll();
-          return contribuyentes.map(c => this.toListItem(c));
-        } catch (authError) {
-          console.error('❌ [ContribuyenteService] Error con autenticación:', authError);
-          NotificationService.error('No tiene permisos para ver contribuyentes');
-          return [];
-        }
-      }
-      
-      throw error;
     }
   }
   
   /**
-   * Busca contribuyente por número de documento
+   * Convierte un contribuyente completo a un item de lista simplificado
+   * Cambiado a public para permitir acceso desde el hook
    */
-  async buscarPorDocumento(numeroDoc: string): Promise<Contribuyente | null> {
-    try {
-      console.log('🔍 [ContribuyenteService] Buscando por documento:', numeroDoc);
-      
-      const todos = await this.getAll();
-      const encontrado = todos.find(c => c.numerodocumento === numeroDoc);
-      
-      if (encontrado) {
-        console.log('✅ [ContribuyenteService] Contribuyente encontrado');
-        return encontrado;
-      }
-      
-      console.log('ℹ️ [ContribuyenteService] Contribuyente no encontrado');
-      return null;
-      
-    } catch (error: any) {
-      console.error('❌ [ContribuyenteService] Error al buscar por documento:', error);
-      throw error;
-    }
+  public toListItem(contribuyente: Contribuyente): ContribuyenteListItem {
+    const nombreCompleto = `${contribuyente.apellidopaterno || ''} ${contribuyente.apellidomaterno || ''} ${contribuyente.nombres || ''}`.trim();
+    
+    return {
+      id: contribuyente.codContribuyente,
+      codigo: `CONT-${String(contribuyente.codContribuyente).padStart(6, '0')}`,
+      tipoDocumento: TIPO_DOCUMENTO_MAP[contribuyente.codTipoDocumento] || contribuyente.codTipoDocumento || '',
+      numeroDocumento: contribuyente.numerodocumento || '',
+      nombreCompleto: nombreCompleto || 'Sin nombre',
+      direccion: contribuyente.direccion || 'Sin dirección',
+      telefono: contribuyente.telefono || '-',
+      estado: contribuyente.codestado || 'ACTIVO',
+      tieneConyugue: !!contribuyente.codConyuge,
+      tieneRepresentante: !!contribuyente.codRepresentanteLegal
+    };
   }
   
   /**
    * Crea un nuevo contribuyente
+   * Este método requiere autenticación (POST con Bearer Token)
    */
-  async create(data: ContribuyenteFormData): Promise<Contribuyente> {
+  async create(data: any): Promise<Contribuyente> {
     try {
-      console.log('📤 [ContribuyenteService] Creando contribuyente:', data);
+      console.log('📤 [ContribuyenteService] Creando contribuyente - datos recibidos:', JSON.stringify(data, null, 2));
       
-      // Preparar datos para la API
+      // Verificar autenticación
+      const token = this.getAuthToken();
+      if (!token) {
+        NotificationService.error('Debe iniciar sesión para crear contribuyentes');
+        throw new Error('No se encontró token de autenticación');
+      }
+      
+      // VALIDACIÓN CRÍTICA: Verificar que codTipopersona no sea null
+      if (!data.codTipopersona) {
+        console.error('❌ ERROR CRÍTICO: codTipopersona es null o undefined');
+        console.error('Datos recibidos:', data);
+        throw new Error('El tipo de persona es obligatorio');
+      }
+      
+      // Preparar datos para la API asegurando que NUNCA haya valores null en campos obligatorios
       const apiData: any = {
-        codTipopersona: data.codTipopersona,
-        codTipoDocumento: data.codTipoDocumento,
-        numerodocumento: data.numerodocumento,
-        nombres: data.nombres,
-        apellidopaterno: data.apellidopaterno,
-        apellidomaterno: data.apellidomaterno,
-        direccion: data.direccion || '',
+        // Campo más importante - DEBE tener valor
+        codTipopersona: data.codTipopersona || '0301',
+        
+        // Otros campos obligatorios
+        codTipoDocumento: data.codTipoDocumento || '4101',
+        numerodocumento: data.numerodocumento || '',
+        nombres: data.nombres || 'SIN NOMBRE',
+        apellidopaterno: data.apellidopaterno !== undefined ? data.apellidopaterno : '',
+        apellidomaterno: data.apellidomaterno !== undefined ? data.apellidomaterno : '',
+        direccion: data.direccion || 'SIN DIRECCION',
+        
+        // Campos opcionales - solo incluir si tienen valor
         telefono: data.telefono || '',
-        codestadocivil: data.codestadocivil,
-        codsexo: data.codsexo,
-        codDireccion: data.codDireccion
+        lote: data.lote || '',
+        otros: data.otros || ''
       };
       
-      // Convertir fecha si existe
+      // Solo agregar estos campos si tienen valor válido
+      if (data.codestadocivil) apiData.codestadocivil = data.codestadocivil;
+      if (data.codsexo) apiData.codsexo = data.codsexo;
+      if (data.codDireccion && data.codDireccion > 0) apiData.codDireccion = data.codDireccion;
+      
+      // Convertir fecha a timestamp si existe
       if (data.fechanacimiento) {
-        const fecha = new Date(data.fechanacimiento);
-        apiData.fechanacimiento = fecha.getTime();
+        if (data.fechanacimiento instanceof Date) {
+          apiData.fechanacimiento = data.fechanacimiento.getTime();
+        } else if (typeof data.fechanacimiento === 'string') {
+          const fecha = new Date(data.fechanacimiento);
+          if (!isNaN(fecha.getTime())) {
+            apiData.fechanacimiento = fecha.getTime();
+          }
+        } else if (typeof data.fechanacimiento === 'number') {
+          apiData.fechanacimiento = data.fechanacimiento;
+        }
       }
       
-      // Agregar datos del cónyuge si existen
-      if (data.conyuge && data.conyuge.numeroDocumento) {
-        apiData.conyugeTipoDocumento = data.conyuge.tipoDocumento;
-        apiData.conyugeNumeroDocumento = data.conyuge.numeroDocumento;
-        apiData.conyugeNombres = data.conyuge.nombres;
-        apiData.conyugeApellidopaterno = data.conyuge.apellidopaterno;
-        apiData.conyugeApellidomaterno = data.conyuge.apellidomaterno;
-        apiData.conyugeTelefono = data.conyuge.telefono;
-        apiData.conyugeDireccion = data.conyuge.direccion;
-        apiData.conyugeCoddireccion = data.conyuge.codDireccion;
+      // Procesar datos del cónyuge si existen
+      if (data.conyuge && typeof data.conyuge === 'object') {
+        // Los datos ya vienen estructurados desde el hook
+        if (data.conyuge.numeroDocumento) {
+          apiData.conyugeTipoDocumento = data.conyuge.tipoDocumento || '4101';
+          apiData.conyugeNumeroDocumento = data.conyuge.numeroDocumento;
+          apiData.conyugeNombres = data.conyuge.nombres || '';
+          apiData.conyugeApellidopaterno = data.conyuge.apellidopaterno || '';
+          apiData.conyugeApellidomaterno = data.conyuge.apellidomaterno || '';
+          apiData.conyugeTelefono = data.conyuge.telefono || '';
+          apiData.conyugeDireccion = data.conyuge.direccion || '';
+          
+          if (data.conyuge.codDireccion && data.conyuge.codDireccion > 0) {
+            apiData.conyugeCoddireccion = data.conyuge.codDireccion;
+          }
+          
+          if (data.conyuge.fechanacimiento) {
+            const fechaConyuge = new Date(data.conyuge.fechanacimiento);
+            if (!isNaN(fechaConyuge.getTime())) {
+              apiData.conyugeFechanacimiento = fechaConyuge.getTime();
+            }
+          }
+        }
       }
       
-      // Agregar datos del representante si existen
-      if (data.representante && data.representante.numeroDocumento) {
-        apiData.repreTipoDocumento = data.representante.tipoDocumento;
-        apiData.repreNumeroDocumento = data.representante.numeroDocumento;
-        apiData.repreNombres = data.representante.nombres;
-        apiData.repreApellidopaterno = data.representante.apellidopaterno;
-        apiData.repreApellidomaterno = data.representante.apellidomaterno;
-        apiData.repreTelefono = data.representante.telefono;
-        apiData.repreDireccion = data.representante.direccion;
-        apiData.repreCoddireccion = data.representante.codDireccion;
+      // Procesar datos del representante si existen
+      if (data.representante && typeof data.representante === 'object') {
+        // Los datos ya vienen estructurados desde el hook
+        if (data.representante.numeroDocumento) {
+          apiData.repreTipoDocumento = data.representante.tipoDocumento || '4101';
+          apiData.repreNumeroDocumento = data.representante.numeroDocumento;
+          apiData.repreNombres = data.representante.nombres || '';
+          apiData.repreApellidopaterno = data.representante.apellidopaterno || '';
+          apiData.repreApellidomaterno = data.representante.apellidomaterno || '';
+          apiData.repreTelefono = data.representante.telefono || '';
+          apiData.repreDireccion = data.representante.direccion || '';
+          
+          if (data.representante.codDireccion && data.representante.codDireccion > 0) {
+            apiData.repreCoddireccion = data.representante.codDireccion;
+          }
+          
+          if (data.representante.fechanacimiento) {
+            const fechaRepre = new Date(data.representante.fechanacimiento);
+            if (!isNaN(fechaRepre.getTime())) {
+              apiData.repreFechanacimiento = fechaRepre.getTime();
+            }
+          }
+        }
       }
       
-      return await super.create(apiData);
+      // VALIDACIÓN FINAL CRÍTICA
+      if (!apiData.codTipopersona) {
+        console.error('❌ ERROR CRÍTICO: apiData.codTipopersona es null después del procesamiento');
+        console.error('apiData:', apiData);
+        throw new Error('Error crítico: No se pudo determinar el tipo de persona');
+      }
+      
+      // URL completa para el POST
+      const url = `${this.baseURL}${this.endpoint}`;
+      
+      console.log('📡 [ContribuyenteService] POST URL:', url);
+      console.log('📋 [ContribuyenteService] Datos finales a enviar:', JSON.stringify(apiData, null, 2));
+      console.log('🔍 [ContribuyenteService] Verificación final - codTipopersona:', apiData.codTipopersona);
+      
+      // Hacer la petición POST con Bearer Token
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(apiData)
+      });
+      
+      console.log('📥 [ContribuyenteService] Respuesta:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [ContribuyenteService] Error response:', errorText);
+        
+        // Intentar parsear el mensaje de error
+        let errorMessage = `Error ${response.status}`;
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (e) {
+          errorMessage = errorText || response.statusText;
+        }
+        
+        if (response.status === 401) {
+          NotificationService.error('Sesión expirada. Por favor, inicie sesión nuevamente');
+          // Limpiar token inválido
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_user');
+          // Redirigir al login
+          window.location.href = '/login';
+          throw new Error('Sesión expirada');
+        } else if (response.status === 400) {
+          throw new Error(errorMessage);
+        } else if (response.status === 409) {
+          throw new Error('Ya existe un contribuyente con ese número de documento');
+        } else if (response.status === 500) {
+          // Error del servidor - probablemente campo NULL
+          if (errorMessage.includes('NULL') || errorMessage.includes('515')) {
+            console.error('❌ Error de campo NULL detectado');
+            console.error('Datos enviados que causaron el error:', apiData);
+            throw new Error('Error: Faltan campos obligatorios. Verifique que todos los campos requeridos estén completos.');
+          }
+          throw new Error(errorMessage);
+        } else {
+          throw new Error(errorMessage);
+        }
+      }
+      
+      const result = await response.json();
+      console.log('✅ [ContribuyenteService] Respuesta exitosa:', result);
+      
+      // Procesar la respuesta
+      if (result.success && result.data) {
+        const nuevoContribuyente = this.normalizeOptions.normalizeItem(result.data, 0);
+        
+        // Limpiar caché para forzar recarga
+        this.clearCache();
+        
+        NotificationService.success('Contribuyente creado exitosamente');
+        return nuevoContribuyente;
+      } else if (result.data) {
+        // A veces la API devuelve los datos directamente sin success
+        const nuevoContribuyente = this.normalizeOptions.normalizeItem(result.data || result, 0);
+        this.clearCache();
+        NotificationService.success('Contribuyente creado exitosamente');
+        return nuevoContribuyente;
+      } else {
+        throw new Error(result.message || 'Error al crear contribuyente');
+      }
       
     } catch (error: any) {
       console.error('❌ [ContribuyenteService] Error al crear:', error);
-      
-      if (error.message?.includes('ya existe')) {
-        NotificationService.error('Ya existe un contribuyente con ese número de documento');
-      } else {
-        NotificationService.error(error.message || 'Error al crear contribuyente');
-      }
-      
+      console.error('Stack trace:', error.stack);
+      NotificationService.error(error.message || 'Error al crear contribuyente');
       throw error;
     }
+  }
+  
+  /**
+   * Actualiza un contribuyente (requiere autenticación)
+   */
+  async update(id: number, data: ContribuyenteFormData): Promise<Contribuyente> {
+    const token = this.getAuthToken();
+    if (!token) {
+      NotificationService.error('Debe iniciar sesión para actualizar contribuyentes');
+      throw new Error('No se encontró token de autenticación');
+    }
+    
+    return super.update(id, data);
+  }
+  
+  /**
+   * Elimina un contribuyente (requiere autenticación)
+   */
+  async delete(id: number): Promise<void> {
+    const token = this.getAuthToken();
+    if (!token) {
+      NotificationService.error('Debe iniciar sesión para eliminar contribuyentes');
+      throw new Error('No se encontró token de autenticación');
+    }
+    
+    return super.delete(id);
+  }
+  
+  /**
+   * Obtiene el token de autenticación
+   */
+  private getAuthToken(): string | null {
+    return localStorage.getItem('auth_token');
   }
   
   /**
@@ -458,6 +575,18 @@ export class ContribuyenteService extends BaseApiService<Contribuyente, Contribu
       estadosCiviles: Object.entries(ESTADO_CIVIL_MAP).map(([value, label]) => ({ value, label })),
       sexos: Object.entries(SEXO_MAP).map(([value, label]) => ({ value, label }))
     };
+  }
+  
+  /**
+   * Limpia el caché de contribuyentes
+   */
+  private clearCache(): void {
+    try {
+      localStorage.removeItem(this.cacheKey);
+      console.log('🧹 [ContribuyenteService] Caché limpiado');
+    } catch (error) {
+      console.error('Error al limpiar caché:', error);
+    }
   }
 }
 

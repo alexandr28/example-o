@@ -1,6 +1,6 @@
 // src/schemas/contribuyenteSchemas.ts
 import { z } from 'zod';
-import { TipoContribuyente, TipoDocumento, Sexo, EstadoCivil } from '../types/formTypes';
+import { TipoContribuyente} from '../types/formTypes';
 
 // Esquema para la dirección
 const direccionSchema = z.object({
@@ -10,6 +10,16 @@ const direccionSchema = z.object({
   loteInicial: z.number(),
   loteFinal: z.number()
 }).nullable();
+
+// Schema personalizado para fecha que acepta Date o string
+const fechaSchema = z.union([
+  z.date(),
+  z.string().transform((val) => {
+    const date = new Date(val);
+    return isNaN(date.getTime()) ? null : date;
+  }),
+  z.null()
+]).nullable().optional();
 
 // Esquema principal del contribuyente
 export const contribuyenteSchema = z.object({
@@ -37,7 +47,7 @@ export const contribuyenteSchema = z.object({
   
   estadoCivil: z.string().optional(),
   
-  fechaNacimiento: z.date().nullable().optional(),
+  fechaNacimiento: fechaSchema,
   
   direccion: direccionSchema,
   
@@ -76,21 +86,21 @@ export const contribuyenteSchema = z.object({
   }
 });
 
-// Esquema para cónyuge/representante legal
+// Esquema para cónyuge/representante
 export const conyugeRepresentanteSchema = z.object({
   tipoDocumento: z.string().min(1, 'Debe seleccionar el tipo de documento'),
   
   numeroDocumento: z.string()
     .min(1, 'El número de documento es requerido')
     .refine((val) => {
-      if (val.length === 8 && /^\d+$/.test(val)) return true;
-      if (val.length === 11 && /^\d+$/.test(val)) return true;
-      if (val.length >= 6 && val.length <= 12) return true;
+      if (val.length === 8 && /^\d+$/.test(val)) return true; // DNI
+      if (val.length === 11 && /^\d+$/.test(val)) return true; // RUC
+      if (val.length >= 6 && val.length <= 12) return true; // Pasaporte o Carnet
       return false;
     }, 'Formato de documento inválido'),
   
   apellidosNombres: z.string()
-    .min(1, 'Los apellidos y nombres son requeridos')
+    .min(1, 'Este campo es requerido')
     .min(3, 'Debe tener al menos 3 caracteres'),
   
   telefono: z.string().optional(),
@@ -99,13 +109,16 @@ export const conyugeRepresentanteSchema = z.object({
   
   estadoCivil: z.string().optional(),
   
-  fechaNacimiento: z.date().nullable().optional(),
+  fechaNacimiento: fechaSchema,
   
   direccion: direccionSchema,
   
-  nFinca: z.string().optional()
+  nFinca: z.string().optional(),
+}).superRefine((data, ctx) => {
+  // Solo validar sexo y estado civil si no es representante legal
+  // (Esta validación se puede ajustar según la lógica de negocio)
 });
 
-// Tipos inferidos de los esquemas
+// Tipo inferido del esquema
 export type ContribuyenteFormData = z.infer<typeof contribuyenteSchema>;
 export type ConyugeRepresentanteFormData = z.infer<typeof conyugeRepresentanteSchema>;

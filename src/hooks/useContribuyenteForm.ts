@@ -1,4 +1,4 @@
-// src/hooks/useContribuyenteForm.ts
+// src/hooks/useContribuyenteForm.ts - VERSIÓN CORREGIDA
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,7 +13,7 @@ import {
   Direccion
 } from '../types';
 import { contribuyenteSchema, conyugeRepresentanteSchema } from '../schemas/contribuyenteSchemas';
-import { contribuyenteService, ContribuyenteFormData as ApiContribuyenteData } from '../services/contribuyenteService';
+import { contribuyenteService, ContribuyenteFormData as ApiContribuyenteFormData } from '../services/contribuyenteService';
 import { direccionService } from '../services/direcionService';
 import { NotificationService } from '../components/utils/Notification';
 
@@ -71,10 +71,21 @@ export const useContribuyenteForm = () => {
   const tipoContribuyenteValue = watchContribuyente('tipoContribuyente');
   const mostrarFormConyuge = watchContribuyente('mostrarFormConyuge');
   
-  // Determinar tipo de contribuyente
+  // Determinar tipo de contribuyente - CORREGIDO
   const tipoContribuyente = useMemo(() => {
-    if (tipoContribuyenteValue === TipoContribuyente.PERSONA_NATURAL) return TipoContribuyente.PERSONA_NATURAL;
-    if (tipoContribuyenteValue === TipoContribuyente.PERSONA_JURIDICA) return TipoContribuyente.PERSONA_JURIDICA;
+    // Manejar tanto valores en minúsculas como mayúsculas
+    if (tipoContribuyenteValue === 'persona_natural' || 
+        tipoContribuyenteValue === 'PERSONA_NATURAL' ||
+        tipoContribuyenteValue === TipoContribuyente.PERSONA_NATURAL) {
+      return TipoContribuyente.PERSONA_NATURAL;
+    }
+    
+    if (tipoContribuyenteValue === 'persona_juridica' || 
+        tipoContribuyenteValue === 'PERSONA_JURIDICA' ||
+        tipoContribuyenteValue === TipoContribuyente.PERSONA_JURIDICA) {
+      return TipoContribuyente.PERSONA_JURIDICA;
+    }
+    
     return null;
   }, [tipoContribuyenteValue]);
 
@@ -120,116 +131,205 @@ export const useContribuyenteForm = () => {
     setContribuyenteValue('mostrarFormConyuge', !mostrarFormConyuge);
   }, [mostrarFormConyuge, setContribuyenteValue]);
 
-  // Mapear datos del formulario a la estructura de la API
+  // Mapear datos del formulario a la estructura de la API - CORREGIDO
   const mapFormDataToApi = useCallback((
     contribuyenteData: ContribuyenteFormData,
     conyugeData?: ConyugeRepresentanteFormData
-  ): ApiContribuyenteData => {
-    // Mapear tipo de persona según el tipo de contribuyente
-    const codTipopersona = tipoContribuyente === TipoContribuyente.PERSONA_JURIDICA ? '0302' : '0301';
+  ): ApiContribuyenteFormData => {
+    // IMPORTANTE: Verificar si el tipoContribuyente está seleccionado
+    if (!contribuyenteData.tipoContribuyente) {
+      throw new Error('Debe seleccionar el tipo de contribuyente');
+    }
     
-    // Mapear tipo de documento
-    const tipoDocMap: { [key: string]: string } = {
+    // Mapear tipo de persona según el tipo de contribuyente
+    let codTipopersona = '0301'; // Por defecto persona natural
+    
+    // Verificar todas las posibles formas del valor
+    const tipoContribuyenteNormalizado = contribuyenteData.tipoContribuyente.toLowerCase();
+    
+    if (tipoContribuyenteNormalizado === 'persona_juridica' || 
+        tipoContribuyenteNormalizado === 'juridica' ||
+        tipoContribuyenteNormalizado === TipoContribuyente.PERSONA_JURIDICA) {
+      codTipopersona = '0302';
+    } else if (tipoContribuyenteNormalizado === 'persona_natural' || 
+               tipoContribuyenteNormalizado === 'natural' ||
+               tipoContribuyenteNormalizado === TipoContribuyente.PERSONA_NATURAL) {
+      codTipopersona = '0301';
+    }
+    
+    console.log('🔍 Tipo contribuyente recibido:', contribuyenteData.tipoContribuyente);
+    console.log('🔍 Código tipo persona asignado:', codTipopersona);
+    
+    // Mapear tipo de documento - CORREGIDO para manejar minúsculas
+    const tipoDocMap: Record<string, string> = {
+      'dni': '4101',
+      'DNI': '4101',
       [TipoDocumento.DNI]: '4101',
+      'ruc': '4102',
+      'RUC': '4102',
       [TipoDocumento.RUC]: '4102',
+      'pasaporte': '4103',
+      'PASAPORTE': '4103',
       [TipoDocumento.PASAPORTE]: '4103',
+      'carnet_extranjeria': '4104',
+      'CARNET_EXTRANJERIA': '4104',
       [TipoDocumento.CARNET_EXTRANJERIA]: '4104'
     };
     
-    // Mapear sexo
-    const sexoMap: { [key: string]: string } = {
+    // Mapear sexo - CORREGIDO
+    const sexoMap: Record<string, string> = {
+      'masculino': '0701',
+      'MASCULINO': '0701',
       [Sexo.MASCULINO]: '0701',
+      'femenino': '0702',
+      'FEMENINO': '0702',
       [Sexo.FEMENINO]: '0702'
     };
     
-    // Mapear estado civil
-    const estadoCivilMap: { [key: string]: string } = {
+    // Mapear estado civil - CORREGIDO
+    const estadoCivilMap: Record<string, string> = {
+      'soltero': '0801',
+      'SOLTERO': '0801',
       [EstadoCivil.SOLTERO]: '0801',
+      'casado': '0802',
+      'CASADO': '0802',
       [EstadoCivil.CASADO]: '0802',
+      'divorciado': '0803',
+      'DIVORCIADO': '0803',
       [EstadoCivil.DIVORCIADO]: '0803',
+      'viudo': '0804',
+      'VIUDO': '0804',
       [EstadoCivil.VIUDO]: '0804',
-      [EstadoCivil.CONVIVIENTE]: '0805'
+      'conviviente': '0805',
+      'CONVIVIENTE': '0805'
     };
     
-    // Para persona jurídica, separar razón social en partes
+    // Para persona jurídica, todo el nombre va en "nombres"
     let nombres = '';
     let apellidopaterno = '';
     let apellidomaterno = '';
     
-    if (tipoContribuyente === TipoContribuyente.PERSONA_JURIDICA) {
-      nombres = contribuyenteData.nombreRazonSocial;
+    const esPersonaJuridica = codTipopersona === '0302';
+    
+    if (esPersonaJuridica) {
+      // Para jurídica, todo va en nombres
+      nombres = contribuyenteData.nombreRazonSocial || 'SIN RAZON SOCIAL';
+      apellidopaterno = '';
+      apellidomaterno = '';
     } else {
       // Para persona natural, parsear apellidos y nombres
-      const partes = contribuyenteData.nombreRazonSocial.split(' ');
+      const partes = (contribuyenteData.nombreRazonSocial || '').trim().split(/\s+/).filter(Boolean);
+      
       if (partes.length >= 3) {
-        apellidopaterno = partes[0];
-        apellidomaterno = partes[1];
-        nombres = partes.slice(2).join(' ');
+        apellidopaterno = partes[0] || 'SIN APELLIDO';
+        apellidomaterno = partes[1] || 'SIN APELLIDO';
+        nombres = partes.slice(2).join(' ') || 'SIN NOMBRE';
       } else if (partes.length === 2) {
-        apellidopaterno = partes[0];
-        nombres = partes[1];
+        apellidopaterno = partes[0] || 'SIN APELLIDO';
+        apellidomaterno = 'SIN APELLIDO';
+        nombres = partes[1] || 'SIN NOMBRE';
+      } else if (partes.length === 1) {
+        apellidopaterno = 'SIN APELLIDO';
+        apellidomaterno = 'SIN APELLIDO';
+        nombres = partes[0] || 'SIN NOMBRE';
       } else {
-        nombres = contribuyenteData.nombreRazonSocial;
+        // Si no hay nada, usar valores por defecto
+        apellidopaterno = 'SIN APELLIDO';
+        apellidomaterno = 'SIN APELLIDO';
+        nombres = 'SIN NOMBRE';
       }
     }
     
-    // Construir objeto para la API
-    const apiData: ApiContribuyenteData = {
-      codTipopersona,
-      codTipoDocumento: tipoDocMap[contribuyenteData.tipoDocumento] || contribuyenteData.tipoDocumento,
-      numerodocumento: contribuyenteData.numeroDocumento,
-      nombres,
-      apellidopaterno,
-      apellidomaterno,
-      direccion: contribuyenteData.direccion?.descripcion || '',
+    // Construir objeto para la API - USANDO LA INTERFAZ CORRECTA DEL SERVICIO
+    const apiData: ApiContribuyenteFormData = {
+      // Campo crítico - NUNCA debe ser null
+      codTipopersona: codTipopersona,
+      
+      // Otros campos obligatorios con nombres exactos que espera el servicio
+      codTipoDocumento: tipoDocMap[contribuyenteData.tipoDocumento] || '4101',
+      numerodocumento: contribuyenteData.numeroDocumento || '', // Nota: es "numerodocumento" no "numeroDocumento"
+      nombres: nombres,
+      apellidopaterno: apellidopaterno,
+      apellidomaterno: apellidomaterno,
+      direccion: contribuyenteData.direccion?.descripcion || 'SIN DIRECCION',
       telefono: contribuyenteData.telefono || '',
-      codestadocivil: estadoCivilMap[contribuyenteData.estadoCivil] || '',
-      codsexo: sexoMap[contribuyenteData.sexo] || '',
-      fechanacimiento: contribuyenteData.fechaNacimiento,
-      codDireccion: contribuyenteData.direccion?.id
+      lote: contribuyenteData.nFinca || '',
+      otros: contribuyenteData.otroNumero || ''
     };
     
-    // Agregar datos del cónyuge si existen
-    if (conyugeData && contribuyenteData.mostrarFormConyuge && tipoContribuyente === TipoContribuyente.PERSONA_NATURAL) {
-      const conyugePartes = conyugeData.apellidosNombres.split(' ');
+    // Campos opcionales solo para persona natural
+    if (!esPersonaJuridica) {
+      apiData.codestadocivil = estadoCivilMap[contribuyenteData.estadoCivil] || '0801';
+      apiData.codsexo = sexoMap[contribuyenteData.sexo] || '0701';
       
+      if (contribuyenteData.fechaNacimiento) {
+        apiData.fechanacimiento = contribuyenteData.fechaNacimiento;
+      }
+    }
+    
+    // Solo agregar codDireccion si tiene un valor válido
+    if (contribuyenteData.direccion?.id && contribuyenteData.direccion.id > 0) {
+      apiData.codDireccion = contribuyenteData.direccion.id;
+    }
+    
+    // Log para debug
+    console.log('📋 Datos finales para API:', {
+      codTipopersona: apiData.codTipopersona,
+      codTipoDocumento: apiData.codTipoDocumento,
+      numerodocumento: apiData.numerodocumento,
+      nombres: apiData.nombres,
+      apellidopaterno: apiData.apellidopaterno,
+      apellidomaterno: apiData.apellidomaterno
+    });
+    
+    // Agregar datos del cónyuge si existen (solo para persona natural)
+    if (conyugeData && contribuyenteData.mostrarFormConyuge && !esPersonaJuridica) {
+      const conyugePartes = (conyugeData.apellidosNombres || '').trim().split(/\s+/).filter(Boolean);
+      
+      // Crear objeto conyuge con la estructura correcta
       apiData.conyuge = {
-        tipoDocumento: tipoDocMap[conyugeData.tipoDocumento] || conyugeData.tipoDocumento,
-        numeroDocumento: conyugeData.numeroDocumento,
-        nombres: conyugePartes.length > 2 ? conyugePartes.slice(2).join(' ') : conyugePartes[conyugePartes.length - 1] || '',
+        tipoDocumento: tipoDocMap[conyugeData.tipoDocumento] || '4101',
+        numeroDocumento: conyugeData.numeroDocumento || '',
+        nombres: conyugePartes.length > 2 ? conyugePartes.slice(2).join(' ') : (conyugePartes[conyugePartes.length - 1] || ''),
         apellidopaterno: conyugePartes[0] || '',
         apellidomaterno: conyugePartes[1] || '',
-        telefono: conyugeData.telefono,
-        direccion: conyugeData.direccion?.descripcion,
+        telefono: conyugeData.telefono || '',
+        direccion: conyugeData.direccion?.descripcion || '',
         codDireccion: conyugeData.direccion?.id
       };
     }
     
     // Agregar datos del representante si es persona jurídica
-    if (conyugeData && contribuyenteData.mostrarFormConyuge && tipoContribuyente === TipoContribuyente.PERSONA_JURIDICA) {
-      const reprePartes = conyugeData.apellidosNombres.split(' ');
+    if (conyugeData && contribuyenteData.mostrarFormConyuge && esPersonaJuridica) {
+      const reprePartes = (conyugeData.apellidosNombres || '').trim().split(/\s+/).filter(Boolean);
       
+      // Crear objeto representante con la estructura correcta
       apiData.representante = {
-        tipoDocumento: tipoDocMap[conyugeData.tipoDocumento] || conyugeData.tipoDocumento,
-        numeroDocumento: conyugeData.numeroDocumento,
-        nombres: reprePartes.length > 2 ? reprePartes.slice(2).join(' ') : reprePartes[reprePartes.length - 1] || '',
+        tipoDocumento: tipoDocMap[conyugeData.tipoDocumento] || '4101',
+        numeroDocumento: conyugeData.numeroDocumento || '',
+        nombres: reprePartes.length > 2 ? reprePartes.slice(2).join(' ') : (reprePartes[reprePartes.length - 1] || ''),
         apellidopaterno: reprePartes[0] || '',
         apellidomaterno: reprePartes[1] || '',
-        telefono: conyugeData.telefono,
-        direccion: conyugeData.direccion?.descripcion,
+        telefono: conyugeData.telefono || '',
+        direccion: conyugeData.direccion?.descripcion || '',
         codDireccion: conyugeData.direccion?.id
       };
     }
     
+    // Validación final - NUNCA enviar si codTipopersona es null
+    if (!apiData.codTipopersona) {
+      throw new Error('Error: No se pudo determinar el tipo de persona');
+    }
+    
     return apiData;
-  }, [tipoContribuyente]);
+  }, []);
 
   // Manejar el envío del formulario
   const onSubmit = contribuyenteForm.handleSubmit(async (data) => {
     try {
       setLoading(true);
       
-      let apiData: ApiContribuyenteData;
+      let apiData;
       
       // Si hay formulario de cónyuge/representante, validarlo primero
       if (data.mostrarFormConyuge) {

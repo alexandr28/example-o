@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { contribuyenteService, ContribuyenteListItem, ContribuyenteFormData } from '../services/contribuyenteService';
 import { NotificationService } from '../components/utils/Notification';
+import { FiltroContribuyente } from '../models';
 
 interface UseContribuyentesReturn {
   // Estados
@@ -13,7 +14,7 @@ interface UseContribuyentesReturn {
   
   // Métodos
   cargarContribuyentes: () => Promise<void>;
-  buscarContribuyentes: (term: string) => Promise<void>;
+  buscarContribuyentes: (filtro: FiltroContribuyente | string) => Promise<void>;
   seleccionarContribuyente: (contribuyente: ContribuyenteListItem) => void;
   crearContribuyente: (data: ContribuyenteFormData) => Promise<void>;
   actualizarContribuyente: (id: number, data: ContribuyenteFormData) => Promise<void>;
@@ -43,40 +44,91 @@ export const useContribuyentes = (): UseContribuyentesReturn => {
     } catch (err: any) {
       console.error('❌ [useContribuyentes] Error al cargar contribuyentes:', err);
       setError(err.message || 'Error al cargar contribuyentes');
-      NotificationService.error('Error al cargar contribuyentes');
+      
+      // No mostrar notificación de error si es 403, es esperado
+      if (!err.message?.includes('403')) {
+        NotificationService.error('Error al cargar contribuyentes');
+      }
     } finally {
       setLoading(false);
     }
   }, []);
   
   /**
-   * Buscar contribuyentes por término
+   * Buscar contribuyentes por término o filtro
    */
-  const buscarContribuyentes = useCallback(async (term: string) => {
-    if (!term.trim()) {
-      await cargarContribuyentes();
-      return;
-    }
-    
+  const buscarContribuyentes = useCallback(async (filtro: FiltroContribuyente | string) => {
     try {
       setLoading(true);
       setError(null);
-      console.log('🔍 [useContribuyentes] Buscando:', term);
       
-      // Filtrar localmente por ahora
-      const todos = await contribuyenteService.getAllAsListItems();
-      const filtrados = todos.filter(c => 
-        c.nombreCompleto.toLowerCase().includes(term.toLowerCase()) ||
-        c.numeroDocumento.includes(term) ||
-        c.codigo.includes(term)
-      );
+      let termino = '';
       
-      setContribuyentes(filtrados);
-      console.log(`✅ [useContribuyentes] ${filtrados.length} resultados encontrados`);
+      // Si es un string, es búsqueda directa
+      if (typeof filtro === 'string') {
+        termino = filtro;
+      } 
+      // Si es un objeto FiltroContribuyente, extraer el término de búsqueda
+      else if (filtro && typeof filtro === 'object') {
+        termino = filtro.busqueda || '';
+      }
+      
+      console.log('🔍 [useContribuyentes] Buscando con término:', termino);
+      
+      // Si no hay término, cargar todos
+      if (!termino.trim()) {
+        await cargarContribuyentes();
+        return;
+      }
+      
+      // Buscar usando el servicio
+      const params = {
+        nombres: termino,
+        numeroDocumento: termino
+      };
+      
+      // Intentar buscar por nombre
+      let resultados = await contribuyenteService.buscarContribuyentes({ nombres: termino });
+      
+      // Si no hay resultados, intentar por documento
+      if (resultados.length === 0) {
+        resultados = await contribuyenteService.buscarContribuyentes({ numeroDocumento: termino });
+      }
+      
+      // Convertir a items de lista
+      const listItems = resultados.map(c => {
+        const service = contribuyenteService as any;
+        return service.toListItem(c);
+      });
+      
+      setContribuyentes(listItems);
+      console.log(`✅ [useContribuyentes] ${listItems.length} resultados encontrados`);
+      
+      if (listItems.length === 0) {
+        NotificationService.info('No se encontraron contribuyentes con ese criterio');
+      }
       
     } catch (err: any) {
       console.error('❌ [useContribuyentes] Error en búsqueda:', err);
       setError(err.message || 'Error al buscar contribuyentes');
+      
+      // Intentar búsqueda local si falla la remota
+      try {
+        const todos = await contribuyenteService.getAllAsListItems();
+        
+        const termino = typeof filtro === 'string' ? filtro : filtro.busqueda || '';
+        
+        const filtrados = todos.filter(c => 
+          c.nombreCompleto.toLowerCase().includes(termino.toLowerCase()) ||
+          c.numeroDocumento.includes(termino) ||
+          c.codigo.includes(termino)
+        );
+        
+        setContribuyentes(filtrados);
+        console.log(`✅ [useContribuyentes] ${filtrados.length} resultados locales encontrados`);
+      } catch (localErr) {
+        console.error('❌ [useContribuyentes] Error en búsqueda local:', localErr);
+      }
     } finally {
       setLoading(false);
     }

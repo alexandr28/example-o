@@ -80,7 +80,7 @@ interface BusquedaPorNombreViaParams {
   nombreVia?: string;
   codSector?: number;
   codBarrio?: number;
-  codUsuario?: number; // Agregado según la API
+  codUsuario?: number;
 }
 
 /**
@@ -206,33 +206,32 @@ export class DireccionService extends BaseApiService<Direccion, DireccionFormDat
   
   /**
    * Busca direcciones por nombre de vía
+   * CORREGIDO: Usar GET con query parameters
    */
   async buscarPorNombreVia(params: BusquedaPorNombreViaParams): Promise<Direccion[]> {
     try {
       console.log('🔍 [DireccionService] Buscando direcciones por nombre de vía:', params);
       
-      // Preparar los parámetros del body
-      const bodyParams = {
-        parametrosBusqueda: params.nombreVia || 'a', // Valor por defecto 'a' como en la imagen
-        codUsuario: params.codUsuario || 1 // Valor por defecto 1 como en la imagen
-      };
+      // Preparar los parámetros de consulta (query parameters)
+      const queryParams = new URLSearchParams({
+        parametrosBusqueda: params.nombreVia || 'a', // Valor por defecto 'a'
+        codUsuario: (params.codUsuario || 1).toString() // Valor por defecto 1
+      });
       
       // IMPORTANTE: En desarrollo usar URL completa
       const baseUrl = import.meta.env.DEV 
         ? `${import.meta.env.VITE_API_URL || 'http://192.168.20.160:8080'}`
         : '';
-      const url = `${baseUrl}/api/direccion/listarDireccionPorNombreVia`;
+      const url = `${baseUrl}/api/direccion/listarDireccionPorNombreVia?${queryParams}`;
       
       console.log('📡 [DireccionService] URL de búsqueda:', url);
-      console.log('📤 [DireccionService] Parámetros del body:', bodyParams);
       
+      // Usar GET sin body
       const response = await this.makeRequest(url, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
           'Accept': 'application/json'
-        },
-        body: JSON.stringify(bodyParams)
+        }
       });
       
       // El API devuelve un array, procesarlo
@@ -299,50 +298,42 @@ export class DireccionService extends BaseApiService<Direccion, DireccionFormDat
         }
       }
       
-      // Mapear los datos al formato que espera el API
-      const apiData = {
-        codSector: data.sectorId,
-        codBarrio: data.barrioId,
-        codVia: data.calleId,
+      // Mapear los datos al formato que espera el backend
+      const mappedData = {
+        sectorId: data.sectorId,
+        barrioId: data.barrioId,
+        calleId: data.calleId,
         cuadra: data.cuadra,
         lado: data.lado,
         loteInicial: data.loteInicial,
-        loteFinal: data.loteFinal
+        loteFinal: data.loteFinal,
+        estado: 1
       };
       
-      console.log('📡 [DireccionService] Enviando al API:', apiData);
+      console.log('📋 [DireccionService] Datos mapeados para crear:', mappedData);
       
-      // USAR EL ENDPOINT BASE CORRECTO: /api/direccion
-      const response = await this.makeRequest(this.url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(apiData)
-      });
-      
-      const direccion = this.normalizeOptions.normalizeItem(response, 0);
+      // Usar el método create del padre con Bearer Token
+      const nuevaDireccion = await super.create(mappedData);
       
       NotificationService.success('Dirección creada exitosamente');
-      console.log('✅ [DireccionService] Dirección creada:', direccion);
-      
-      // Actualizar caché agregando la nueva dirección
-      const cached = this.loadFromCache() || [];
-      cached.push(direccion);
-      this.saveToCache(cached);
-      
-      return direccion;
+      return nuevaDireccion;
       
     } catch (error: any) {
       console.error('❌ [DireccionService] Error al crear dirección:', error);
       
-      if (error.message?.includes('403')) {
-        NotificationService.error('No tiene permisos para crear direcciones. Contacte al administrador.');
-      } else if (error.message?.includes('401')) {
-        NotificationService.error('Su sesión ha expirado. Por favor, inicie sesión nuevamente');
+      if (error.status === 401 || error.message?.includes('401')) {
+        NotificationService.error('Sesión expirada. Por favor, inicie sesión nuevamente');
+        // Limpiar datos de autenticación
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        // Redirigir al login si es necesario
+        window.location.href = '/login';
+      } else if (error.status === 403 || error.message?.includes('403')) {
+        NotificationService.error('No tiene permisos para crear direcciones');
+      } else if (error.message?.includes('Duplicate')) {
+        NotificationService.error('Ya existe una dirección con esos datos');
       } else {
-        NotificationService.error(error.message || 'Error al crear dirección');
+        NotificationService.error(error.message || 'Error al crear la dirección');
       }
       
       throw error;
@@ -350,11 +341,11 @@ export class DireccionService extends BaseApiService<Direccion, DireccionFormDat
   }
   
   /**
-   * Actualiza una dirección existente (requiere Bearer Token)
+   * Actualiza una dirección (requiere Bearer Token)
    */
   async update(id: number, data: DireccionFormData): Promise<Direccion> {
     try {
-      console.log('📝 [DireccionService] Actualizando dirección:', id, data);
+      console.log('📤 [DireccionService] Actualizando dirección:', { id, data });
       
       const token = this.getAuthToken();
       if (!token) {
@@ -362,48 +353,22 @@ export class DireccionService extends BaseApiService<Direccion, DireccionFormDat
         throw new Error('No se encontró token de autenticación');
       }
       
-      // Mapear los datos al formato que espera el API
-      const apiData = {
-        codDireccion: id,
-        codSector: data.sectorId,
-        codBarrio: data.barrioId,
-        codVia: data.calleId,
-        cuadra: data.cuadra,
-        lado: data.lado,
-        loteInicial: data.loteInicial,
-        loteFinal: data.loteFinal
-      };
-      
-      // Usar el endpoint con el ID
-      const updateUrl = `${this.url}/${id}`;
-      
-      const response = await this.makeRequest(updateUrl, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(apiData)
-      });
-      
-      const direccion = this.normalizeOptions.normalizeItem(response, 0);
+      const direccionActualizada = await super.update(id, data);
       
       NotificationService.success('Dirección actualizada exitosamente');
-      console.log('✅ [DireccionService] Dirección actualizada:', direccion);
-      
-      // Actualizar caché
-      const cached = this.loadFromCache() || [];
-      const index = cached.findIndex(d => d.id === id);
-      if (index !== -1) {
-        cached[index] = direccion;
-        this.saveToCache(cached);
-      }
-      
-      return direccion;
+      return direccionActualizada;
       
     } catch (error: any) {
       console.error('❌ [DireccionService] Error al actualizar dirección:', error);
-      NotificationService.error(error.message || 'Error al actualizar dirección');
+      
+      if (error.status === 401) {
+        NotificationService.error('Sesión expirada. Por favor, inicie sesión nuevamente');
+      } else if (error.status === 403) {
+        NotificationService.error('No tiene permisos para actualizar direcciones');
+      } else {
+        NotificationService.error(error.message || 'Error al actualizar la dirección');
+      }
+      
       throw error;
     }
   }
@@ -411,7 +376,7 @@ export class DireccionService extends BaseApiService<Direccion, DireccionFormDat
   /**
    * Elimina una dirección (requiere Bearer Token)
    */
-  async delete(id: number): Promise<boolean> {
+  async delete(id: number): Promise<void> {
     try {
       console.log('🗑️ [DireccionService] Eliminando dirección:', id);
       
@@ -421,29 +386,21 @@ export class DireccionService extends BaseApiService<Direccion, DireccionFormDat
         throw new Error('No se encontró token de autenticación');
       }
       
-      // Usar el endpoint con el ID
-      const deleteUrl = `${this.url}/${id}`;
-      
-      await this.makeRequest(deleteUrl, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      await super.delete(id);
       
       NotificationService.success('Dirección eliminada exitosamente');
-      console.log('✅ [DireccionService] Dirección eliminada:', id);
-      
-      // Actualizar caché removiendo la dirección eliminada
-      const cached = this.loadFromCache() || [];
-      const filtered = cached.filter(d => d.id !== id);
-      this.saveToCache(filtered);
-      
-      return true;
       
     } catch (error: any) {
       console.error('❌ [DireccionService] Error al eliminar dirección:', error);
-      NotificationService.error(error.message || 'Error al eliminar dirección');
+      
+      if (error.status === 401) {
+        NotificationService.error('Sesión expirada. Por favor, inicie sesión nuevamente');
+      } else if (error.status === 403) {
+        NotificationService.error('No tiene permisos para eliminar direcciones');
+      } else {
+        NotificationService.error(error.message || 'Error al eliminar la dirección');
+      }
+      
       throw error;
     }
   }
@@ -452,22 +409,7 @@ export class DireccionService extends BaseApiService<Direccion, DireccionFormDat
    * Obtiene el token de autenticación
    */
   private getAuthToken(): string | null {
-    const token = localStorage.getItem('auth_token');
-    if (!token) {
-      console.warn('⚠️ [DireccionService] No se encontró token de autenticación');
-    } else {
-      // Verificar que el token no esté vacío
-      console.log('🔑 [DireccionService] Token encontrado:', token.substring(0, 20) + '...');
-    }
-    return token;
-  }
-  
-  /**
-   * Obtiene una dirección por ID (sin usar - solo para compatibilidad)
-   */
-  async getById(id: number): Promise<Direccion> {
-    console.warn('⚠️ [DireccionService] getById no está implementado en el backend');
-    throw new Error('Método no disponible');
+    return localStorage.getItem('auth_token');
   }
 }
 

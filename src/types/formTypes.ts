@@ -1,67 +1,43 @@
-import { z } from 'zod';
+// src/types/formTypes.ts
 
+// Enums para los tipos de datos
 export enum TipoContribuyente {
-  PERSONA_NATURAL = 'persona_natural',
-  PERSONA_JURIDICA = 'persona_juridica'
+  PERSONA_NATURAL = 'PERSONA_NATURAL',
+  PERSONA_JURIDICA = 'PERSONA_JURIDICA'
 }
 
 export enum TipoDocumento {
-  DNI = 'dni',
-  RUC = 'ruc',
-  PASAPORTE = 'pasaporte',
-  CARNET_EXTRANJERIA = 'carnet_extranjeria'
+  DNI = 'DNI',
+  RUC = 'RUC',
+  PASAPORTE = 'PASAPORTE',
+  CARNET_EXTRANJERIA = 'CARNET_EXTRANJERIA'
 }
 
 export enum Sexo {
-  MASCULINO = 'masculino',
-  FEMENINO = 'femenino'
+  MASCULINO = 'MASCULINO',
+  FEMENINO = 'FEMENINO'
 }
 
 export enum EstadoCivil {
-  SOLTERO = 'soltero',
-  CASADO = 'casado',
-  VIUDO = 'viudo',
-  DIVORCIADO = 'divorciado'
+  SOLTERO = 'SOLTERO',
+  CASADO = 'CASADO',
+  DIVORCIADO = 'DIVORCIADO',
+  VIUDO = 'VIUDO',
+  CONVIVIENTE = 'CONVIVIENTE'
 }
 
+// Interfaz para direcciones
 export interface Direccion {
   id: number;
   descripcion: string;
   lado: string;
   loteInicial: number;
   loteFinal: number;
+  // Campos adicionales del API si los hay
+  sectorId?: number;
+  barrioId?: number;
+  calleId?: number;
 }
 
-export interface ContribuyenteFormData {
-  tipoContribuyente: TipoContribuyente | string;
-  tipoDocumento: TipoDocumento | string;
-  numeroDocumento: string;
-  nombreRazonSocial: string;
-  telefono: string;
-  sexo: Sexo | string;
-  estadoCivil: EstadoCivil | string;
-  fechaNacimiento: string | null;
-  direccion: Direccion | null;
-  nFinca: string;
-  otroNumero: string;
-  mostrarFormConyuge: boolean;
-}
-
-export interface ConyugeRepresentanteFormData {
-  tipoDocumento: TipoDocumento | string;
-  numeroDocumento: string;
-  apellidosNombres: string;
-  telefono: string;
-  sexo: Sexo | string;
-  estadoCivil: EstadoCivil | string;
-  fechaNacimiento: string | null;
-  direccion: Direccion | null;
-  nFinca: string;
-}
-
-export interface DireccionSeleccionadaModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSelectDireccion: (direccion: Direccion) => void;
-  direcciones: Direccion[];
-}
+// Re-exportar tipos de los schemas
+export type { ContribuyenteFormData, ConyugeRepresentanteFormData } from '../schemas/contribuyenteSchemas';
