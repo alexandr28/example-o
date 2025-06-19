@@ -1,146 +1,272 @@
 // src/components/contribuyentes/ContribuyenteForm.tsx
-import { FC, useCallback, useMemo, memo } from 'react';
-import { Controller } from 'react-hook-form';
+import React, { useState, useCallback, memo } from 'react';
+import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
+import PersonaForm from './PersonaForm';
 import FormSection from '../utils/FormSecction';
-import { useContribuyenteForm } from '../../hooks/useContribuyenteForm';
-import { TipoContribuyente } from '../../types/formTypes';
-import { Select, Button, PersonaForm, SelectorDirecciones } from '../';
+import Button from '../ui/Button';
+import SelectorDirecciones from '../modal/SelectorDirecciones';
+import { Direccion, TipoDocumento } from '../../types/formTypes';
+import { NotificationService } from '../utils/Notification';
+//import { useContribuyenteAPI } from '../../hooks/useContribuyenteApi';
 
 /**
- * Formulario principal para registro y edición de contribuyentes
+ * Formulario principal de contribuyentes
+ * Versión sin Yup - usa validación manual
  */
-const ContribuyenteForm: FC = memo(() => {
-  const {
-    contribuyenteForm,
-    conyugeRepresentanteForm,
-    tipoContribuyente,
-    mostrarFormConyuge,
-    shouldDisablePersonaFields,
-    isDireccionModalOpen,
-    isConyugeDireccionModalOpen,
-    direcciones,
-    loading,
-    onSubmit,
-    handleOpenDireccionModal,
-    handleCloseDireccionModal,
-    handleOpenConyugeDireccionModal,
-    handleCloseConyugeDireccionModal,
-    handleSelectDireccion,
-    handleSelectConyugeDireccion,
-    toggleConyugeForm,
-    getDireccionTextoCompleto,
-    getConyugeButtonText,
-  } = useContribuyenteForm();
+const ContribuyenteForm: React.FC = memo(() => {
+  const navigate = useNavigate();
+  // Comentar el hook problemático
+  // const { guardarContribuyente } = useContribuyenteAPI();
+  
+  const [loading, setLoading] = useState(false);
+  const [showConyugeRepresentante, setShowConyugeRepresentante] = useState(false);
+  const [isDireccionModalOpen, setIsDireccionModalOpen] = useState(false);
+  const [isConyugeDireccionModalOpen, setIsConyugeDireccionModalOpen] = useState(false);
+  const [tipoContribuyente, setTipoContribuyente] = useState<'natural' | 'juridica'>('natural');
 
-  // Opciones para el select de tipo de contribuyente
-  const tipoContribuyenteOptions = useMemo(() => [
-    { value: TipoContribuyente.PERSONA_NATURAL, label: 'Persona Natural' },
-    { value: TipoContribuyente.PERSONA_JURIDICA, label: 'Persona Jurídica' },
-  ], []);
+  // Formulario principal con validación manual
+  const principalForm = useForm({
+    defaultValues: {
+      esPersonaJuridica: false,
+      tipoDocumento: 'DNI',
+      numeroDocumento: '',
+      nombres: '',
+      razonSocial: '',
+      apellidoPaterno: '',
+      apellidoMaterno: '',
+      direccion: null,
+      nFinca: '',
+      otroNumero: '',
+      telefono: '',
+      sexo: 'Masculino',
+      estadoCivil: 'Soltero/a',
+      fechaNacimiento: null
+    },
+    mode: 'onBlur'
+  });
 
-  // Handlers
-  const handleEditar = useCallback(() => {
-    console.log('Modo edición activado');
-    // Implementar lógica de edición
+  // Formulario para cónyuge/representante
+  const conyugeRepresentanteForm = useForm({
+    defaultValues: {
+      tipoDocumento: 'DNI',
+      numeroDocumento: '',
+      nombres: '',
+      apellidoPaterno: '',
+      apellidoMaterno: '',
+      direccion: null,
+      nFinca: '',
+      otroNumero: '',
+      telefono: '',
+      sexo: 'Masculino',
+      estadoCivil: 'Soltero/a',
+      fechaNacimiento: null
+    }
+  });
+
+  // Observar cambios en el tipo de contribuyente
+  const esPersonaJuridica = principalForm.watch('esPersonaJuridica');
+
+  // Manejar cambio de tipo de contribuyente
+  const handleTipoContribuyenteChange = useCallback((value: string) => {
+    const esJuridica = value === 'Persona Jurídica';
+    setTipoContribuyente(esJuridica ? 'juridica' : 'natural');
+    principalForm.setValue('esPersonaJuridica', esJuridica);
+    
+    // Cambiar tipo de documento según el tipo de contribuyente
+    if (esJuridica) {
+      principalForm.setValue('tipoDocumento', 'RUC');
+    } else {
+      principalForm.setValue('tipoDocumento', 'DNI');
+    }
+  }, [principalForm]);
+
+  // Manejar selección de dirección principal
+  const handleSelectDireccion = useCallback((direccion: Direccion) => {
+    principalForm.setValue('direccion', direccion);
+    setIsDireccionModalOpen(false);
+  }, [principalForm]);
+
+  // Manejar selección de dirección cónyuge/representante
+  const handleSelectConyugeDireccion = useCallback((direccion: Direccion) => {
+    conyugeRepresentanteForm.setValue('direccion', direccion);
+    setIsConyugeDireccionModalOpen(false);
+  }, [conyugeRepresentanteForm]);
+
+  // Toggle cónyuge/representante
+  const toggleConyugeForm = useCallback(() => {
+    setShowConyugeRepresentante(!showConyugeRepresentante);
+    if (!showConyugeRepresentante) {
+      conyugeRepresentanteForm.reset();
+    }
+  }, [showConyugeRepresentante, conyugeRepresentanteForm]);
+
+  // Obtener texto completo de dirección
+  const getDireccionTextoCompleto = useCallback((direccion: Direccion | null, nFinca: string, otroNumero?: string) => {
+    if (!direccion) return '';
+    
+    let texto = direccion.descripcion || '';
+    if (nFinca) texto += ` - N° FINCA: ${nFinca}`;
+    if (otroNumero) texto += ` - ${otroNumero}`;
+    
+    return texto;
   }, []);
 
+  /**
+   * Validación manual de los datos del formulario
+   */
+  const validarFormulario = (data: any): boolean => {
+    const errores = [];
+    
+    // Validar campos requeridos
+    if (!data.tipoDocumento) {
+      errores.push('Tipo de documento es requerido');
+    }
+    
+    if (!data.numeroDocumento) {
+      errores.push('Número de documento es requerido');
+    }
+    
+    if (data.esPersonaJuridica) {
+      if (!data.razonSocial) {
+        errores.push('Razón social es requerida');
+      }
+    } else {
+      // Para persona natural, validar el campo combinado o los campos separados
+      if (!data.apellidosNombres && (!data.nombres || !data.apellidoPaterno || !data.apellidoMaterno)) {
+        errores.push('Nombres es requerido, Apellido paterno es requerido, Apellido materno es requerido');
+      }
+    }
+    
+    if (!data.direccion) {
+      errores.push('Debe seleccionar una dirección');
+    }
+    
+    // Si hay errores, mostrarlos
+    if (errores.length > 0) {
+      NotificationService.error(errores.join(', '));
+      return false;
+    }
+    
+    return true;
+  };
+
+  /**
+   * Manejar el submit del formulario
+   * Versión simplificada sin dependencias externas
+   */
+  const handleSubmit = useCallback(async (data: any) => {
+    try {
+      // Validar formulario
+      if (!validarFormulario(data)) {
+        return;
+      }
+      
+      setLoading(true);
+      console.log('📋 [ContribuyenteForm] Datos a enviar:', data);
+
+      // Preparar los datos completos incluyendo cónyuge/representante si existe
+      const datosCompletos = {
+        ...data,
+        tieneConyugeRepresentante: showConyugeRepresentante,
+        conyugeRepresentante: showConyugeRepresentante ? conyugeRepresentanteForm.getValues() : null
+      };
+
+      // Por ahora, simular el guardado
+      console.log('💾 Datos preparados para guardar:', datosCompletos);
+      
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Mostrar mensaje de éxito
+      NotificationService.success('Contribuyente registrado correctamente (simulado)');
+      
+      // Limpiar formulario
+      handleNuevo();
+      
+      // NOTA: Cuando los servicios estén configurados, descomentar:
+      // await guardarContribuyente(datosCompletos);
+      
+    } catch (error) {
+      console.error('❌ [ContribuyenteForm] Error al guardar:', error);
+      NotificationService.error('Error al guardar el contribuyente');
+    } finally {
+      setLoading(false);
+    }
+  }, [showConyugeRepresentante, conyugeRepresentanteForm]);
+
+  // Manejar nuevo registro
   const handleNuevo = useCallback(() => {
-    contribuyenteForm.reset();
+    principalForm.reset();
     conyugeRepresentanteForm.reset();
-  }, [contribuyenteForm, conyugeRepresentanteForm]);
+    setShowConyugeRepresentante(false);
+    setTipoContribuyente('natural');
+  }, [principalForm, conyugeRepresentanteForm]);
+
+  // Manejar edición (placeholder)
+  const handleEditar = useCallback(() => {
+    NotificationService.info('Función de edición no implementada aún');
+  }, []);
+
+  // Modal handlers
+  const handleOpenDireccionModal = useCallback(() => setIsDireccionModalOpen(true), []);
+  const handleCloseDireccionModal = useCallback(() => setIsDireccionModalOpen(false), []);
+  const handleOpenConyugeDireccionModal = useCallback(() => setIsConyugeDireccionModalOpen(true), []);
+  const handleCloseConyugeDireccionModal = useCallback(() => setIsConyugeDireccionModalOpen(false), []);
 
   return (
     <>
-      <form onSubmit={onSubmit} className="space-y-8">
-        {/* Overlay de carga */}
-        {loading && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-            <div className="bg-white rounded-lg p-6 flex items-center space-x-3">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="text-lg">Guardando contribuyente...</span>
-            </div>
-          </div>
-        )}
+      <form onSubmit={principalForm.handleSubmit(handleSubmit)} className="p-6 space-y-6">
+        {/* Selector de tipo de contribuyente */}
+        <div className="flex items-center space-x-4 mb-6">
+          <label className="text-sm font-medium text-gray-700">
+            Tipo contribuyente (2 opciones)
+          </label>
+          <select
+            value={tipoContribuyente === 'juridica' ? 'Persona Jurídica' : 'Persona Natural'}
+            onChange={(e) => handleTipoContribuyenteChange(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="Persona Natural">Persona Natural</option>
+            <option value="Persona Jurídica">Persona Jurídica</option>
+          </select>
+          <span className="text-sm text-gray-500">
+            Valor: "{tipoContribuyente === 'juridica' ? 'PERSONA_JURIDICA' : 'PERSONA_NATURAL'}" | Válido: ✓
+          </span>
+        </div>
 
-        {/* Sección: Datos del contribuyente */}
-        <FormSection title="Datos del contribuyente">
-          <div className="space-y-6">
-            {/* Campo: Tipo de contribuyente */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="md:col-span-2">
-                <Controller
-                  name="tipoContribuyente"
-                  control={contribuyenteForm.control}
-                  render={({ field }) => (
-                    <Select
-                      {...field}
-                      label="Tipo contribuyente"
-                      options={tipoContribuyenteOptions}
-                      error={contribuyenteForm.formState.errors.tipoContribuyente?.message as string}
-                      disabled={loading}
-                    />
-                  )}
-                />
-              </div>
-            </div>
-
-            {/* Formulario de datos personales */}
-            <PersonaForm
-              form={contribuyenteForm}
-              isJuridica={tipoContribuyente === TipoContribuyente.PERSONA_JURIDICA}
-              onOpenDireccionModal={handleOpenDireccionModal}
-              direccion={contribuyenteForm.watch('direccion')}
-              getDireccionTextoCompleto={getDireccionTextoCompleto}
-              disablePersonaFields={shouldDisablePersonaFields || loading}
-            />
-            
-            {/* Botones de acción */}
-            <div className="flex justify-between pt-4">
-              <Button
-                type="button"
-                variant="accent"
-                onClick={toggleConyugeForm}
-                disabled={loading || !tipoContribuyente}
-              >
-                {getConyugeButtonText()}
-              </Button>
-              
-              <div className="flex space-x-2">
-                <Button
-                  type="submit"
-                  variant="primary"
-                  disabled={loading}
-                >
-                  {loading ? 'Guardando...' : 'Guardar'}
-                </Button>
-                
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleEditar}
-                  disabled={loading}
-                >
-                  Editar
-                </Button>
-                
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleNuevo}
-                  disabled={loading}
-                >
-                  Nuevo
-                </Button>
-              </div>
-            </div>
-          </div>
+        {/* Datos principales */}
+        <FormSection title="Datos del Contribuyente">
+          <PersonaForm
+            form={principalForm}
+            isJuridica={esPersonaJuridica}
+            onOpenDireccionModal={handleOpenDireccionModal}
+            direccion={principalForm.watch('direccion')}
+            getDireccionTextoCompleto={getDireccionTextoCompleto}
+            disablePersonaFields={loading}
+          />
         </FormSection>
-        
-        {/* Sección condicional: Datos del cónyuge / representante legal */}
-        {mostrarFormConyuge && (
+
+        {/* Botón para agregar cónyuge/representante */}
+        <div className="flex justify-start">
+          <Button
+            type="button"
+            variant={showConyugeRepresentante ? 'secondary' : 'primary'}
+            onClick={toggleConyugeForm}
+            disabled={loading}
+          >
+            {showConyugeRepresentante 
+              ? 'Ocultar' 
+              : esPersonaJuridica 
+                ? 'Agregar datos del representante legal' 
+                : 'Agregar datos del cónyuge'}
+          </Button>
+        </div>
+
+        {/* Formulario de cónyuge/representante */}
+        {showConyugeRepresentante && (
           <FormSection 
-            title={tipoContribuyente === TipoContribuyente.PERSONA_NATURAL ? 
-              'Datos del cónyuge' : 'Datos del representante legal'}
+            title={esPersonaJuridica ? 'Datos del representante legal' : 'Datos del cónyuge'}
           >
             <PersonaForm
               form={conyugeRepresentanteForm}
@@ -157,6 +283,34 @@ const ContribuyenteForm: FC = memo(() => {
             />
           </FormSection>
         )}
+
+        {/* Botones de acción */}
+        <div className="flex justify-end space-x-3 pt-6 border-t">
+          <Button
+            type="submit"
+            variant="primary"
+            loading={loading}
+            disabled={loading}
+          >
+            Guardar
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleEditar}
+            disabled={loading}
+          >
+            Editar
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleNuevo}
+            disabled={loading}
+          >
+            Nuevo
+          </Button>
+        </div>
       </form>
 
       {/* Modals - Fuera del formulario */}

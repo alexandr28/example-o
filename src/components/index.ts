@@ -63,3 +63,8 @@ export {default as ProtectedRoute} from './auth/ProtectedRoute'
 export {  EntityForm } from './EntityForm';
 export { EntityList } from './EntityList';
 export { default as FormErrorBoundary } from './utils/FormErrorBoundary';
+
+//export { DireccionForm } from './contribuyentes/DireccionnForm';
+export { ConyugeForm } from './contribuyentes/ConyugeForm';
+export { RepresentanteLegalForm } from './contribuyentes/RepresentanteLegalForm';
+export { default as FormSection } from './utils/FormSecction';

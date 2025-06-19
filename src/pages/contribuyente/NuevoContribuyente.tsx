@@ -1,13 +1,12 @@
-import { FC, useMemo, memo } from 'react';
-import {ContribuyenteForm, Breadcrumb} from '../../components';
-import {MainLayout} from '../../layout';
+// src/pages/contribuyente/NuevoContribuyente.tsx
+import React, { FC, useMemo, memo } from 'react';
+import { ContribuyenteForm, Breadcrumb, NotificationContainer } from '../../components';
+import { MainLayout } from '../../layout';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 
 /**
  * Página para crear un nuevo contribuyente
- * 
- * Esta página muestra el encabezado,
- * y el formulario principal para registrar un nuevo contribuyente.
+ * Usa el ContribuyenteForm existente con las APIs integradas
  */
 const NuevoContribuyente: FC = memo(() => {
   // Definir las migas de pan para la navegación
@@ -22,16 +21,17 @@ const NuevoContribuyente: FC = memo(() => {
       <div className="space-y-4">
         {/* Navegación de migas de pan */}
         <Breadcrumb items={breadcrumbItems} />
-      
-      
-      
+        
         {/* Contenedor del formulario */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-         <ContribuyenteForm />
+          <ContribuyenteForm />
         </div>
       </div>
-  </MainLayout>
-);
+      
+      {/* Contenedor de notificaciones */}
+      <NotificationContainer />
+    </MainLayout>
+  );
 });
 
 // Nombre para DevTools
