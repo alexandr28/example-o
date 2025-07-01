@@ -1,11 +1,46 @@
-// src/pages/mantenedores/SectoresPage.tsx
+// src/pages/mantenedores/SectoresPage.tsx - Versión mejorada con Material-UI
 import React, { useState, useMemo } from 'react';
+import {
+  Box,
+  Paper,
+  Typography,
+  Button,
+  Alert,
+  AlertTitle,
+  Chip,
+  Grid,
+  Stack,
+  CircularProgress,
+  Backdrop,
+  useTheme,
+  Fade,
+  LinearProgress,
+  IconButton,
+  Collapse
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Refresh as RefreshIcon,
+  CloudOff as CloudOffIcon,
+  Cloud as CloudIcon,
+  Sync as SyncIcon,
+  Storage as StorageIcon,
+  BugReport as BugReportIcon,
+  WifiOff as WifiOffIcon,
+  CheckCircle as CheckCircleIcon,
+  Error as ErrorIcon,
+  Warning as WarningIcon,
+  Info as InfoIcon,
+  Clear as ClearIcon
+} from '@mui/icons-material';
 import { MainLayout } from '../../layout';
 import { SectorList, SectorForm, Breadcrumb } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useSectores } from '../../hooks';
 
 const SectoresPage: React.FC = () => {
+  const theme = useTheme();
   const {
     sectores,
     sectorSeleccionado,
@@ -29,19 +64,31 @@ const SectoresPage: React.FC = () => {
   // Estados locales
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showDebug, setShowDebug] = useState(false);
+  const [alertType, setAlertType] = useState<'success' | 'error' | 'warning' | 'info'>('info');
 
   // Migas de pan
   const breadcrumbItems: BreadcrumbItem[] = useMemo(() => [
-    { label: 'Módulo', path: '/' },
+    { label: 'Inicio', path: '/' },
     { label: 'Mantenedores', path: '/mantenedores' },
     { label: 'Ubicación', path: '/mantenedores/ubicacion' },
     { label: 'Sectores', active: true }
   ], []);
 
   // Función para mostrar mensaje temporal
-  const showMessage = (message: string, duration = 3000) => {
+  const showMessage = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info', duration = 3000) => {
     setSuccessMessage(message);
+    setAlertType(type);
     setTimeout(() => setSuccessMessage(null), duration);
+  };
+
+  // Obtener icono según el tipo de alerta
+  const getAlertIcon = () => {
+    switch (alertType) {
+      case 'success': return <CheckCircleIcon />;
+      case 'error': return <ErrorIcon />;
+      case 'warning': return <WarningIcon />;
+      default: return <InfoIcon />;
+    }
   };
 
   // Manejo de edición
@@ -49,7 +96,7 @@ const SectoresPage: React.FC = () => {
     if (sectorSeleccionado) {
       setModoEdicion(true);
     } else {
-      showMessage("⚠️ Por favor, seleccione un sector para editar");
+      showMessage("Por favor, seleccione un sector para editar", 'warning');
     }
   };
 
@@ -57,11 +104,14 @@ const SectoresPage: React.FC = () => {
   const handleGuardar = async (data: { nombre: string }) => {
     try {
       await guardarSector(data);
-      showMessage(modoEdicion 
-        ? "✅ Sector actualizado correctamente" 
-        : "✅ Sector creado correctamente");
+      showMessage(
+        modoEdicion 
+          ? "Sector actualizado correctamente" 
+          : "Sector creado correctamente",
+        'success'
+      );
     } catch (error: any) {
-      showMessage(`❌ Error al guardar: ${error.message}`);
+      showMessage(`Error al guardar: ${error.message}`, 'error');
     }
   };
 
@@ -69,197 +119,345 @@ const SectoresPage: React.FC = () => {
   const handleEliminar = async (id: number) => {
     try {
       await eliminarSector(id);
-      showMessage("✅ Sector eliminado correctamente");
+      showMessage("Sector eliminado correctamente", 'success');
     } catch (error: any) {
-      showMessage(`❌ Error al eliminar: ${error.message}`);
+      showMessage(`Error al eliminar: ${error.message}`, 'error');
     }
   };
 
   // Test de API
   const handleTestApi = async () => {
-    showMessage("🧪 Probando conexión con API...");
+    showMessage("Probando conexión con API...", 'info');
     
     try {
       const isConnected = await testApiConnection();
-      showMessage(isConnected 
-        ? "✅ API conectada correctamente" 
-        : "❌ API no responde correctamente");
+      showMessage(
+        isConnected 
+          ? "Conexión con API exitosa" 
+          : "No se pudo conectar con la API",
+        isConnected ? 'success' : 'error'
+      );
     } catch (error) {
-      showMessage("❌ Error al probar API");
+      showMessage("Error al probar conexión", 'error');
     }
   };
 
-  // Forzar recarga
+  // Forzar recarga online
   const handleForceReload = async () => {
-    showMessage("🔄 Forzando recarga desde API...");
-    
-    try {
-      await forzarModoOnline();
-      showMessage("✅ Datos recargados desde API");
-    } catch (error: any) {
-      showMessage(`❌ Error al forzar recarga: ${error.message}`);
-    }
+    await forzarModoOnline();
+    await cargarSectores();
   };
 
-  // Limpiar cache
-  const handleClearCache = () => {
-    localStorage.removeItem('sectores_cache');
-    showMessage("🧹 Cache limpiado");
+  // Sincronización manual
+  const handleSync = async () => {
+    showMessage("Sincronizando con el servidor...", 'info');
+    const success = await sincronizarManualmente();
+    showMessage(
+      success 
+        ? "Sincronización completada" 
+        : "Error en la sincronización",
+      success ? 'success' : 'error'
+    );
   };
 
   return (
     <MainLayout title="Mantenimiento de Sectores">
-      <div className="space-y-4">
-        {/* Header con botones de acciones */}
-        <div className="flex justify-between items-center">
+      <Box sx={{ height: '100%', bgcolor: '#F5F5F5' }}>
+        {/* Breadcrumb */}
+        <Box sx={{ px: 3, pt: 2, pb: 1 }}>
           <Breadcrumb items={breadcrumbItems} />
-          
-          <div className="flex space-x-2">
-            <button 
+        </Box>
+
+        {/* Header con acciones */}
+        <Box sx={{ px: 3, pb: 2 }}>
+          <Stack direction="row" justifyContent="flex-end" spacing={1}>
+            {/* Botones de acción */}
+            <Button
+              size="small"
+              variant="text"
+              startIcon={<WifiOffIcon />}
               onClick={handleTestApi}
-              className="text-purple-600 hover:text-purple-800 flex items-center text-sm px-2 py-1 rounded border border-purple-200 hover:bg-purple-50"
+              sx={{ 
+                textTransform: 'none',
+                color: '#8B5CF6',
+                fontWeight: 500,
+                fontSize: '0.875rem'
+              }}
+            >
+              Test API
+            </Button>
+            
+            <Button
+              size="small"
+              variant="text"
+              startIcon={<RefreshIcon />}
+              onClick={() => cargarSectores()}
               disabled={loading}
+              sx={{ 
+                textTransform: 'none',
+                color: '#3B82F6',
+                fontWeight: 500,
+                fontSize: '0.875rem'
+              }}
             >
-              🧪 Test API
-            </button>
+              Recargar
+            </Button>
             
-            <button 
-              onClick={handleForceReload}
-              className="text-blue-600 hover:text-blue-800 flex items-center text-sm px-2 py-1 rounded border border-blue-200 hover:bg-blue-50"
-              disabled={loading}
+            <Button
+              size="small"
+              variant="text"
+              startIcon={<ClearIcon />}
+              onClick={() => localStorage.removeItem('sectores_cache')}
+              sx={{ 
+                textTransform: 'none',
+                color: '#EF4444',
+                fontWeight: 500,
+                fontSize: '0.875rem'
+              }}
             >
-              🔄 Recargar
-            </button>
+              Limpiar Cache
+            </Button>
             
-            <button 
-              onClick={handleClearCache}
-              className="text-orange-600 hover:text-orange-800 flex items-center text-sm px-2 py-1 rounded border border-orange-200 hover:bg-orange-50"
+            <IconButton 
+              onClick={() => setShowDebug(!showDebug)}
+              size="small"
+              sx={{
+                color: showDebug ? '#10B981' : '#6B7280',
+              }}
             >
-              🧹 Limpiar Cache
-            </button>
-            
-            {process.env.NODE_ENV === 'development' && (
-              <button 
-                onClick={() => setShowDebug(!showDebug)}
-                className="text-gray-600 hover:text-gray-800 flex items-center text-sm px-2 py-1 rounded border border-gray-200 hover:bg-gray-50"
-                disabled={loading}
-              >
-                🔧 {showDebug ? 'Ocultar' : 'Debug'}
-              </button>
-            )}
-          </div>
-        </div>
+              <BugReportIcon sx={{ fontSize: '1.25rem' }} />
+            </IconButton>
+          </Stack>
+        </Box>
 
-        {/* Panel de debug */}
-        {showDebug && process.env.NODE_ENV === 'development' && (
-          <div className="bg-gray-900 text-green-400 p-4 rounded-md font-mono text-xs overflow-auto max-h-96">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-green-300 font-bold">🔧 INFORMACIÓN DE DEBUG</h3>
-              <button 
-                onClick={sincronizarManualmente}
-                className="text-green-300 hover:text-green-200 px-2 py-1 rounded border border-green-600"
+        {/* Panel de Debug */}
+        <Collapse in={showDebug}>
+          <Paper 
+            sx={{ 
+              p: 2, 
+              mb: 3, 
+              bgcolor: 'grey.100',
+              border: '1px solid',
+              borderColor: 'grey.300',
+              borderRadius: 1,
+              fontFamily: 'monospace',
+              fontSize: '0.875rem'
+            }}
+          >
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+              Estado de Debug
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6} md={3}>
+                <Typography variant="caption" color="text.secondary">Modo Offline:</Typography>
+                <Typography variant="body2">{isOfflineMode ? 'Sí' : 'No'}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Typography variant="caption" color="text.secondary">Total Sectores:</Typography>
+                <Typography variant="body2">{sectores.length}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Typography variant="caption" color="text.secondary">Caché Local:</Typography>
+                <Typography variant="body2">{localStorage.getItem('sectores_cache') ? 'Sí' : 'No'}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Typography variant="caption" color="text.secondary">Token Auth:</Typography>
+                <Typography variant="body2">{localStorage.getItem('auth_token') ? 'Presente' : 'Ausente'}</Typography>
+              </Grid>
+            </Grid>
+            <Box sx={{ mt: 2 }}>
+              <Button 
+                size="small" 
+                variant="outlined" 
+                onClick={handleTestApi}
+                startIcon={<WifiOffIcon />}
               >
-                Sincronizar
-              </button>
-            </div>
-            <pre>{JSON.stringify({
-              totalSectores: sectores.length,
-              sectorSeleccionado: sectorSeleccionado?.nombre || 'Ninguno',
-              modoEdicion,
-              isOfflineMode,
-              loading,
-              error,
-              searchTerm,
-              cache: {
-                sectores: !!localStorage.getItem('sectores_cache')
+                Test API Connection
+              </Button>
+            </Box>
+          </Paper>
+        </Collapse>
+
+        {/* Alertas y mensajes */}
+        <Stack spacing={2} sx={{ mb: 3 }}>
+          {/* Mensaje de éxito/error */}
+          <Collapse in={!!successMessage}>
+            <Alert 
+              severity={alertType}
+              icon={getAlertIcon()}
+              onClose={() => setSuccessMessage(null)}
+              sx={{ 
+                borderRadius: 1,
+                '& .MuiAlert-icon': {
+                  fontSize: '1.5rem'
+                }
+              }}
+            >
+              {successMessage}
+            </Alert>
+          </Collapse>
+
+          {/* Alerta de modo offline */}
+          {isOfflineMode && (
+            <Alert 
+              severity="warning" 
+              icon={<CloudOffIcon />}
+              action={
+                <Button 
+                  color="inherit" 
+                  size="small" 
+                  onClick={handleForceReload}
+                  disabled={loading}
+                >
+                  Reconectar
+                </Button>
               }
-            }, null, 2)}</pre>
-          </div>
-        )}
+            >
+              <AlertTitle>Modo sin conexión</AlertTitle>
+              Trabajando con datos locales. Los cambios se sincronizarán cuando se restablezca la conexión.
+            </Alert>
+          )}
 
-        {/* Mensaje de éxito/error */}
-        {successMessage && (
-          <div className={`border px-4 py-3 rounded relative ${
-            successMessage.includes('❌') 
-              ? 'bg-red-50 border-red-200 text-red-800' 
-              : successMessage.includes('⚠️')
-              ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
-              : 'bg-green-50 border-green-200 text-green-800'
-          }`} role="alert">
-            <span className="block sm:inline">{successMessage}</span>
-          </div>
-        )}
+          {/* Mensajes de error */}
+          {error && (
+            <Alert severity="error" icon={<ErrorIcon />}>
+              {error}
+            </Alert>
+          )}
+        </Stack>
 
-        {/* Alerta de modo offline */}
-        {isOfflineMode && (
-          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded relative">
-            <div className="flex justify-between items-center">
-              <div>
-                <span className="font-medium">⚠️ Modo sin conexión:</span>
-                <span className="ml-1">Trabajando con datos locales.</span>
-              </div>
-              <button 
-                onClick={handleForceReload}
-                className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300"
-                disabled={loading}
-              >
-                Reconectar
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Loading overlay */}
+        <Backdrop
+          sx={{ 
+            color: '#fff', 
+            zIndex: (theme) => theme.zIndex.drawer + 1,
+            position: 'absolute'
+          }}
+          open={loading}
+        >
+          <CircularProgress color="inherit" />
+        </Backdrop>
 
-        {/* Mensajes de error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
-            <span className="block sm:inline">{error}</span>
-          </div>
-        )}
+        {/* Contenido principal */}
+        <Box sx={{ px: 3, pb: 3 }}>
+          <Grid container spacing={2}>
+            {/* Formulario */}
+            <Grid item xs={12}>
+              <Fade in timeout={300}>
+                <Box>
+                  <SectorForm
+                    sectorSeleccionado={sectorSeleccionado}
+                    onGuardar={handleGuardar}
+                    onNuevo={limpiarSeleccion}
+                    onEditar={handleEditar}
+                    modoOffline={isOfflineMode}
+                    loading={loading}
+                    isEditMode={modoEdicion}
+                  />
+                </Box>
+              </Fade>
+            </Grid>
 
-        {/* Formulario de sectores */}
-        <SectorForm
-          sectorSeleccionado={sectorSeleccionado}
-          onGuardar={handleGuardar}
-          onNuevo={limpiarSeleccion}
-          onEditar={handleEditar}
-          modoOffline={isOfflineMode}
-          loading={loading}
-          isEditMode={modoEdicion}
-        />
+            {/* Lista */}
+            <Grid item xs={12}>
+              <Fade in timeout={500}>
+                <Paper 
+                  elevation={0}
+                  sx={{ 
+                    backgroundColor: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: 1,
+                    overflow: 'hidden'
+                  }}
+                >
+                  <SectorList
+                    sectores={sectores}
+                    onSelectSector={seleccionarSector}
+                    isOfflineMode={isOfflineMode}
+                    onEliminar={handleEliminar}
+                    loading={loading}
+                    onSearch={buscarSectores}
+                    searchTerm={searchTerm}
+                  />
+                </Paper>
+              </Fade>
+            </Grid>
+          </Grid>
 
-        {/* Lista de sectores */}
-        <SectorList
-          sectores={sectores}
-          onSelectSector={seleccionarSector}
-          isOfflineMode={isOfflineMode}
-          onEliminar={handleEliminar}
-          loading={loading}
-          onSearch={buscarSectores}
-          searchTerm={searchTerm}
-        />
-
-        {/* Información adicional */}
-        <div className="bg-gray-50 p-4 rounded-md text-sm text-gray-600">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <span className="font-medium">Total sectores:</span>
-              <span className="ml-2">{sectores.length}</span>
-            </div>
-            <div>
-              <span className="font-medium">Estado:</span>
-              <span className="ml-2">{isOfflineMode ? '🔴 Offline' : '🟢 Online'}</span>
-            </div>
-            <div>
-              <span className="font-medium">Seleccionado:</span>
-              <span className="ml-2">{sectorSeleccionado?.nombre || 'Ninguno'}</span>
-            </div>
-            <div>
-              <span className="font-medium">Modo:</span>
-              <span className="ml-2">{modoEdicion ? 'Edición' : 'Vista'}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+          {/* Información adicional */}
+          <Box sx={{ mt: 3 }}>
+            <Paper 
+              elevation={0}
+              sx={{ 
+                p: 2,
+                backgroundColor: 'grey.50',
+                border: '1px solid',
+                borderColor: 'grey.200',
+                borderRadius: 1
+              }}
+            >
+              <Grid container spacing={3}>
+                <Grid item xs={6} sm={3}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <StorageIcon sx={{ color: 'text.secondary', fontSize: '1.25rem' }} />
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Total sectores
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {sectores.length}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    {isOfflineMode ? (
+                      <CloudOffIcon sx={{ color: 'warning.main', fontSize: '1.25rem' }} />
+                    ) : (
+                      <CloudIcon sx={{ color: 'success.main', fontSize: '1.25rem' }} />
+                    )}
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Estado
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {isOfflineMode ? 'Offline' : 'Online'}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <EditIcon sx={{ color: 'text.secondary', fontSize: '1.25rem' }} />
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Seleccionado
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {sectorSeleccionado?.nombre || 'Ninguno'}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <InfoIcon sx={{ color: 'text.secondary', fontSize: '1.25rem' }} />
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Modo
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {modoEdicion ? 'Edición' : 'Vista'}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Grid>
+              </Grid>
+            </Paper>
+          </Box>
+        </Box>
+      </Box>
     </MainLayout>
   );
 };

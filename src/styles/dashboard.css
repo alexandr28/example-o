@@ -1,0 +1,172 @@
+/* src/styles/dashboard.css - Estilos adicionales para el Dashboard */
+
+/* Animaciones para las tarjetas de estadísticas */
+@keyframes slideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Aplicar animación a las tarjetas */
+  .stats-card {
+    animation: slideInUp 0.5s ease-out;
+  }
+  
+  .stats-card:nth-child(1) {
+    animation-delay: 0.1s;
+  }
+  
+  .stats-card:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+  
+  .stats-card:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+  
+  .stats-card:nth-child(4) {
+    animation-delay: 0.4s;
+  }
+  
+  /* Efecto de brillo en hover para las tarjetas */
+  .stats-card-hover {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .stats-card-hover::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+      45deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.1) 50%,
+      transparent 70%
+    );
+    transform: rotate(45deg) translate(-100%, -100%);
+    transition: transform 0.6s;
+  }
+  
+  .stats-card-hover:hover::before {
+    transform: rotate(45deg) translate(100%, 100%);
+  }
+  
+  /* Gradientes para los avatares */
+  .avatar-gradient-blue {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .avatar-gradient-green {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  }
+  
+  .avatar-gradient-purple {
+    background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+  }
+  
+  .avatar-gradient-yellow {
+    background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+  }
+  
+  /* Efecto de pulso para badges */
+  @keyframes pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+    }
+    70% {
+      box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+    }
+  }
+  
+  .pulse-badge {
+    animation: pulse 2s infinite;
+  }
+  
+  /* Mejoras para las barras de progreso */
+  .progress-bar-animated {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .progress-bar-animated::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.3),
+      transparent
+    );
+    animation: progress-shine 2s linear infinite;
+  }
+  
+  @keyframes progress-shine {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+  
+  /* Estilo para actividades recientes */
+  .activity-item {
+    transition: all 0.3s ease;
+  }
+  
+  .activity-item:hover {
+    transform: translateX(8px);
+  }
+  
+  /* Mejoras para botones de acción rápida */
+  .quick-action-button {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+  
+  .quick-action-button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+  }
+  
+  .quick-action-button:hover::before {
+    width: 300px;
+    height: 300px;
+  }
+  
+  /* Dashboard responsive */
+  @media (max-width: 768px) {
+    .dashboard-header {
+      text-align: center;
+    }
+    
+    .dashboard-actions {
+      justify-content: center;
+      margin-top: 1rem;
+    }
+  }

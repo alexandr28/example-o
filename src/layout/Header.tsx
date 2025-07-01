@@ -1,127 +1,399 @@
-import { FC, memo } from 'react';
+// src/layout/Header.tsx - Versión mejorada con Material-UI
+import React, { FC, memo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  AppBar,
+  Toolbar,
+  IconButton,
+  Typography,
+  Badge,
+  Menu,
+  MenuItem,
+  Avatar,
+  Box,
+  useTheme,
+  Tooltip,
+  Divider,
+  ListItemIcon,
+  ListItemText,
+  Switch,
+  FormControlLabel,
+  Chip,
+  alpha,
+  useMediaQuery
+} from '@mui/material';
+import {
+  Menu as MenuIcon,
+  Notifications,
+  AccountCircle,
+  Settings,
+  Logout,
+  Brightness4,
+  Brightness7,
+  Search,
+  MoreVert,
+  Person,
+  Security,
+  Language
+} from '@mui/icons-material';
 import { useSidebar } from '../context/SidebarContext';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme as useCustomTheme } from '../context/ThemeContext';
 import { useAuthContext } from '../context/AuthContext';
-import {Button} from '../components'
 
 interface HeaderProps {
-  title: string;
+  title?: string;
 }
 
-/**
- * Componente de encabezado para la aplicación
- * 
- * Muestra el título de la aplicación, botón para colapsar/expandir el sidebar
- * y controles de usuario adicionales
- */
-const Header: FC<HeaderProps> = memo(({ title }) => {
-  const { isExpanded, toggleSidebar } = useSidebar();
-  const { theme, toggleTheme } = useTheme();
-  const { user, logout } = useAuthContext();
+const Header: FC<HeaderProps> = memo(({ title = 'Sistema de Gestión Tributaria' }) => {
+  const theme = useTheme();
   const navigate = useNavigate();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
+  const { toggleSidebar, toggleMobileSidebar, isExpanded } = useSidebar();
+  const { theme: appTheme, toggleTheme } = useCustomTheme();
+  const { user, logout } = useAuthContext();
 
-  // Manejar el cierre de sesión
+  const [anchorElUser, setAnchorElUser] = useState<null | HTMLElement>(null);
+  const [anchorElNotifications, setAnchorElNotifications] = useState<null | HTMLElement>(null);
+
+  // Estados para las notificaciones de ejemplo
+  const [notifications] = useState([
+    { id: 1, message: 'Nuevo contribuyente registrado', time: '5 min', read: false },
+    { id: 2, message: 'Reporte de predios generado', time: '1 hora', read: false },
+    { id: 3, message: 'Caja cerrada exitosamente', time: '2 horas', read: true },
+  ]);
+
+  const unreadNotifications = notifications.filter(n => !n.read).length;
+
+  const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorElUser(event.currentTarget);
+  };
+
+  const handleCloseUserMenu = () => {
+    setAnchorElUser(null);
+  };
+
+  const handleOpenNotifications = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorElNotifications(event.currentTarget);
+  };
+
+  const handleCloseNotifications = () => {
+    setAnchorElNotifications(null);
+  };
+
   const handleLogout = () => {
+    handleCloseUserMenu();
     logout();
     navigate('/login');
   };
 
+  const handleProfile = () => {
+    handleCloseUserMenu();
+    navigate('/perfil');
+  };
+
+  const handleSettings = () => {
+    handleCloseUserMenu();
+    navigate('/configuracion');
+  };
+
+  const drawerWidth = isExpanded ? 280 : 72;
+
   return (
-    <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 h-16 flex items-center px-4 shadow-sm">
-      {/* Botón para mostrar/ocultar sidebar */}
-      <Button
-        onClick={toggleSidebar}
-        className="p-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600"
-        aria-label={isExpanded ? "Colapsar menú" : "Expandir menú"}
-      >
-        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d={isExpanded ? "M4 6h16M4 12h16M4 18h7" : "M4 6h16M4 12h16M4 18h16"}
-          />
-        </svg>
-      </Button>
-      
-      {/* Título de la página o sección */}
-      <div className="ml-4 text-lg font-semibold text-gray-700 dark:text-white">
-        {title}
-      </div>
-      
-      {/* Controles adicionales (derecha) */}
-      <div className="ml-auto flex items-center space-x-2">
-        {/* Botón de notificaciones */}
-        <Button 
-          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600"
-          aria-label="Notificaciones"
+    <AppBar
+      position="fixed"
+      sx={{
+        width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` },
+        left: { xs: 0, md: `${drawerWidth}px` },
+        transition: theme.transitions.create(['width', 'left'], {
+          easing: theme.transitions.easing.sharp,
+          duration: theme.transitions.duration.enteringScreen,
+        }),
+        backgroundColor: '#2D3748',
+        color: '#FFFFFF',
+        boxShadow: `0px 1px 3px rgba(0, 0, 0, 0.2)`,
+      }}
+    >
+      <Toolbar sx={{ minHeight: 64, px: { xs: 2, sm: 3 } }}>
+        {/* Botón del menú móvil */}
+        <IconButton
+          edge="start"
+          color="inherit"
+          aria-label="abrir menú"
+          onClick={isMobile ? toggleMobileSidebar : toggleSidebar}
+          sx={{ 
+            mr: 2,
+            display: { md: 'none' },
+            color: 'rgba(255, 255, 255, 0.8)',
+            '&:hover': {
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            }
+          }}
         >
-          <svg className="h-6 w-6 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-          </svg>
-        </Button>
-        
-        {/* Botón de tema */}
-        <Button 
-          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600"
-          aria-label={theme === 'dark' ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
-          onClick={toggleTheme}
-        >
-          {theme === 'dark' ? (
-            <svg className="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-          ) : (
-            <svg className="h-6 w-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-            </svg>
-          )}
-        </Button>
-        
-        {/* Menú desplegable de usuario */}
-        <div className="relative">
-          <Button 
-            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600 flex items-center"
-            aria-label="Perfil de usuario"
+          <MenuIcon />
+        </IconButton>
+
+        {/* Título de la página */}
+        <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Typography
+            variant={isMobile ? "h6" : "h5"}
+            noWrap
+            component="div"
+            sx={{ 
+              fontWeight: 600,
+              color: '#10B981',
+            }}
           >
-            <svg className="h-6 w-6 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            {user && (
-              <span className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                {user.username}
-              </span>
-            )}
-          </Button>
+            {title}
+          </Typography>
           
-          {/* Menú desplegable */}
-          <div className="absolute right-0 mt-2 w-48 py-1 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10 hidden group-hover:block">
-            <Button
-              onClick={handleLogout}
-              className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+          {/* Breadcrumb o información adicional */}
+          {!isMobile && user && (
+            <Chip
+              label={`${user.roles?.[0] || 'Usuario'}`}
+              size="small"
+              color="primary"
+              variant="outlined"
+              sx={{ ml: 2 }}
+            />
+          )}
+        </Box>
+
+        {/* Sección de acciones */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {/* Búsqueda rápida (solo desktop) */}
+          {!isMobile && (
+            <Tooltip title="Búsqueda rápida">
+              <IconButton
+                size="large"
+                color="inherit"
+                onClick={() => navigate('/buscar')}
+              >
+                <Search />
+              </IconButton>
+            </Tooltip>
+          )}
+
+          {/* Cambiar tema */}
+          <Tooltip title={appTheme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
+            <IconButton
+              size="large"
+              color="inherit"
+              onClick={toggleTheme}
+              sx={{
+                color: 'rgba(255, 255, 255, 0.8)',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                }
+              }}
             >
-              Cerrar sesión
-            </Button>
-          </div>
-        </div>
-        
-        {/* Botón de cerrar sesión directo */}
-        <Button 
-          onClick={handleLogout}
-          className="p-2 rounded-full hover:bg-red-100 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200"
-          aria-label="Cerrar sesión"
+              {appTheme === 'dark' ? <Brightness7 /> : <Brightness4 />}
+            </IconButton>
+          </Tooltip>
+
+          {/* Notificaciones */}
+          <Tooltip title="Notificaciones">
+            <IconButton
+              size="large"
+              color="inherit"
+              onClick={handleOpenNotifications}
+              sx={{
+                color: 'rgba(255, 255, 255, 0.8)',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                }
+              }}
+            >
+              <Badge badgeContent={unreadNotifications} color="error">
+                <Notifications />
+              </Badge>
+            </IconButton>
+          </Tooltip>
+
+          {/* Menú de usuario */}
+          <Tooltip title="Cuenta de usuario">
+            <IconButton
+              onClick={handleOpenUserMenu}
+              sx={{ ml: 1 }}
+            >
+              <Avatar
+                sx={{
+                  width: 40,
+                  height: 40,
+                  bgcolor: '#10B981',
+                  color: '#FFFFFF',
+                }}
+              >
+                {user?.nombreCompleto?.charAt(0) || user?.username?.charAt(0) || 'U'}
+              </Avatar>
+            </IconButton>
+          </Tooltip>
+        </Box>
+
+        {/* Menú de notificaciones */}
+        <Menu
+          anchorEl={anchorElNotifications}
+          open={Boolean(anchorElNotifications)}
+          onClose={handleCloseNotifications}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'right',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'right',
+          }}
+          PaperProps={{
+            sx: {
+              width: 320,
+              maxHeight: 400,
+              mt: 1.5,
+            }
+          }}
         >
-          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-        </Button>
-      </div>
-    </header>
+          <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography variant="h6">Notificaciones</Typography>
+            <Chip label={`${unreadNotifications} nuevas`} size="small" color="primary" />
+          </Box>
+          <Divider />
+          {notifications.map((notification) => (
+            <MenuItem
+              key={notification.id}
+              onClick={handleCloseNotifications}
+              sx={{
+                py: 2,
+                backgroundColor: !notification.read ? alpha(theme.palette.primary.main, 0.05) : 'transparent',
+                '&:hover': {
+                  backgroundColor: !notification.read 
+                    ? alpha(theme.palette.primary.main, 0.08)
+                    : theme.palette.action.hover,
+                },
+              }}
+            >
+              <Box sx={{ width: '100%' }}>
+                <Typography variant="body2" sx={{ fontWeight: !notification.read ? 600 : 400 }}>
+                  {notification.message}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {notification.time}
+                </Typography>
+              </Box>
+            </MenuItem>
+          ))}
+          <Divider />
+          <MenuItem onClick={handleCloseNotifications} sx={{ justifyContent: 'center', py: 1.5 }}>
+            <Typography variant="body2" color="primary">
+              Ver todas las notificaciones
+            </Typography>
+          </MenuItem>
+        </Menu>
+
+        {/* Menú de usuario */}
+        <Menu
+          anchorEl={anchorElUser}
+          open={Boolean(anchorElUser)}
+          onClose={handleCloseUserMenu}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'right',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'right',
+          }}
+          PaperProps={{
+            sx: {
+              width: 280,
+              mt: 1.5,
+            }
+          }}
+        >
+          {/* Header del menú con info del usuario */}
+          <Box sx={{ px: 2, py: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar
+                sx={{
+                  width: 48,
+                  height: 48,
+                  bgcolor: '#10B981',
+                }}
+              >
+                {user?.nombreCompleto?.charAt(0) || user?.username?.charAt(0) || 'U'}
+              </Avatar>
+              <Box>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  {user?.nombreCompleto || user?.username || 'Usuario'}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {user?.email || 'usuario@sistema.com'}
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+          
+          <Divider />
+          
+          <MenuItem onClick={handleProfile}>
+            <ListItemIcon>
+              <Person fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Mi Perfil</ListItemText>
+          </MenuItem>
+          
+          <MenuItem onClick={handleSettings}>
+            <ListItemIcon>
+              <Settings fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Configuración</ListItemText>
+          </MenuItem>
+          
+          <MenuItem>
+            <ListItemIcon>
+              <Security fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Cambiar Contraseña</ListItemText>
+          </MenuItem>
+          
+          <Divider />
+          
+          <Box sx={{ px: 2, py: 1 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={appTheme === 'dark'}
+                  onChange={toggleTheme}
+                  size="small"
+                />
+              }
+              label="Modo oscuro"
+              sx={{ width: '100%' }}
+            />
+          </Box>
+          
+          <MenuItem>
+            <ListItemIcon>
+              <Language fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Idioma</ListItemText>
+            <Typography variant="caption" color="text.secondary">
+              Español
+            </Typography>
+          </MenuItem>
+          
+          <Divider />
+          
+          <MenuItem onClick={handleLogout} sx={{ color: theme.palette.error.main }}>
+            <ListItemIcon>
+              <Logout fontSize="small" color="error" />
+            </ListItemIcon>
+            <ListItemText>Cerrar Sesión</ListItemText>
+          </MenuItem>
+        </Menu>
+      </Toolbar>
+    </AppBar>
   );
 });
 
-// Nombre para DevTools
 Header.displayName = 'Header';
 
 export default Header;

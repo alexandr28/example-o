@@ -1,0 +1,77 @@
+/* src/styles/sidebar-mui.css - Estilos adicionales para el Sidebar con Material-UI */
+
+/* Mejoras para el modo colapsado */
+.MuiDrawer-paper {
+    transition: width 225ms cubic-bezier(0.4, 0, 0.6, 1) 0ms !important;
+  }
+  
+  /* Ocultar scrollbar pero mantener funcionalidad */
+  .MuiDrawer-paper::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .MuiDrawer-paper::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .MuiDrawer-paper::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+  }
+  
+  .MuiDrawer-paper::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Dark mode scrollbar */
+  .MuiDrawer-paper.dark::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  
+  .MuiDrawer-paper.dark::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+  
+  /* Mejoras para iconos en modo colapsado */
+  .MuiListItemIcon-root {
+    transition: margin 225ms cubic-bezier(0.4, 0, 0.6, 1) 0ms;
+  }
+  
+  /* Asegurar que los tooltips aparezcan correctamente */
+  .MuiTooltip-popper {
+    z-index: 1500 !important;
+  }
+  
+  /* Mejoras para dispositivos táctiles */
+  @media (hover: none) {
+    .MuiListItemButton-root {
+      -webkit-tap-highlight-color: transparent;
+    }
+  }
+  
+  /* Animación suave para el texto */
+  .MuiListItemText-root {
+    transition: opacity 225ms cubic-bezier(0.4, 0, 0.6, 1) 0ms;
+  }
+  
+  /* Mejoras visuales para el avatar */
+  .MuiAvatar-root {
+    transition: all 225ms cubic-bezier(0.4, 0, 0.6, 1) 0ms;
+  }
+  
+  /* Asegurar alineación correcta en modo colapsado */
+  .collapsed .MuiListItemIcon-root {
+    margin: 0 auto;
+  }
+  
+  /* Mejoras para el indicador activo */
+  .MuiListItemButton-root::before {
+    transition: all 225ms cubic-bezier(0.4, 0, 0.6, 1) 0ms;
+  }
+  
+  /* Prevenir overflow de texto */
+  .MuiTypography-root {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
