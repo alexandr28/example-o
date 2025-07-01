@@ -12,4 +12,10 @@ export {default as UitPage} from './mantenedores/UitPage'
 export {default as AlcabalaPage} from './mantenedores/AlcabalaPage'
 export {default as DepreciacionPage} from './mantenedores/DepreciacionPage'
 export { default as LoginPage } from './Login/LoginPage';
+
+
+// Páginas de Predio
 export { default as NuevoPredio } from './predio/NuevoPredio';
+export { default as ConsultaPredioPage } from './predio/ConsultaPredioPage';
+export { default as RegistroPisoPage } from './predio/pisos/RegistroPisoPage';
+export { default as ConsultaPisosPage } from './predio/pisos/ConsultaPisoPage'; 

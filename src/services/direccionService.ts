@@ -300,7 +300,7 @@ export class DireccionService extends BaseApiService<Direccion, DireccionFormDat
       
       // Mapear los datos al formato que espera el backend
       const mappedData = {
-        sectorId: data.sectorId,
+        codSector: data.sectorId,
         barrioId: data.barrioId,
         calleId: data.calleId,
         cuadra: data.cuadra,

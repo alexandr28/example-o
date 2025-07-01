@@ -152,7 +152,7 @@ class CalleServiceClass extends BaseApiService<Calle, CalleFormData> {
       const requestData = {
         codTipoVia: tipoViaToCode[data.tipoVia] || 1,
         nombreVia: data.nombre.trim(),
-        codSector: data.sectorId,
+        // codSector: data.sectorId,
         codBarrio: data.barrioId
       };
       
@@ -233,41 +233,41 @@ class CalleServiceClass extends BaseApiService<Calle, CalleFormData> {
   }
   
   // Método para obtener calles por sector
-  async getBySector(sectorId: number): Promise<Calle[]> {
+  async getBySector(codSector: number): Promise<Calle[]> {
     try {
-      console.log(`📡 [CalleService] Obteniendo calles del sector ${sectorId}`);
+      console.log(`📡 [CalleService] Obteniendo calles del sector ${codSector}`);
       
       // Primero obtener todas las calles
       const allCalles = await this.getAll();
       
       // Filtrar por sector
-      const callesSector = allCalles.filter(calle => calle.sectorId === sectorId);
+      const callesSector = allCalles.filter(calle => calle.sectorId === codSector);
       
-      console.log(`✅ [CalleService] ${callesSector.length} calles encontradas para sector ${sectorId}`);
+      console.log(`✅ [CalleService] ${callesSector.length} calles encontradas para sector ${codSector}`);
       return callesSector;
       
     } catch (error) {
-      console.error(`❌ [CalleService] Error al obtener calles del sector ${sectorId}:`, error);
+      console.error(`❌ [CalleService] Error al obtener calles del sector ${codSector}:`, error);
       throw error;
     }
   }
   
   // Método para obtener calles por barrio
-  async getByBarrio(barrioId: number): Promise<Calle[]> {
+  async getByBarrio(codBarrio: number): Promise<Calle[]> {
     try {
-      console.log(`📡 [CalleService] Obteniendo calles del barrio ${barrioId}`);
+      console.log(`📡 [CalleService] Obteniendo calles del barrio ${codBarrio}`);
       
       // Primero obtener todas las calles
       const allCalles = await this.getAll();
       
       // Filtrar por barrio
-      const callesBarrio = allCalles.filter(calle => calle.barrioId === barrioId);
+      const callesBarrio = allCalles.filter(calle => calle.barrioId === codBarrio);
       
-      console.log(`✅ [CalleService] ${callesBarrio.length} calles encontradas para barrio ${barrioId}`);
+      console.log(`✅ [CalleService] ${callesBarrio.length} calles encontradas para barrio ${codBarrio}`);
       return callesBarrio;
       
     } catch (error) {
-      console.error(`❌ [CalleService] Error al obtener calles del barrio ${barrioId}:`, error);
+      console.error(`❌ [CalleService] Error al obtener calles del barrio ${codBarrio}:`, error);
       throw error;
     }
   }

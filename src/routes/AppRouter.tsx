@@ -14,7 +14,10 @@ ConsultaContribuyente,
 UitPage,
 AlcabalaPage,
 DepreciacionPage,
-NuevoPredio
+NuevoPredio,
+ConsultaPredioPage,
+RegistroPisoPage,
+ConsultaPisosPage
 } 
   from  '../pages'
 import { SidebarProvider } from '../context/SidebarContext';
@@ -61,22 +64,38 @@ const AppRouter: React.FC = () => {
                 </ProtectedRoute>
               } />
 
-              {/* Rutas de predio */}
-              <Route path="/predio/nuevo" element={
+               {/* Rutas de predio */}
+               <Route path="/predio/nuevo" element={
                 <ProtectedRoute>
-                  <NuevoPredio />
-                </ProtectedRoute>
+                  <NuevoPredio />  {/* Cambiar DemoPage por NuevoPredio */}
+                 </ProtectedRoute>
               } />
-              <Route path="/predio/buscar" element={
-                <ProtectedRoute>
-                  <DemoPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/predio/listado" element={
-                <ProtectedRoute>
-                  <DemoPage />
-                </ProtectedRoute>
-              } />
+              
+              <Route 
+                path="/predio/consulta" 
+                element={
+                  <ProtectedRoute>
+                    <ConsultaPredioPage />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              <Route 
+                path="/predio/pisos/registro" 
+                element={
+                  <ProtectedRoute>
+                    <RegistroPisoPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/predio/pisos/consulta" 
+                element={
+                  <ProtectedRoute>
+                    <ConsultaPisosPage />
+                  </ProtectedRoute>
+                } 
+              />
 
                {/* Rutas Caja */}
               <Route path="/caja/apertura" element={

@@ -68,4 +68,10 @@ export { default as FormErrorBoundary } from './utils/FormErrorBoundary';
 export { ConyugeForm } from './contribuyentes/ConyugeForm';
 export { RepresentanteLegalForm } from './contribuyentes/RepresentanteLegalForm';
 export { default as FormSection } from './utils/FormSecction';
+
+// Export Predio & Piso
 export { default as PredioForm } from './predio/PredioForm';
+export {default as ConsultaPredios} from  './predio/ConsultaPredios'
+export {default as ConsultaPisos } from './predio/pisos/ConsultaPisos'
+export {default as RegistrosPisos} from './predio/pisos/RegistrosPisos'
+export {default as  SelectorPredios} from './predio/pisos/SelectorPredios'
