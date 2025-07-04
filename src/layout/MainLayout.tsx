@@ -1,4 +1,4 @@
-// src/layout/MainLayout.tsx - Versión completa con Material-UI
+// src/layout/MainLayout.tsx - Versión con FormContextDebug
 import React, { FC, ReactNode, memo, useEffect } from 'react';
 import {
   Box,
@@ -12,6 +12,7 @@ import AppSidebar from './AppSidebar';
 import Header from './Header';
 import { useAuthContext } from '../context/AuthContext';
 import { useSidebar } from '../context/SidebarContext';
+import FormContextDebug from '../components/debug/FormContextDebug';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -94,16 +95,16 @@ const MainLayout: FC<MainLayoutProps> = memo(({
       {/* Barra lateral */}
       <AppSidebar />
 
-      {/* Header - posicionado absolutamente */}
+      {/* Header - ajustado para dejar espacio al sidebar */}
       <Header title={title} />
 
-      {/* Contenido principal - posicionado absolutamente */}
+      {/* Contenido principal - ajustado para el sidebar */}
       <Box
         component="main"
         sx={{
           position: 'fixed',
           top: 64, // Altura del header
-          left: isMobile ? 0 : drawerWidth,
+          left: drawerWidth, // Dejar espacio para el sidebar
           right: 0,
           bottom: 0,
           backgroundColor: '#F5F5F5',
@@ -116,6 +117,9 @@ const MainLayout: FC<MainLayoutProps> = memo(({
       >
         {children}
       </Box>
+
+      {/* Debug del FormContext en desarrollo */}
+      <FormContextDebug />
     </Box>
   );
 });

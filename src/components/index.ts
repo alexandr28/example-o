@@ -75,3 +75,8 @@ export {default as ConsultaPredios} from  './predio/ConsultaPredios'
 export {default as ConsultaPisos } from './predio/pisos/ConsultaPisos'
 export {default as RegistrosPisos} from './predio/pisos/RegistrosPisos'
 export {default as  SelectorPredios} from './predio/pisos/SelectorPredios'
+
+// Exportación de componentes de navegación
+export { default as SafeLink } from './navigation/SafeLink';
+export { default as SafeListItemButton } from './navigation/SafeListItemButton';
+export {default as navigationGuard } from './utils/navigationGuard'

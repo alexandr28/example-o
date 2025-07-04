@@ -1,4 +1,4 @@
-import React, { FC, memo } from 'react';
+import React, { FC, memo } from "react";
 
 export interface BreadcrumbItem {
   label: string;
@@ -12,16 +12,20 @@ interface BreadcrumbProps {
 
 /**
  * Componente de navegación de migas de pan
- * 
+ *
  * Muestra la jerarquía de navegación y la ubicación actual
  */
 const Breadcrumb: FC<BreadcrumbProps> = memo(({ items }) => {
   return (
-    <nav className="mb-8" aria-label="Breadcrumb">
+    <nav className="mb-2" aria-label="Breadcrumb">
       <ol className="flex items-center text-sm">
         {items.map((item, index) => (
           <React.Fragment key={item.label}>
-            <li className={item.active ? "text-gray-900 font-medium" : "text-gray-600"}>
+            <li
+              className={
+                item.active ? "text-gray-900 font-medium" : "text-gray-600"
+              }
+            >
               {item.path ? (
                 <a href={item.path} className="hover:underline">
                   {item.label}
@@ -39,6 +43,6 @@ const Breadcrumb: FC<BreadcrumbProps> = memo(({ items }) => {
 });
 
 // Nombre para DevTools
-Breadcrumb.displayName = 'Breadcrumb';
+Breadcrumb.displayName = "Breadcrumb";
 
 export default Breadcrumb;

@@ -33,6 +33,7 @@ import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import { SidebarProvider } from '../context/SidebarContext';
 import MuiThemeProviderWrapper from '../providers/MuiThemeProvider';
+import {FormProvider} from '../context'
 
 // Componentes de autenticación
 import LoginPage from '../pages/Login/LoginPage';
@@ -48,6 +49,7 @@ const AppRouter: React.FC = () => {
       <ThemeProvider>
         <MuiThemeProviderWrapper>
           <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
+            <FormProvider>
             <SidebarProvider>
               {/* Debug component para desarrollo */}
               {process.env.NODE_ENV === 'development' && <SimpleDebug />}
@@ -326,6 +328,7 @@ const AppRouter: React.FC = () => {
                 </Routes>
               </Router>
             </SidebarProvider>
+            </FormProvider>
           </LocalizationProvider>
         </MuiThemeProviderWrapper>
       </ThemeProvider>

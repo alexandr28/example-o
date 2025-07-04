@@ -107,7 +107,7 @@ const baseThemeConfig: ThemeOptions = {
           borderRadius: 8,
           padding: '8px 16px',
           fontSize: '0.875rem',
-          fontWeight: 500,
+          fontWeight: 400,
           boxShadow: 'none',
           '&:hover': {
             boxShadow: 'none',

@@ -1,11 +1,35 @@
-// src/layout/AppSidebar.tsx - versión completamente corregida
+// src/layout/AppSidebar.tsx - Versión completa sin Paper
 
 import React, { FC, memo, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
+import {
+  Box,
+  List,
+  Typography,
+  IconButton,
+  useTheme,
+  alpha,
+  styled
+} from '@mui/material';
+import {
+  Dashboard as DashboardIcon,
+  People as PeopleIcon,
+  Home as HomeIcon,
+  AccountBalance as AccountBalanceIcon,
+  Receipt as ReceiptIcon,
+  Assessment as ReportsIcon,
+  Gavel as GavelIcon,
+  Business as FraccionamientoIcon,
+  Settings as SettingsIcon,
+  Computer as ComputerIcon,
+  SwapVert as SwapVertIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon
+} from '@mui/icons-material';
 import SidebarWidget from './SidebarWiget';
 import { useSidebar } from '../context/SidebarContext';
 
-// Define la estructura de los elementos del submenú para permitir anidamiento
+// Interfaces
 interface SubMenuItem {
   id: string;
   label: string;
@@ -14,7 +38,6 @@ interface SubMenuItem {
   subMenuItems?: SubMenuItem[];
 }
 
-// Define la estructura de los elementos del menú principal
 interface MenuItem {
   id: string;
   label: string;
@@ -23,112 +46,148 @@ interface MenuItem {
   subMenuItems?: SubMenuItem[];
 }
 
-// Define las propiedades del componente AppSidebar
 interface AppSidebarProps {
   toggleSidebar?: () => void;
 }
 
-// Iconos para el menú (componentes del proyecto original)
-const DashboardIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 6h16M4 12h16m-7 6h7" />
-  </svg>
-);
+// Contenedor principal del Sidebar - Usando Box en lugar de Paper
+const SidebarContainer = styled(Box)(({ theme }) => ({
+  position: 'fixed',
+  left: 0,
+  top: 0,
+  bottom: 0,
+  backgroundColor: '#4a5568',
+  color: '#ffffff',
+  display: 'flex',
+  flexDirection: 'column',
+  transition: theme.transitions.create('width', {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.enteringScreen,
+  }),
+  overflowX: 'hidden',
+  zIndex: theme.zIndex.drawer,
+  opacity: 1,
+  borderRadius: 0,
+  boxShadow: '2px 0 5px rgba(0,0,0,0.1)',
+  '& *': {
+    opacity: 1,
+  }
+}));
 
-const ContribuyenteIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-  </svg>
-);
+const LogoContainer = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: theme.spacing(2),
+  backgroundColor: '#3d4451',
+  borderBottom: `1px solid rgba(255, 255, 255, 0.1)`,
+  position: 'relative',
+  minHeight: 64,
+}));
 
-const PredioIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-  </svg>
-);
+const MenuSection = styled(Typography)(({ theme }) => ({
+  fontSize: '0.75rem',
+  fontWeight: 600,
+  color: 'rgba(255, 255, 255, 0.7)',
+  textTransform: 'uppercase',
+  padding: theme.spacing(2, 2, 1),
+  letterSpacing: '0.5px',
+}));
 
-const CuentaCorrienteIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-);
+const ScrollableContent = styled(Box)({
+  flex: 1,
+  overflowY: 'auto',
+  overflowX: 'hidden',
+  backgroundColor: '#4a5568',
+  '&::-webkit-scrollbar': {
+    width: '6px',
+  },
+  '&::-webkit-scrollbar-track': {
+    background: 'rgba(0, 0, 0, 0.2)',
+    borderRadius: 0,
+  },
+  '&::-webkit-scrollbar-thumb': {
+    background: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 0,
+    '&:hover': {
+      background: 'rgba(255, 255, 255, 0.4)',
+    },
+  },
+});
 
-const ReportesIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-  </svg>
-);
+const ToggleButton = styled(IconButton)(({ theme }) => ({
+  position: 'absolute',
+  right: theme.spacing(1),
+  top: '50%',
+  transform: 'translateY(-50%)',
+  color: alpha('#ffffff', 0.7),
+  padding: theme.spacing(0.5),
+  borderRadius: 0,
+  '&:hover': {
+    backgroundColor: alpha('#ffffff', 0.1),
+    color: '#ffffff',
+  },
+}));
 
-const CajaIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-);
-
-const CoactivaIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const MantenedoresIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-  </svg>
-);
-
-const SistemaIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-  </svg>
-);
-
-const MigracionIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-);
-
-// Configuración de los elementos del menú - PRIMERO DECLARAMOS LOS ARRAYS
+// Elementos del menú principal
 const menuItems: MenuItem[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
-    icon: <DashboardIcon/>,
+    icon: <DashboardIcon />,
     path: '/dashboard',
   },
   {
-    id: 'contribuyente',
-    label: 'Contribuyente',
-    icon: <ContribuyenteIcon/>,
+    id: 'contribuyentes',
+    label: 'Contribuyentes',
+    icon: <PeopleIcon />,
     subMenuItems: [
-      { id: 'nuevo-contribuyente', label: 'Registrar', path: '/contribuyente/nuevo' },
-      { id: 'consulta-contribuyentes', label: 'Consulta', path: '/contribuyente/consulta' },
+      { id: 'nuevo-contribuyente', label: 'Nuevo', path: '/contribuyente/nuevo' },
+      { id: 'consulta-contribuyente', label: 'Consulta', path: '/contribuyente/consulta' },
+      { id: 'creditos-hipotecarios', label: 'Créditos Hipotecarios', path: '/contribuyente/creditos-hipotecarios' },
+      { id: 'grupo-familiar', label: 'Grupo Familiar', path: '/contribuyente/grupo-familiar' },
     ],
   },
   {
     id: 'predio',
     label: 'Predio',
-    icon: <CuentaCorrienteIcon />,
+    icon: <HomeIcon />,
     subMenuItems: [
-      { id: 'nuevo-predio', label: 'Registro Predio', path: '/predio/nuevo' },
-      { id: 'consulta-predios', label: 'Consulta General', path: '/predio/consulta' },
-      { 
-        id: 'pisos', 
-        label: 'Pisos',
-        subMenuItems: [
-          { id: 'registro-pisos', label: 'Registro Pisos', path: '/predio/pisos/registro' },
-          { id: 'consulta-pisos', label: 'Consulta Pisos', path: '/predio/pisos/consulta' },
-        ]
-      },
+      { id: 'registro-predio', label: 'Registro Predio', path: '/predio/nuevo' },
+      { id: 'consulta-predio', label: 'Consulta Predio', path: '/predio/consulta' },
+      { id: 'registro-pisos', label: 'Registro Pisos', path: '/predio/pisos/registro' },
+      { id: 'consulta-pisos', label: 'Consulta Pisos', path: '/predio/pisos/consulta' },
       { id: 'asignacion-predios', label: 'Asignación', path: '/predio/asignacion' },
       { id: 'transferencia-predios', label: 'Transferencia', path: '/predio/transferencia' },
     ],
   },
   {
+    id: 'fraccionamiento',
+    label: 'Fraccionamiento',
+    icon: <FraccionamientoIcon />,
+    subMenuItems: [
+      { id: 'nuevo-fraccionamiento', label: 'Nuevo', path: '/fraccionamiento/nuevo' },
+      { id: 'consulta-fraccionamiento', label: 'Consulta', path: '/fraccionamiento/consulta' },
+      { id: 'gestion-lotes', label: 'Gestión de Lotes', path: '/fraccionamiento/lotes' },
+      { id: 'aprobaciones', label: 'Aprobaciones', path: '/fraccionamiento/aprobaciones' },
+    ],
+  },
+  {
+    id: 'cuenta-corriente',
+    label: 'Cuenta Corriente',
+    icon: <AccountBalanceIcon />,
+    subMenuItems: [
+      { id: 'estado-cuenta', label: 'Estado de Cuenta', path: '/cuenta-corriente/estado' },
+      { id: 'cargo-nuevo', label: 'Nuevo Cargo', path: '/cuenta-corriente/cargo/nuevo' },
+      { id: 'abono-nuevo', label: 'Nuevo Abono', path: '/cuenta-corriente/abono/nuevo' },
+      { id: 'consulta-movimientos', label: 'Consulta Movimientos', path: '/cuenta-corriente/consulta' },
+      { id: 'liquidacion', label: 'Liquidación', path: '/cuenta-corriente/liquidacion' },
+    ],
+  },
+  {
     id: 'caja',
     label: 'Caja',
-    icon: <CajaIcon />,
+    icon: <ReceiptIcon />,
     subMenuItems: [
       { id: 'apertura-caja', label: 'Apertura de Caja', path: '/caja/apertura' },
       { id: 'cierre-caja', label: 'Cierre de Caja', path: '/caja/cierre' },
@@ -138,7 +197,7 @@ const menuItems: MenuItem[] = [
   {
     id: 'reportes',
     label: 'Reportes',
-    icon: <ReportesIcon />,
+    icon: <ReportsIcon />,
     subMenuItems: [
       { id: 'reporte-contribuyentes', label: 'Contribuyentes', path: '/reportes/contribuyentes' },
       { id: 'reporte-predios', label: 'Predios', path: '/reportes/predios' },
@@ -148,7 +207,7 @@ const menuItems: MenuItem[] = [
   {
     id: 'coactiva',
     label: 'Coactiva',
-    icon: <CoactivaIcon />,
+    icon: <GavelIcon />,
     subMenuItems: [
       { id: 'expedientes', label: 'Expedientes', path: '/coactiva/expedientes' },
       { id: 'resoluciones', label: 'Resoluciones', path: '/coactiva/resoluciones' },
@@ -157,47 +216,34 @@ const menuItems: MenuItem[] = [
   },
 ];
 
-// Elementos del menú OTHERS
-const othersMenuItems: MenuItem[] = [
+// Elementos del menú SISTEMA
+const sistemaMenuItems: MenuItem[] = [
   {
     id: 'mantenedores',
     label: 'Mantenedores',
-    icon: <MantenedoresIcon />,
+    icon: <SettingsIcon />,
     subMenuItems: [
-      { 
-        id: 'ubicacion-parametros', 
-        label: 'Ubicacion', 
-        subMenuItems: [
-          { id: 'calles-ubicacion', label: 'Calles', path: '/mantenedores/ubicacion/calles' },
-          { id: 'sectores-ubicacion', label: 'Sectores', path: '/mantenedores/ubicacion/sectores' },
-          { id: 'barrios-ubicacion', label: 'Barrios', path: '/mantenedores/ubicacion/barrios' },
-          { id: 'direcciones-ubicacion', label: 'Direcciones', path: '/mantenedores/ubicacion/direcciones' },
-        ]
-      },
-      { 
-        id: 'arancel-parametros', 
-        label: 'Arancel', 
-        subMenuItems: [
-          { id: 'asignacion-arancel', label: 'Asignación', path: '/mantenedores/arancel/asignacion' },
-          { id: 'valoresUnitarios-arancel', label: 'Valores Unitarios', path: '/mantenedores/arancel/valoresUnitarios' },
-        ]
-      },
-      { id: 'tarifas',
-        label: 'Tarifas',  
-        subMenuItems:[
-          {id:'uit-epa',label:'UIT - EPA',path: '/mantenedores/tarifas/uit'},
-          {id:'alcabala',label:'Alcabala',path: '/mantenedores/tarifas/alcabala'},
-          {id:'depreciacion',label:'Depreciacion',path: '/mantenedores/tarifas/depreciacion'},
-          {id:'arbitrios',label:'Arbitrios',path: '/mantenedores/tarifas/arbitrios'}
-        ]
-      },
+      // Ubicación
+      { id: 'calles-ubicacion', label: 'Calles', path: '/mantenedores/calles' },
+      { id: 'sectores-ubicacion', label: 'Sectores', path: '/mantenedores/sectores' },
+      { id: 'barrios-ubicacion', label: 'Barrios', path: '/mantenedores/barrios' },
+      { id: 'direcciones-ubicacion', label: 'Direcciones', path: '/mantenedores/direcciones' },
+      // Arancel
+      { id: 'asignacion-arancel', label: 'Asignación Arancel', path: '/mantenedores/aranceles' },
+      { id: 'valoresUnitarios-arancel', label: 'Valores Unitarios', path: '/mantenedores/valores-unitarios' },
+      // Tarifas
+      { id: 'uit-epa', label: 'UIT - EPA', path: '/mantenedores/uit' },
+      { id: 'alcabala', label: 'Alcabala', path: '/mantenedores/alcabala' },
+      { id: 'depreciacion', label: 'Depreciación', path: '/mantenedores/depreciacion' },
+      { id: 'arbitrios', label: 'Arbitrios', path: '/mantenedores/arbitrios' },
+      // Otros
       { id: 'escala', label: 'Escala', path: '/mantenedores/escala' },
     ],
   },
   {
     id: 'sistema',
     label: 'Sistema',
-    icon: <SistemaIcon />,
+    icon: <ComputerIcon />,
     subMenuItems: [
       { id: 'configuracion', label: 'Configuración', path: '/sistema/configuracion' },
       { id: 'auditoria', label: 'Auditoría', path: '/sistema/auditoria' },
@@ -207,7 +253,7 @@ const othersMenuItems: MenuItem[] = [
   {
     id: 'migracion',
     label: 'Migración',
-    icon: <MigracionIcon />,
+    icon: <SwapVertIcon />,
     subMenuItems: [
       { id: 'importar', label: 'Importar', path: '/migracion/importar' },
       { id: 'exportar', label: 'Exportar', path: '/migracion/exportar' },
@@ -218,11 +264,9 @@ const othersMenuItems: MenuItem[] = [
 
 /**
  * Componente principal de la barra lateral de la aplicación.
- * Soporta modo expandido y colapsado.
  */
-const AppSidebar: FC<AppSidebarProps> = memo(({
-  toggleSidebar
-}) => {
+const AppSidebar: FC<AppSidebarProps> = memo(() => {
+  const theme = useTheme();
   const location = useLocation();
   const { 
     isExpanded, 
@@ -231,9 +275,17 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
     setActiveItem, 
     toggleSubmenu,
     toggleSidebar: contextToggleSidebar,
-    setIsHovered,
     setOpenSubmenus,
   } = useSidebar();
+
+  const drawerWidth = isExpanded ? 260 : 72;
+
+  // Debug para verificar que el componente se está renderizando
+  useEffect(() => {
+    console.log('AppSidebar montado - isExpanded:', isExpanded, 'width:', drawerWidth);
+    console.log('MenuItems:', menuItems);
+    console.log('OpenSubmenus:', openSubmenus);
+  }, [isExpanded, drawerWidth, openSubmenus]);
 
   // Determina si un elemento del menú está activo
   const isActiveRoute = useCallback((path?: string): boolean => {
@@ -241,7 +293,7 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
     return location.pathname === path || location.pathname.startsWith(path + '/');
   }, [location.pathname]);
 
-  // Determina si un elemento del menú debe mostrarse como activo (SIN ACTUALIZAR ESTADO)
+  // Determina si un elemento del menú debe mostrarse como activo
   const isActiveMenuItem = useCallback((item: MenuItem): boolean => {
     if (activeItem === item.id) return true;
     if (isActiveRoute(item.path)) {
@@ -277,7 +329,7 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
       return childMenus;
     };
 
-    const childMenus = findChildMenus(menuId, [...menuItems, ...othersMenuItems]);
+    const childMenus = findChildMenus(menuId, [...menuItems, ...sistemaMenuItems]);
     
     if (childMenus.length > 0) {
       setOpenSubmenus(prev => prev.filter(id => !childMenus.includes(id)));
@@ -286,89 +338,23 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
 
   // Manejador personalizado para el toggle de submenús
   const handleSubmenuToggle = useCallback((menuId: string) => {
-    const isOpen = openSubmenus.includes(menuId);
-    
-    if (isOpen) {
-      // Si está abierto, cerrarlo junto con sus hijos
-      closeChildSubmenus(menuId);
+    // Si el menú ya está abierto, simplemente cerrarlo
+    if (openSubmenus.includes(menuId)) {
       setOpenSubmenus(prev => prev.filter(id => id !== menuId));
     } else {
-      // Si está cerrado, abrirlo
-      setOpenSubmenus(prev => [...prev, menuId]);
+      // Si está cerrado, cerrar todos los demás y abrir este
+      setOpenSubmenus([menuId]);
     }
-  }, [openSubmenus, closeChildSubmenus, setOpenSubmenus]);
+  }, [openSubmenus, setOpenSubmenus]);
 
-  // Efecto para actualizar el activeItem basado en la ruta actual
-  useEffect(() => {
-    const updateActiveItem = () => {
-      // Buscar en menuItems
-      for (const item of menuItems) {
-        if (isActiveRoute(item.path)) {
-          setActiveItem(item.id);
-          return;
-        }
-        
-        // Verificar submenús
-        if (item.subMenuItems) {
-          for (const subItem of item.subMenuItems) {
-            if (isActiveRoute(subItem.path)) {
-              setActiveItem(item.id);
-              return;
-            }
-            
-            // Verificar submenús anidados
-            if (subItem.subMenuItems) {
-              for (const nestedItem of subItem.subMenuItems) {
-                if (isActiveRoute(nestedItem.path)) {
-                  setActiveItem(item.id);
-                  return;
-                }
-              }
-            }
-          }
-        }
-      }
-      
-      // Buscar en othersMenuItems
-      for (const item of othersMenuItems) {
-        if (isActiveRoute(item.path)) {
-          setActiveItem(item.id);
-          return;
-        }
-        
-        // Verificar submenús
-        if (item.subMenuItems) {
-          for (const subItem of item.subMenuItems) {
-            if (isActiveRoute(subItem.path)) {
-              setActiveItem(item.id);
-              return;
-            }
-            
-            // Verificar submenús anidados
-            if (subItem.subMenuItems) {
-              for (const nestedItem of subItem.subMenuItems) {
-                if (isActiveRoute(nestedItem.path)) {
-                  setActiveItem(item.id);
-                  return;
-                }
-              }
-            }
-          }
-        }
-      }
-    };
-    
-    updateActiveItem();
-  }, [location.pathname, setActiveItem, isActiveRoute]);
-
-  // Efecto para mantener los menús necesarios abiertos según la ruta
+  // Efecto para expandir submenús según la ruta actual
   useEffect(() => {
     const currentPath = location.pathname;
     
     const findParentMenuIds = (path: string): string[] => {
       const parentIds: string[] = [];
       
-      const searchInMenu = (items: MenuItem[] | SubMenuItem[], parentId?: string) => {
+      const searchInMenu = (items: (MenuItem | SubMenuItem)[], parentId?: string) => {
         for (const item of items) {
           if (item.path && (item.path === path || path.startsWith(item.path + '/'))) {
             if (parentId) {
@@ -383,56 +369,21 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
       };
       
       searchInMenu(menuItems);
-      searchInMenu(othersMenuItems);
+      searchInMenu(sistemaMenuItems);
       
       return parentIds;
     };
     
     const parentIds = findParentMenuIds(currentPath);
     
+    // Solo mantener abiertos los menús que contienen la ruta actual
     if (parentIds.length > 0) {
-      // Agregar IDs específicos según la ruta
-      if (currentPath.includes('/mantenedores/')) {
-        parentIds.push('mantenedores');
-      }
-      
-      if (currentPath.includes('/mantenedores/ubicacion/')) {
-        parentIds.push('ubicacion-parametros');
-      }
-      
-      if (currentPath.includes('/mantenedores/arancel/')) {
-        parentIds.push('arancel-parametros');
-      }
-      
-      if (currentPath.includes('/mantenedores/tarifas/')) {
-        parentIds.push('tarifas');
-      }
-      
-      setOpenSubmenus(prev => {
-        const combined = [...new Set([...prev, ...parentIds])];
-        return combined;
-      });
+      setOpenSubmenus(parentIds);
+    } else {
+      // Si no hay coincidencias, cerrar todos los submenús
+      setOpenSubmenus([]);
     }
   }, [location.pathname, setOpenSubmenus]);
-
-  // Renderiza el logo
-  const renderLogo = () => (
-    <div className="flex items-center justify-center py-3 px-3">
-      {!isExpanded ? (
-        <img 
-          src="/escudoMDE.png" 
-          alt="MDE" 
-          className="w-12 h-12 transition-all duration-300" 
-        />
-      ) : (
-        <img 
-          src="/logoMenu.png" 
-          alt="Municipalidad Distrital de La Esperanza" 
-          className="max-w-[200px] transition-all duration-300" 
-        />
-      )}
-    </div>
-  );
 
   // Manejar el toggle del sidebar
   const handleToggleSidebar = () => {
@@ -442,41 +393,80 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
   };
 
   return (
-    <aside 
-      className={`flex flex-col h-screen bg-white border-r border-gray-200 transition-all duration-300 ${
-        isExpanded ? 'w-64' : 'w-16'
-      }`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+    <SidebarContainer
+      className="sidebar-container"
+      sx={{
+        width: drawerWidth,
+        backgroundColor: '#4a5568 !important',
+        opacity: '1 !important',
+        borderRadius: '0 !important',
+        borderTopLeftRadius: '0 !important',
+        borderTopRightRadius: '0 !important',
+        borderBottomLeftRadius: '0 !important',
+        borderBottomRightRadius: '0 !important',
+        overflow: 'hidden',
+        '&, & *': {
+          borderRadius: '0 !important',
+        },
+        '& .MuiPaper-root, & .MuiBox-root': {
+          borderRadius: '0 !important',
+        },
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: '#4a5568',
+          zIndex: -1,
+          borderRadius: 0,
+        }
+      }}
+      style={{
+        borderRadius: 0,
+        WebkitBorderRadius: 0,
+        MozBorderRadius: 0,
+      }}
     >
-      {/* Logo */}
-      <div className="flex items-center">
-        {renderLogo()}
-        {!isExpanded && (
-          <button 
-            onClick={handleToggleSidebar}
-            className="absolute right-2 top-3 text-gray-500 hover:text-gray-700"
-            aria-label="Expandir menú"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth="2" 
-                d="M13 5l7 7-7 7M5 5l7 7-7 7" 
-              />
-            </svg>
-          </button>
+      {/* Logo y botón de toggle */}
+      <LogoContainer>
+        <Typography
+          variant="h6"
+          sx={{
+            fontWeight: 600,
+            color: '#ffffff',
+            letterSpacing: isExpanded ? 1 : 0.5,
+            fontSize: isExpanded ? '1.25rem' : '0.875rem',
+            transition: theme.transitions.create(['font-size', 'letter-spacing']),
+          }}
+        >
+          {isExpanded ? 'SIS. Rentas' : 'SR'}
+        </Typography>
+        <ToggleButton
+          onClick={handleToggleSidebar}
+          size="small"
+          aria-label={isExpanded ? "Colapsar menú" : "Expandir menú"}
+        >
+          {isExpanded ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+        </ToggleButton>
+      </LogoContainer>
+
+      {/* Contenido scrollable */}
+      <ScrollableContent>
+        {/* Sección MENU */}
+        {isExpanded ? (
+          <MenuSection>MENU</MenuSection>
+        ) : (
+          <Box sx={{ textAlign: 'center', py: 1 }}>
+            <Typography variant="caption" sx={{ color: alpha('#ffffff', 0.5) }}>
+              •••
+            </Typography>
+          </Box>
         )}
-      </div>
 
-      {/* Sección MENU */}
-      {isExpanded && <div className="px-4 py-2 text-xs font-semibold text-gray-400">MENU</div>}
-      {!isExpanded && <div className="flex justify-center text-xs py-2">•••</div>}
-
-      {/* Elementos del menú principal */}
-      <div className="flex-1 overflow-y-auto">
-        <nav className="py-2">
+        {/* Elementos del menú principal */}
+        <List component="nav" sx={{ px: 1 }}>
           {menuItems.map((item) => (
             <SidebarWidget
               key={item.id}
@@ -485,19 +475,26 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
               label={isExpanded ? item.label : ''}
               path={item.path}
               isActive={isActiveMenuItem(item)}
-              subMenuItems={isExpanded ? item.subMenuItems : []}
+              subMenuItems={item.subMenuItems || []}
               onCustomToggle={handleSubmenuToggle}
             />
           ))}
-        </nav>
+        </List>
 
-        {/* Separador OTHERS */}
-        {isExpanded && <div className="px-4 py-2 mt-4 text-xs font-semibold text-gray-400">SISTEMA</div>}
-        {!isExpanded && <div className="flex justify-center text-xs py-2 mt-4">•••</div>}
+        {/* Separador SISTEMA */}
+        {isExpanded ? (
+          <MenuSection>SISTEMA</MenuSection>
+        ) : (
+          <Box sx={{ textAlign: 'center', py: 1 }}>
+            <Typography variant="caption" sx={{ color: alpha('#ffffff', 0.5) }}>
+              •••
+            </Typography>
+          </Box>
+        )}
 
-        {/* Elementos del menú OTHER */}
-        <nav className="py-2">
-          {othersMenuItems.map((item) => (
+        {/* Elementos del menú SISTEMA */}
+        <List component="nav" sx={{ px: 1 }}>
+          {sistemaMenuItems.map((item) => (
             <SidebarWidget
               key={item.id}
               id={item.id}
@@ -505,30 +502,13 @@ const AppSidebar: FC<AppSidebarProps> = memo(({
               label={isExpanded ? item.label : ''}
               path={item.path}
               isActive={isActiveMenuItem(item)}
-              subMenuItems={isExpanded ? item.subMenuItems : []}
+              subMenuItems={item.subMenuItems || []}
               onCustomToggle={handleSubmenuToggle}
             />
           ))}
-        </nav>
-      </div>
-
-      {/* Pie de página - Solo visible cuando no está colapsado */}
-      {isExpanded && (
-        <div className="border-t border-gray-200 py-4 px-4">
-          <div className="text-center">
-            <div className="text-sm font-semibold text-gray-700">Sub Gerencia de Sistemas</div>
-            <div className="text-xs text-gray-500 mt-1">Todos los Derechos Reservados</div>
-            <div className="text-xs text-gray-500">Municipalidad Distrital de la Esperanza</div>
-            <button 
-              className="mt-3 bg-green-600 text-white rounded-md w-full py-2 text-sm font-medium"
-              onClick={handleToggleSidebar}
-            >
-              MDE
-            </button>
-          </div>
-        </div>
-      )}
-    </aside>
+        </List>
+      </ScrollableContent>
+    </SidebarContainer>
   );
 });
 

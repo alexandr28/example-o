@@ -10,11 +10,6 @@ export interface Barrio {
   nombreBarrio?: string; // Campo que viene de la API
   sectorId: number; // ✅ OBLIGATORIO - siempre debe tener un sectorId válido
   sector?: Sector | null; // ✅ PUEDE SER NULL - relación opcional
-  estado?: boolean;
-  fechaCreacion?: Date | string;
-  fechaModificacion?: Date | string;
-  usuarioCreacion?: string;
-  usuarioModificacion?: string;
 }
 
 // Tipo para el formulario de Barrio

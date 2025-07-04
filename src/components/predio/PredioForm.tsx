@@ -1,7 +1,8 @@
-// src/components/predio/PredioForm.tsx
+// src/components/predio/PredioForm.tsx - Ejemplo actualizado
 import React, { useState, useCallback, memo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { useFormWrapper } from '../../hooks/useFormWrapper';
 import FormSection from '../utils/FormSecction';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -74,21 +75,13 @@ const USO_PREDIO_OPTIONS = [
  */
 const PredioForm: React.FC = memo(() => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [isDireccionModalOpen, setIsDireccionModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Configuración del formulario
-  const {
-    register,
-    control,
-    handleSubmit,
-    watch,
-    setValue,
-    reset,
-    formState: { errors }
-  } = useForm<PredioFormData>({
+  // Inicializar react-hook-form
+  const baseForm = useForm<PredioFormData>({
     defaultValues: {
-      anioAdquisicion: new Date().getFullYear().toString(),
+      anioAdquisicion: '',
       fechaAdquisicion: null,
       condicionPropiedad: '',
       direccion: null,
@@ -100,428 +93,265 @@ const PredioForm: React.FC = memo(() => {
       usoPredio: '',
       areaTerreno: 0,
       numeroPisos: 1,
-      numeroCondominos: 1,
-      rutaFotografiaPredio: '',
-      rutaPlanoPredio: ''
+      numeroCondominos: 0,
     }
   });
 
-  // Observar valores
-  const direccion = watch('direccion');
-  const nFinca = watch('nFinca');
-  const otroNumero = watch('otroNumero');
+  // Usar el wrapper para integrar con FormContext
+  const form = useFormWrapper({
+    formId: 'predio-form',
+    form: baseForm
+  });
 
-  // Generar años para el select
-  const currentYear = new Date().getFullYear();
-  const yearOptions = [];
-  for (let year = currentYear; year >= 1900; year--) {
-    yearOptions.push({ value: year.toString(), label: year.toString() });
-  }
+  const { control, handleSubmit, setValue, watch, markSaved } = form;
 
-  // Manejar selección de dirección
-  const handleSelectDireccion = useCallback((direccion: Direccion) => {
-    setValue('direccion', direccion);
-    setIsDireccionModalOpen(false);
-  }, [setValue]);
-
-  // Obtener texto completo de dirección
-  const getDireccionTextoCompleto = useCallback((direccion: Direccion | null): string => {
-    if (!direccion) return 'Dirección seleccionada';
-    
-    // Si tiene descripción directa, usarla
-    if (direccion.descripcion) {
-      return direccion.descripcion;
-    }
-    
-    // Si no, construir la descripción
-    const partes = [];
-    if (direccion.nombreSector) partes.push(direccion.nombreSector);
-    if (direccion.nombreBarrio) partes.push(direccion.nombreBarrio);
-    if (direccion.nombreTipoVia) partes.push(direccion.nombreTipoVia);
-    if (direccion.nombreVia) partes.push(direccion.nombreVia);
-    if (direccion.cuadra) partes.push(`Cuadra ${direccion.cuadra}`);
-    
-    return partes.join(' ') || 'Dirección seleccionada';
-  }, []);
-
-  // Manejar subida de archivos
-  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>, fieldName: 'rutaFotografiaPredio' | 'rutaPlanoPredio') => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Aquí normalmente subirías el archivo al servidor
-      // Por ahora, solo guardamos el nombre del archivo
-      setValue(fieldName, file.name);
-      NotificationService.info(`Archivo ${file.name} seleccionado`);
-    }
-  }, [setValue]);
-
-  // Manejar envío del formulario
-  const onSubmit = useCallback(async (data: PredioFormData) => {
+  // Manejar el envío del formulario
+  const onSubmit = async (data: PredioFormData) => {
+    setIsSubmitting(true);
     try {
-      setLoading(true);
+      console.log('Datos del formulario:', data);
       
-      console.log('📋 Datos del predio a guardar:', data);
+      // Aquí iría la llamada a la API para guardar
+      // await api.savePredio(data);
       
       // Simular guardado
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      NotificationService.success('Predio registrado correctamente');
+      NotificationService.success('Predio registrado exitosamente');
       
-      // Limpiar formulario
-      reset();
+      // Marcar el formulario como guardado
+      markSaved();
       
-      // Navegar a la lista de predios después de 2 segundos
-      setTimeout(() => {
-        navigate('/predio/consulta');
-      }, 2000);
-      
+      // Navegar a la lista después de guardar
+      navigate('/predio/consulta');
     } catch (error) {
-      console.error('❌ Error al guardar predio:', error);
+      console.error('Error al guardar:', error);
       NotificationService.error('Error al registrar el predio');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
-  }, [reset, navigate]);
+  };
 
-  // Limpiar formulario
-  const handleNuevo = useCallback(() => {
-    reset();
-    NotificationService.info('Formulario limpiado');
-  }, [reset]);
+  // Manejar la selección de dirección
+  const handleDireccionSelect = useCallback((direccion: Direccion) => {
+    setValue('direccion', direccion, { shouldDirty: true });
+    setIsModalOpen(false);
+  }, [setValue]);
+
+  // Observar el valor de la dirección
+  const direccionSeleccionada = watch('direccion');
 
   return (
-    <>
-      <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
-        {/* Sección: Datos del predio */}
-        <FormSection title="Datos del predio">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Año de adquisición */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Año
-              </label>
-              <Controller
-                name="anioAdquisicion"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    {...field}
-                    options={yearOptions}
-                    placeholder="Seleccione"
-                  />
-                )}
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {/* Sección: Datos del Predio */}
+      <FormSection title="Datos del Predio">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Controller
+            name="anioAdquisicion"
+            control={control}
+            rules={{ required: 'El año de adquisición es requerido' }}
+            render={({ field, fieldState: { error } }) => (
+              <Input
+                {...field}
+                label="Año de Adquisición"
+                type="number"
+                placeholder="2024"
+                error={error?.message}
               />
-            </div>
+            )}
+          />
 
-            {/* Fecha de adquisición */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Fecha de adquisición
-              </label>
-              <Controller
-                name="fechaAdquisicion"
-                control={control}
-                render={({ field }) => (
-                  <CalendarInput
-                    value={field.value}
-                    onChange={field.onChange}
-                    placeholder="dd / mm / aaaa"
-                  />
-                )}
+          <Controller
+            name="fechaAdquisicion"
+            control={control}
+            rules={{ required: 'La fecha de adquisición es requerida' }}
+            render={({ field, fieldState: { error } }) => (
+              <CalendarInput
+                {...field}
+                label="Fecha de Adquisición"
+                placeholder="Seleccione fecha"
+                error={error?.message}
               />
-            </div>
+            )}
+          />
 
-            {/* Condición propiedad */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Condición propiedad
-              </label>
-              <Controller
-                name="condicionPropiedad"
-                control={control}
-                rules={{ required: 'La condición de propiedad es requerida' }}
-                render={({ field }) => (
-                  <Select
-                    {...field}
-                    options={CONDICION_PROPIEDAD_OPTIONS}
-                    placeholder="Seleccione"
-                    error={errors.condicionPropiedad?.message}
-                  />
-                )}
+          <Controller
+            name="condicionPropiedad"
+            control={control}
+            rules={{ required: 'La condición de propiedad es requerida' }}
+            render={({ field, fieldState: { error } }) => (
+              <Select
+                {...field}
+                label="Condición de Propiedad"
+                options={CONDICION_PROPIEDAD_OPTIONS}
+                placeholder="Seleccione condición"
+                error={error?.message}
               />
-            </div>
-          </div>
+            )}
+          />
 
-          {/* Dirección */}
-          <div className="mt-4">
-            <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Dirección
-                </label>
-                <Input
-                  type="text"
-                  value={getDireccionTextoCompleto(direccion)}
-                  readOnly
-                  placeholder="Dirección seleccionada"
-                  className="bg-gray-50"
-                />
-              </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Dirección del Predio
+            </label>
+            <div className="flex gap-2">
+              <Input
+                value={direccionSeleccionada ? 
+                  `${direccionSeleccionada.nombreCalle} ${direccionSeleccionada.numeracion || ''}` : 
+                  ''
+                }
+                placeholder="Seleccione una dirección"
+                readOnly
+              />
               <Button
                 type="button"
+                onClick={() => setIsModalOpen(true)}
                 variant="secondary"
-                onClick={() => setIsDireccionModalOpen(true)}
               >
-                Seleccionar dirección
+                Buscar
               </Button>
             </div>
-            
-            {/* Texto adicional de dirección */}
-            <div className="mt-2 text-sm text-gray-500 bg-gray-50 p-2 rounded">
-              DIRECCIÓN SELECCIONADA + LOTE + OTRO NUMERO
-            </div>
           </div>
 
-          {/* N° Finca, Otro número y Arancel */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                N° finca
-              </label>
+          <Controller
+            name="nFinca"
+            control={control}
+            render={({ field }) => (
               <Input
-                {...register('nFinca')}
-                type="text"
-                placeholder="N° finca"
+                {...field}
+                label="N° Finca"
+                placeholder="Número de finca"
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Otro número
-              </label>
-              <Input
-                {...register('otroNumero')}
-                type="text"
-                placeholder="Otro número"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Arancel
-              </label>
-              <Input
-                {...register('arancel', { 
-                  valueAsNumber: true,
-                  min: { value: 0, message: 'El arancel debe ser mayor a 0' }
-                })}
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                error={errors.arancel?.message}
-              />
-            </div>
-          </div>
-
-          {/* Tipo predio, Conductor y Usos de predio */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tipo predio
-              </label>
-              <Controller
-                name="tipoPredio"
-                control={control}
-                rules={{ required: 'El tipo de predio es requerido' }}
-                render={({ field }) => (
-                  <Select
-                    {...field}
-                    options={TIPO_PREDIO_OPTIONS}
-                    placeholder="Seleccione"
-                    error={errors.tipoPredio?.message}
-                  />
-                )}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Conductor
-              </label>
-              <Controller
-                name="conductor"
-                control={control}
-                rules={{ required: 'El conductor es requerido' }}
-                render={({ field }) => (
-                  <Select
-                    {...field}
-                    options={CONDUCTOR_OPTIONS}
-                    placeholder="Seleccione"
-                    error={errors.conductor?.message}
-                  />
-                )}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Usos de predio
-              </label>
-              <Controller
-                name="usoPredio"
-                control={control}
-                rules={{ required: 'El uso del predio es requerido' }}
-                render={({ field }) => (
-                  <Select
-                    {...field}
-                    options={USO_PREDIO_OPTIONS}
-                    placeholder="Seleccione"
-                    error={errors.usoPredio?.message}
-                  />
-                )}
-              />
-            </div>
-          </div>
-
-          {/* Área de terreno, Número de pisos y N° Condóminos */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Área de terreno
-              </label>
-              <Input
-                {...register('areaTerreno', { 
-                  valueAsNumber: true,
-                  required: 'El área de terreno es requerida',
-                  min: { value: 0, message: 'El área debe ser mayor a 0' }
-                })}
-                type="number"
-                step="0.01"
-                placeholder="Ingrese área en m2"
-                error={errors.areaTerreno?.message}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Número de pisos
-              </label>
-              <Input
-                {...register('numeroPisos', { 
-                  valueAsNumber: true,
-                  required: 'El número de pisos es requerido',
-                  min: { value: 0, message: 'Debe ser mayor o igual a 0' }
-                })}
-                type="number"
-                placeholder="Ingrese cantidad de pisos"
-                error={errors.numeroPisos?.message}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                N° Condóminos
-              </label>
-              <Input
-                {...register('numeroCondominos', { 
-                  valueAsNumber: true,
-                  required: 'El número de condóminos es requerido',
-                  min: { value: 1, message: 'Debe ser mayor o igual a 1' }
-                })}
-                type="number"
-                placeholder="Ingrese cantidad"
-                error={errors.numeroCondominos?.message}
-              />
-            </div>
-          </div>
-        </FormSection>
-
-        {/* Sección: Imágenes */}
-        <FormSection title="Imágenes">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ruta de fotografía del predio
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  value={watch('rutaFotografiaPredio') || ''}
-                  readOnly
-                  placeholder="Ruta de fotografía del predio"
-                  className="flex-1 bg-gray-50"
-                />
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => handleFileUpload(e, 'rutaFotografiaPredio')}
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    as="span"
-                  >
-                    Seleccionar archivo
-                  </Button>
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ruta de plano del predio
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  value={watch('rutaPlanoPredio') || ''}
-                  readOnly
-                  placeholder="Ruta de plano del predio"
-                  className="flex-1 bg-gray-50"
-                />
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    className="hidden"
-                    onChange={(e) => handleFileUpload(e, 'rutaPlanoPredio')}
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    as="span"
-                  >
-                    Seleccionar archivo
-                  </Button>
-                </label>
-              </div>
-            </div>
-          </div>
-        </FormSection>
-
-        {/* Botón de registro */}
-        <div className="flex justify-center pt-6">
-          <Button
-            type="submit"
-            variant="primary"
-            loading={loading}
-            disabled={loading}
-            className="px-8 py-3 bg-green-500 hover:bg-green-600 text-white"
-          >
-            Registrar / editar
-          </Button>
+            )}
+          />
         </div>
-      </form>
+      </FormSection>
+
+      {/* Sección: Otros Datos */}
+      <FormSection title="Otros Datos">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Controller
+            name="tipoPredio"
+            control={control}
+            rules={{ required: 'El tipo de predio es requerido' }}
+            render={({ field, fieldState: { error } }) => (
+              <Select
+                {...field}
+                label="Tipo de Predio"
+                options={TIPO_PREDIO_OPTIONS}
+                placeholder="Seleccione tipo"
+                error={error?.message}
+              />
+            )}
+          />
+
+          <Controller
+            name="conductor"
+            control={control}
+            rules={{ required: 'El conductor es requerido' }}
+            render={({ field, fieldState: { error } }) => (
+              <Select
+                {...field}
+                label="Conductor"
+                options={CONDUCTOR_OPTIONS}
+                placeholder="Seleccione conductor"
+                error={error?.message}
+              />
+            )}
+          />
+
+          <Controller
+            name="usoPredio"
+            control={control}
+            rules={{ required: 'El uso del predio es requerido' }}
+            render={({ field, fieldState: { error } }) => (
+              <Select
+                {...field}
+                label="Uso del Predio"
+                options={USO_PREDIO_OPTIONS}
+                placeholder="Seleccione uso"
+                error={error?.message}
+              />
+            )}
+          />
+
+          <Controller
+            name="areaTerreno"
+            control={control}
+            rules={{ 
+              required: 'El área del terreno es requerida',
+              min: { value: 1, message: 'El área debe ser mayor a 0' }
+            }}
+            render={({ field, fieldState: { error } }) => (
+              <Input
+                {...field}
+                label="Área del Terreno (m²)"
+                type="number"
+                placeholder="0.00"
+                error={error?.message}
+              />
+            )}
+          />
+
+          <Controller
+            name="numeroPisos"
+            control={control}
+            rules={{ 
+              required: 'El número de pisos es requerido',
+              min: { value: 1, message: 'Debe haber al menos 1 piso' }
+            }}
+            render={({ field, fieldState: { error } }) => (
+              <Input
+                {...field}
+                label="Número de Pisos"
+                type="number"
+                placeholder="1"
+                error={error?.message}
+              />
+            )}
+          />
+
+          <Controller
+            name="numeroCondominos"
+            control={control}
+            render={({ field }) => (
+              <Input
+                {...field}
+                label="Número de Condóminos"
+                type="number"
+                placeholder="0"
+              />
+            )}
+          />
+        </div>
+      </FormSection>
+
+      {/* Botones de acción */}
+      <div className="flex justify-end gap-4 pt-6">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => navigate('/predio/consulta')}
+        >
+          Cancelar
+        </Button>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Guardando...' : 'Guardar Predio'}
+        </Button>
+      </div>
 
       {/* Modal de selección de dirección */}
       <SelectorDirecciones
-        isOpen={isDireccionModalOpen}
-        onClose={() => setIsDireccionModalOpen(false)}
-        onSelectDireccion={handleSelectDireccion}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSelect={handleDireccionSelect}
+        title="Seleccionar Dirección del Predio"
       />
-    </>
+    </form>
   );
 });
 

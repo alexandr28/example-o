@@ -1,6 +1,6 @@
-// src/layout/SidebarWidget.tsx - Versión mejorada con Material-UI
+// src/layout/SidebarWidget.tsx - Versión actualizada para tema verde oscuro
 import React, { FC, ReactNode, memo, useCallback, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ListItem,
   ListItemButton,
@@ -11,19 +11,17 @@ import {
   Tooltip,
   Box,
   useTheme,
-  alpha,
-  IconButton,
-  Typography
+  alpha
 } from '@mui/material';
 import {
   ExpandLess,
   ExpandMore,
-  ChevronRight,
   FiberManualRecord
 } from '@mui/icons-material';
 import { useSidebar } from '../context/SidebarContext';
+import { navigationGuard } from '../components/utils/navigationGuard';
 
-// Interfaces para los elementos del submenú con soporte para anidamiento
+// Interfaces
 export interface SubMenuItem {
   id: string;
   label: string;
@@ -43,10 +41,6 @@ interface SidebarWidgetProps {
   onCustomToggle?: (menuId: string) => void;
 }
 
-/**
- * Componente para un elemento individual en la barra lateral
- * Soporta íconos, etiquetas y submenús desplegables anidados
- */
 const SidebarWidget: FC<SidebarWidgetProps> = memo(({
   id,
   icon,
@@ -59,10 +53,11 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
 }) => {
   const theme = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const { isExpanded, openSubmenus, setActiveItem, toggleSubmenu } = useSidebar();
   const [hovered, setHovered] = useState(false);
 
-  // Determina si un elemento del menú está activo basado en la ruta actual
+  // Determina si un elemento del menú está activo
   const isActiveRoute = useCallback((itemPath?: string): boolean => {
     if (!itemPath) return false;
     return location.pathname === itemPath || location.pathname.startsWith(itemPath + '/');
@@ -81,21 +76,48 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
     return false;
   }, [isActiveRoute]);
 
-  // Verifica si este menú tiene algún elemento activo
   const shouldBeOpen = hasActiveSubmenuItem(subMenuItems);
   const isMenuActive = isActive || shouldBeOpen || isActiveRoute(path);
   const hasSubMenu = subMenuItems.length > 0;
   const isSubMenuOpen = openSubmenus.includes(id) || (hasSubMenu && shouldBeOpen);
 
-  // Manejo de clics
+  // Manejar navegación con confirmación
+  const handleNavigation = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    if (!path) return;
+    
+    // Si la ruta actual es la misma, no hacer nada
+    if (location.pathname === path) {
+      return;
+    }
+
+    // Verificar si hay cambios sin guardar usando navigationGuard
+    if (navigationGuard.hasUnsavedChanges()) {
+      if (navigationGuard.confirmNavigation()) {
+        navigationGuard.clearUnsavedChanges();
+        setActiveItem(id);
+        navigate(path);
+      }
+    } else {
+      // No hay cambios, navegar normalmente
+      setActiveItem(id);
+      navigate(path);
+    }
+  }, [path, location.pathname, setActiveItem, id, navigate]);
+
+  // Manejar clics para elementos sin ruta
   const handleClick = useCallback(() => {
     if (hasSubMenu) {
+      // Si tiene submenú, toggle el submenú
       if (onCustomToggle) {
         onCustomToggle(id);
       } else {
         toggleSubmenu(id);
       }
     } else if (path) {
+      // Si tiene path pero llegó aquí, significa que es un elemento sin submenú
+      // que por alguna razón no se manejó con handleNavigation
       setActiveItem(id);
     }
   }, [hasSubMenu, path, id, onCustomToggle, toggleSubmenu, setActiveItem]);
@@ -106,7 +128,7 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
       <SidebarWidget
         key={item.id}
         id={item.id}
-        icon={item.icon || <FiberManualRecord sx={{ fontSize: 8 }} />}
+        icon={item.icon || <FiberManualRecord sx={{ fontSize: 6 }} />}
         label={item.label}
         path={item.path}
         isActive={isActiveRoute(item.path)}
@@ -117,26 +139,27 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
     ));
   };
 
-  // Calcular indentación basada en el nivel
-  const paddingLeft = isExpanded ? level * 2 + 2.5 : 2.5;
+  // Estilos
+  const paddingLeft = isExpanded ? level * 1.5 + 1 : 1;
 
-  // Estilos del botón según el estado
   const buttonStyles = {
-    minHeight: 48,
+    minHeight: 44,
     justifyContent: isExpanded ? 'initial' : 'center',
     px: paddingLeft,
     py: 1,
-    borderRadius: 1,
-    mx: 1,
-    my: 0.5,
+    borderRadius: 0, // Sin bordes redondeados
+    mx: 0.5,
+    my: 0.25,
     position: 'relative',
+    color: isMenuActive ? '#ffffff' : alpha('#ffffff', 0.7),
     backgroundColor: isMenuActive
-      ? 'rgba(16, 185, 129, 0.15)'
+      ? 'rgba(255, 255, 255, 0.15)' // Fondo semi-transparente para items activos
       : 'transparent',
     '&:hover': {
       backgroundColor: isMenuActive
-        ? 'rgba(16, 185, 129, 0.25)'
-        : 'rgba(255, 255, 255, 0.05)',
+        ? 'rgba(255, 255, 255, 0.2)' // Hover más visible
+        : 'rgba(255, 255, 255, 0.1)',
+      color: '#ffffff',
     },
     '&::before': isMenuActive && level === 0 ? {
       content: '""',
@@ -144,81 +167,64 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
       left: 0,
       top: '50%',
       transform: 'translateY(-50%)',
-      width: 4,
+      width: 3,
       height: '70%',
-      backgroundColor: '#10B981',
-      borderRadius: '0 4px 4px 0',
+      backgroundColor: '#60a5fa', // Azul claro para el indicador activo
+      borderRadius: 0, // Sin bordes redondeados
     } : {},
-    transition: theme.transitions.create(['background-color', 'padding'], {
+    transition: theme.transitions.create(['background-color', 'color'], {
       duration: theme.transitions.duration.shorter,
     }),
   };
 
-  // Estilos del ícono
   const iconStyles = {
     minWidth: 0,
-    mr: isExpanded ? 2 : 'auto',
+    mr: isExpanded ? 1.5 : 'auto',
     justifyContent: 'center',
     color: isMenuActive
-      ? '#10B981'
-      : 'rgba(255, 255, 255, 0.7)',
-    transition: theme.transitions.create('color', {
-      duration: theme.transitions.duration.shorter,
-    }),
+      ? '#60a5fa' // Azul claro para íconos activos
+      : 'inherit',
+    '& svg': {
+      fontSize: level === 0 ? 20 : 16,
+      transition: theme.transitions.create('color'),
+    },
   };
 
-  // Estilos del texto
   const textStyles = {
     opacity: isExpanded ? 1 : 0,
-    transition: theme.transitions.create(['opacity'], {
-      duration: theme.transitions.duration.shorter,
-    }),
+    fontSize: level === 0 ? '0.875rem' : '0.813rem',
+    fontWeight: isMenuActive ? 500 : 400,
+    color: 'inherit',
+    '& .MuiListItemText-primary': {
+      fontSize: 'inherit',
+      fontWeight: 'inherit',
+    },
   };
 
   // Contenido del botón
   const buttonContent = (
     <>
-      <ListItemIcon sx={iconStyles}>
-        {level > 0 && !icon ? (
-          <Box
-            sx={{
-              width: 6,
-              height: 6,
-              borderRadius: '50%',
-              backgroundColor: isMenuActive
-                ? '#10B981'
-                : 'rgba(255, 255, 255, 0.5)',
-              opacity: isMenuActive ? 1 : 0.5,
-            }}
-          />
-        ) : (
-          icon
-        )}
-      </ListItemIcon>
-      
+      {icon && (
+        <ListItemIcon sx={iconStyles}>
+          {icon}
+        </ListItemIcon>
+      )}
       {isExpanded && (
         <>
           <ListItemText
             primary={label}
-            primaryTypographyProps={{
-              fontSize: level > 0 ? '0.875rem' : '0.95rem',
-              fontWeight: isMenuActive ? 600 : 400,
-              color: isMenuActive
-                ? '#10B981'
-                : '#FFFFFF',
-              sx: textStyles,
-            }}
+            sx={textStyles}
           />
           {hasSubMenu && (
             <Box
               sx={{
                 ml: 'auto',
-                display: 'flex',
-                alignItems: 'center',
-                color: 'rgba(255, 255, 255, 0.7)',
+                color: isMenuActive ? '#60a5fa' : alpha('#ffffff', 0.5),
+                transition: theme.transitions.create(['transform', 'color']),
+                transform: isSubMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
               }}
             >
-              {isSubMenuOpen ? <ExpandLess /> : <ExpandMore />}
+              {isSubMenuOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
             </Box>
           )}
         </>
@@ -226,7 +232,6 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
     </>
   );
 
-  // Renderizar el elemento del menú
   return (
     <Box
       onMouseEnter={() => setHovered(true)}
@@ -244,11 +249,19 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
             title={!isExpanded && level === 0 ? label : ''}
             placement="right"
             arrow
+            componentsProps={{
+              tooltip: {
+                sx: {
+                  bgcolor: 'rgba(0, 0, 0, 0.9)',
+                  '& .MuiTooltip-arrow': {
+                    color: 'rgba(0, 0, 0, 0.9)',
+                  },
+                },
+              },
+            }}
           >
             <ListItemButton
-              component={Link}
-              to={path}
-              onClick={() => setActiveItem(id)}
+              onClick={handleNavigation}
               sx={buttonStyles}
             >
               {buttonContent}
@@ -259,6 +272,16 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
             title={!isExpanded && level === 0 ? label : ''}
             placement="right"
             arrow
+            componentsProps={{
+              tooltip: {
+                sx: {
+                  bgcolor: 'rgba(0, 0, 0, 0.9)',
+                  '& .MuiTooltip-arrow': {
+                    color: 'rgba(0, 0, 0, 0.9)',
+                  },
+                },
+              },
+            }}
           >
             <ListItemButton
               onClick={handleClick}
@@ -270,7 +293,6 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
         )}
       </ListItem>
 
-      {/* Submenú con animación */}
       {hasSubMenu && (
         <Collapse
           in={isSubMenuOpen && isExpanded}
@@ -285,12 +307,11 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
               '&::before': level === 0 ? {
                 content: '""',
                 position: 'absolute',
-                left: theme.spacing(4),
+                left: theme.spacing(2.5),
                 top: 0,
                 bottom: 0,
                 width: 1,
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                opacity: 0.5,
+                backgroundColor: alpha('#ffffff', 0.1),
               } : {},
             }}
           >
@@ -299,7 +320,6 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
         </Collapse>
       )}
 
-      {/* Indicador visual cuando está colapsado y tiene submenús activos */}
       {!isExpanded && hasSubMenu && shouldBeOpen && (
         <Box
           sx={{
@@ -310,8 +330,8 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
             width: 6,
             height: 6,
             borderRadius: '50%',
-            backgroundColor: '#10B981',
-            boxShadow: `0 0 0 2px rgba(16, 185, 129, 0.3)`,
+            backgroundColor: '#60a5fa',
+            boxShadow: `0 0 0 2px ${alpha('#60a5fa', 0.3)}`,
           }}
         />
       )}
@@ -319,7 +339,6 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
   );
 });
 
-// Para React DevTools
 SidebarWidget.displayName = 'SidebarWidget';
 
 export default SidebarWidget;
