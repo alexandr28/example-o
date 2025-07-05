@@ -1,12 +1,53 @@
-// src/pages/mantenedores/BarriosPage.tsx - CORREGIDO
+// src/pages/mantenedores/BarriosPage.tsx - Versión con Material-UI
 import React, { useState, useMemo } from 'react';
+import {
+  Box,
+  Paper,
+  Grid,
+  Alert,
+  AlertTitle,
+  Chip,
+  IconButton,
+  Typography,
+  Collapse,
+  LinearProgress,
+  Card,
+  CardContent,
+  Stack,
+  Tooltip,
+  Fade,
+  useTheme,
+  alpha,
+  Button,
+  ButtonGroup,
+  Divider
+} from '@mui/material';
+import {
+  Refresh as RefreshIcon,
+  Science as ScienceIcon,
+  CloudOff as CloudOffIcon,
+  CloudQueue as CloudIcon,
+  DeleteSweep as DeleteSweepIcon,
+  Sync as SyncIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  LocationCity as LocationCityIcon,
+  Map as MapIcon,
+  CheckCircle as CheckCircleIcon,
+  Cancel as CancelIcon,
+  Search as SearchIcon,
+  Clear as ClearIcon
+} from '@mui/icons-material';
 import { MainLayout } from '../../layout';
-import { BarrioList, BarrioForm, Breadcrumb } from '../../components';
+import { Breadcrumb } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useBarrios } from '../../hooks/useBarrios';
 import { BarrioFormData } from '../../models/Barrio';
+import BarrioFormMUI from '../../components/barrio/BarrioForm';
+import BarrioListMUI from '../../components/barrio/BarrioList';
 
 const BarriosPage: React.FC = () => {
+  const theme = useTheme();
   const {
     // Estados principales
     barrios,
@@ -43,6 +84,7 @@ const BarriosPage: React.FC = () => {
   // Estados locales
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showDebug, setShowDebug] = useState(false);
+  const [expandedInfo, setExpandedInfo] = useState(false);
 
   // Migas de pan
   const breadcrumbItems: BreadcrumbItem[] = useMemo(() => [
@@ -67,7 +109,7 @@ const BarriosPage: React.FC = () => {
     }
   };
 
-  // Manejo de guardado - IMPORTANTE: Recibe BarrioFormData completo
+  // Manejo de guardado
   const handleGuardar = async (data: BarrioFormData) => {
     try {
       console.log('📤 [BarriosPage] Guardando barrio:', data);
@@ -79,7 +121,6 @@ const BarriosPage: React.FC = () => {
           ? "✅ Barrio actualizado correctamente" 
           : "✅ Barrio creado correctamente");
         
-        // Recargar datos después de un pequeño delay
         setTimeout(async () => {
           await cargarBarrios();
         }, 500);
@@ -99,8 +140,6 @@ const BarriosPage: React.FC = () => {
     try {
       await eliminarBarrio(id);
       showMessage("✅ Barrio eliminado correctamente");
-      
-      // Recargar datos
       await cargarBarrios();
     } catch (error: any) {
       showMessage(`❌ Error al eliminar: ${error.message}`);
@@ -152,244 +191,246 @@ const BarriosPage: React.FC = () => {
     }
   };
 
+  // Determinar tipo de alerta según el contenido del mensaje
+  const getAlertSeverity = (message: string) => {
+    if (message.includes('✅')) return 'success';
+    if (message.includes('❌')) return 'error';
+    if (message.includes('⚠️')) return 'warning';
+    return 'info';
+  };
+
   return (
     <MainLayout title="Mantenimiento de Barrios">
-      <div className="space-y-4">
-        {/* Header con botones de acciones */}
-        <div className="flex justify-between items-center">
+      <Box sx={{ p: 3 }}>
+        {/* Breadcrumb */}
+        <Box sx={{ mb: 3 }}>
           <Breadcrumb items={breadcrumbItems} />
-          
-          <div className="flex space-x-2">
-            <button 
-              onClick={handleTestApi}
-              className="text-purple-600 hover:text-purple-800 flex items-center text-sm px-2 py-1 rounded border border-purple-200 hover:bg-purple-50"
-              disabled={loading}
-            >
-              🧪 Test API
-            </button>
-            
-            <button 
-              onClick={handleReloadSectores}
-              className="text-indigo-600 hover:text-indigo-800 flex items-center text-sm px-2 py-1 rounded border border-indigo-200 hover:bg-indigo-50"
-              disabled={loadingSectores}
-            >
-              🎯 Sectores
-            </button>
-            
-            <button 
-              onClick={handleForceReload}
-              className="text-blue-600 hover:text-blue-800 flex items-center text-sm px-2 py-1 rounded border border-blue-200 hover:bg-blue-50"
-              disabled={loading}
-            >
-              🔄 Recargar
-            </button>
-            
-            <button 
-              onClick={handleClearCache}
-              className="text-orange-600 hover:text-orange-800 flex items-center text-sm px-2 py-1 rounded border border-orange-200 hover:bg-orange-50"
-            >
-              🧹 Limpiar Cache
-            </button>
-            
-            <button 
-              onClick={sincronizarManualmente}
-              className="text-green-600 hover:text-green-800 flex items-center text-sm px-2 py-1 rounded border border-green-200 hover:bg-green-50"
-              disabled={loading}
-            >
-              🔁 Sincronizar
-            </button>
-            
-            {process.env.NODE_ENV === 'development' && (
-              <button 
-                onClick={() => setShowDebug(!showDebug)}
-                className="text-gray-600 hover:text-gray-800 flex items-center text-sm px-2 py-1 rounded border border-gray-200 hover:bg-gray-50"
-                disabled={loading}
-              >
-                🔧 {showDebug ? 'Ocultar' : 'Debug'}
-              </button>
-            )}
-          </div>
-        </div>
+        </Box>
 
-        {/* Panel de debug */}
-        {showDebug && process.env.NODE_ENV === 'development' && (
-          <div className="bg-gray-900 text-green-400 p-4 rounded-md font-mono text-xs overflow-auto max-h-96">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-green-300 font-bold">🔧 INFORMACIÓN DE DEBUG - BARRIOS</h3>
-              <div className="space-x-2">
-                <button 
-                  onClick={handleTestApi}
-                  className="text-green-300 hover:text-green-200 px-2 py-1 rounded border border-green-600 text-xs"
-                >
-                  Test API
-                </button>
-                <button 
-                  onClick={sincronizarManualmente}
-                  className="text-green-300 hover:text-green-200 px-2 py-1 rounded border border-green-600 text-xs"
-                >
-                  Sincronizar
-                </button>
-              </div>
-            </div>
-            <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
-            {lastSyncTime && (
-              <div className="mt-2 text-green-300">
-                Última sincronización: {lastSyncTime.toLocaleString()}
-              </div>
-            )}
-          </div>
+        {/* Progress bar */}
+        {(loading || loadingSectores) && (
+          <Box sx={{ width: '100%', mb: 2 }}>
+            <LinearProgress />
+          </Box>
         )}
 
-        {/* Mensaje de éxito/error */}
-        {successMessage && (
-          <div className={`border px-4 py-3 rounded relative ${
-            successMessage.includes('❌') 
-              ? 'bg-red-50 border-red-200 text-red-800' 
-              : successMessage.includes('⚠️')
-              ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
-              : 'bg-green-50 border-green-200 text-green-800'
-          }`} role="alert">
-            <span className="block sm:inline">{successMessage}</span>
-          </div>
-        )}
+        {/* Header removido - título ahora está solo en el breadcrumb */}
 
-        {/* Alerta de modo offline */}
-        {isOfflineMode && (
-          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded relative">
-            <div className="flex justify-between items-center">
-              <div>
-                <span className="font-medium">⚠️ Modo sin conexión:</span>
-                <span className="ml-1">Trabajando con datos locales.</span>
-              </div>
-              <button 
-                onClick={handleForceReload}
-                className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300"
-                disabled={loading}
-              >
-                Reconectar
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Mensajes de alerta */}
+        <Collapse in={!!successMessage}>
+          <Alert 
+            severity={getAlertSeverity(successMessage || '')} 
+            sx={{ mb: 2 }}
+            onClose={() => setSuccessMessage(null)}
+          >
+            {successMessage}
+          </Alert>
+        </Collapse>
 
-        {/* Alerta de pocos sectores */}
+        {/* Alerta de sectores */}
         {sectores.length === 0 && !loadingSectores && (
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded relative">
-            <div className="flex justify-between items-center">
-              <div>
-                <span className="font-medium">⚠️ Sin sectores disponibles:</span>
-                <span className="ml-1">No se pueden crear barrios sin sectores.</span>
-              </div>
-              <button 
+          <Alert 
+            severity="warning" 
+            sx={{ mb: 2 }}
+            action={
+              <Button
+                color="inherit"
+                size="small"
                 onClick={handleReloadSectores}
-                className="px-3 py-1 bg-amber-200 text-amber-800 rounded hover:bg-amber-300"
                 disabled={loadingSectores}
               >
                 Cargar sectores
-              </button>
-            </div>
-          </div>
+              </Button>
+            }
+          >
+            <AlertTitle>Sin sectores disponibles</AlertTitle>
+            No se pueden crear barrios sin sectores.
+          </Alert>
         )}
 
-        {/* Mensajes de error */}
+        {/* Error general */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
-            <span className="block sm:inline">{error}</span>
-          </div>
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
         )}
 
-        {/* Formulario de barrios - CORREGIDO: Cambiar onGuardar por onSubmit */}
-        <BarrioForm
-          barrioSeleccionado={barrioSeleccionado}
-          sectores={sectores}
-          onSubmit={handleGuardar}  /* CAMBIO IMPORTANTE: onGuardar -> onSubmit */
-          onNuevo={limpiarSeleccion}
-          onEditar={handleEditar}
-          loading={loading}
-          loadingSectores={loadingSectores}
-          isEditMode={modoEdicion}
-          isOfflineMode={isOfflineMode}
-        />
+        {/* Debug info */}
+        {showDebug && process.env.NODE_ENV === 'development' && (
+          <Collapse in={showDebug}>
+            <Paper sx={{ p: 2, mb: 2, bgcolor: 'grey.100' }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Debug Info:
+              </Typography>
+              <pre style={{ fontSize: '0.8rem', overflow: 'auto' }}>
+                {JSON.stringify(debugInfo, null, 2)}
+              </pre>
+            </Paper>
+          </Collapse>
+        )}
 
-        {/* Lista de barrios */}
-        <BarrioList
-          barrios={barrios}
-          onSelectBarrio={seleccionarBarrio}
-          isOfflineMode={isOfflineMode}
-          onEliminar={handleEliminar}
-          loading={loading}
-          onSearch={buscarBarrios}
-          searchTerm={searchTerm}
-          obtenerNombreSector={obtenerNombreSector}
-        />
+        {/* Layout principal */}
+        <Grid container spacing={3}>
+          {/* Formulario */}
+          <Grid item xs={12} md={4}>
+            <BarrioFormMUI
+              barrioSeleccionado={barrioSeleccionado}
+              sectores={sectores}
+              onSubmit={handleGuardar}
+              onNuevo={limpiarSeleccion}
+              onEditar={handleEditar}
+              loading={loading}
+              loadingSectores={loadingSectores}
+              isEditMode={modoEdicion}
+              isOfflineMode={isOfflineMode}
+            />
+          </Grid>
 
-        {/* Información adicional */}
-        <div className="bg-gray-50 p-4 rounded-md text-sm text-gray-600">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div>
-              <span className="font-medium">Total barrios:</span>
-              <span className="ml-2">{barrios.length}</span>
-            </div>
-            <div>
-              <span className="font-medium">Total sectores:</span>
-              <span className="ml-2">{sectores.length}</span>
-            </div>
-            <div>
-              <span className="font-medium">Estado:</span>
-              <span className="ml-2">{isOfflineMode ? '🔴 Offline' : '🟢 Online'}</span>
-            </div>
-            <div>
-              <span className="font-medium">Seleccionado:</span>
-              <span className="ml-2">{barrioSeleccionado?.nombre || 'Ninguno'}</span>
-            </div>
-            <div>
-              <span className="font-medium">Modo:</span>
-              <span className="ml-2">{modoEdicion ? 'Edición' : 'Vista'}</span>
-            </div>
-          </div>
-          
-          {/* Información adicional de contexto */}
-          {barrioSeleccionado && (
-            <div className="mt-2 pt-2 border-t border-gray-200">
-              <div className="text-xs text-gray-500">
-                <span className="font-medium">Barrio seleccionado:</span> {barrioSeleccionado.nombre}
-                {' | '}
-                <span className="font-medium">Sector:</span> {obtenerNombreSector(barrioSeleccionado.sectorId)}
-                {barrioSeleccionado.estado !== undefined && (
+          {/* Lista */}
+          <Grid item xs={12} md={8}>
+            <BarrioListMUI
+              barrios={barrios}
+              onSelectBarrio={seleccionarBarrio}
+              isOfflineMode={isOfflineMode}
+              onEliminar={handleEliminar}
+              loading={loading}
+              onSearch={buscarBarrios}
+              searchTerm={searchTerm}
+              obtenerNombreSector={obtenerNombreSector}
+            />
+          </Grid>
+        </Grid>
+
+        {/* Panel de información expandible */}
+        <Box sx={{ mt: 3 }}>
+          <Card>
+            <CardContent>
+              <Box
+                onClick={() => setExpandedInfo(!expandedInfo)}
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  cursor: 'pointer'
+                }}
+              >
+                <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                  Información del Sistema
+                </Typography>
+                <IconButton size="small">
+                  {expandedInfo ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                </IconButton>
+              </Box>
+
+              <Collapse in={expandedInfo}>
+                <Divider sx={{ my: 2 }} />
+                <Grid container spacing={2}>
+                  <Grid item xs={6} sm={4}>
+                    <Stack spacing={0.5}>
+                      <Typography variant="caption" color="text.secondary">
+                        Total barrios
+                      </Typography>
+                      <Typography variant="h6">
+                        {barrios.length}
+                      </Typography>
+                    </Stack>
+                  </Grid>
+                  
+                  <Grid item xs={6} sm={4}>
+                    <Stack spacing={0.5}>
+                      <Typography variant="caption" color="text.secondary">
+                        Total sectores
+                      </Typography>
+                      <Typography variant="h6">
+                        {sectores.length}
+                      </Typography>
+                    </Stack>
+                  </Grid>
+                  
+                  <Grid item xs={6} sm={4}>
+                    <Stack spacing={0.5}>
+                      <Typography variant="caption" color="text.secondary">
+                        Modo
+                      </Typography>
+                      <Chip
+                        label={modoEdicion ? 'Edición' : 'Vista'}
+                        color={modoEdicion ? 'primary' : 'default'}
+                        size="small"
+                      />
+                    </Stack>
+                  </Grid>
+                </Grid>
+
+                {/* Información del barrio seleccionado */}
+                {barrioSeleccionado && (
                   <>
-                    {' | '}
-                    <span className="font-medium">Estado:</span> {' '}
-                    <span className={barrioSeleccionado.estado ? 'text-green-600' : 'text-red-600'}>
-                      {barrioSeleccionado.estado ? 'Activo' : 'Inactivo'}
-                    </span>
+                    <Divider sx={{ my: 2 }} />
+                    <Box sx={{ p: 2, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1 }}>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Barrio Seleccionado:
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={4}>
+                          <Typography variant="body2" color="text.secondary">
+                            Nombre: <strong>{barrioSeleccionado.nombre}</strong>
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                          <Typography variant="body2" color="text.secondary">
+                            Sector: <strong>{obtenerNombreSector(barrioSeleccionado.sectorId)}</strong>
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                          <Typography variant="body2" color="text.secondary">
+                            Estado: {' '}
+                            <Chip
+                              icon={barrioSeleccionado.estado ? <CheckCircleIcon /> : <CancelIcon />}
+                              label={barrioSeleccionado.estado ? 'Activo' : 'Inactivo'}
+                              color={barrioSeleccionado.estado ? 'success' : 'error'}
+                              size="small"
+                            />
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Box>
                   </>
                 )}
-              </div>
-            </div>
-          )}
-          
-          {/* Indicador de búsqueda activa */}
-          {searchTerm && (
-            <div className="mt-2 pt-2 border-t border-gray-200">
-              <div className="text-xs text-gray-500 flex justify-between items-center">
-                <span>
-                  <span className="font-medium">Búsqueda activa:</span> "{searchTerm}"
-                  {' - '}
-                  <span className="font-medium">Resultados:</span> {barrios.length}
-                </span>
-                <button
-                  onClick={() => buscarBarrios('')}
-                  className="text-blue-600 hover:text-blue-800"
-                >
-                  Limpiar búsqueda
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+
+                {/* Búsqueda activa */}
+                {searchTerm && (
+                  <>
+                    <Divider sx={{ my: 2 }} />
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      p: 2,
+                      bgcolor: alpha(theme.palette.info.main, 0.05),
+                      borderRadius: 1
+                    }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <SearchIcon color="info" />
+                        <Typography variant="body2">
+                          Búsqueda activa: <strong>"{searchTerm}"</strong> - {barrios.length} resultados
+                        </Typography>
+                      </Box>
+                      <Button
+                        size="small"
+                        startIcon={<ClearIcon />}
+                        onClick={() => buscarBarrios('')}
+                      >
+                        Limpiar búsqueda
+                      </Button>
+                    </Box>
+                  </>
+                )}
+              </Collapse>
+            </CardContent>
+          </Card>
+        </Box>
+      </Box>
     </MainLayout>
   );
 };
 
-export default BarriosPage;
+export default BarriosPage

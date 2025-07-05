@@ -52,7 +52,7 @@ const AppRouter: React.FC = () => {
             <FormProvider>
             <SidebarProvider>
               {/* Debug component para desarrollo */}
-              {process.env.NODE_ENV === 'development' && <SimpleDebug />}
+             
               
               <Router>
                 {/* Manejador de autenticación automática y notificaciones */}

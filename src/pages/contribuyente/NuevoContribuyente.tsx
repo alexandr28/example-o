@@ -1,123 +1,142 @@
-// src/pages/contribuyente/NuevoContribuyente.tsx
-import React, { FC, useMemo, memo, useCallback } from 'react';
-import { ContribuyenteForm, Breadcrumb, NotificationContainer } from '../../components';
+// src/pages/contribuyente/NuevoContribuyente.tsx - Versión con Material-UI
+import React, { useCallback, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Alert,
+  Collapse,
+  LinearProgress
+} from '@mui/material';
 import { MainLayout } from '../../layout';
+import { Breadcrumb, NotificationContainer } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
-import ErrorBoundary from '../../components/utils/ErrorBoundary';
+import ContribuyenteFormMUI from '../../components/contribuyentes/ContribuyenteForm';
 import { useContribuyenteAPI } from '../../hooks/useContribuyenteApi';
-import AuthStatusDebug from '../../components/debug/AuthStatusDebug';
+import { NotificationService } from '../../components/utils/Notification';
 
 /**
- * Error Boundary específico para el formulario de contribuyente
+ * Página para crear un nuevo contribuyente con Material-UI
  */
-class ContribuyenteFormErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean; error: Error | null }
-> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Error en ContribuyenteForm:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="p-6 bg-red-50 border border-red-200 rounded-md">
-          <h3 className="text-lg font-medium text-red-800 mb-2">
-            Error al cargar el formulario
-          </h3>
-          <p className="text-sm text-red-600 mb-4">
-            Ha ocurrido un error al cargar el formulario de contribuyente.
-          </p>
-          <details className="text-xs text-red-500">
-            <summary className="cursor-pointer">Ver detalles técnicos</summary>
-            <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto">
-              {this.state.error?.toString()}
-            </pre>
-          </details>
-          <button 
-            onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-          >
-            Recargar página
-          </button>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
-/**
- * Wrapper seguro para el ContribuyenteForm
- * Previene el error de props booleanas en elementos DOM
- */
-const SafeContribuyenteFormWrapper: FC = () => {
+const NuevoContribuyente: React.FC = () => {
+  const navigate = useNavigate();
   const { guardarContribuyente } = useContribuyenteAPI();
-  
-  const handleSubmit = useCallback(async (formData: any) => {
-    try {
-      await guardarContribuyente(formData);
-    } catch (error) {
-      console.error('Error al guardar:', error);
-    }
-  }, [guardarContribuyente]);
-  
-  return (
-    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-      {/* Envolver en un div para aislar cualquier prop problemática */}
-      <div>
-        <ContribuyenteForm onSubmit={handleSubmit} />
-      </div>
-    </div>
-  );
-};
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-/**
- * Página para crear un nuevo contribuyente
- * Usa el ContribuyenteForm existente con las APIs integradas
- */
-const NuevoContribuyente: FC = memo(() => {
   // Definir las migas de pan para la navegación
-  const breadcrumbItems: BreadcrumbItem[] = useMemo(() => [
+  const breadcrumbItems: BreadcrumbItem[] = [
     { label: 'Módulo', path: '/' },
     { label: 'Contribuyente', path: '/contribuyente' },
     { label: 'Nuevo contribuyente', active: true }
-  ], []);
+  ];
+
+  // Función para mostrar mensaje temporal
+  const showMessage = (message: string, type: 'success' | 'error' = 'success', duration = 5000) => {
+    if (type === 'success') {
+      setSuccessMessage(message);
+      setError(null);
+    } else {
+      setError(message);
+      setSuccessMessage(null);
+    }
+    
+    setTimeout(() => {
+      setSuccessMessage(null);
+      setError(null);
+    }, duration);
+  };
+
+  // Manejar el guardado del contribuyente
+  const handleSubmit = useCallback(async (formData: any) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('📤 [NuevoContribuyente] Guardando contribuyente:', formData);
+      
+      await guardarContribuyente(formData);
+      
+      showMessage('✅ Contribuyente guardado exitosamente', 'success');
+      
+      // Redirigir después de un breve delay
+      setTimeout(() => {
+        navigate('/contribuyente/consulta');
+      }, 2000);
+      
+    } catch (error: any) {
+      console.error('❌ [NuevoContribuyente] Error al guardar:', error);
+      showMessage(
+        `❌ Error al guardar: ${error.message || 'Error desconocido'}`,
+        'error'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [guardarContribuyente, navigate]);
+
+  // Manejar edición (por implementar)
+  const handleEdit = useCallback(() => {
+    NotificationService.info('Función de edición en desarrollo');
+  }, []);
+
+  // Manejar nuevo (limpiar formulario)
+  const handleNew = useCallback(() => {
+    setError(null);
+    setSuccessMessage(null);
+    NotificationService.info('Formulario limpiado');
+  }, []);
 
   return (
-    <MainLayout>
-      <ErrorBoundary>
-        <div className="space-y-4">
-          {/* Navegación de migas de pan */}
+    <MainLayout title="Nuevo Contribuyente">
+      <Box sx={{ p: 3 }}>
+        {/* Navegación de migas de pan */}
+        <Box sx={{ mb: 3 }}>
           <Breadcrumb items={breadcrumbItems} />
-          
-          {/* Contenedor del formulario con Error Boundary específico */}
-          <ContribuyenteFormErrorBoundary>
-            <SafeContribuyenteFormWrapper />
-          </ContribuyenteFormErrorBoundary>
-        </div>
+        </Box>
+
+        {/* Progress bar */}
+        {loading && (
+          <Box sx={{ width: '100%', mb: 2 }}>
+            <LinearProgress />
+          </Box>
+        )}
+
+        {/* Mensaje de éxito */}
+        <Collapse in={!!successMessage}>
+          <Alert 
+            severity="success" 
+            sx={{ mb: 2 }}
+            onClose={() => setSuccessMessage(null)}
+          >
+            {successMessage}
+          </Alert>
+        </Collapse>
+
+        {/* Mensaje de error */}
+        <Collapse in={!!error}>
+          <Alert 
+            severity="error" 
+            sx={{ mb: 2 }}
+            onClose={() => setError(null)}
+          >
+            {error}
+          </Alert>
+        </Collapse>
+
+        {/* Formulario de contribuyente */}
+        <ContribuyenteFormMUI
+          onSubmit={handleSubmit}
+          onEdit={handleEdit}
+          onNew={handleNew}
+          loading={loading}
+        />
         
         {/* Contenedor de notificaciones */}
         <NotificationContainer />
-        
-        {/* Debug de autenticación (solo en desarrollo) */}
-        <AuthStatusDebug />
-      </ErrorBoundary>
+      </Box>
     </MainLayout>
   );
-});
-
-// Nombre para DevTools
-NuevoContribuyente.displayName = 'NuevoContribuyente';
+};
 
 export default NuevoContribuyente;

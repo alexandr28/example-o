@@ -1,23 +1,59 @@
-// src/components/barrio/BarrioForm.tsx
+// src/components/barrio/BarrioFormMUI.tsx
 import React, { FC, useEffect, useState } from 'react';
+import {
+  Paper,
+  TextField,
+  Button,
+  Box,
+  Typography,
+  FormControl,
+  Stack,
+  Chip,
+  Alert,
+  CircularProgress,
+  Divider,
+  IconButton,
+  Tooltip,
+  useTheme,
+  alpha,
+  Autocomplete
+} from '@mui/material';
+import {
+  Save as SaveIcon,
+  Add as AddIcon,
+  Edit as EditIcon,
+  Clear as ClearIcon,
+  LocationCity as LocationCityIcon,
+  Home as HomeIcon
+} from '@mui/icons-material';
 import { BarrioFormData } from '../../models/Barrio';
 import { Sector } from '../../models/Sector';
 
 interface BarrioFormProps {
-  initialData?: BarrioFormData;
+  barrioSeleccionado?: BarrioFormData | null;
   sectores: Sector[];
   onSubmit: (data: BarrioFormData) => void;
-  onCancel: () => void;
+  onNuevo: () => void;
+  onEditar: () => void;
   loading?: boolean;
+  loadingSectores?: boolean;
+  isEditMode?: boolean;
+  isOfflineMode?: boolean;
 }
 
-const BarrioForm: FC<BarrioFormProps> = ({
-  initialData,
+const BarrioFormMUI: FC<BarrioFormProps> = ({
+  barrioSeleccionado,
   sectores,
   onSubmit,
-  onCancel,
-  loading = false
+  onNuevo,
+  onEditar,
+  loading = false,
+  loadingSectores = false,
+  isEditMode = false,
+  isOfflineMode = false
 }) => {
+  const theme = useTheme();
+  
   // Estados del formulario
   const [formData, setFormData] = useState<BarrioFormData>({
     nombre: '',
@@ -25,16 +61,30 @@ const BarrioForm: FC<BarrioFormProps> = ({
     estado: 1
   });
   
-  // Estado para el sector seleccionado (para debugging)
-  const [selectedSectorId, setSelectedSectorId] = useState<string>('');
+  const [errors, setErrors] = useState<{
+    nombre?: string;
+    sectorId?: string;
+  }>({});
 
   // Inicializar con datos si es edición
   useEffect(() => {
-    if (initialData) {
-      setFormData(initialData);
-      setSelectedSectorId(initialData.sectorId?.toString() || '');
+    if (barrioSeleccionado && isEditMode) {
+      setFormData({
+        nombre: barrioSeleccionado.nombre || '',
+        sectorId: barrioSeleccionado.sectorId || null,
+        estado: barrioSeleccionado.estado !== undefined ? barrioSeleccionado.estado : 1
+      });
+      setErrors({});
+    } else {
+      // Limpiar formulario
+      setFormData({
+        nombre: '',
+        sectorId: null,
+        estado: 1
+      });
+      setErrors({});
     }
-  }, [initialData]);
+  }, [barrioSeleccionado, isEditMode]);
 
   // Manejar cambios en los inputs
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -43,31 +93,53 @@ const BarrioForm: FC<BarrioFormProps> = ({
       ...prev,
       [name]: value
     }));
+    
+    // Limpiar error del campo modificado
+    if (errors[name as keyof typeof errors]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: undefined
+      }));
+    }
   };
 
-  // Manejar cambio en el select de sector
-  const handleSectorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    console.log('🔄 Sector seleccionado:', value);
-    
-    setSelectedSectorId(value);
+  // Manejar cambio en el autocomplete de sector
+  const handleSectorChange = (value: Sector | null) => {
     setFormData(prev => ({
       ...prev,
-      sectorId: value ? Number(value) : null
+      sectorId: value ? value.id : null
     }));
+    
+    // Limpiar error si había
+    if (errors.sectorId) {
+      setErrors(prev => ({
+        ...prev,
+        sectorId: undefined
+      }));
+    }
+  };
+
+  // Validar formulario
+  const validateForm = (): boolean => {
+    const newErrors: typeof errors = {};
+    
+    if (!formData.nombre.trim()) {
+      newErrors.nombre = 'El nombre del barrio es requerido';
+    }
+    
+    if (!formData.sectorId) {
+      newErrors.sectorId = 'Debe seleccionar un sector';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   // Manejar submit
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.nombre.trim()) {
-      alert('El nombre del barrio es requerido');
-      return;
-    }
-    
-    if (!formData.sectorId) {
-      alert('Debe seleccionar un sector');
+    if (!validateForm()) {
       return;
     }
     
@@ -75,97 +147,217 @@ const BarrioForm: FC<BarrioFormProps> = ({
     onSubmit(formData);
   };
 
-  // Obtener el nombre del sector seleccionado
+  // Obtener el sector seleccionado
   const sectorSeleccionado = sectores.find(s => s.id === formData.sectorId);
 
+  // Determinar si el formulario está deshabilitado
+  const isDisabled = loading || (sectores.length === 0 && !loadingSectores);
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-semibold mb-4">
-          {initialData ? 'Editar Barrio' : 'Nuevo Barrio'}
-        </h3>
+    <Paper
+      sx={{
+        p: 3,
+        height: '100%',
+        position: 'relative',
+        overflow: 'hidden'
+      }}
+    >
+      {/* Header del formulario */}
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+          <HomeIcon color="primary" />
+          <Typography variant="h6" component="h2">
+            {isEditMode ? 'Editar Barrio' : 'Nuevo Barrio'}
+          </Typography>
+        </Box>
         
-        {/* Campo Sector */}
-        <div className="mb-4">
-          <label htmlFor="sector" className="block text-sm font-medium text-gray-700 mb-2">
-            Sector <span className="text-red-500">*</span>
-            {sectores.length > 0 && <span className="text-gray-500 text-xs ml-2">({sectores.length} opciones)</span>}
-          </label>
-          
-          <select
-            id="sector"
-            name="sectorId"
-            value={selectedSectorId}
-            onChange={handleSectorChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            disabled={loading || sectores.length === 0}
-            required
-          >
-            <option value="">Seleccione un sector</option>
-            {sectores.map(sector => (
-              <option key={sector.id} value={sector.id.toString()}>
-                {sector.nombre}
-              </option>
-            ))}
-          </select>
-          
-          {/* Debug info */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="text-xs text-gray-500 mt-1">
-              <div>Valor actual: {selectedSectorId || 'ninguno'}</div>
-              <div>Opciones: {sectores.map(s => `${s.id}:${s.nombre}`).join(', ')}</div>
-            </div>
+        {/* Chips de estado */}
+        <Stack direction="row" spacing={1}>
+          {barrioSeleccionado && !isEditMode && (
+            <Chip
+              label={`Seleccionado: ${barrioSeleccionado.nombre}`}
+              size="small"
+              color="info"
+              onDelete={onNuevo}
+            />
           )}
-        </div>
-        
-        {/* Mostrar sector seleccionado */}
-        {sectorSeleccionado && (
-          <div className="mb-4 p-3 bg-blue-50 rounded">
-            <span className="text-sm text-blue-700">
-              Sector seleccionado: {sectorSeleccionado.nombre}
-            </span>
-          </div>
-        )}
-        
-        {/* Campo Nombre */}
-        <div className="mb-4">
-          <label htmlFor="nombre" className="block text-sm font-medium text-gray-700 mb-2">
-            Nombre del Barrio <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
+        </Stack>
+      </Box>
+
+      <Divider sx={{ mb: 3 }} />
+
+      {/* Formulario */}
+      <form onSubmit={handleSubmit}>
+        <Stack spacing={3}>
+          {/* Autocomplete de Sector */}
+          <Autocomplete
+            id="sector"
+            options={sectores}
+            getOptionLabel={(option) => option.nombre || ''}
+            value={sectorSeleccionado || null}
+            onChange={(event, newValue) => handleSectorChange(newValue)}
+            disabled={isDisabled || loadingSectores}
+            loading={loadingSectores}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Sector *"
+                error={!!errors.sectorId}
+                helperText={errors.sectorId || (sectores.length === 0 && !loadingSectores ? "No hay sectores disponibles" : "")}
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <>
+                      <LocationCityIcon 
+                        sx={{ 
+                          color: 'action.disabled', 
+                          mr: 1,
+                          ml: 1
+                        }} 
+                      />
+                      {params.InputProps.startAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            renderOption={(props, option) => (
+              <Box component="li" {...props}>
+                <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+                  <Typography>{option.nombre}</Typography>
+                  {option.estado === false && (
+                    <Chip
+                      label="Inactivo"
+                      size="small"
+                      color="error"
+                      sx={{ ml: 1 }}
+                    />
+                  )}
+                </Box>
+              </Box>
+            )}
+            isOptionEqualToValue={(option, value) => option.id === value?.id}
+            noOptionsText="No se encontraron sectores"
+            placeholder="Buscar sector..."
+          />
+
+          {/* Mostrar información del sector seleccionado */}
+          {sectorSeleccionado && (
+            <Alert 
+              severity="info" 
+              icon={<LocationCityIcon />}
+              sx={{ 
+                bgcolor: alpha(theme.palette.info.main, 0.05),
+                border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
+              }}
+            >
+              <Typography variant="body2">
+                <strong>Sector seleccionado:</strong> {sectorSeleccionado.nombre}
+              </Typography>
+            </Alert>
+          )}
+
+          {/* Campo Nombre */}
+          <TextField
+            fullWidth
             id="nombre"
             name="nombre"
+            label="Nombre del Barrio"
             value={formData.nombre}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Ingrese nombre del barrio"
-            disabled={loading}
+            error={!!errors.nombre}
+            helperText={errors.nombre}
+            disabled={isDisabled}
             required
+            placeholder="Ingrese el nombre del barrio"
+            InputProps={{
+              startAdornment: (
+                <HomeIcon 
+                  sx={{ 
+                    color: 'action.disabled', 
+                    mr: 1
+                  }} 
+                />
+              )
+            }}
           />
-        </div>
-        
-        {/* Botones */}
-        <div className="flex justify-end space-x-2 mt-6">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-            disabled={loading}
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-            disabled={loading || !formData.nombre || !formData.sectorId}
-          >
-            {loading ? 'Guardando...' : (initialData ? 'Actualizar' : 'Guardar')}
-          </button>
-        </div>
-      </div>
-    </form>
+
+          {/* Debug info en desarrollo */}
+          {process.env.NODE_ENV === 'development' && (
+            <Alert severity="info" sx={{ mt: 1 }}>
+              <Typography variant="caption">
+                Debug: Sector ID: {formData.sectorId || 'null'} | 
+                Estado: {formData.estado} | 
+                Modo: {isEditMode ? 'Edición' : 'Nuevo'}
+              </Typography>
+            </Alert>
+          )}
+
+          {/* Botones de acción */}
+          <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
+            {/* Botón Nuevo */}
+            <Button
+              variant="outlined"
+              onClick={onNuevo}
+              disabled={loading}
+              startIcon={<AddIcon />}
+              fullWidth
+            >
+              Nuevo
+            </Button>
+
+            {/* Botón Editar */}
+            <Button
+              variant="outlined"
+              onClick={onEditar}
+              disabled={loading || !barrioSeleccionado || isEditMode}
+              startIcon={<EditIcon />}
+              fullWidth
+            >
+              Editar
+            </Button>
+
+            {/* Botón Guardar */}
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={isDisabled || !formData.nombre || !formData.sectorId}
+              startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
+              fullWidth
+              sx={{
+                bgcolor: isEditMode ? 'warning.main' : 'primary.main',
+                '&:hover': {
+                  bgcolor: isEditMode ? 'warning.dark' : 'primary.dark'
+                }
+              }}
+            >
+              {loading ? 'Guardando...' : (isEditMode ? 'Actualizar' : 'Guardar')}
+            </Button>
+          </Stack>
+        </Stack>
+      </form>
+
+      {/* Loading overlay */}
+      {loadingSectores && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            bgcolor: alpha(theme.palette.background.paper, 0.8),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      )}
+    </Paper>
   );
 };
 
-export default BarrioForm;
+export default BarrioFormMUI;

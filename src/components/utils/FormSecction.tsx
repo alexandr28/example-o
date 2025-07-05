@@ -1,31 +1,110 @@
-import React, { FC, memo, ReactNode } from 'react';
+// src/components/utils/FormSectionMUI.tsx
+import React from 'react';
+import {
+  Box,
+  Typography,
+  Paper,
+  IconButton,
+  useTheme,
+  alpha,
+  Stack
+} from '@mui/material';
+import {
+  Delete as DeleteIcon,
+  ExpandMore as ExpandMoreIcon
+} from '@mui/icons-material';
 
-interface FormSectionProps {
+interface FormSectionMUIProps {
   title: string;
-  children: ReactNode;
-  debug?: ReactNode;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  onDelete?: () => void;
+  collapsible?: boolean;
+  defaultExpanded?: boolean;
 }
 
-/**
- * Componente para secciones de formulario con título y contenido
- * 
- * Proporciona un estilo consistente para las distintas secciones de formulario
- */
-const FormSection: FC<FormSectionProps> = memo(({ title, children, debug }) => {
+const FormSectionMUI: React.FC<FormSectionMUIProps> = ({
+  title,
+  icon,
+  children,
+  onDelete,
+  collapsible = false,
+  defaultExpanded = true
+}) => {
+  const theme = useTheme();
+  const [expanded, setExpanded] = React.useState(defaultExpanded);
+
   return (
-    <section className="bg-white rounded-md shadow-sm overflow-hidden">
-      <header className="px-6 py-4 bg-gray-50 border-b">
-        <h2 className="text-lg font-medium text-gray-800">{title}</h2>
-        {debug && <div className="text-xs text-gray-500 mt-1">{debug}</div>}
-      </header>
-      <div className="p-6">
-        {children}
-      </div>
-    </section>
+    <Paper
+      elevation={0}
+      sx={{
+        border: `1px solid ${theme.palette.divider}`,
+        borderRadius: 2,
+        overflow: 'hidden',
+        mb: 3
+      }}
+    >
+      {/* Header */}
+      <Box
+        sx={{
+          bgcolor: alpha(theme.palette.primary.main, 0.04),
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          px: 3,
+          py: 2
+        }}
+      >
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Stack direction="row" alignItems="center" spacing={1}>
+            {icon && (
+              <Box sx={{ color: theme.palette.primary.main, display: 'flex' }}>
+                {icon}
+              </Box>
+            )}
+            <Typography variant="h6" component="h3" sx={{ fontWeight: 500 }}>
+              {title}
+            </Typography>
+          </Stack>
+
+          <Stack direction="row" spacing={1}>
+            {onDelete && (
+              <IconButton
+                size="small"
+                onClick={onDelete}
+                sx={{
+                  color: theme.palette.error.main,
+                  '&:hover': {
+                    bgcolor: alpha(theme.palette.error.main, 0.08)
+                  }
+                }}
+              >
+                <DeleteIcon />
+              </IconButton>
+            )}
+            
+            {collapsible && (
+              <IconButton
+                size="small"
+                onClick={() => setExpanded(!expanded)}
+                sx={{
+                  transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: theme.transitions.create('transform')
+                }}
+              >
+                <ExpandMoreIcon />
+              </IconButton>
+            )}
+          </Stack>
+        </Stack>
+      </Box>
+
+      {/* Content */}
+      {(!collapsible || expanded) && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </Paper>
   );
-});
+};
 
-// Nombre para DevTools
-FormSection.displayName = 'FormSection';
-
-export default FormSection;
+export default FormSectionMUI;

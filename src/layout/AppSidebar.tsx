@@ -144,8 +144,7 @@ const menuItems: MenuItem[] = [
     subMenuItems: [
       { id: 'nuevo-contribuyente', label: 'Nuevo', path: '/contribuyente/nuevo' },
       { id: 'consulta-contribuyente', label: 'Consulta', path: '/contribuyente/consulta' },
-      { id: 'creditos-hipotecarios', label: 'Créditos Hipotecarios', path: '/contribuyente/creditos-hipotecarios' },
-      { id: 'grupo-familiar', label: 'Grupo Familiar', path: '/contribuyente/grupo-familiar' },
+     
     ],
   },
   {
@@ -179,9 +178,7 @@ const menuItems: MenuItem[] = [
     subMenuItems: [
       { id: 'estado-cuenta', label: 'Estado de Cuenta', path: '/cuenta-corriente/estado' },
       { id: 'cargo-nuevo', label: 'Nuevo Cargo', path: '/cuenta-corriente/cargo/nuevo' },
-      { id: 'abono-nuevo', label: 'Nuevo Abono', path: '/cuenta-corriente/abono/nuevo' },
-      { id: 'consulta-movimientos', label: 'Consulta Movimientos', path: '/cuenta-corriente/consulta' },
-      { id: 'liquidacion', label: 'Liquidación', path: '/cuenta-corriente/liquidacion' },
+    
     ],
   },
   {

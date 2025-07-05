@@ -1,301 +1,440 @@
-// src/components/contribuyentes/PersonaForm.tsx
-import React, { useEffect } from 'react';
-import { UseFormReturn, Controller } from 'react-hook-form';
-import { Input, Button } from '../';
-import CalendarInput from '../utils/CalendarInput';
-import { Direccion } from '../../types/formTypes';
+// src/components/contribuyentes/PersonaFormMUI.tsx
+import React from 'react';
+import { Controller, UseFormReturn } from 'react-hook-form';
+import {
+  Grid,
+  TextField,
+  Button,
+  Box,
+  Typography,
+  InputAdornment,
+  IconButton,
+  Alert,
+  useTheme,
+  alpha,
+  FormControl,
+  FormLabel,
+  RadioGroup,
+  FormControlLabel,
+  Radio
+} from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import {
+  Badge as BadgeIcon,
+  Person as PersonIcon,
+  Business as BusinessIcon,
+  Phone as PhoneIcon,
+  LocationOn as LocationIcon,
+  Home as HomeIcon,
+  Clear as ClearIcon,
+  Search as SearchIcon,
+  Wc as WcIcon,
+  FamilyRestroom as FamilyRestroomIcon,
+  CalendarMonth as CalendarIcon
+} from '@mui/icons-material';
+import SearchableSelect from '../ui/SearchableSelect';
 
 interface PersonaFormProps {
   form: UseFormReturn<any>;
   isJuridica?: boolean;
   isRepresentante?: boolean;
   onOpenDireccionModal: () => void;
-  direccion: Direccion | null;
-  getDireccionTextoCompleto: (direccion: Direccion | null) => string;
+  direccion: any;
+  getDireccionTextoCompleto: (direccion: any, nFinca: string, otroNumero?: string) => string;
   disablePersonaFields?: boolean;
-  showDeleteButton?: boolean;
-  onDelete?: () => void;
 }
 
-const PersonaForm: React.FC<PersonaFormProps> = ({
+const PersonaFormMUI: React.FC<PersonaFormProps> = ({
   form,
   isJuridica = false,
   isRepresentante = false,
   onOpenDireccionModal,
   direccion,
   getDireccionTextoCompleto,
-  disablePersonaFields = false,
-  showDeleteButton = false,
-  onDelete
+  disablePersonaFields = false
 }) => {
-  const { register, control, watch, formState: { errors }, setValue } = form;
-  const tipoDocumento = watch('tipoDocumento');
+  const theme = useTheme();
+  const { control, watch, setValue, formState: { errors } } = form;
+
   const nFinca = watch('nFinca');
   const otroNumero = watch('otroNumero');
 
-  // Debug: Log cuando cambia la dirección
-  useEffect(() => {
-    console.log('📍 [PersonaForm] Dirección actualizada:', direccion);
-    if (direccion) {
-      console.log('📋 [PersonaForm] Campos de dirección:', {
-        id: direccion.id,
-        descripcion: direccion.descripcion,
-        nombreSector: direccion.nombreSector,
-        nombreBarrio: direccion.nombreBarrio,
-        nombreTipoVia: direccion.nombreTipoVia,
-        nombreVia: direccion.nombreVia,
-        cuadra: direccion.cuadra
-      });
-    }
-  }, [direccion]);
+  // Opciones para los selectores
+  const tipoDocumentoOptions = isJuridica
+    ? [{ id: 'RUC', label: 'RUC', descripcion: 'Registro Único de Contribuyentes' }]
+    : [
+        { id: 'DNI', label: 'DNI', descripcion: 'Documento Nacional de Identidad' },
+        { id: 'CE', label: 'Carnet de Extranjería', descripcion: 'Para extranjeros residentes' },
+        { id: 'PASAPORTE', label: 'Pasaporte', descripcion: 'Documento internacional' }
+      ];
 
-  // Construir texto de dirección completo incluyendo N° Finca y Otro Número
-  const direccionCompleta = React.useMemo(() => {
-    let texto = getDireccionTextoCompleto(direccion);
-    
-    if (direccion && (nFinca || otroNumero)) {
-      const extras = [];
-      if (nFinca) extras.push(`N° Finca: ${nFinca}`);
-      if (otroNumero) extras.push(`Otro N°: ${otroNumero}`);
-      
-      if (extras.length > 0) {
-        texto += ` (${extras.join(', ')})`;
-      }
-    }
-    
-    return texto;
-  }, [direccion, nFinca, otroNumero, getDireccionTextoCompleto]);
+  const estadoCivilOptions = [
+    { id: 'Soltero/a', label: 'Soltero/a' },
+    { id: 'Casado/a', label: 'Casado/a' },
+    { id: 'Viudo/a', label: 'Viudo/a' },
+    { id: 'Divorciado/a', label: 'Divorciado/a' },
+    { id: 'Conviviente', label: 'Conviviente' }
+  ];
+
+  const tipoDocumento = watch('tipoDocumento');
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Tipo de documento */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Tipo documento <span className="text-gray-500 text-xs">({isJuridica ? '1' : '4'} opciones)</span>
-          </label>
-          <select
-            {...register('tipoDocumento')}
-            disabled={disablePersonaFields}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            {isJuridica ? (
-              <option value="RUC">RUC</option>
-            ) : (
-              <>
-                <option value="DNI">DNI</option>
-                <option value="PASAPORTE">PASAPORTE</option>
-                <option value="CARNET_EXTRANJERIA">CARNET EXTRANJERIA</option>
-                <option value="OTROS">OTROS</option>
-              </>
+    <Grid container spacing={2}>
+      {/* Primera fila - Tipo Documento, Número Documento, Nombres/Razón Social */}
+      <Grid item xs={12} md={4}>
+        <Controller
+          name="tipoDocumento"
+          control={control}
+          render={({ field }) => (
+            <SearchableSelect
+              {...field}
+              id="tipo-documento"
+              label="Tipo de Documento"
+              options={tipoDocumentoOptions}
+              value={tipoDocumentoOptions.find(opt => opt.id === field.value) || null}
+              onChange={(newValue) => field.onChange(newValue?.id || '')}
+              required
+              disabled={disablePersonaFields}
+              startIcon={<BadgeIcon />}
+              error={!!errors.tipoDocumento}
+              helperText={errors.tipoDocumento?.message}
+            />
+          )}
+        />
+      </Grid>
+
+      <Grid item xs={12} md={4}>
+        <Controller
+          name="numeroDocumento"
+          control={control}
+          rules={{
+            required: 'El número de documento es requerido',
+            pattern: {
+              value: tipoDocumento === 'DNI' ? /^\d{8}$/ : tipoDocumento === 'RUC' ? /^\d{11}$/ : /^.+$/,
+              message: tipoDocumento === 'DNI' ? 'El DNI debe tener 8 dígitos' : 
+                       tipoDocumento === 'RUC' ? 'El RUC debe tener 11 dígitos' : 
+                       'Formato inválido'
+            }
+          }}
+          render={({ field }) => (
+            <TextField
+              {...field}
+              fullWidth
+              label="Número de Documento"
+              placeholder={
+                tipoDocumento === 'DNI' ? '12345678' :
+                tipoDocumento === 'RUC' ? '20123456789' :
+                'Ingrese número'
+              }
+              error={!!errors.numeroDocumento}
+              helperText={errors.numeroDocumento?.message}
+              disabled={disablePersonaFields}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <BadgeIcon />
+                  </InputAdornment>
+                )
+              }}
+            />
+          )}
+        />
+      </Grid>
+
+      <Grid item xs={12} md={4}>
+        {isJuridica ? (
+          <Controller
+            name="razonSocial"
+            control={control}
+            rules={{ required: 'La razón social es requerida' }}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                fullWidth
+                label="Razón Social"
+                placeholder="Ingrese razón social"
+                error={!!errors.razonSocial}
+                helperText={errors.razonSocial?.message}
+                disabled={disablePersonaFields}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <BusinessIcon />
+                    </InputAdornment>
+                  )
+                }}
+              />
             )}
-          </select>
-          <div className="text-xs text-gray-500 mt-1">
-            Valor: "{tipoDocumento}" | Válido: ✓
-          </div>
-        </div>
-
-        {/* Número de documento */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Número documento
-          </label>
-          <Input
-            {...register('numeroDocumento')}
-            type="text"
-            disabled={disablePersonaFields}
-            placeholder={tipoDocumento === 'RUC' ? '20000000000' : '00000000'}
-            maxLength={tipoDocumento === 'RUC' ? 11 : tipoDocumento === 'DNI' ? 8 : 20}
           />
-        </div>
-
-        {/* Apellidos y nombres / Razón social */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {isJuridica ? 'Razón social' : 'Nombres'}
-          </label>
-          <Input
-            {...register(isJuridica ? 'razonSocial' : 'nombres')}
-            type="text"
-            disabled={disablePersonaFields}
-            placeholder={isJuridica ? 'EMPRESA S.A.C.' : 'Juan Carlos'}
+        ) : (
+          <Controller
+            name="nombres"
+            control={control}
+            rules={{ required: 'Los nombres son requeridos' }}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                fullWidth
+                label="Nombres"
+                placeholder="Ingrese nombres"
+                error={!!errors.nombres}
+                helperText={errors.nombres?.message}
+                disabled={disablePersonaFields}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <PersonIcon />
+                    </InputAdornment>
+                  )
+                }}
+              />
+            )}
           />
-        </div>
-
-        {/* Apellidos para persona natural */}
-        {!isJuridica && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Apellido paterno
-              </label>
-              <Input
-                {...register('apellidoPaterno')}
-                type="text"
-                disabled={disablePersonaFields}
-                placeholder="García"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Apellido materno
-              </label>
-              <Input
-                {...register('apellidoMaterno')}
-                type="text"
-                disabled={disablePersonaFields}
-                placeholder="López"
-              />
-            </div>
-          </>
         )}
+      </Grid>
 
-        {/* Fecha de nacimiento para persona natural */}
-        {!isJuridica && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Fecha de nacimiento
-            </label>
+      {/* Segunda fila - Apellidos y Fecha (solo personas naturales) */}
+      {!isJuridica && (
+        <>
+          <Grid item xs={12} md={4}>
             <Controller
-              name="fechaNacimiento"
+              name="apellidoPaterno"
               control={control}
+              rules={{ required: 'El apellido paterno es requerido' }}
               render={({ field }) => (
-                <CalendarInput
-                  value={field.value}
-                  onChange={field.onChange}
-                  placeholder="Seleccionar fecha"
+                <TextField
+                  {...field}
+                  fullWidth
+                  label="Apellido Paterno"
+                  placeholder="Apellido paterno"
+                  error={!!errors.apellidoPaterno}
+                  helperText={errors.apellidoPaterno?.message}
                   disabled={disablePersonaFields}
                 />
               )}
             />
-          </div>
-        )}
+          </Grid>
 
-        {/* Estado civil y sexo para persona natural */}
-        {!isJuridica && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Estado civil
-              </label>
-              <select
-                {...register('estadoCivil')}
-                disabled={disablePersonaFields}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="Soltero/a">Soltero/a</option>
-                <option value="Casado/a">Casado/a</option>
-                <option value="Divorciado/a">Divorciado/a</option>
-                <option value="Viudo/a">Viudo/a</option>
-                <option value="Conviviente">Conviviente</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sexo
-              </label>
-              <select
-                {...register('sexo')}
-                disabled={disablePersonaFields}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="Masculino">Masculino</option>
-                <option value="Femenino">Femenino</option>
-              </select>
-            </div>
-          </>
-        )}
-
-        {/* Teléfono */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Teléfono
-          </label>
-          <Input
-            {...register('telefono')}
-            type="tel"
-            disabled={disablePersonaFields}
-            placeholder="999999999"
-            maxLength={12}
-          />
-        </div>
-
-        {/* Dirección completa */}
-        <div className="md:col-span-3">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Dirección completa
-          </label>
-          <div className="flex gap-2">
-            <Input
-              type="text"
-              value={direccionCompleta}
-              readOnly
-              disabled={disablePersonaFields}
-              placeholder="Seleccionar dirección"
-              className="flex-1 bg-gray-50"
+          <Grid item xs={12} md={4}>
+            <Controller
+              name="apellidoMaterno"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  fullWidth
+                  label="Apellido Materno"
+                  placeholder="Apellido materno"
+                  disabled={disablePersonaFields}
+                />
+              )}
             />
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={onOpenDireccionModal}
-              disabled={disablePersonaFields}
-            >
-              Buscar
-            </Button>
-          </div>
-          {direccion && (
-            <div className="text-xs text-gray-500 mt-1">
-              ID Dirección: {direccion.id || direccion.codDireccion} | 
-              Sector: {direccion.nombreSector || '-'} | 
-              Barrio: {direccion.nombreBarrio || '-'}
-            </div>
-          )}
-        </div>
+          </Grid>
 
-        {/* N° Finca */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            N° Finca
-          </label>
-          <Input
-            {...register('nFinca')}
-            type="text"
-            disabled={disablePersonaFields}
-            placeholder="123"
-          />
-        </div>
+          <Grid item xs={12} md={4}>
+            <Controller
+              name="fechaNacimiento"
+              control={control}
+              render={({ field }) => (
+                <DatePicker
+                  {...field}
+                  label="Fecha de Nacimiento"
+                  format="dd/MM/yyyy"
+                  disabled={disablePersonaFields}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      placeholder: "DD/MM/YYYY",
+                      error: !!errors.fechaNacimiento,
+                      helperText: errors.fechaNacimiento?.message,
+                      InputProps: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <CalendarIcon />
+                          </InputAdornment>
+                        )
+                      }
+                    }
+                  }}
+                />
+              )}
+            />
+          </Grid>
 
-        {/* Otro número */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Otro número
-          </label>
-          <Input
-            {...register('otroNumero')}
-            type="text"
-            disabled={disablePersonaFields}
-            placeholder="Dpto 201"
-          />
-        </div>
-      </div>
+          {/* Tercera fila - Sexo, Estado Civil, Teléfono */}
+          <Grid item xs={12} md={4}>
+            <FormControl component="fieldset" fullWidth>
+              <FormLabel component="legend">Sexo</FormLabel>
+              <Controller
+                name="sexo"
+                control={control}
+                render={({ field }) => (
+                  <RadioGroup
+                    {...field}
+                    row
+                    disabled={disablePersonaFields}
+                  >
+                    <FormControlLabel value="Masculino" control={<Radio size="small" />} label="Masculino" />
+                    <FormControlLabel value="Femenino" control={<Radio size="small" />} label="Femenino" />
+                  </RadioGroup>
+                )}
+              />
+            </FormControl>
+          </Grid>
 
-      {/* Botón de eliminar si es necesario */}
-      {showDeleteButton && onDelete && (
-        <div className="flex justify-end mt-4">
-          <Button
-            type="button"
-            variant="danger"
-            onClick={onDelete}
-            disabled={disablePersonaFields}
-          >
-            Eliminar {isRepresentante ? 'representante' : 'cónyuge'}
-          </Button>
-        </div>
+          <Grid item xs={12} md={4}>
+            <Controller
+              name="estadoCivil"
+              control={control}
+              render={({ field }) => (
+                <SearchableSelect
+                  {...field}
+                  id="estado-civil"
+                  label="Estado Civil"
+                  options={estadoCivilOptions}
+                  value={estadoCivilOptions.find(opt => opt.id === field.value) || null}
+                  onChange={(newValue) => field.onChange(newValue?.id || '')}
+                  disabled={disablePersonaFields}
+                  startIcon={<FamilyRestroomIcon />}
+                />
+              )}
+            />
+          </Grid>
+        </>
       )}
-    </div>
+
+      {/* Teléfono - Para personas jurídicas va después de la razón social */}
+      <Grid item xs={12} md={4}>
+        <Controller
+          name="telefono"
+          control={control}
+          render={({ field }) => (
+            <TextField
+              {...field}
+              fullWidth
+              label="Teléfono"
+              placeholder="999 999 999"
+              disabled={disablePersonaFields}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <PhoneIcon />
+                  </InputAdornment>
+                )
+              }}
+            />
+          )}
+        />
+      </Grid>
+
+      {/* Sección de Dirección Fiscal */}
+      <Grid item xs={12}>
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="subtitle1" gutterBottom color="primary" sx={{ mb: 2, fontWeight: 500 }}>
+            Dirección Fiscal
+          </Typography>
+          
+          <Grid container spacing={2}>
+            {/* Cuarta fila - Botón Seleccionar, N° Finca, Otro Número */}
+            <Grid item xs={12} md={4}>
+              <Button
+                variant="contained"
+                fullWidth
+                onClick={onOpenDireccionModal}
+                disabled={disablePersonaFields}
+                startIcon={<LocationIcon />}
+                sx={{ height: '56px' }}
+              >
+                Seleccione Dirección
+              </Button>
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <Controller
+                name="nFinca"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="N° Finca"
+                    placeholder="123"
+                    disabled={disablePersonaFields || !direccion}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <HomeIcon />
+                        </InputAdornment>
+                      )
+                    }}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <Controller
+                name="otroNumero"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="Otro Número"
+                    placeholder="Dpto, Int, etc."
+                    disabled={disablePersonaFields || !direccion}
+                  />
+                )}
+              />
+            </Grid>
+
+            {/* Quinta fila - Campo de dirección (solo lectura) */}
+            {direccion && (
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Dirección"
+                  value={direccion.descripcion}
+                  disabled
+                  multiline
+                  rows={2}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LocationIcon />
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          size="small"
+                          onClick={() => setValue('direccion', null)}
+                          disabled={disablePersonaFields}
+                        >
+                          <ClearIcon />
+                        </IconButton>
+                      </InputAdornment>
+                    )
+                  }}
+                />
+              </Grid>
+            )}
+
+            {/* Dirección completa */}
+            {direccion && (nFinca || otroNumero) && (
+              <Grid item xs={12}>
+                <Alert severity="info" icon={<LocationIcon />}>
+                  <Typography variant="body2">
+                    <strong>Dirección completa:</strong> {getDireccionTextoCompleto(direccion, nFinca, otroNumero)}
+                  </Typography>
+                </Alert>
+              </Grid>
+            )}
+          </Grid>
+        </Box>
+      </Grid>
+    </Grid>
   );
 };
 
-export default PersonaForm;
+export default PersonaFormMUI;
