@@ -1,88 +1,72 @@
-import React, { useEffect, useMemo } from 'react';
-import {MainLayout} from '../../layout';
-import {Breadcrumb, DireccionForm, DireccionList} from '../../components';
+import React, { useEffect } from 'react';
+import { MainLayout } from '../../layout';
+import { Breadcrumb } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useDirecciones } from '../../hooks/useDirecciones';
+import DireccionFormMUI from '../../components/direcciones/DireccionForm';
+import DireccionListMUI from '../../components/direcciones/DireccionList';
+import { Box, Stack } from '@mui/material';
 
 /**
- * Página para administrar las direcciones del sistema
- * 
- * Permite añadir, editar, eliminar y buscar direcciones
- * Incluye selección de sector, barrio, calle, cuadra, lado y lotes
+ * Página para gestionar las direcciones del sistema
+ * Usa componentes DireccionForm y DireccionList con Material UI
  */
 const DireccionesPage: React.FC = () => {
-  // Usamos el hook personalizado para la gestión de direcciones
+  // Hook simplificado que solo usa el servicio de direcciones
   const {
     direcciones,
-    sectores,
-    barrios,
-    barriosFiltrados,
-    calles,
-    lados,
     direccionSeleccionada,
-    sectorSeleccionado,
-    modoEdicion,
     loading,
     error,
     cargarDirecciones,
-    cargarDependencias,
     seleccionarDireccion,
-    handleSectorChange,
     limpiarSeleccion,
-    guardarDireccion,
-    setModoEdicion
+    buscarPorNombreVia
   } = useDirecciones();
-  // Cargar datos iniciales
-  useEffect(() => {
-    cargarDependencias();
-    cargarDirecciones();
-  }, [cargarDependencias, cargarDirecciones]);
 
-  // Migas de pan para la navegación
-  const breadcrumbItems: BreadcrumbItem[] = useMemo(() => [
+  // Cargar direcciones al montar
+  useEffect(() => {
+    cargarDirecciones();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Migas de pan
+  const breadcrumbItems: BreadcrumbItem[] = [
     { label: 'Módulo', path: '/' },
     { label: 'Mantenedores', path: '/mantenedores' },
     { label: 'Ubicación', path: '/mantenedores/ubicacion' },
     { label: 'Direcciones', active: true }
-  ], []);
-
-  // Manejo de edición
-  const handleEditar = () => {
-    if (direccionSeleccionada) {
-      setModoEdicion(true);
-    }
-  };
+  ];
 
   return (
-    <MainLayout title="Mantenimiento de Direcciones">
-      <div className="space-y-4">
-        {/* Navegación de migas de pan */}
-        <Breadcrumb items={breadcrumbItems} />
+    <MainLayout title="Gestión de Direcciones">
+      <Box sx={{ p: 3 }}>
+        {/* Navegación */}
+        <Box sx={{ mb: 3 }}>
+          <Breadcrumb items={breadcrumbItems} />
+        </Box>
         
-        
-        
-        {/* Formulario de direcciones */}
-        <DireccionForm
-          direccionSeleccionada={direccionSeleccionada}
-          sectores={sectores}
-          barrios={barrios}
-          calles={calles}
-          lados={lados}
-          sectorSeleccionado={sectorSeleccionado}
-          onSectorChange={handleSectorChange}
-          onGuardar={guardarDireccion}
-          onNuevo={limpiarSeleccion}
-          onEditar={handleEditar}
-          loading={loading}
-        />
-        
-        {/* Lista de direcciones */}
-        <DireccionList
-          direcciones={direcciones}
-          onSelectDireccion={seleccionarDireccion}
-          loading={loading}
-        />
-      </div>
+        {/* Contenido principal */}
+        <Stack spacing={3}>
+          {/* Formulario de búsqueda */}
+          <DireccionFormMUI
+            direccionSeleccionada={direccionSeleccionada}
+            onBuscar={buscarPorNombreVia}
+            onLimpiar={limpiarSeleccion}
+            onRecargar={cargarDirecciones}
+            loading={loading}
+            error={error}
+          />
+          
+          {/* Lista de direcciones */}
+          <DireccionListMUI
+            direcciones={direcciones}
+            direccionSeleccionada={direccionSeleccionada}
+            onSelectDireccion={seleccionarDireccion}
+            loading={loading}
+          />
+        </Stack>
+      </Box>
     </MainLayout>
   );
 };

@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Button from '../ui/Button';
 import { Direccion, Sector, Barrio, Calle, LadoDireccion } from '../../models';
-import { DireccionFormData } from '../../models/Direccion';
+import { DireccionFormData } from '../../models/Direcciones';
 
 // Schema de validación
 const direccionSchema = z.object({
@@ -47,10 +47,10 @@ interface DireccionFormProps {
 
 const DireccionForm: React.FC<DireccionFormProps> = ({
   direccionSeleccionada,
-  sectores,
-  barrios,
-  calles,
-  lados,
+  sectores = [], // Valor por defecto
+  barrios = [],  // Valor por defecto
+  calles = [],   // Valor por defecto
+  lados = [],    // Valor por defecto
   sectorSeleccionado,
   onSectorChange,
   onGuardar,
@@ -82,13 +82,13 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
 
   // Filtrar barrios según el sector seleccionado
   useEffect(() => {
-    if (watchedSectorId) {
+    if (watchedSectorId && Array.isArray(barrios)) {
       const filtered = barrios.filter(b => b.sectorId === parseInt(watchedSectorId));
       setBarriosFiltrados(filtered);
       
       // Si el barrio actual no pertenece al sector, limpiar selección
       const currentBarrioId = watch('barrioId');
-      if (currentBarrioId && !filtered.find(b => b.id.toString() === currentBarrioId)) {
+      if (currentBarrioId && !filtered.find(b => b.id && b.id.toString() === currentBarrioId)) {
         setValue('barrioId', '');
       }
     } else {
@@ -99,13 +99,13 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
 
   // Filtrar calles según el barrio seleccionado
   useEffect(() => {
-    if (watchedBarrioId) {
+    if (watchedBarrioId && Array.isArray(calles)) {
       const filtered = calles.filter(c => c.barrioId === parseInt(watchedBarrioId));
       setCallesFiltradas(filtered);
       
       // Si la calle actual no pertenece al barrio, limpiar selección
       const currentCalleId = watch('calleId');
-      if (currentCalleId && !filtered.find(c => c.id.toString() === currentCalleId)) {
+      if (currentCalleId && !filtered.find(c => c.id && c.id.toString() === currentCalleId)) {
         setValue('calleId', '');
       }
     } else {
@@ -114,31 +114,33 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
     }
   }, [watchedBarrioId, calles, setValue, watch]);
 
-  // Notificar cambio de sector al padre
-  useEffect(() => {
-    if (watchedSectorId) {
-      onSectorChange(parseInt(watchedSectorId));
-    }
-  }, [watchedSectorId, onSectorChange]);
-
-  // Actualizar el formulario cuando se selecciona una dirección para editar
+  // Cargar datos cuando se selecciona una dirección
   useEffect(() => {
     if (direccionSeleccionada) {
-      setValue('sectorId', direccionSeleccionada.sectorId.toString());
-      setValue('barrioId', direccionSeleccionada.barrioId.toString());
-      setValue('calleId', direccionSeleccionada.calleId.toString());
-      setValue('cuadra', direccionSeleccionada.cuadra);
-      setValue('lado', direccionSeleccionada.lado);
-      setValue('loteInicial', direccionSeleccionada.loteInicial.toString());
-      setValue('loteFinal', direccionSeleccionada.loteFinal.toString());
+      reset({
+        sectorId: direccionSeleccionada.sectorId?.toString() || '',
+        barrioId: direccionSeleccionada.barrioId?.toString() || '',
+        calleId: direccionSeleccionada.calleId?.toString() || '',
+        cuadra: direccionSeleccionada.cuadra || '',
+        lado: direccionSeleccionada.lado || LadoDireccion.NINGUNO,
+        loteInicial: direccionSeleccionada.loteInicial?.toString() || '1',
+        loteFinal: direccionSeleccionada.loteFinal?.toString() || '1',
+      });
       setIsEditMode(false);
-    } else {
-      setIsEditMode(true);
     }
-  }, [direccionSeleccionada, setValue]);
+  }, [direccionSeleccionada, reset]);
 
+  // Manejar el cambio de sector desde el exterior
+  useEffect(() => {
+    if (sectorSeleccionado) {
+      setValue('sectorId', sectorSeleccionado.toString());
+      onSectorChange(sectorSeleccionado);
+    }
+  }, [sectorSeleccionado, setValue, onSectorChange]);
+
+  // Submit del formulario
   const onSubmit = (data: FormValues) => {
-    const formattedData: DireccionFormData = {
+    const formData: DireccionFormData = {
       sectorId: parseInt(data.sectorId),
       barrioId: parseInt(data.barrioId),
       calleId: parseInt(data.calleId),
@@ -148,13 +150,14 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
       loteFinal: parseInt(data.loteFinal),
     };
     
-    onGuardar(formattedData);
+    onGuardar(formData);
   };
 
+  // Handlers
   const handleNuevo = () => {
     reset();
-    onNuevo();
     setIsEditMode(true);
+    onNuevo();
   };
 
   const handleEditar = () => {
@@ -162,16 +165,27 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
     onEditar();
   };
 
-  // Determinar si el formulario debe estar deshabilitado
-  const isFormDisabled = loading || (direccionSeleccionada !== null && !isEditMode);
+  const isFormDisabled = loading || !isEditMode;
+
+  // Asegurar que lados tenga un valor por defecto
+  const ladosOptions = lados.length > 0 ? lados : [
+    { value: LadoDireccion.NINGUNO, label: 'Ninguno' },
+    { value: LadoDireccion.IZQUIERDO, label: 'Izquierdo' },
+    { value: LadoDireccion.DERECHO, label: 'Derecho' },
+    { value: LadoDireccion.PAR, label: 'Par' },
+    { value: LadoDireccion.IMPAR, label: 'Impar' }
+  ];
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Datos de la dirección</h2>
-      
+    <div className="bg-white p-6 rounded-lg shadow">
+      <h2 className="text-xl font-semibold mb-4">
+        {direccionSeleccionada && !isEditMode ? 'Dirección Seleccionada' : 
+         isEditMode && direccionSeleccionada ? 'Editar Dirección' : 'Nueva Dirección'}
+      </h2>
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          
+        {/* Primera fila */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Sector */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -187,7 +201,7 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 >
                   <option value="">Seleccione un sector</option>
-                  {sectores.map(sector => (
+                  {Array.isArray(sectores) && sectores.map(sector => (
                     <option key={sector.id} value={sector.id.toString()}>
                       {sector.nombre}
                     </option>
@@ -215,11 +229,15 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 >
                   <option value="">Seleccione un barrio</option>
-                  {barriosFiltrados.map(barrio => (
-                    <option key={barrio.id} value={barrio.id.toString()}>
-                      {barrio.nombre}
-                    </option>
-                  ))}
+                  {barriosFiltrados.map(barrio => {
+                    // Verificar que el barrio tenga id antes de usarlo
+                    if (!barrio.id) return null;
+                    return (
+                      <option key={barrio.id} value={barrio.id.toString()}>
+                        {barrio.nombre || barrio.nombreBarrio || `Barrio ${barrio.id}`}
+                      </option>
+                    );
+                  })}
                 </select>
               )}
             />
@@ -243,11 +261,15 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 >
                   <option value="">Seleccione una calle</option>
-                  {callesFiltradas.map(calle => (
-                    <option key={calle.id} value={calle.id.toString()}>
-                      {calle.tipoVia} {calle.nombre}
-                    </option>
-                  ))}
+                  {callesFiltradas.map(calle => {
+                    // Verificar que la calle tenga id antes de usarlo
+                    if (!calle.id) return null;
+                    return (
+                      <option key={calle.id} value={calle.id.toString()}>
+                        {calle.tipoVia} {calle.nombre}
+                      </option>
+                    );
+                  })}
                 </select>
               )}
             />
@@ -255,7 +277,10 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
               <p className="mt-1 text-sm text-red-600">{errors.calleId.message}</p>
             )}
           </div>
+        </div>
 
+        {/* Segunda fila */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Cuadra */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -293,7 +318,7 @@ const DireccionForm: React.FC<DireccionFormProps> = ({
                   disabled={isFormDisabled}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 >
-                  {lados.map(lado => (
+                  {ladosOptions.map(lado => (
                     <option key={lado.value} value={lado.value}>
                       {lado.label}
                     </option>

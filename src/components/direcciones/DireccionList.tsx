@@ -1,223 +1,337 @@
-// src/components/direcciones/DireccionList.tsx - ACTUALIZADO
-import React, { useState } from 'react';
-import { Input, Button } from '../';
-import { Direccion } from '../../models';
+// src/components/direcciones/DireccionListMUI.tsx
+import React, { useState, useMemo } from 'react';
+import {
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TablePagination,
+  IconButton,
+  Chip,
+  Box,
+  Typography,
+  TextField,
+  InputAdornment,
+  Tooltip,
+  TableSortLabel,
+  Skeleton,
+  Stack,
+  Button,
+  useTheme,
+  alpha
+} from '@mui/material';
+import {
+  Search as SearchIcon,
+  LocationOn as LocationIcon,
+  Visibility as VisibilityIcon,
+  FilterList as FilterIcon,
+  Business as BusinessIcon,
+  Home as HomeIcon
+} from '@mui/icons-material';
 
-interface DireccionListProps {
-  direcciones: Direccion[];
-  onSelectDireccion: (direccion: Direccion) => void;
+interface DireccionListMUIProps {
+  direcciones: any[];
+  direccionSeleccionada: any | null;
+  onSelectDireccion: (direccion: any) => void;
   loading?: boolean;
 }
 
-const DireccionList: React.FC<DireccionListProps> = ({ 
-  direcciones, 
-  onSelectDireccion,
-  loading = false 
-}) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+type Order = 'asc' | 'desc';
 
-  // Filtrar la lista de direcciones según el término de búsqueda
-  const filteredDirecciones = direcciones.filter(direccion => 
-    direccion.descripcion?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    direccion.cuadra.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    direccion.nombreSector?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    direccion.nombreBarrio?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    direccion.nombreVia?.toLowerCase().includes(searchTerm.toLowerCase())
+const DireccionListMUI: React.FC<DireccionListMUIProps> = ({
+  direcciones,
+  direccionSeleccionada,
+  onSelectDireccion,
+  loading = false
+}) => {
+  const theme = useTheme();
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [order, setOrder] = useState<Order>('asc');
+  const [orderBy, setOrderBy] = useState<string>('nombreVia');
+
+  // Filtrar direcciones localmente
+  const filteredDirecciones = useMemo(() => {
+    return direcciones.filter(dir => {
+      const search = searchTerm.toLowerCase();
+      return (
+        dir.nombreSector?.toLowerCase().includes(search) ||
+        dir.nombreBarrio?.toLowerCase().includes(search) ||
+        dir.nombreVia?.toLowerCase().includes(search) ||
+        dir.nombreTipoVia?.toLowerCase().includes(search) ||
+        dir.cuadra?.toString().includes(search)
+      );
+    });
+  }, [direcciones, searchTerm]);
+
+  // Ordenar direcciones
+  const sortedDirecciones = useMemo(() => {
+    const comparator = (a: any, b: any) => {
+      let aValue = a[orderBy] || '';
+      let bValue = b[orderBy] || '';
+      
+      if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+      if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+      
+      if (order === 'desc') {
+        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+      }
+      return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+    };
+    
+    return [...filteredDirecciones].sort(comparator);
+  }, [filteredDirecciones, order, orderBy]);
+
+  // Paginación
+  const paginatedDirecciones = sortedDirecciones.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
   );
 
-  // Calcular la cantidad de páginas
-  const totalPages = Math.ceil(filteredDirecciones.length / itemsPerPage);
-  
-  // Obtener los elementos de la página actual
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredDirecciones.slice(indexOfFirstItem, indexOfLastItem);
-
-  // Cambiar de página
-  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
-
-  // Formatear el lado para mostrar
-  const formatLado = (lado: string): string => {
-    switch (lado) {
-      case '-': return 'Ninguno';
-      case 'I': return 'Izquierdo';
-      case 'D': return 'Derecho';
-      case 'P': return 'Par';
-      case 'IM': return 'Impar';
-      default: return lado;
-    }
+  const handleRequestSort = (property: string) => {
+    const isAsc = orderBy === property && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
   };
 
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Columnas de la tabla
+  const columns = [
+    { id: 'codDireccion', label: 'Código', width: '10%' },
+    { id: 'nombreSector', label: 'Sector', width: '15%' },
+    { id: 'nombreBarrio', label: 'Barrio', width: '15%' },
+    { id: 'nombreTipoVia', label: 'Tipo Vía', width: '12%' },
+    { id: 'nombreVia', label: 'Nombre Vía', width: '20%' },
+    { id: 'cuadra', label: 'Cuadra', width: '10%', align: 'center' as const },
+    { id: 'lotes', label: 'Lotes', width: '10%', align: 'center' as const },
+    { id: 'actions', label: 'Acciones', width: '8%', align: 'center' as const }
+  ];
+
   return (
-    <div className="bg-white rounded-md shadow-sm overflow-hidden mt-6">
-      <div className="px-6 py-4 bg-gray-50 border-b">
-        <h2 className="text-lg font-medium text-gray-800">Lista de direcciones</h2>
-      </div>
-      
-      <div className="p-6">
-        <div className="mb-4">
-          <div className="flex items-center">
-            <div className="w-36">
-              <label className="block text-sm font-medium text-gray-700">Buscar por</label>
-            </div>
-            <div className="flex-1 relative">
-              <Input
-                placeholder="Buscar por dirección"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                disabled={loading}
-              />
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                <svg
-                  className="h-5 w-5 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
+    <Paper elevation={3}>
+      {/* Header */}
+      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6" component="h3">
+            Lista de Direcciones
+          </Typography>
+          
+          {/* Búsqueda local */}
+          <TextField
+            size="small"
+            placeholder="Filtrar resultados..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            sx={{ width: 300 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Stack>
+      </Box>
+
+      {/* Tabla */}
+      <TableContainer sx={{ maxHeight: 600 }}>
+        <Table stickyHeader size="medium">
+          <TableHead>
+            <TableRow>
+              {columns.map((column) => (
+                <TableCell
+                  key={column.id}
+                  align={column.align}
+                  style={{ width: column.width }}
+                  sx={{ 
+                    bgcolor: 'grey.100',
+                    fontWeight: 'bold'
+                  }}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <svg className="animate-spin h-8 w-8 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Dirección <span className="ml-1">▼</span>
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Lado <span className="ml-1">▼</span>
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Lote Inicial <span className="ml-1">▼</span>
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Lote Final <span className="ml-1">▼</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {currentItems.map((direccion) => (
-                  <tr 
-                    key={direccion.id} 
-                    onClick={() => onSelectDireccion(direccion)}
-                    className="hover:bg-gray-100 cursor-pointer"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {direccion.descripcion || 'Sin descripción'}
-                      </div>
-                      {process.env.NODE_ENV === 'development' && (
-                        <div className="text-xs text-gray-500">
-                          ID: {direccion.id} | Sector: {direccion.sectorId} | Barrio: {direccion.barrioId} | Calle: {direccion.calleId}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">
-                        {formatLado(direccion.lado)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">
-                        {direccion.loteInicial}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">
-                        {direccion.loteFinal}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {currentItems.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
-                      No se encontraron resultados
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-        
-        {/* Paginación */}
-        {!loading && totalPages > 1 && (
-          <div className="mt-4 flex justify-between items-center">
-            <div className="text-sm text-gray-500">
-              Mostrando de {indexOfFirstItem + 1} a {Math.min(indexOfLastItem, filteredDirecciones.length)} de {filteredDirecciones.length} registros
-            </div>
-            <nav className="flex space-x-1">
-              <Button
-                onClick={() => paginate(Math.max(currentPage - 1, 1))}
-                className="px-3 py-1 rounded text-gray-500 hover:bg-gray-100"
-                disabled={currentPage === 1}
-              >
-                <span aria-hidden="true">&lt;</span>
-              </Button>
-              
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((number) => {
-                // Mostrar solo algunos números de página
-                if (
-                  number === 1 ||
-                  number === totalPages ||
-                  (number >= currentPage - 2 && number <= currentPage + 2)
-                ) {
-                  return (
-                    <button
-                      key={number}
-                      onClick={() => paginate(number)}
-                      className={`px-3 py-1 rounded ${
-                        currentPage === number
-                          ? 'bg-blue-500 text-white'
-                          : 'text-gray-500 hover:bg-gray-100'
-                      }`}
+                  {column.id !== 'actions' && column.id !== 'lotes' ? (
+                    <TableSortLabel
+                      active={orderBy === column.id}
+                      direction={orderBy === column.id ? order : 'asc'}
+                      onClick={() => handleRequestSort(column.id)}
                     >
-                      {number}
-                    </button>
-                  );
-                } else if (
-                  number === currentPage - 3 ||
-                  number === currentPage + 3
-                ) {
-                  return <span key={number} className="px-2">...</span>;
-                }
-                return null;
-              })}
-              
-              <Button
-                onClick={() => paginate(Math.min(currentPage + 1, totalPages))}
-                className="px-3 py-1 rounded text-gray-500 hover:bg-gray-100"
-                disabled={currentPage === totalPages}
-              >
-                <span aria-hidden="true">&gt;</span>
-              </Button>
-            </nav>
-          </div>
-        )}
-      </div>
-    </div>
+                      {column.label}
+                    </TableSortLabel>
+                  ) : (
+                    column.label
+                  )}
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          
+          <TableBody>
+            {loading ? (
+              // Skeletons de carga
+              [...Array(5)].map((_, index) => (
+                <TableRow key={`skeleton-${index}`}>
+                  {columns.map((column) => (
+                    <TableCell key={column.id} align={column.align}>
+                      <Skeleton variant="text" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : paginatedDirecciones.length === 0 ? (
+              // Estado vacío
+              <TableRow>
+                <TableCell colSpan={columns.length} align="center">
+                  <Box sx={{ py: 8 }}>
+                    <LocationIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                    <Typography variant="h6" color="text.secondary">
+                      No se encontraron direcciones
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {searchTerm ? 'Intente con otros términos de búsqueda' : 'No hay direcciones registradas'}
+                    </Typography>
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ) : (
+              // Filas de datos
+              paginatedDirecciones.map((direccion) => {
+                const isSelected = direccionSeleccionada?.codDireccion === direccion.codDireccion;
+                
+                return (
+                  <TableRow
+                    key={direccion.codDireccion}
+                    hover
+                    selected={isSelected}
+                    sx={{
+                      cursor: 'pointer',
+                      bgcolor: isSelected ? alpha(theme.palette.primary.main, 0.08) : 'inherit',
+                      '&:hover': {
+                        bgcolor: isSelected 
+                          ? alpha(theme.palette.primary.main, 0.12) 
+                          : alpha(theme.palette.action.hover, 0.04)
+                      }
+                    }}
+                  >
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={isSelected ? 'bold' : 'normal'}>
+                        {direccion.codDireccion}
+                      </Typography>
+                    </TableCell>
+                    
+                    <TableCell>
+                      <Stack direction="row" alignItems="center" spacing={0.5}>
+                        <BusinessIcon fontSize="small" color="action" />
+                        <Typography variant="body2">
+                          {direccion.nombreSector}
+                        </Typography>
+                      </Stack>
+                    </TableCell>
+                    
+                    <TableCell>
+                      <Stack direction="row" alignItems="center" spacing={0.5}>
+                        <HomeIcon fontSize="small" color="action" />
+                        <Typography variant="body2">
+                          {direccion.nombreBarrio}
+                        </Typography>
+                      </Stack>
+                    </TableCell>
+                    
+                    <TableCell>
+                      <Chip
+                        label={direccion.nombreTipoVia}
+                        size="small"
+                        variant="outlined"
+                        color="primary"
+                      />
+                    </TableCell>
+                    
+                    <TableCell>
+                      <Typography variant="body2" fontWeight="medium">
+                        {direccion.nombreVia}
+                      </Typography>
+                    </TableCell>
+                    
+                    <TableCell align="center">
+                      <Chip
+                        label={direccion.cuadra}
+                        size="small"
+                        color="secondary"
+                      />
+                    </TableCell>
+                    
+                    <TableCell align="center">
+                      <Typography variant="body2">
+                        {direccion.loteInicial} - {direccion.loteFinal}
+                      </Typography>
+                    </TableCell>
+                    
+                    <TableCell align="center">
+                      <Tooltip title={isSelected ? "Dirección seleccionada" : "Seleccionar dirección"}>
+                        <IconButton
+                          size="small"
+                          color={isSelected ? "primary" : "default"}
+                          onClick={() => onSelectDireccion(direccion)}
+                        >
+                          {isSelected ? <LocationIcon /> : <VisibilityIcon />}
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Paginación */}
+      <TablePagination
+        rowsPerPageOptions={[5, 10, 25, 50]}
+        component="div"
+        count={sortedDirecciones.length}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={handleChangePage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+        labelRowsPerPage="Filas por página:"
+        labelDisplayedRows={({ from, to, count }) => 
+          `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
+        }
+      />
+
+      {/* Resumen */}
+      <Box sx={{ p: 2, bgcolor: 'grey.50', borderTop: 1, borderColor: 'divider' }}>
+        <Stack direction="row" spacing={2}>
+          <Chip
+            icon={<LocationIcon />}
+            label={`Total: ${direcciones.length} direcciones`}
+            size="small"
+            color="primary"
+          />
+          {searchTerm && (
+            <Chip
+              icon={<FilterIcon />}
+              label={`Filtradas: ${filteredDirecciones.length}`}
+              size="small"
+              color="secondary"
+            />
+          )}
+        </Stack>
+      </Box>
+    </Paper>
   );
 };
 
-export default DireccionList;
+export default DireccionListMUI;
