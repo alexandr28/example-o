@@ -1,5 +1,6 @@
-// src/services/connectivityService.ts - VERSIÓN CORREGIDA PARA USAR PROXY
+// src/services/connectivityService.ts
 import { getAuthToken } from '../api/authClient';
+import { API_CONFIG, buildApiUrl, getPublicHeaders, getAuthHeaders } from '../config/api.config';
 
 /**
  * Servicio para monitorear y gestionar la conectividad con las APIs
@@ -14,16 +15,14 @@ class ConnectivityService {
   private checkInterval: number = 30000; // 30 segundos
   private intervalId: number | null = null;
 
-  // Lista de API endpoints a comprobar
-  private apiEndpoints = [
-    '/api/via',
-    '/api/sector',
-    '/api/barrio',
-    '/api/direccion',
-    '/api/contribuyente'
-  ];
+  // Usar endpoints desde la configuración
+  private apiEndpoints = API_CONFIG.healthCheckEndpoints;
 
   constructor() {
+    console.log('🔧 [ConnectivityService] Inicializado');
+    console.log('🌐 [ConnectivityService] API Base URL:', API_CONFIG.baseURL);
+    console.log('📍 [ConnectivityService] Endpoints a verificar:', this.apiEndpoints);
+    
     this.setupEventListeners();
     this.initializeApiStatus();
     this.checkAPIAvailability();
@@ -45,7 +44,11 @@ class ConnectivityService {
    * Extrae el nombre de la API del endpoint
    */
   private getApiNameFromEndpoint(endpoint: string): string {
-    // Extrae el nombre de la API del endpoint (e.g., '/api/via' -> 'via')
+    // Manejar endpoints con subrutas
+    if (endpoint.includes('/direccion/')) return 'direccion';
+    if (endpoint.includes('/persona/')) return 'persona';
+    
+    // Para endpoints simples
     const parts = endpoint.split('/');
     return parts[parts.length - 1];
   }
@@ -55,12 +58,14 @@ class ConnectivityService {
    */
   private setupEventListeners() {
     window.addEventListener('online', () => {
+      console.log('🌐 [ConnectivityService] Conexión a Internet restaurada');
       this.isOnline = true;
       this.checkAPIAvailability();
       this.notifyListeners();
     });
 
     window.addEventListener('offline', () => {
+      console.log('🚫 [ConnectivityService] Sin conexión a Internet');
       this.isOnline = false;
       this.updateAllApiStatus(false);
       this.notifyListeners();
@@ -71,12 +76,10 @@ class ConnectivityService {
    * Inicia las comprobaciones periódicas de disponibilidad
    */
   private startPeriodicChecks() {
-    // Limpiar intervalo existente si hay uno
     if (this.intervalId !== null) {
       window.clearInterval(this.intervalId);
     }
 
-    // Configurar nuevo intervalo
     this.intervalId = window.setInterval(() => {
       this.checkAPIAvailability();
     }, this.checkInterval) as unknown as number;
@@ -117,7 +120,7 @@ class ConnectivityService {
       this.isOnline = Object.values(this.apiStatus).some(status => status);
       this.notifyListeners();
     } catch (error) {
-      console.warn('Error al comprobar disponibilidad de APIs:', error);
+      console.warn('❌ [ConnectivityService] Error al comprobar disponibilidad de APIs:', error);
       this.isOnline = false;
       this.updateAllApiStatus(false);
       this.notifyListeners();
@@ -126,104 +129,92 @@ class ConnectivityService {
 
   /**
    * Comprueba la disponibilidad de un endpoint específico
-   * Primero sin autenticación y luego con autenticación si hay token
    */
   private async checkEndpoint(endpoint: string): Promise<boolean> {
     const apiName = this.getApiNameFromEndpoint(endpoint);
     
     try {
-      // Para sectores, vías y barrios, no verificar autenticación
-      const noAuthApis = ['sector', 'via', 'barrio', 'direccion'];
+      // APIs que no requieren autenticación (desde configuración)
+      const noAuthApis = ['sector', 'via', 'barrio', 'direccion', 'persona'];
       const requiresAuth = !noAuthApis.includes(apiName);
       
-      // Si no requiere autenticación o no hay conexión general a internet
       if (!requiresAuth || !navigator.onLine) {
-        // Verificar disponibilidad básica sin autenticación
         const isAvailable = await this.checkBasicEndpoint(endpoint);
         this.apiStatus[apiName] = isAvailable;
-        this.authStatus[apiName] = isAvailable; // Consideramos igual autenticación y disponibilidad
-        
+        this.authStatus[apiName] = isAvailable;
         return isAvailable;
       }
-      
-      // Para otras APIs que sí requieren autenticación
-      // Verificar disponibilidad básica primero
+  
+      // Para APIs que requieren autenticación
+      const token = getAuthToken();
       const isAvailable = await this.checkBasicEndpoint(endpoint);
       this.apiStatus[apiName] = isAvailable;
       
-      // Si está disponible, verificar autenticación
-      if (isAvailable) {
-        const token = localStorage.getItem('auth_token');
-        if (token) {
-          const isAuthValid = await this.checkAuthenticatedEndpoint(endpoint, token);
-          this.authStatus[apiName] = isAuthValid;
-        } else {
-          this.authStatus[apiName] = false;
-        }
+      if (isAvailable && token) {
+        const isAuthenticated = await this.checkAuthenticatedEndpoint(endpoint, token);
+        this.authStatus[apiName] = isAuthenticated;
       } else {
         this.authStatus[apiName] = false;
       }
       
-      return this.apiStatus[apiName];
+      this.notifyListeners(apiName);
+      return isAvailable;
+      
     } catch (error) {
-      console.warn(`API ${apiName} no disponible:`, error);
+      console.error(`❌ [ConnectivityService] Error al comprobar ${apiName}:`, error);
       this.apiStatus[apiName] = false;
       this.authStatus[apiName] = false;
-      
-      // Notificar específico para esta API
       this.notifyListeners(apiName);
-      
       return false;
     }
   }
 
   /**
-   * Verifica la disponibilidad básica de un endpoint (sin autenticación)
-   * CORREGIDO: Usa rutas relativas para aprovechar el proxy de Vite
+   * Verifica la disponibilidad básica del endpoint (sin autenticación)
+   * Usa la configuración centralizada
    */
   private async checkBasicEndpoint(endpoint: string): Promise<boolean> {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
-      // IMPORTANTE: Usar la ruta relativa para que pase por el proxy
-      // En desarrollo esto será interceptado por Vite y redirigido a http://192.168.20.160:8080
-      const response = await fetch(endpoint, {
-        method: 'GET', // Cambiado de OPTIONS a GET para mejor compatibilidad
+      // Usar buildApiUrl de la configuración
+      const fullUrl = buildApiUrl(endpoint);
+      console.log(`🔍 [ConnectivityService] Verificando endpoint: ${fullUrl}`);
+      
+      const response = await fetch(fullUrl, {
+        method: 'GET',
         signal: controller.signal,
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'same-origin' // Cambiado de 'omit' a 'same-origin'
+        headers: getPublicHeaders(),
+        mode: 'cors'
       });
       
       clearTimeout(timeoutId);
       
-      // Considerar exitoso si:
-      // - Status 200-299 (éxito)
-      // - Status 401/403 (API disponible pero requiere auth)
-      return response.ok || response.status === 401 || response.status === 403;
+      // Considerar disponible si status es 200-299, 401 o 403
+      const isAvailable = response.ok || response.status === 401 || response.status === 403;
+      console.log(`${isAvailable ? '✅' : '❌'} [ConnectivityService] ${endpoint}: ${response.status}`);
+      
+      return isAvailable;
     } catch (error) {
       // Si el GET falla, intentar con HEAD
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
         
-        const response = await fetch(endpoint, {
+        const fullUrl = buildApiUrl(endpoint);
+        const response = await fetch(fullUrl, {
           method: 'HEAD',
           signal: controller.signal,
-          headers: {
-            'Accept': 'application/json'
-          },
-          credentials: 'same-origin'
+          headers: getPublicHeaders(),
+          mode: 'cors'
         });
         
         clearTimeout(timeoutId);
         
         return response.ok || response.status === 401 || response.status === 403;
       } catch (headError) {
-        // Si ambos fallan, la API no está disponible
+        console.error(`❌ [ConnectivityService] No se pudo conectar a ${endpoint}`);
         return false;
       }
     }
@@ -231,35 +222,34 @@ class ConnectivityService {
 
   /**
    * Verifica la disponibilidad del endpoint con autenticación
-   * CORREGIDO: Usa rutas relativas para aprovechar el proxy
    */
   private async checkAuthenticatedEndpoint(endpoint: string, token: string): Promise<boolean> {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
-      // IMPORTANTE: Usar la ruta relativa
-      const response = await fetch(endpoint, {
-        method: 'GET', // Cambiado de HEAD a GET
+      // Usar buildApiUrl de la configuración
+      const fullUrl = buildApiUrl(endpoint);
+      console.log(`🔐 [ConnectivityService] Verificando con auth: ${fullUrl}`);
+      
+      const response = await fetch(fullUrl, {
+        method: 'GET',
         signal: controller.signal,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include' // Para incluir cookies si las hay
+        headers: getAuthHeaders(),
+        mode: 'cors',
+        credentials: 'include'
       });
       
       clearTimeout(timeoutId);
       
-      // Si recibimos 401, el token está caducado
       if (response.status === 401) {
+        console.warn('⚠️ [ConnectivityService] Token inválido o expirado');
         return false;
       }
       
-      // Considerar exitoso si status es 200-299
       return response.ok;
     } catch (error) {
+      console.error('❌ [ConnectivityService] Error en verificación autenticada:', error);
       return false;
     }
   }
@@ -319,7 +309,7 @@ class ConnectivityService {
   }
 
   /**
-   * Forzar una comprobación inmediata de un endpoint específico o todos
+   * Forzar una comprobación inmediata
    */
   public async forcePing(apiName?: string): Promise<boolean> {
     if (apiName) {
@@ -333,7 +323,7 @@ class ConnectivityService {
   }
 
   /**
-   * Obtener información detallada del estado de todas las APIs
+   * Obtener información detallada del estado
    */
   public getDetailedStatus(): {
     online: boolean;

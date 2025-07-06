@@ -4,12 +4,14 @@
  * Maneja automáticamente las URLs según el entorno
  */
 
-// URL base del backend
+// URL base del backend - SIEMPRE usar la IP correcta
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.20.160:8080';
+
+// Verificar que la URL esté bien configurada
+console.log('🔧 API_BASE_URL configurada como:', API_BASE_URL);
 
 /**
  * Construye la URL completa para una petición
- * En desarrollo, usa la URL completa para evitar problemas con el proxy
  */
 export const buildApiUrl = (endpoint: string): string => {
   // Si el endpoint ya es una URL completa, devolverla tal cual
@@ -17,15 +19,14 @@ export const buildApiUrl = (endpoint: string): string => {
     return endpoint;
   }
   
-  // En desarrollo, usar la URL completa del backend
-  if (import.meta.env.DEV) {
-    // Asegurar que el endpoint empiece con /
-    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    return `${API_BASE_URL}${cleanEndpoint}`;
-  }
+  // Asegurar que el endpoint empiece con /
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   
-  // En producción, usar rutas relativas
-  return endpoint;
+  // Construir URL completa
+  const fullUrl = `${API_BASE_URL}${cleanEndpoint}`;
+  
+  console.log(`🌐 URL construida: ${fullUrl}`);
+  return fullUrl;
 };
 
 /**
@@ -36,14 +37,22 @@ export const apiRequest = async (endpoint: string, options?: RequestInit): Promi
   
   console.log(`📡 API Request: ${options?.method || 'GET'} ${url}`);
   
+  // Headers por defecto
+  const defaultHeaders = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+  
   try {
     const response = await fetch(url, {
       ...options,
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        ...defaultHeaders,
         ...options?.headers
-      }
+      },
+      // Importante para CORS
+      mode: 'cors',
+      credentials: 'include'
     });
     
     console.log(`📥 API Response: ${response.status} ${response.statusText}`);
@@ -65,8 +74,20 @@ export const apiGet = async (endpoint: string, headers?: HeadersInit): Promise<a
   });
   
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`API Error ${response.status}: ${error}`);
+    let errorMessage = `API Error ${response.status}`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorData.error || errorMessage;
+    } catch {
+      // Si no es JSON, intentar texto
+      try {
+        const errorText = await response.text();
+        if (errorText) errorMessage = errorText;
+      } catch {
+        // Usar mensaje por defecto
+      }
+    }
+    throw new Error(errorMessage);
   }
   
   return response.json();
@@ -83,8 +104,19 @@ export const apiPost = async (endpoint: string, data: any, headers?: HeadersInit
   });
   
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`API Error ${response.status}: ${error}`);
+    let errorMessage = `API Error ${response.status}`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorData.error || errorMessage;
+    } catch {
+      try {
+        const errorText = await response.text();
+        if (errorText) errorMessage = errorText;
+      } catch {
+        // Usar mensaje por defecto
+      }
+    }
+    throw new Error(errorMessage);
   }
   
   return response.json();

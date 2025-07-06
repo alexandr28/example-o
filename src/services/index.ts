@@ -22,3 +22,21 @@ export { connectivityService } from './connectivityService';
 // import barrioService from '../services/barrioService';
 // import sectorService from '../services/sectorService';
 // import calleService from '../services/calleApiService';
+export { default as barrioService } from './barrioService';
+export { default as sectorService } from './sectorService'; 
+export { default as calleService } from './calleApiService';
+export {  personaService } from './personaService';
+export {  contribuyenteService } from './contribuyenteService';
+export {  contribuyenteListService } from './contribuyenteListService';
+export { DireccionService} from './direccionService';
+export { pisoService } from './pisoService';
+export { predioService } from './predioService';
+/*
+export { arancelService } from './arancelService';
+export { valorUnitarioService } from './valorUnitarioService';
+export { uitService } from './uitService';
+export { alcabalaService } from './alcabalaService';
+export { depreciacionService } from './depreciacionService';
+export { depreciacionService } from './depreciacionService';
+
+*/

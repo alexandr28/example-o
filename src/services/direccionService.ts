@@ -1,108 +1,58 @@
 // src/services/direccionService.ts
-import { BaseApiService } from './BaseApiService';
-import { Direccion, DireccionFormData } from '../models';
+import { API_CONFIG, buildApiUrl, getPublicHeaders } from '../config/api.config';
 import { NotificationService } from '../components/utils/Notification';
 
-/**
- * Configuración de normalización para direcciones
- */
-const direccionNormalizeOptions = {
-  normalizeItem: (item: any): Direccion => {
-    // Construir la descripción concatenada
-    let descripcionParts = [];
-    
-    // Agregar sector
-    if (item.nombreSector) {
-      descripcionParts.push(item.nombreSector);
-    }
-    
-    // Agregar barrio (solo si existe y no es null)
-    if (item.nombreBarrio && item.nombreBarrio !== null && item.nombreBarrio !== '') {
-      descripcionParts.push(item.nombreBarrio);
-    }
-    
-    // Agregar vía con tipo
-    if (item.nombreTipoVia && item.nombreVia) {
-      descripcionParts.push(`${item.nombreTipoVia} ${item.nombreVia}`);
-    } else if (item.nombreVia) {
-      descripcionParts.push(item.nombreVia);
-    }
-    
-    // Agregar cuadra
-    if (item.cuadra) {
-      descripcionParts.push(`Cuadra ${item.cuadra}`);
-    }
-    
-    // Unir todas las partes con espacios
-    const descripcionCompleta = descripcionParts.join(' ');
-    
-    return {
-      id: item.codDireccion || item.direccionId || item.id || 0,
-      sectorId: item.codSector || item.sectorId || 0,
-      barrioId: item.codBarrio || item.barrioId || 0,
-      calleId: item.codVia || item.calleId || 0,
-      cuadra: item.cuadra || '',
-      lado: item.lado || '-',
-      loteInicial: item.loteInicial || 0,
-      loteFinal: item.loteFinal || 0,
-      descripcion: descripcionCompleta,
-      estado: item.estado === 1 || item.estado === true,
-      // Datos adicionales del API
-      nombreSector: item.nombreSector || '',
-      nombreBarrio: item.nombreBarrio || '',
-      nombreVia: item.nombreVia || '',
-      nombreTipoVia: item.nombreTipoVia || '',
-      codDireccion: item.codDireccion,
-      codBarrioVia: item.codBarrioVia,
-      codSector: item.codSector,
-      codBarrio: item.codBarrio,
-      codVia: item.codVia,
-      // Relaciones opcionales
-      sector: item.sector || undefined,
-      barrio: item.barrio || undefined,
-      calle: item.calle || undefined
-    };
-  }
-};
-
-/**
- * Interfaz para parámetros de búsqueda por tipo de vía
- */
-interface BusquedaPorTipoViaParams {
-  parametrosBusqueda: string;
-  codUsuario?: number;
+// Interfaces
+export interface Direccion {
+  codDireccion: number;
+  codBarrioVia: number | null;
+  cuadra: number;
+  lado: string | null;
+  loteInicial: number;
+  loteFinal: number;
+  codUsuario: number | null;
+  codSector: number | null;
+  codVia: number | null;
+  codBarrio: number;
+  parametroBusqueda?: string | null;
+  nombreBarrio: string;
+  nombreSector: string;
+  codTipoVia: number;
+  nombreVia: string;
+  nombreTipoVia: string;
+  descripcion?: string;
 }
 
-/**
- * Interfaz para parámetros de búsqueda por nombre de vía
- */
-interface BusquedaPorNombreViaParams {
+export interface DireccionBusquedaParams {
+  parametrosBusqueda?: string;
   nombreVia?: string;
   codSector?: number;
   codBarrio?: number;
   codUsuario?: number;
 }
 
+export interface DireccionApiResponse {
+  success: boolean;
+  message: string;
+  data: Direccion[];
+  pagina?: number | null;
+  limite?: number | null;
+  totalPaginas?: number | null;
+  totalRegistros?: number | null;
+}
+
 /**
  * Servicio para manejar las operaciones de direcciones
+ * Conecta directamente con el servidor real
  */
-export class DireccionService extends BaseApiService<Direccion, DireccionFormData> {
+export class DireccionService {
   private static instance: DireccionService;
+  private readonly API_ENDPOINT = '/api/direccion';
   
-  constructor() {
-    // En desarrollo, usar la URL completa para evitar problemas con el proxy
-    const baseURL = import.meta.env.DEV 
-      ? (import.meta.env.VITE_API_URL || 'http://192.168.20.160:8080')
-      : '';
-      
-    super(
-      baseURL, // URL base completa en desarrollo
-      '/api/direccion', // endpoint base
-      direccionNormalizeOptions, // opciones de normalización
-      'direcciones_cache' // clave de caché
-    );
-    
-    console.log('🔧 [DireccionService] Configurado con baseURL:', baseURL);
+  private constructor() {
+    console.log('🔧 [DireccionService] Inicializado');
+    console.log('🌐 [DireccionService] API Base:', API_CONFIG.baseURL);
+    console.log('📍 [DireccionService] Endpoint:', this.API_ENDPOINT);
   }
   
   /**
@@ -114,304 +64,305 @@ export class DireccionService extends BaseApiService<Direccion, DireccionFormDat
     }
     return DireccionService.instance;
   }
-
+  
   /**
-   * Obtiene todas las direcciones
-   * IMPORTANTE: NO usa el endpoint base, sino el endpoint específico de búsqueda
+   * Construye la URL completa para una petición
    */
-  async getAll(): Promise<Direccion[]> {
+  private buildUrl(path: string): string {
+    return buildApiUrl(`${this.API_ENDPOINT}${path}`);
+  }
+  
+  /**
+   * Realiza una petición GET al servidor
+   */
+  private async fetchJson<T = any>(url: string): Promise<T> {
+    console.log(`📡 [DireccionService] GET: ${url}`);
+    
     try {
-      console.log('🔄 [DireccionService] Obteniendo todas las direcciones');
-      
-      // Usar directamente el endpoint de búsqueda con parámetros por defecto
-      return await this.buscarPorNombreVia({
-        nombreVia: 'a', // Parámetro por defecto para obtener resultados
-        codUsuario: 1
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: getPublicHeaders(),
+        mode: 'cors',
+        credentials: 'omit' // No enviar cookies
       });
       
-    } catch (error: any) {
-      console.error('❌ [DireccionService] Error al obtener direcciones:', error);
+      console.log(`📥 [DireccionService] Response: ${response.status} ${response.statusText}`);
       
-      // Si hay error, intentar devolver del caché
-      const cached = this.loadFromCache();
-      if (cached && cached.length > 0) {
-        console.log(`📦 [DireccionService] Devolviendo ${cached.length} direcciones del caché`);
-        return cached;
+      if (response.status === 403) {
+        console.warn('⚠️ [DireccionService] Error 403 - Intentando sin parámetros adicionales');
+        throw new Error('Sin autorización para acceder a direcciones');
       }
       
+      if (!response.ok) {
+        throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data;
+      
+    } catch (error) {
+      console.error(`❌ [DireccionService] Error:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Formatea una dirección completa
+   */
+  private formatearDireccion(dir: Direccion): Direccion {
+    const descripcion = `${dir.nombreSector} - ${dir.nombreBarrio} - ${dir.nombreTipoVia} ${dir.nombreVia} - Cuadra ${dir.cuadra}`;
+    
+    return {
+      ...dir,
+      descripcion
+    };
+  }
+  
+  /**
+   * Lista direcciones por tipo de vía
+   * Usa parámetros mínimos para evitar error 403
+   */
+  async listarPorTipoVia(parametrosBusqueda: string = '', codUsuario: number = 1): Promise<Direccion[]> {
+    try {
+      console.log(`🔍 [DireccionService] Buscando direcciones por tipo de vía: "${parametrosBusqueda}"`);
+      
+      // Si no hay parámetro de búsqueda, usar uno por defecto
+      const busqueda = parametrosBusqueda || 'CALLE';
+      
+      const params = new URLSearchParams({
+        parametrosBusqueda: busqueda,
+        codUsuario: codUsuario.toString()
+      });
+      
+      const url = this.buildUrl(`/listarDireccionPorTipoVia?${params}`);
+      
+      // Intentar primero con los parámetros normales
+      try {
+        const response = await this.fetchJson<DireccionApiResponse>(url);
+        
+        if (response.success && response.data) {
+          console.log(`✅ [DireccionService] ${response.data.length} direcciones encontradas`);
+          const direccionesFormateadas = response.data.map(dir => this.formatearDireccion(dir));
+          return direccionesFormateadas;
+        }
+      } catch (error: any) {
+        // Si falla, intentar con parámetros diferentes
+        console.log('⚠️ [DireccionService] Reintentando con parámetros alternativos...');
+        
+        const paramsAlt = new URLSearchParams({
+          parametrosBusqueda: 'a',
+          codUsuario: '1'
+        });
+        
+        const urlAlt = this.buildUrl(`/listarDireccionPorTipoVia?${paramsAlt}`);
+        const responseAlt = await this.fetchJson<DireccionApiResponse>(urlAlt);
+        
+        if (responseAlt.success && responseAlt.data) {
+          console.log(`✅ [DireccionService] ${responseAlt.data.length} direcciones encontradas (intento alternativo)`);
+          const direccionesFormateadas = responseAlt.data.map(dir => this.formatearDireccion(dir));
+          return direccionesFormateadas;
+        }
+      }
+      
+      console.warn('⚠️ [DireccionService] No se encontraron direcciones');
+      return [];
+      
+    } catch (error: any) {
+      console.error('❌ [DireccionService] Error al listar por tipo de vía:', error);
+      NotificationService.error('No se pudieron cargar las direcciones. Verifique su conexión.');
       return [];
     }
   }
   
   /**
-   * Busca direcciones por tipo de vía
+   * Lista direcciones por nombre de vía
    */
-  async buscarPorTipoVia(params: BusquedaPorTipoViaParams): Promise<Direccion[]> {
+  async listarPorNombreVia(params: DireccionBusquedaParams): Promise<Direccion[]> {
     try {
-      console.log('🔍 [DireccionService] Buscando direcciones por tipo de vía:', params);
+      console.log('🔍 [DireccionService] Buscando direcciones con parámetros:', params);
       
+      // Construir parámetros con valores por defecto
       const queryParams = new URLSearchParams({
-        parametrosBusqueda: params.parametrosBusqueda,
-        ...(params.codUsuario && { codUsuario: params.codUsuario.toString() })
+        parametrosBusqueda: params.parametrosBusqueda || params.nombreVia || 'a',
+        codUsuario: (params.codUsuario || 1).toString()
       });
       
-      // IMPORTANTE: En desarrollo usar URL completa
-      const baseUrl = import.meta.env.DEV 
-        ? `${import.meta.env.VITE_API_URL || 'http://192.168.20.160:8080'}`
-        : '';
-      const url = `${baseUrl}/api/direccion/listarDireccionPorTipoVia?${queryParams}`;
-      console.log('📡 [DireccionService] URL de búsqueda:', url);
-      
-      const response = await this.makeRequest(url, {
-        method: 'GET'
-      });
-      
-      // El API devuelve un array, procesarlo
-      let dataArray: any[] = [];
-      if (Array.isArray(response)) {
-        dataArray = response;
-      } else if (response && typeof response === 'object' && response.data) {
-        dataArray = response.data;
-      } else {
-        console.warn('⚠️ [DireccionService] Respuesta inesperada:', response);
-        dataArray = [];
+      // Agregar parámetros opcionales si existen
+      if (params.codSector !== undefined && params.codSector !== null) {
+        queryParams.append('codSector', params.codSector.toString());
+      }
+      if (params.codBarrio !== undefined && params.codBarrio !== null) {
+        queryParams.append('codBarrio', params.codBarrio.toString());
       }
       
-      const direcciones = dataArray.map((item: any, index: number) => 
-        this.normalizeOptions.normalizeItem(item, index)
-      );
+      const url = this.buildUrl(`/listarDireccionPorNombreVia?${queryParams}`);
       
-      console.log(`✅ [DireccionService] ${direcciones.length} direcciones encontradas`);
-      
-      // Guardar en caché si hay resultados
-      if (direcciones.length > 0) {
-        this.saveToCache(direcciones);
+      try {
+        const response = await this.fetchJson<DireccionApiResponse>(url);
+        
+        if (response.success && response.data) {
+          console.log(`✅ [DireccionService] ${response.data.length} direcciones encontradas`);
+          const direccionesFormateadas = response.data.map(dir => this.formatearDireccion(dir));
+          return direccionesFormateadas;
+        }
+        
+        return [];
+        
+      } catch (error: any) {
+        // Si falla con 403, intentar con parámetros mínimos
+        if (error.message.includes('403') || error.message.includes('autorización')) {
+          console.log('⚠️ [DireccionService] Reintentando con parámetros mínimos...');
+          
+          const paramsMin = new URLSearchParams({
+            parametrosBusqueda: 'a',
+            codUsuario: '1'
+          });
+          
+          const urlMin = this.buildUrl(`/listarDireccionPorNombreVia?${paramsMin}`);
+          const responseMin = await this.fetchJson<DireccionApiResponse>(urlMin);
+          
+          if (responseMin.success && responseMin.data) {
+            console.log(`✅ [DireccionService] ${responseMin.data.length} direcciones encontradas (parámetros mínimos)`);
+            
+            // Filtrar localmente si había parámetros de búsqueda
+            let resultados = responseMin.data.map(dir => this.formatearDireccion(dir));
+            
+            if (params.nombreVia) {
+              resultados = resultados.filter(dir => 
+                dir.nombreVia.toLowerCase().includes(params.nombreVia!.toLowerCase())
+              );
+            }
+            
+            if (params.codSector) {
+              resultados = resultados.filter(dir => dir.codSector === params.codSector);
+            }
+            
+            if (params.codBarrio) {
+              resultados = resultados.filter(dir => dir.codBarrio === params.codBarrio);
+            }
+            
+            return resultados;
+          }
+        }
+        
+        throw error;
       }
-      
-      return direcciones;
       
     } catch (error: any) {
-      console.error('❌ [DireccionService] Error al buscar por tipo de vía:', error);
-      
-      // Si hay error, intentar devolver del caché
-      const cached = this.loadFromCache();
-      if (cached && cached.length > 0) {
-        console.log(`📦 [DireccionService] Error en búsqueda, devolviendo ${cached.length} direcciones del caché`);
-        return cached;
-      }
-      
+      console.error('❌ [DireccionService] Error al listar por nombre de vía:', error);
+      NotificationService.error('No se pudieron cargar las direcciones');
       return [];
     }
+  }
+  
+  /**
+   * Obtiene todas las direcciones
+   */
+  async obtenerTodas(): Promise<Direccion[]> {
+    console.log('🔄 [DireccionService] Obteniendo todas las direcciones...');
+    
+    // Intentar primero con listarPorNombreVia que parece ser más permisivo
+    const direcciones = await this.listarPorNombreVia({
+      parametrosBusqueda: 'a',
+      codUsuario: 1
+    });
+    
+    if (direcciones.length === 0) {
+      // Si no funciona, intentar con listarPorTipoVia
+      console.log('⚠️ [DireccionService] Intentando método alternativo...');
+      return await this.listarPorTipoVia('', 1);
+    }
+    
+    return direcciones;
   }
   
   /**
    * Busca direcciones por nombre de vía
-   * CORREGIDO: Usar GET con query parameters
    */
-  async buscarPorNombreVia(params: BusquedaPorNombreViaParams): Promise<Direccion[]> {
+  async buscarPorNombreVia(nombreVia: string): Promise<Direccion[]> {
+    return this.listarPorNombreVia({
+      nombreVia,
+      parametrosBusqueda: nombreVia,
+      codUsuario: 1
+    });
+  }
+  
+  /**
+   * Busca direcciones por sector
+   */
+  async buscarPorSector(codSector: number): Promise<Direccion[]> {
+    return this.listarPorNombreVia({
+      parametrosBusqueda: 'a',
+      codSector,
+      codUsuario: 1
+    });
+  }
+  
+  /**
+   * Busca direcciones por barrio
+   */
+  async buscarPorBarrio(codBarrio: number): Promise<Direccion[]> {
+    return this.listarPorNombreVia({
+      parametrosBusqueda: 'a',
+      codBarrio,
+      codUsuario: 1
+    });
+  }
+  
+  /**
+   * Busca direcciones con filtros avanzados
+   */
+  async buscarConFiltros(filtros: {
+    tipo?: string;
+    nombre?: string;
+    sector?: number;
+    barrio?: number;
+  }): Promise<Direccion[]> {
     try {
-      console.log('🔍 [DireccionService] Buscando direcciones por nombre de vía:', params);
+      console.log('🔍 [DireccionService] Buscando con filtros:', filtros);
       
-      // Preparar los parámetros de consulta (query parameters)
-      const queryParams = new URLSearchParams({
-        parametrosBusqueda: params.nombreVia || 'a', // Valor por defecto 'a'
-        codUsuario: (params.codUsuario || 1).toString() // Valor por defecto 1
+      // Si hay tipo de vía, usar búsqueda por tipo
+      if (filtros.tipo) {
+        return await this.listarPorTipoVia(filtros.tipo, 1);
+      }
+      
+      // Si no, usar búsqueda por nombre
+      return await this.listarPorNombreVia({
+        nombreVia: filtros.nombre,
+        parametrosBusqueda: filtros.nombre || 'a',
+        codSector: filtros.sector,
+        codBarrio: filtros.barrio,
+        codUsuario: 1
       });
       
-      // IMPORTANTE: En desarrollo usar URL completa
-      const baseUrl = import.meta.env.DEV 
-        ? `${import.meta.env.VITE_API_URL || 'http://192.168.20.160:8080'}`
-        : '';
-      const url = `${baseUrl}/api/direccion/listarDireccionPorNombreVia?${queryParams}`;
-      
-      console.log('📡 [DireccionService] URL de búsqueda:', url);
-      
-      // Usar GET sin body
-      const response = await this.makeRequest(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      
-      // El API devuelve un array, procesarlo
-      let dataArray: any[] = [];
-      if (Array.isArray(response)) {
-        dataArray = response;
-      } else if (response && typeof response === 'object' && response.data) {
-        dataArray = response.data;
-      } else {
-        console.warn('⚠️ [DireccionService] Respuesta inesperada:', response);
-        dataArray = [];
-      }
-      
-      const direcciones = dataArray.map((item: any, index: number) => 
-        this.normalizeOptions.normalizeItem(item, index)
-      );
-      
-      console.log(`✅ [DireccionService] ${direcciones.length} direcciones encontradas`);
-      
-      // Guardar en caché si hay resultados
-      if (direcciones.length > 0) {
-        this.saveToCache(direcciones);
-      }
-      
-      return direcciones;
-      
-    } catch (error: any) {
-      console.error('❌ [DireccionService] Error al buscar por nombre de vía:', error);
-      
-      // Si hay error, intentar devolver del caché
-      const cached = this.loadFromCache();
-      if (cached && cached.length > 0) {
-        console.log(`📦 [DireccionService] Error en búsqueda, devolviendo ${cached.length} direcciones del caché`);
-        return cached;
-      }
-      
+    } catch (error) {
+      console.error('❌ [DireccionService] Error en búsqueda con filtros:', error);
       return [];
     }
   }
   
   /**
-   * Crea una nueva dirección (requiere Bearer Token)
-   * IMPORTANTE: Usa el endpoint base /api/direccion con POST
+   * Verifica la conectividad con el servidor
    */
-  async create(data: DireccionFormData): Promise<Direccion> {
+  async verificarConexion(): Promise<boolean> {
     try {
-      console.log('📤 [DireccionService] Creando nueva dirección:', data);
+      console.log('🔍 [DireccionService] Verificando conexión con el servidor...');
       
-      const token = this.getAuthToken();
-      if (!token) {
-        NotificationService.error('Debe iniciar sesión para guardar direcciones');
-        throw new Error('No se encontró token de autenticación');
-      }
+      // Intentar una petición simple
+      const direcciones = await this.listarPorNombreVia({
+        parametrosBusqueda: 'a',
+        codUsuario: 1
+      });
       
-      // Verificar roles del usuario
-      const userStr = localStorage.getItem('auth_user');
-      if (userStr) {
-        try {
-          const user = JSON.parse(userStr);
-          console.log('👤 [DireccionService] Usuario:', user.username);
-          console.log('🎭 [DireccionService] Roles:', user.roles);
-        } catch (e) {
-          console.error('Error al parsear usuario');
-        }
-      }
+      console.log('✅ [DireccionService] Conexión exitosa');
+      return true;
       
-      // Mapear los datos al formato que espera el backend
-      const mappedData = {
-        codSector: data.sectorId,
-        barrioId: data.barrioId,
-        calleId: data.calleId,
-        cuadra: data.cuadra,
-        lado: data.lado,
-        loteInicial: data.loteInicial,
-        loteFinal: data.loteFinal,
-        estado: 1
-      };
-      
-      console.log('📋 [DireccionService] Datos mapeados para crear:', mappedData);
-      
-      // Usar el método create del padre con Bearer Token
-      const nuevaDireccion = await super.create(mappedData);
-      
-      NotificationService.success('Dirección creada exitosamente');
-      return nuevaDireccion;
-      
-    } catch (error: any) {
-      console.error('❌ [DireccionService] Error al crear dirección:', error);
-      
-      if (error.status === 401 || error.message?.includes('401')) {
-        NotificationService.error('Sesión expirada. Por favor, inicie sesión nuevamente');
-        // Limpiar datos de autenticación
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
-        // Redirigir al login si es necesario
-        window.location.href = '/login';
-      } else if (error.status === 403 || error.message?.includes('403')) {
-        NotificationService.error('No tiene permisos para crear direcciones');
-      } else if (error.message?.includes('Duplicate')) {
-        NotificationService.error('Ya existe una dirección con esos datos');
-      } else {
-        NotificationService.error(error.message || 'Error al crear la dirección');
-      }
-      
-      throw error;
+    } catch (error) {
+      console.error('❌ [DireccionService] Sin conexión con el servidor');
+      return false;
     }
-  }
-  
-  /**
-   * Actualiza una dirección (requiere Bearer Token)
-   */
-  async update(id: number, data: DireccionFormData): Promise<Direccion> {
-    try {
-      console.log('📤 [DireccionService] Actualizando dirección:', { id, data });
-      
-      const token = this.getAuthToken();
-      if (!token) {
-        NotificationService.error('Debe iniciar sesión para actualizar direcciones');
-        throw new Error('No se encontró token de autenticación');
-      }
-      
-      const direccionActualizada = await super.update(id, data);
-      
-      NotificationService.success('Dirección actualizada exitosamente');
-      return direccionActualizada;
-      
-    } catch (error: any) {
-      console.error('❌ [DireccionService] Error al actualizar dirección:', error);
-      
-      if (error.status === 401) {
-        NotificationService.error('Sesión expirada. Por favor, inicie sesión nuevamente');
-      } else if (error.status === 403) {
-        NotificationService.error('No tiene permisos para actualizar direcciones');
-      } else {
-        NotificationService.error(error.message || 'Error al actualizar la dirección');
-      }
-      
-      throw error;
-    }
-  }
-  
-  /**
-   * Elimina una dirección (requiere Bearer Token)
-   */
-  async delete(id: number): Promise<void> {
-    try {
-      console.log('🗑️ [DireccionService] Eliminando dirección:', id);
-      
-      const token = this.getAuthToken();
-      if (!token) {
-        NotificationService.error('Debe iniciar sesión para eliminar direcciones');
-        throw new Error('No se encontró token de autenticación');
-      }
-      
-      await super.delete(id);
-      
-      NotificationService.success('Dirección eliminada exitosamente');
-      
-    } catch (error: any) {
-      console.error('❌ [DireccionService] Error al eliminar dirección:', error);
-      
-      if (error.status === 401) {
-        NotificationService.error('Sesión expirada. Por favor, inicie sesión nuevamente');
-      } else if (error.status === 403) {
-        NotificationService.error('No tiene permisos para eliminar direcciones');
-      } else {
-        NotificationService.error(error.message || 'Error al eliminar la dirección');
-      }
-      
-      throw error;
-    }
-  }
-  
-  /**
-   * Obtiene el token de autenticación
-   */
-  private getAuthToken(): string | null {
-    return localStorage.getItem('auth_token');
   }
 }
 
-// Exportar la instancia singleton
+// Exportar instancia singleton
 export const direccionService = DireccionService.getInstance();

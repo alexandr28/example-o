@@ -1,42 +1,46 @@
 // src/services/contribuyenteListService.ts
+import { API_CONFIG, buildApiUrl, requiresAuth, getAuthHeaders, getPublicHeaders } from '../config/api.config';
 import { NotificationService } from '../components/utils/Notification';
 
-/**
- * Interface para la lista simplificada de contribuyentes
- */
-export interface ContribuyenteListItem {
-  codigo: number;
-  contribuyente: string;
-  documento: string;
-  direccion: string;
-  telefono?: string;
-  tipoPersona?: 'natural' | 'juridica';
+export interface ContribuyentePersona {
+  codPersona: number;
+  codTipopersona?: string | null;
+  codTipoDocumento?: string | null;
+  numerodocumento: string;
+  nombres?: string | null;
+  apellidomaterno?: string | null;
+  apellidopaterno?: string | null;
+  direccion?: string | null;
+  nombrePersona: string;
+  // Campos adicionales que pueden venir
+  telefono?: string | null;
+  email?: string | null;
+  fechanacimiento?: number | null;
+  codestadocivil?: string | null;
+  codsexo?: string | null;
 }
 
-/**
- * Interface para la respuesta del API de personas
- */
-interface PersonaApiResponse {
+export interface ContribuyenteListResponse {
   success: boolean;
   message: string;
-  data: any[];
-  pagina: number | null;
-  limite: number | null;
-  totalPaginas: number | null;
-  totalRegistros: number | null;
+  data: ContribuyentePersona[];
+  pagina?: number | null;
+  limite?: number | null;
+  totalPaginas?: number | null;
+  totalRegistros?: number | null;
 }
 
 /**
- * Servicio especializado para la lista de contribuyentes
- * Usa el endpoint de personas con form-data
+ * Servicio para listar contribuyentes desde el endpoint de personas
+ * Este servicio NO requiere autenticación
  */
-class ContribuyenteListService {
+export class ContribuyenteListService {
   private static instance: ContribuyenteListService;
-  // NO incluir el host, solo la ruta relativa para que use el proxy
-  private readonly API_BASE = '';  // Vacío porque vamos a usar rutas absolutas desde la raíz
-  private contribuyentesCache: ContribuyenteListItem[] = [];
   
-  private constructor() {}
+  private constructor() {
+    console.log('🔧 [ContribuyenteListService] Inicializado');
+    console.log('🌐 [ContribuyenteListService] Base URL:', API_CONFIG.baseURL);
+  }
   
   static getInstance(): ContribuyenteListService {
     if (!ContribuyenteListService.instance) {
@@ -46,261 +50,122 @@ class ContribuyenteListService {
   }
   
   /**
-   * Obtiene el token de autenticación
+   * Lista todos los contribuyentes usando el endpoint de personas
+   * NO requiere autenticación
    */
-  private getAuthToken(): string | null {
-    return localStorage.getItem('auth_token');
-  }
-  
-  /**
-   * Obtiene la lista de contribuyentes usando el endpoint de personas
-   */
-  async obtenerListaContribuyentes(): Promise<ContribuyenteListItem[]> {
+  async listarContribuyentes(parametroBusqueda: string = 'a'): Promise<ContribuyentePersona[]> {
     try {
-      console.log('📋 [ContribuyenteListService] Obteniendo lista de contribuyentes...');
+      console.log('🔍 [ContribuyenteListService] Listando contribuyentes');
       
-      // Si no hay token, devolver datos de prueba
-      const token = this.getAuthToken();
-      if (!token) {
-        console.log('⚠️ No hay token de autenticación, usando datos de prueba');
-        return this.getDatosPrueba();
+      const params = new URLSearchParams({
+        parametroBusqueda,
+        codUsuario: '1'
+      });
+      
+      // Usar el endpoint de personas que no requiere auth
+      const endpoint = `${API_CONFIG.endpoints.personas.listarPorTipoYNombre}?${params}`;
+      const url = buildApiUrl(endpoint);
+      
+      console.log('📡 [ContribuyenteListService] GET:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: getPublicHeaders(),
+        mode: 'cors'
+      });
+      
+      console.log('📥 [ContribuyenteListService] Response:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
       }
       
-      // Obtener personas naturales y jurídicas
-      const [personasNaturales, personasJuridicas] = await Promise.all([
-        this.obtenerPersonasPorTipo('0301', 'a'),
-        this.obtenerPersonasPorTipo('0302', 'a')
-      ]);
+      const data: ContribuyenteListResponse = await response.json();
       
-      // Combinar ambas listas
-      const todasLasPersonas = [...personasNaturales, ...personasJuridicas];
-      
-      if (todasLasPersonas.length > 0) {
-        // Mapear personas a items de lista
-        const listaItems = todasLasPersonas.map((persona: any) => ({
-          codigo: persona.codPersona || 0,
-          contribuyente: persona.nombrePersona || this.construirNombreCompleto(persona),
-          documento: persona.numerodocumento || '-',
-          direccion: persona.direccion === 'null' || !persona.direccion ? 'Sin dirección' : persona.direccion,
-          telefono: persona.telefono || '',
-          tipoPersona: (persona.codTipoPersona === '0301' ? 'natural' : 'juridica') as 'natural' | 'juridica'
-        }));
-        
-        this.contribuyentesCache = listaItems;
-        console.log(`✅ [ContribuyenteListService] ${listaItems.length} contribuyentes cargados`);
-        return listaItems;
+      if (data.success && data.data) {
+        console.log(`✅ [ContribuyenteListService] ${data.data.length} contribuyentes encontrados`);
+        return data.data;
       }
       
-      console.log('⚠️ [ContribuyenteListService] No se encontraron personas');
-      return this.getDatosPrueba();
+      console.warn('⚠️ [ContribuyenteListService] No se encontraron contribuyentes');
+      return [];
       
     } catch (error: any) {
       console.error('❌ [ContribuyenteListService] Error:', error);
-      
-      // Si es error 403, probablemente no hay autenticación
-      if (error.message?.includes('403')) {
-        console.log('⚠️ Error de autorización, usando datos de prueba');
-        return this.getDatosPrueba();
-      }
-      
-      // Si hay datos en cache, usarlos
-      if (this.contribuyentesCache.length > 0) {
-        console.log('📦 Usando datos en cache');
-        return this.contribuyentesCache;
-      }
-      
-      return this.getDatosPrueba();
+      NotificationService.error('Error al cargar contribuyentes');
+      throw error;
     }
   }
   
   /**
-   * Obtiene personas por tipo usando form-data
+   * Busca contribuyentes por nombre o documento
    */
-  private async obtenerPersonasPorTipo(codTipoPersona: string, busqueda: string): Promise<any[]> {
-    try {
-      const token = this.getAuthToken();
-      
-      // Crear FormData
-      const formData = new FormData();
-      formData.append('codTipoPersona', codTipoPersona);
-      formData.append('parametroBusqueda', busqueda);
-      
-      // IMPORTANTE: Usar ruta relativa, NO incluir localhost:3000
-      const url = '/api/persona/listarPersonaPorTipoPersonaNombreRazon';
-      console.log('🌐 [ContribuyenteListService] POST:', url);
-      
-      const headers: HeadersInit = {
-        'Accept': 'application/json'
-      };
-      
-      // Agregar token si existe
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: formData,
-        credentials: 'include'
-      });
-      
-      console.log('📥 Response status:', response.status);
-      
-      if (!response.ok) {
-        if (response.status === 403) {
-          throw new Error('Error 403: Sin autorización');
-        }
-        console.error('❌ Error en respuesta:', response.status, response.statusText);
-        return [];
-      }
-      
-      const data: PersonaApiResponse = await response.json();
-      console.log('📥 Response data:', data);
-      
-      if (data.success && data.data) {
-        return Array.isArray(data.data) ? data.data : [data.data];
-      }
-      
-      return [];
-    } catch (error) {
-      console.error('❌ Error al obtener personas:', error);
+  async buscarContribuyentes(termino: string): Promise<ContribuyentePersona[]> {
+    if (!termino || termino.length < 2) {
       return [];
     }
+    
+    return this.listarContribuyentes(termino);
   }
   
   /**
-   * Busca contribuyentes con filtro
+   * Obtiene un contribuyente por su código de persona
    */
-  async filtrarContribuyentes(filtro: any): Promise<ContribuyenteListItem[]> {
+  async obtenerPorCodigo(codPersona: number): Promise<ContribuyentePersona | null> {
     try {
-      const { busqueda, tipoContribuyente, tipoDocumento } = filtro;
+      // Primero buscar en la lista general
+      const todos = await this.listarContribuyentes();
+      const encontrado = todos.find(c => c.codPersona === codPersona);
       
-      // Si no hay búsqueda, obtener todos
-      if (!busqueda || busqueda.trim() === '') {
-        const todos = await this.obtenerListaContribuyentes();
-        
-        // Aplicar filtros locales si existen
-        return todos.filter(item => {
-          if (tipoContribuyente && item.tipoPersona !== tipoContribuyente) {
-            return false;
-          }
-          if (tipoDocumento && tipoDocumento !== 'todos') {
-            // Aquí podrías filtrar por tipo de documento si tuvieras esa información
-          }
-          return true;
-        });
+      if (encontrado) {
+        console.log('✅ [ContribuyenteListService] Contribuyente encontrado:', encontrado.nombrePersona);
+        return encontrado;
       }
       
-      // Si no hay token, filtrar datos de prueba
-      const token = this.getAuthToken();
-      if (!token) {
-        const datosPrueba = this.getDatosPrueba();
-        return datosPrueba.filter(item => {
-          const busquedaLower = busqueda.toLowerCase();
-          return item.contribuyente.toLowerCase().includes(busquedaLower) ||
-                 item.documento.toLowerCase().includes(busquedaLower) ||
-                 item.direccion.toLowerCase().includes(busquedaLower);
-        });
-      }
-      
-      // Buscar en ambos tipos de persona según el filtro
-      let personasNaturales: any[] = [];
-      let personasJuridicas: any[] = [];
-      
-      if (!tipoContribuyente || tipoContribuyente === 'natural') {
-        personasNaturales = await this.obtenerPersonasPorTipo('0301', busqueda);
-      }
-      
-      if (!tipoContribuyente || tipoContribuyente === 'juridica') {
-        personasJuridicas = await this.obtenerPersonasPorTipo('0302', busqueda);
-      }
-      
-      const todasLasPersonas = [...personasNaturales, ...personasJuridicas];
-      
-      // Mapear a items de lista
-      return todasLasPersonas.map((persona: any) => ({
-        codigo: persona.codPersona || 0,
-        contribuyente: persona.nombrePersona || this.construirNombreCompleto(persona),
-        documento: persona.numerodocumento || '-',
-        direccion: persona.direccion === 'null' || !persona.direccion ? 'Sin dirección' : persona.direccion,
-        telefono: persona.telefono || '',
-        tipoPersona: (persona.codTipoPersona === '0301' ? 'natural' : 'juridica') as 'natural' | 'juridica'
-      }));
+      console.warn('⚠️ [ContribuyenteListService] Contribuyente no encontrado');
+      return null;
       
     } catch (error) {
-      console.error('Error al filtrar:', error);
-      return this.getDatosPrueba();
+      console.error('❌ [ContribuyenteListService] Error al obtener contribuyente:', error);
+      throw error;
     }
   }
   
   /**
-   * Construye el nombre completo desde los datos de persona
+   * Convierte un ContribuyentePersona al formato esperado por otros componentes
    */
-  private construirNombreCompleto(persona: any): string {
-    // Si viene nombrePersona, usarlo directamente
-    if (persona.nombrePersona) {
-      return persona.nombrePersona;
+  formatearContribuyente(persona: ContribuyentePersona): any {
+    // Intentar separar el nombre completo si es necesario
+    const partesNombre = persona.nombrePersona.split(' ');
+    let apellidoPaterno = persona.apellidopaterno || '';
+    let apellidoMaterno = persona.apellidomaterno || '';
+    let nombres = persona.nombres || '';
+    
+    // Si no vienen los campos separados, intentar deducirlos del nombre completo
+    if (!apellidoPaterno && !apellidoMaterno && !nombres && partesNombre.length >= 3) {
+      apellidoPaterno = partesNombre[0];
+      apellidoMaterno = partesNombre[1];
+      nombres = partesNombre.slice(2).join(' ');
     }
     
-    // Si no, construir desde los campos
-    const partes = [
-      persona.apellidopaterno,
-      persona.apellidomaterno,
-      persona.nombres
-    ].filter(Boolean);
-    
-    return partes.length > 0 ? partes.join(' ') : 'Sin nombre';
-  }
-  
-  /**
-   * Datos de prueba para desarrollo
-   */
-  private getDatosPrueba(): ContribuyenteListItem[] {
-    return [
-      {
-        codigo: 1,
-        contribuyente: 'Juan Pérez García',
-        documento: '12345678',
-        direccion: 'Av. Los Olivos 123, Trujillo',
-        telefono: '999 888 777',
-        tipoPersona: 'natural'
-      },
-      {
-        codigo: 2,
-        contribuyente: 'María Rodríguez López',
-        documento: '87654321',
-        direccion: 'Jr. Las Flores 456, Trujillo',
-        telefono: '988 777 666',
-        tipoPersona: 'natural'
-      },
-      {
-        codigo: 3,
-        contribuyente: 'Empresa ABC S.A.C.',
-        documento: '20123456789',
-        direccion: 'Av. Industrial 789, Trujillo',
-        telefono: '044-123456',
-        tipoPersona: 'juridica'
-      },
-      {
-        codigo: 4,
-        contribuyente: 'Comercial XYZ E.I.R.L.',
-        documento: '20987654321',
-        direccion: 'Jr. Comercio 321, Trujillo',
-        telefono: '044-654321',
-        tipoPersona: 'juridica'
-      },
-      {
-        codigo: 5,
-        contribuyente: 'Carlos Mendoza Silva',
-        documento: '11223344',
-        direccion: 'Calle Los Pinos 567, Trujillo',
-        telefono: '977 666 555',
-        tipoPersona: 'natural'
-      }
-    ];
+    return {
+      codigoPersona: persona.codPersona,
+      codigoContribuyente: persona.codPersona, // Usar el mismo código
+      nombre: persona.nombrePersona,
+      numeroDocumento: persona.numerodocumento,
+      tipoDocumento: persona.codTipoDocumento,
+      direccion: persona.direccion === 'null' ? '' : (persona.direccion || ''),
+      telefono: persona.telefono || '',
+      email: persona.email || '',
+      nombres,
+      apellidoPaterno,
+      apellidoMaterno,
+      fechaNacimiento: persona.fechanacimiento,
+      estadoCivil: persona.codestadocivil,
+      sexo: persona.codsexo
+    };
   }
 }
 
-// Exportar instancia única
+// Exportar instancia singleton
 export const contribuyenteListService = ContribuyenteListService.getInstance();

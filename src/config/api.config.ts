@@ -1,11 +1,16 @@
-// src/config/api.config.ts - VERSIÓN CON IP CORRECTA
+// src/config/api.config.ts
 /**
  * Configuración centralizada de la API
- * TEMPORAL: IP hardcodeada mientras se corrige el .env
+ * Mantiene todos los endpoints y configuraciones en un solo lugar
  */
 
-// IMPORTANTE: Forzar la URL correcta
-const API_BASE_URL = 'http://192.168.20.160:8080'; // IP CORRECTA
+// URL base del backend - SIEMPRE usar la IP correcta
+const API_BASE_URL = 'http://192.168.20.160:8080'; // FORZAR IP CORRECTA
+
+// Verificar que no estamos usando localhost:3000
+if (API_BASE_URL.includes('localhost:3000')) {
+  console.error('❌ ERROR: API_BASE_URL está usando localhost:3000 - CORREGIR INMEDIATAMENTE');
+}
 
 // Log para debug
 console.log('🔧 API Configuration:');
@@ -28,13 +33,36 @@ export const API_CONFIG = {
     
     // Mantenedores (GET sin auth, POST/PUT/DELETE con auth)
     sectores: '/api/sector',
-    barrios: '/api/barrio',    // Corregido: era /api/barrio
+    barrios: '/api/barrio',
     vias: '/api/via',
-    direcciones: '/api/direccion/listarDireccionPorNombreVia',
-    contribuyentes: '/api/contribuyente',
-    // Módulos principales (requieren auth)
     
+    // Direcciones - Endpoints específicos sin autenticación
+    direcciones: {
+      base: '/api/direccion',
+      listarPorNombreVia: '/api/direccion/listarDireccionPorNombreVia',
+      listarPorTipoVia: '/api/direccion/listarDireccionPorTipoVia',
+      obtenerPorCodigo: '/api/direccion/obtenerPorCodigo',
+      crear: '/api/direccion',
+      actualizar: '/api/direccion',
+      eliminar: '/api/direccion'
+    },
+    
+    // Personas - Endpoint sin autenticación para búsquedas
+    personas: {
+      base: '/api/persona',
+      listarPorTipoYNombre: '/api/persona/listarPersonaPorTipoPersonaNombreRazon',
+      obtenerPorCodigo: '/api/persona/obtenerPorCodigo',
+      crear: '/api/persona',
+      actualizar: '/api/persona',
+      eliminar: '/api/persona'
+    },
+    
+    // Contribuyentes (requieren auth para todas las operaciones)
+    contribuyentes: '/api/contribuyente',
+    
+    // Módulos principales (requieren auth)
     predios: '/api/predio',
+    pisos: '/api/piso',
     
     // Otros endpoints (requieren auth)
     aranceles: '/api/arancel',
@@ -69,30 +97,48 @@ export const API_CONFIG = {
     '/api/sector',
     '/api/barrio', 
     '/api/via',
-    '/api/calle',
     '/api/direccion/listarDireccionPorNombreVia',
-    '/api/contribuyente',
+    '/api/direccion/listarDireccionPorTipoVia',
+    '/api/persona/listarPersonaPorTipoPersonaNombreRazon',
   ],
   
-  // Métodos que requieren autenticación
+  // Endpoints para verificación de conectividad
+  healthCheckEndpoints: [
+    '/api/direccion/listarDireccionPorNombreVia',
+    '/api/persona/listarPersonaPorTipoPersonaNombreRazon',
+    '/api/sector',
+    '/api/barrio',
+    '/api/via',
+    '/api/contribuyente'
+  ],
+  
+  // Métodos que siempre requieren autenticación
   authRequiredMethods: ['POST', 'PUT', 'DELETE', 'PATCH'],
   
   // Cache configuration
   cache: {
     enabled: true,
-    ttl: 24 * 60 * 60 * 1000, // 24 horas
+    ttl: 5 * 60 * 1000, // 5 minutos para datos dinámicos
+    staticTtl: 24 * 60 * 60 * 1000, // 24 horas para datos estáticos
     keys: {
       sectores: 'sectores_cache',
       barrios: 'barrios_cache',
-      calles: 'calles_cache',
-      vias: 'tipos_via_cache',
-      direcciones: 'direcciones_cache'
+      vias: 'vias_cache',
+      direcciones: 'direcciones_cache',
+      personas: 'personas_cache',
+      contribuyentes: 'contribuyentes_cache'
     }
   }
 };
 
 // Función helper para construir URLs completas
 export const buildApiUrl = (endpoint: string): string => {
+  // Si ya es una URL completa, devolverla tal cual
+  if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
+    return endpoint;
+  }
+  
+  // Construir URL completa
   return `${API_CONFIG.baseURL}${endpoint}`;
 };
 
@@ -113,7 +159,11 @@ export const requiresAuth = (endpoint: string, method: string = 'GET'): boolean 
 
 // Función helper para obtener headers con autenticación
 export const getAuthHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('auth_token');
+  const token = localStorage.getItem('auth_token') || 
+                sessionStorage.getItem('auth_token') ||
+                localStorage.getItem('token') ||
+                sessionStorage.getItem('token');
+                
   const headers: HeadersInit = {
     ...API_CONFIG.defaultHeaders
   };
@@ -123,6 +173,13 @@ export const getAuthHeaders = (): HeadersInit => {
   }
   
   return headers;
+};
+
+// Función helper para obtener headers sin autenticación
+export const getPublicHeaders = (): HeadersInit => {
+  return {
+    ...API_CONFIG.defaultHeaders
+  };
 };
 
 // Función helper para manejar errores de API
@@ -154,14 +211,57 @@ export const handleApiError = (error: any): string => {
   }
 };
 
+// Helper para obtener endpoint completo de direcciones
+export const getDireccionEndpoint = (tipo: 'listarPorNombreVia' | 'listarPorTipoVia' | 'base' = 'base'): string => {
+  if (tipo === 'base') {
+    return API_CONFIG.endpoints.direcciones.base;
+  }
+  return API_CONFIG.endpoints.direcciones[tipo];
+};
+
+// Helper para obtener endpoint completo de personas
+export const getPersonaEndpoint = (tipo: 'listarPorTipoYNombre' | 'base' = 'base'): string => {
+  if (tipo === 'base') {
+    return API_CONFIG.endpoints.personas.base;
+  }
+  return API_CONFIG.endpoints.personas[tipo];
+};
+
+// Helper para verificar si el backend está disponible
+export const checkBackendHealth = async (): Promise<boolean> => {
+  try {
+    // Intentar con un endpoint público que no requiere auth
+    const response = await fetch(buildApiUrl('/api/sector'), {
+      method: 'HEAD',
+      headers: getPublicHeaders()
+    });
+    
+    return response.ok || response.status === 401 || response.status === 403;
+  } catch (error) {
+    console.error('❌ Backend no disponible:', error);
+    return false;
+  }
+};
+
 // Exportar tipos útiles
 export type ApiEndpoint = keyof typeof API_CONFIG.endpoints;
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+export type DireccionEndpointType = keyof typeof API_CONFIG.endpoints.direcciones;
+export type PersonaEndpointType = keyof typeof API_CONFIG.endpoints.personas;
+
+// Constantes de configuración adicionales
+export const API_CONSTANTS = {
+  DEFAULT_PAGE_SIZE: 20,
+  MAX_PAGE_SIZE: 100,
+  DEFAULT_TIMEOUT: API_CONFIG.timeout,
+  DEFAULT_COD_USUARIO: 1,
+  DEFAULT_SEARCH_PARAM: 'a'
+};
 
 // Log de configuración
 console.log('✅ API Configuration cargada:', {
   baseURL: API_CONFIG.baseURL,
-  endpoints: Object.keys(API_CONFIG.endpoints).length,
+  totalEndpoints: Object.keys(API_CONFIG.endpoints).length,
   publicEndpoints: API_CONFIG.publicEndpoints.length,
   cacheEnabled: API_CONFIG.cache.enabled
 });

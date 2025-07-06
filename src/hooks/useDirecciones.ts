@@ -1,154 +1,74 @@
-// src/hooks/useDirecciones.ts - VERSIÓN ACTUALIZADA
+// src/hooks/useDirecciones.ts
 import { useState, useCallback, useEffect } from 'react';
-import { direccionService } from '../services/direcionService';
-import sectorService from '../services/sectorService';
-import barrioService from '../services/barrioService';
-import calleApiService from '../services/calleApiService';
-import { Direccion, DireccionFormData, Sector, Barrio, Calle, LadoDireccion } from '../models';
+import { direccionService, Direccion } from '../services/direcionService';
 import { NotificationService } from '../components/utils/Notification';
 
-interface UseDireccionesReturn {
-  // Estados
-  direcciones: Direccion[];
-  sectores: Sector[];
-  barrios: Barrio[];
-  barriosFiltrados: Barrio[];
-  calles: Calle[];
-  callesFiltradas: Calle[];
-  lados: { value: string; label: string }[];
-  direccionSeleccionada: Direccion | null;
-  sectorSeleccionado: number | null;
-  barrioSeleccionado: number | null;
-  modoEdicion: boolean;
-  loading: boolean;
-  error: string | null;
-  searchTerm: string;
-  
-  // Métodos
-  cargarDirecciones: () => Promise<void>;
-  cargarDependencias: () => Promise<void>;
-  buscarDirecciones: (term: string) => Promise<void>;
-  buscarPorTipoVia: (parametros: string) => Promise<void>;
-  buscarPorNombreVia: (nombre?: string) => Promise<void>;
-  seleccionarDireccion: (direccion: Direccion) => void;
-  handleSectorChange: (sectorId: number) => void;
-  handleBarrioChange: (barrioId: number) => void;
-  limpiarSeleccion: () => void;
-  guardarDireccion: (data: DireccionFormData) => Promise<void>;
-  eliminarDireccion: (id: number) => Promise<void>;
-  setModoEdicion: (modo: boolean) => void;
-  setSearchTerm: (term: string) => void;
-}
-
-export const useDirecciones = (): UseDireccionesReturn => {
-  // Estados principales
+/**
+ * Hook para gestionar direcciones con datos reales del servidor
+ */
+export const useDirecciones = () => {
   const [direcciones, setDirecciones] = useState<Direccion[]>([]);
-  const [sectores, setSectores] = useState<Sector[]>([]);
-  const [barrios, setBarrios] = useState<Barrio[]>([]);
-  const [calles, setCalles] = useState<Calle[]>([]);
-  
-  // Estados de filtrado
-  const [barriosFiltrados, setBarriosFiltrados] = useState<Barrio[]>([]);
-  const [callesFiltradas, setCallesFiltradas] = useState<Calle[]>([]);
-  
-  // Estados de selección
-  const [direccionSeleccionada, setDireccionSeleccionada] = useState<Direccion | null>(null);
-  const [sectorSeleccionado, setSectorSeleccionado] = useState<number | null>(null);
-  const [barrioSeleccionado, setBarrioSeleccionado] = useState<number | null>(null);
-  
-  // Estados de UI
-  const [modoEdicion, setModoEdicion] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  
-  // Opciones de lados
-  const lados = [
-    { value: LadoDireccion.NINGUNO, label: 'Ninguno' },
-    { value: LadoDireccion.IZQUIERDO, label: 'Izquierdo' },
-    { value: LadoDireccion.DERECHO, label: 'Derecho' },
-    { value: LadoDireccion.PAR, label: 'Par' },
-    { value: LadoDireccion.IMPAR, label: 'Impar' }
-  ];
+  const [conectado, setConectado] = useState(false);
   
   /**
-   * Cargar todas las direcciones
+   * Verifica la conexión con el servidor
+   */
+  const verificarConexion = useCallback(async () => {
+    const estaConectado = await direccionService.verificarConexion();
+    setConectado(estaConectado);
+    return estaConectado;
+  }, []);
+  
+  /**
+   * Carga todas las direcciones del servidor
    */
   const cargarDirecciones = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('🔄 [useDirecciones] Cargando direcciones...');
       
-      const data = await direccionService.getAll();
-      setDirecciones(data);
+      console.log('🔄 [useDirecciones] Cargando direcciones del servidor...');
       
-      console.log(`✅ [useDirecciones] ${data.length} direcciones cargadas`);
-    } catch (err: any) {
-      console.error('❌ [useDirecciones] Error al cargar direcciones:', err);
-      setError(err.message || 'Error al cargar direcciones');
-      NotificationService.error('Error al cargar direcciones');
+      const data = await direccionService.obtenerTodas();
+      
+      if (data && data.length > 0) {
+        console.log(`✅ [useDirecciones] ${data.length} direcciones cargadas del servidor`);
+        setDirecciones(data);
+        setConectado(true);
+      } else {
+        console.warn('⚠️ [useDirecciones] No se encontraron direcciones');
+        setDirecciones([]);
+        NotificationService.info('No se encontraron direcciones registradas');
+      }
+      
+    } catch (error: any) {
+      console.error('❌ [useDirecciones] Error:', error);
+      
+      if (error.message.includes('403') || error.message.includes('autorización')) {
+        setError('Sin autorización para acceder a direcciones');
+        NotificationService.warning('No tiene permisos para ver direcciones. Contacte al administrador.');
+      } else if (error.message.includes('conexión')) {
+        setError('Error de conexión con el servidor');
+        NotificationService.error('No se pudo conectar con el servidor');
+      } else {
+        setError('Error al cargar direcciones');
+        NotificationService.error('Error al cargar las direcciones');
+      }
+      
+      setDirecciones([]);
+      setConectado(false);
     } finally {
       setLoading(false);
     }
   }, []);
   
   /**
-   * Buscar direcciones por tipo de vía
+   * Busca direcciones por nombre de vía
    */
-  const buscarPorTipoVia = useCallback(async (parametros: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      console.log('🔍 [useDirecciones] Buscando por tipo de vía:', parametros);
-      
-      const data = await direccionService.buscarPorTipoVia({
-        parametrosBusqueda: parametros,
-        codUsuario: 1 // Siempre enviar codUsuario: 1
-      });
-      
-      setDirecciones(data);
-      console.log(`✅ [useDirecciones] ${data.length} direcciones encontradas`);
-    } catch (err: any) {
-      console.error('❌ [useDirecciones] Error en búsqueda por tipo de vía:', err);
-      setError(err.message || 'Error al buscar direcciones');
-      NotificationService.error('Error al buscar direcciones');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-  
-  /**
-   * Buscar direcciones por nombre de vía
-   * ACTUALIZADO: Solo usa nombreVia y codUsuario según la API
-   */
-  const buscarPorNombreVia = useCallback(async (nombre?: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      console.log('🔍 [useDirecciones] Buscando por nombre de vía:', nombre);
-      
-      const data = await direccionService.buscarPorNombreVia({
-        nombreVia: nombre || 'a', // Valor por defecto 'a' si no se especifica
-        codUsuario: 1 // Siempre enviar codUsuario: 1
-      });
-      
-      setDirecciones(data);
-      console.log(`✅ [useDirecciones] ${data.length} direcciones encontradas`);
-    } catch (err: any) {
-      console.error('❌ [useDirecciones] Error en búsqueda por nombre de vía:', err);
-      setError(err.message || 'Error al buscar direcciones');
-      NotificationService.error('Error al buscar direcciones');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-  
-  /**
-   * Buscar direcciones genérico
-   */
-  const buscarDirecciones = useCallback(async (term: string) => {
-    if (!term.trim()) {
+  const buscarPorNombreVia = useCallback(async (nombreVia: string) => {
+    if (!nombreVia || nombreVia.trim().length < 2) {
       await cargarDirecciones();
       return;
     }
@@ -156,213 +76,115 @@ export const useDirecciones = (): UseDireccionesReturn => {
     try {
       setLoading(true);
       setError(null);
-      console.log('🔍 [useDirecciones] Buscando direcciones:', term);
       
-      // Usar buscarPorNombreVia con el término de búsqueda
-      await buscarPorNombreVia(term);
+      console.log(`🔍 [useDirecciones] Buscando por nombre de vía: "${nombreVia}"`);
       
-    } catch (err: any) {
-      console.error('❌ [useDirecciones] Error en búsqueda:', err);
-      setError(err.message || 'Error al buscar direcciones');
-    } finally {
-      setLoading(false);
-    }
-  }, [cargarDirecciones, buscarPorNombreVia]);
-  
-  /**
-   * Cargar dependencias (sectores, barrios, calles)
-   */
-  const cargarDependencias = useCallback(async () => {
-    try {
-      console.log('🔄 [useDirecciones] Cargando dependencias...');
+      const resultados = await direccionService.buscarPorNombreVia(nombreVia);
       
-      const [sectoresData, barriosData, callesData] = await Promise.all([
-        sectorService.getAll(),
-        barrioService.getAll(),
-        calleApiService.getAll()
-      ]);
+      console.log(`✅ [useDirecciones] ${resultados.length} direcciones encontradas`);
+      setDirecciones(resultados);
       
-      setSectores(sectoresData);
-      setBarrios(barriosData);
-      setCalles(callesData);
-      
-      console.log('✅ [useDirecciones] Dependencias cargadas:', {
-        sectores: sectoresData.length,
-        barrios: barriosData.length,
-        calles: callesData.length
-      });
-    } catch (err: any) {
-      console.error('❌ [useDirecciones] Error al cargar dependencias:', err);
-      setError('Error al cargar datos necesarios');
-    }
-  }, []);
-  
-  /**
-   * Manejar cambio de sector
-   */
-  const handleSectorChange = useCallback((sectorId: number) => {
-    console.log('🔄 [useDirecciones] Sector cambiado:', sectorId);
-    setSectorSeleccionado(sectorId);
-    
-    // Filtrar barrios del sector
-    const barriosDelSector = barrios.filter(b => b.sectorId === sectorId);
-    setBarriosFiltrados(barriosDelSector);
-    
-    // Limpiar selección de barrio si no pertenece al nuevo sector
-    if (barrioSeleccionado && !barriosDelSector.find(b => b.id === barrioSeleccionado)) {
-      setBarrioSeleccionado(null);
-      setCallesFiltradas([]);
-    }
-  }, [barrios, barrioSeleccionado]);
-  
-  /**
-   * Manejar cambio de barrio
-   */
-  const handleBarrioChange = useCallback((barrioId: number) => {
-    console.log('🔄 [useDirecciones] Barrio cambiado:', barrioId);
-    setBarrioSeleccionado(barrioId);
-    
-    // Filtrar calles del barrio
-    const callesDelBarrio = calles.filter(c => c.barrioId === barrioId);
-    setCallesFiltradas(callesDelBarrio);
-  }, [calles]);
-  
-  /**
-   * Seleccionar dirección
-   */
-  const seleccionarDireccion = useCallback((direccion: Direccion) => {
-    console.log('📍 [useDirecciones] Dirección seleccionada:', direccion);
-    setDireccionSeleccionada(direccion);
-    setModoEdicion(false);
-    
-    // Actualizar sector y barrio seleccionados
-    if (direccion.sectorId) {
-      handleSectorChange(direccion.sectorId);
-    }
-    if (direccion.barrioId) {
-      handleBarrioChange(direccion.barrioId);
-    }
-  }, [handleSectorChange, handleBarrioChange]);
-  
-  /**
-   * Limpiar selección
-   */
-  const limpiarSeleccion = useCallback(() => {
-    console.log('🧹 [useDirecciones] Limpiando selección');
-    setDireccionSeleccionada(null);
-    setSectorSeleccionado(null);
-    setBarrioSeleccionado(null);
-    setBarriosFiltrados([]);
-    setCallesFiltradas([]);
-    setModoEdicion(false);
-  }, []);
-  
-  /**
-   * Guardar dirección (crear o actualizar)
-   */
-  const guardarDireccion = useCallback(async (data: DireccionFormData) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      if (modoEdicion && direccionSeleccionada) {
-        console.log('📝 [useDirecciones] Actualizando dirección:', direccionSeleccionada.id);
-        await direccionService.update(direccionSeleccionada.id, data);
-      } else {
-        console.log('➕ [useDirecciones] Creando nueva dirección');
-        await direccionService.create(data);
+      if (resultados.length === 0) {
+        NotificationService.info(`No se encontraron direcciones con "${nombreVia}"`);
       }
       
-      // Recargar direcciones y limpiar formulario
-      await cargarDirecciones();
-      limpiarSeleccion();
-      
-    } catch (err: any) {
-      console.error('❌ [useDirecciones] Error al guardar dirección:', err);
-      setError(err.message || 'Error al guardar dirección');
+    } catch (error: any) {
+      console.error('❌ [useDirecciones] Error en búsqueda:', error);
+      setError('Error al buscar direcciones');
+      setDirecciones([]);
     } finally {
       setLoading(false);
     }
-  }, [modoEdicion, direccionSeleccionada, cargarDirecciones, limpiarSeleccion]);
+  }, [cargarDirecciones]);
   
   /**
-   * Eliminar dirección
+   * Busca direcciones por tipo de vía
    */
-  const eliminarDireccion = useCallback(async (id: number) => {
+  const buscarPorTipoVia = useCallback(async (tipoVia: string) => {
+    if (!tipoVia) {
+      await cargarDirecciones();
+      return;
+    }
+    
     try {
-      const confirmar = window.confirm('¿Está seguro de eliminar esta dirección?');
-      if (!confirmar) return;
-      
       setLoading(true);
       setError(null);
       
-      console.log('🗑️ [useDirecciones] Eliminando dirección:', id);
-      await direccionService.delete(id);
+      console.log(`🔍 [useDirecciones] Buscando por tipo de vía: "${tipoVia}"`);
       
-      // Recargar direcciones y limpiar selección
-      await cargarDirecciones();
-      limpiarSeleccion();
+      const resultados = await direccionService.listarPorTipoVia(tipoVia);
       
-      NotificationService.success('Dirección eliminada exitosamente');
-    } catch (err: any) {
-      console.error('❌ [useDirecciones] Error al eliminar dirección:', err);
-      setError(err.message || 'Error al eliminar dirección');
-      NotificationService.error('Error al eliminar dirección');
+      console.log(`✅ [useDirecciones] ${resultados.length} direcciones encontradas`);
+      setDirecciones(resultados);
+      
+      if (resultados.length === 0) {
+        NotificationService.info(`No se encontraron direcciones tipo "${tipoVia}"`);
+      }
+      
+    } catch (error: any) {
+      console.error('❌ [useDirecciones] Error en búsqueda:', error);
+      setError('Error al buscar direcciones');
+      setDirecciones([]);
     } finally {
       setLoading(false);
     }
-  }, [cargarDirecciones, limpiarSeleccion]);
+  }, [cargarDirecciones]);
   
-  // Efecto para filtrar barrios cuando cambia el sector
-  useEffect(() => {
-    if (sectorSeleccionado) {
-      const filtrados = barrios.filter(b => b.sectorId === sectorSeleccionado);
-      setBarriosFiltrados(filtrados);
-    } else {
-      setBarriosFiltrados([]);
+  /**
+   * Busca direcciones con filtros combinados
+   */
+  const buscarConFiltros = useCallback(async (filtros: {
+    tipo?: string;
+    nombre?: string;
+    sector?: number;
+    barrio?: number;
+  }) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('🔍 [useDirecciones] Buscando con filtros:', filtros);
+      
+      const resultados = await direccionService.buscarConFiltros(filtros);
+      
+      console.log(`✅ [useDirecciones] ${resultados.length} direcciones encontradas`);
+      setDirecciones(resultados);
+      
+      if (resultados.length === 0) {
+        NotificationService.info('No se encontraron direcciones con los criterios especificados');
+      }
+      
+    } catch (error: any) {
+      console.error('❌ [useDirecciones] Error en búsqueda:', error);
+      setError('Error al buscar direcciones');
+      setDirecciones([]);
+    } finally {
+      setLoading(false);
     }
-  }, [sectorSeleccionado, barrios]);
+  }, []);
   
-  // Efecto para filtrar calles cuando cambia el barrio
+  /**
+   * Efecto para verificar conexión al montar
+   */
   useEffect(() => {
-    if (barrioSeleccionado) {
-      const filtradas = calles.filter(c => c.barrioId === barrioSeleccionado);
-      setCallesFiltradas(filtradas);
-    } else {
-      setCallesFiltradas([]);
-    }
-  }, [barrioSeleccionado, calles]);
+    verificarConexion();
+  }, [verificarConexion]);
   
   return {
-    // Estados
+    // Estado
     direcciones,
-    sectores,
-    barrios,
-    barriosFiltrados,
-    calles,
-    callesFiltradas,
-    lados,
-    direccionSeleccionada,
-    sectorSeleccionado,
-    barrioSeleccionado,
-    modoEdicion,
     loading,
     error,
-    searchTerm,
+    conectado,
     
-    // Métodos
+    // Acciones
     cargarDirecciones,
-    cargarDependencias,
-    buscarDirecciones,
-    buscarPorTipoVia,
     buscarPorNombreVia,
-    seleccionarDireccion,
-    handleSectorChange,
-    handleBarrioChange,
-    limpiarSeleccion,
-    guardarDireccion,
-    eliminarDireccion,
-    setModoEdicion,
-    setSearchTerm
+    buscarPorTipoVia,
+    buscarConFiltros,
+    verificarConexion,
+    
+    // Utilidades
+    totalDirecciones: direcciones.length
   };
 };
