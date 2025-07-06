@@ -1,28 +1,38 @@
+// src/pages/contribuyente/ConsultaContribuyente.tsx
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Stack,
+  Button,
+  useTheme
+} from '@mui/material';
+import {
+  PersonAdd as PersonAddIcon
+} from '@mui/icons-material';
 import { MainLayout } from '../../layout';
-import { Breadcrumb,FiltroContribuyenteForm,ContribuyenteList } from '../../components';
+import { Breadcrumb } from '../../components';
+import FiltroContribuyenteFormMUI from '../../components/contribuyentes/FiltroContribuyenteForm';
+import ContribuyenteListMUI from '../../components/contribuyentes/ContribuyenteList';
+import { NotificationContainer } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useContribuyentes } from '../../hooks';
-import { FiltroContribuyente } from '../../models';
 
 /**
- * Página para consultar y listar contribuyentes
- * 
- * Permite buscar contribuyentes por tipo y término de búsqueda,
- * y muestra el resultado en una tabla con paginación.
+ * Página para consultar y listar contribuyentes con diseño compacto
  */
-const ContribuyenteListado: React.FC = () => {
-  // Hooks personalizados
+const ConsultaContribuyente: React.FC = () => {
+  const theme = useTheme();
+  const navigate = useNavigate();
+  
+  // Hook personalizado para manejar contribuyentes
   const { 
     contribuyentes, 
     loading, 
     error, 
-    buscarContribuyentes 
+    buscarContribuyentes,
+    cargarContribuyentes
   } = useContribuyentes();
-  
-  // Estados locales para el formulario
-  const [tipoContribuyente, setTipoContribuyente] = useState('');
-  const [busqueda, setBusqueda] = useState('');
 
   // Migas de pan para la navegación
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -31,63 +41,86 @@ const ContribuyenteListado: React.FC = () => {
     { label: 'Consulta contribuyente', active: true }
   ];
 
-  // Manejar cambios en los campos del formulario
-  const handleTipoContribuyenteChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setTipoContribuyente(e.target.value);
-  };
-
-  const handleBusquedaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setBusqueda(e.target.value);
-  };
+  // Cargar contribuyentes al montar el componente
+  useEffect(() => {
+    cargarContribuyentes();
+  }, [cargarContribuyentes]);
 
   // Manejar la búsqueda de contribuyentes
-  const handleBuscar = () => {
-    const filtro: FiltroContribuyente = {
-      tipoContribuyente,
-      busqueda
-    };
-    
+  const handleBuscar = (filtro: any) => {
+    console.log('🔍 Buscando con filtros:', filtro);
     buscarContribuyentes(filtro);
   };
 
+  // Manejar la navegación a nuevo contribuyente
+  const handleNuevo = () => {
+    navigate('/contribuyente/nuevo');
+  };
+
   // Manejar la edición de un contribuyente
-  const handleEditar = (codigo: string) => {
-    console.log('Redirigir a edición del contribuyente:', codigo);
-    // En un caso real, aquí se haría la navegación a la página de edición
-    // navigate(`/contribuyente/editar/${codigo}`);
+  const handleEditar = (codigo: string | number) => {
+    console.log('Editar contribuyente:', codigo);
+    navigate(`/contribuyente/editar/${codigo}`);
+  };
+
+  // Manejar ver detalles de un contribuyente
+  const handleVer = (codigo: string | number) => {
+    console.log('Ver contribuyente:', codigo);
+    navigate(`/contribuyente/ver/${codigo}`);
   };
 
   return (
     <MainLayout title="Consulta de Contribuyentes">
-      <div className="space-y-4 p-1">
+      <Box sx={{ p: 3 }}>
         {/* Navegación de migas de pan */}
-        <Breadcrumb items={breadcrumbItems} />
+        <Box sx={{ mb: 3 }}>
+          <Breadcrumb items={breadcrumbItems} />
+        </Box>
 
-        {/* Mostrar errores si hay */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
-            <span className="block sm:inline">{error}</span>
-          </div>
-        )}
+        {/* Contenedor principal centrado */}
+        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+          <Box sx={{ width: '100%', maxWidth: '900px' }}>
+            <Stack spacing={3}>
+              {/* Botón de nuevo contribuyente */}
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  variant="contained"
+                  startIcon={<PersonAddIcon />}
+                  onClick={handleNuevo}
+                  sx={{
+                    textTransform: 'none',
+                    backgroundColor: theme.palette.primary.main,
+                    '&:hover': {
+                      backgroundColor: theme.palette.primary.dark,
+                    }
+                  }}
+                >
+                  Nuevo Contribuyente
+                </Button>
+              </Box>
 
-        {/* Filtros de contribuyentes */}
-        <FiltroContribuyenteForm
-          tipoContribuyente={tipoContribuyente}
-          busqueda={busqueda}
-          onTipoContribuyenteChange={handleTipoContribuyenteChange}
-          onBusquedaChange={handleBusquedaChange}
-          onBuscar={handleBuscar}
-        />
+              {/* Filtros de búsqueda */}
+              <FiltroContribuyenteFormMUI
+                onBuscar={handleBuscar}
+                loading={loading}
+              />
 
-        {/* Lista de contribuyentes */}
-        <ContribuyenteList
-          contribuyentes={contribuyentes}
-          onEditar={handleEditar}
-          loading={loading}
-        />
-      </div>
+              {/* Lista de contribuyentes */}
+              <ContribuyenteListMUI
+                contribuyentes={contribuyentes}
+                onEditar={handleEditar}
+                onVer={handleVer}
+                loading={loading}
+              />
+            </Stack>
+          </Box>
+        </Box>
+
+        {/* Contenedor de notificaciones */}
+        <NotificationContainer />
+      </Box>
     </MainLayout>
   );
 };
 
-export default ContribuyenteListado;
+export default ConsultaContribuyente;

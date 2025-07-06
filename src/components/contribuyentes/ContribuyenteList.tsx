@@ -17,13 +17,13 @@ import {
   Alert,
   Tooltip,
   useTheme,
-  alpha,
   Stack,
   Avatar,
   Menu,
   MenuItem,
   ListItemIcon,
-  ListItemText
+  ListItemText,
+  Badge
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -33,23 +33,24 @@ import {
   Business as BusinessIcon,
   Phone as PhoneIcon,
   LocationOn as LocationIcon,
-  Badge as BadgeIcon
+  Badge as BadgeIcon,
+  Info as InfoIcon
 } from '@mui/icons-material';
 
 interface Contribuyente {
-  codigo: string;
+  codigo: string | number;  // Acepta ambos tipos
   contribuyente: string;
   documento: string;
   direccion: string;
   telefono?: string;
-  tipoPersona?: string;
-  estado?: boolean;
+  tipoPersona?: 'natural' | 'juridica' | string;
+  estado?: 'activo' | 'inactivo';
 }
 
 interface ContribuyenteListProps {
   contribuyentes: Contribuyente[];
-  onEditar: (codigo: string) => void;
-  onVer?: (codigo: string) => void;
+  onEditar: (codigo: string | number) => void;
+  onVer?: (codigo: string | number) => void;
   loading?: boolean;
 }
 
@@ -63,10 +64,10 @@ const ContribuyenteListMUI: React.FC<ContribuyenteListProps> = ({
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedCodigo, setSelectedCodigo] = useState<string>('');
+  const [selectedCodigo, setSelectedCodigo] = useState<string | number>('');
 
   // Manejo del menú de acciones
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, codigo: string) => {
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, codigo: string | number) => {
     setAnchorEl(event.currentTarget);
     setSelectedCodigo(codigo);
   };
@@ -106,199 +107,225 @@ const ContribuyenteListMUI: React.FC<ContribuyenteListProps> = ({
 
   // Obtener icono según tipo de persona
   const getTipoPersonaIcon = (tipo?: string) => {
-    if (tipo?.toLowerCase().includes('juridica')) {
-      return <BusinessIcon />;
-    }
-    return <PersonIcon />;
+    return tipo === 'juridica' ? 
+      <BusinessIcon sx={{ fontSize: 16 }} /> : 
+      <PersonIcon sx={{ fontSize: 16 }} />;
   };
 
-  // Obtener color del chip según el tipo de documento
-  const getDocumentoChipColor = (documento: string) => {
-    if (documento.startsWith('20')) return 'primary'; // RUC empresa
-    if (documento.startsWith('10')) return 'info'; // RUC persona
-    if (documento.length === 8) return 'success'; // DNI
-    return 'default';
+  // Obtener avatar según tipo
+  const getAvatar = (tipo?: string, nombre?: string) => {
+    const icon = tipo === 'juridica' ? 
+      <BusinessIcon sx={{ fontSize: 18 }} /> : 
+      <PersonIcon sx={{ fontSize: 18 }} />;
+    
+    const bgcolor = tipo === 'juridica' ? 
+      theme.palette.info.main : 
+      theme.palette.success.main;
+
+    return (
+      <Avatar sx={{ width: 32, height: 32, bgcolor, fontSize: 14 }}>
+        {icon}
+      </Avatar>
+    );
   };
 
-  // Skeleton rows para loading
-  const renderSkeletonRows = () => {
-    return Array.from({ length: 5 }).map((_, index) => (
-      <TableRow key={`skeleton-${index}`}>
-        <TableCell><Skeleton variant="circular" width={40} height={40} /></TableCell>
-        <TableCell><Skeleton /></TableCell>
-        <TableCell><Skeleton width={100} /></TableCell>
-        <TableCell><Skeleton /></TableCell>
-        <TableCell><Skeleton width={40} /></TableCell>
-      </TableRow>
-    ));
-  };
+  if (loading) {
+    return (
+      <Box sx={{ maxWidth: '900px' }}>
+        <Paper elevation={0} sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
+          {[...Array(5)].map((_, index) => (
+            <Skeleton key={index} variant="rectangular" height={60} sx={{ mb: 1 }} />
+          ))}
+        </Paper>
+      </Box>
+    );
+  }
 
   return (
-    <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-      {/* Header */}
-      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-        <Typography variant="h6" component="div">
-          Lista de Contribuyentes
-          <Chip
-            label={contribuyentes.length}
-            size="small"
-            color="primary"
-            sx={{ ml: 2 }}
-          />
-        </Typography>
-      </Box>
+    <Box sx={{ maxWidth: '900px' }}>
+      <Paper elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 2, overflow: 'hidden' }}>
+        {/* Header */}
+        <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.divider}` }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              Lista de Contribuyentes
+            </Typography>
+            <Chip 
+              label={`${contribuyentes.length} registros`}
+              size="small"
+              color="primary"
+              variant="outlined"
+              sx={{ fontSize: '0.75rem' }}
+            />
+          </Box>
+        </Box>
 
-      {/* Tabla */}
-      <TableContainer sx={{ maxHeight: 600 }}>
-        <Table stickyHeader size="medium">
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 600, width: 60 }}>Tipo</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Contribuyente</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 140 }}>Documento</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Dirección / Contacto</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }} align="center">Acciones</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {loading ? (
-              renderSkeletonRows()
-            ) : paginatedContribuyentes.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                  <Alert severity="info" sx={{ display: 'inline-flex' }}>
-                    No se encontraron contribuyentes con los criterios especificados
-                  </Alert>
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedContribuyentes.map((contribuyente) => (
-                <TableRow
-                  key={contribuyente.codigo}
-                  hover
-                  sx={{ 
-                    '&:hover': {
-                      bgcolor: alpha(theme.palette.primary.main, 0.04)
-                    }
-                  }}
-                >
-                  {/* Tipo de persona */}
-                  <TableCell>
-                    <Avatar
-                      sx={{
-                        bgcolor: contribuyente.tipoPersona?.includes('juridica') 
-                          ? theme.palette.primary.main 
-                          : theme.palette.secondary.main,
-                        width: 40,
-                        height: 40
+        {contribuyentes.length === 0 ? (
+          <Box sx={{ p: 8, textAlign: 'center' }}>
+            <InfoIcon sx={{ fontSize: 48, color: theme.palette.info.main, mb: 2 }} />
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              No se encontraron contribuyentes con los criterios especificados
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Intenta modificar los filtros de búsqueda
+            </Typography>
+          </Box>
+        ) : (
+          <>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 600, fontSize: '0.813rem' }}>Tipo</TableCell>
+                    <TableCell sx={{ fontWeight: 600, fontSize: '0.813rem' }}>Contribuyente</TableCell>
+                    <TableCell sx={{ fontWeight: 600, fontSize: '0.813rem' }}>Documento</TableCell>
+                    <TableCell sx={{ fontWeight: 600, fontSize: '0.813rem' }}>Dirección / Contacto</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, fontSize: '0.813rem' }}>Acciones</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {paginatedContribuyentes.map((contribuyente) => (
+                    <TableRow 
+                      key={contribuyente.codigo}
+                      hover
+                      sx={{ 
+                        '&:hover': { 
+                          backgroundColor: theme.palette.action.hover 
+                        },
+                        '& td': { 
+                          py: 1.5,
+                          fontSize: '0.813rem'
+                        }
                       }}
                     >
-                      {getTipoPersonaIcon(contribuyente.tipoPersona)}
-                    </Avatar>
-                  </TableCell>
-
-                  {/* Nombre del contribuyente */}
-                  <TableCell>
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {contribuyente.contribuyente}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Código: {contribuyente.codigo}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-
-                  {/* Documento */}
-                  <TableCell>
-                    <Chip
-                      icon={<BadgeIcon />}
-                      label={contribuyente.documento}
-                      size="small"
-                      color={getDocumentoChipColor(contribuyente.documento)}
-                      variant="outlined"
-                    />
-                  </TableCell>
-
-                  {/* Dirección y contacto */}
-                  <TableCell>
-                    <Stack spacing={0.5}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <LocationIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                        <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
-                          {contribuyente.direccion}
+                      <TableCell>
+                        <Tooltip title={contribuyente.tipoPersona === 'juridica' ? 'Persona Jurídica' : 'Persona Natural'}>
+                          {getAvatar(contribuyente.tipoPersona, contribuyente.contribuyente)}
+                        </Tooltip>
+                      </TableCell>
+                      
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {contribuyente.contribuyente}
                         </Typography>
-                      </Box>
-                      {contribuyente.telefono && (
+                      </TableCell>
+                      
+                      <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <PhoneIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                          <Typography variant="caption" color="text.secondary">
-                            {contribuyente.telefono}
+                          <BadgeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                          <Typography variant="body2">
+                            {contribuyente.documento}
                           </Typography>
                         </Box>
-                      )}
-                    </Stack>
-                  </TableCell>
+                      </TableCell>
+                      
+                      <TableCell>
+                        <Stack spacing={0.5}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <LocationIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                              {contribuyente.direccion || 'Sin dirección'}
+                            </Typography>
+                          </Box>
+                          {contribuyente.telefono && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <PhoneIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                {contribuyente.telefono}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Stack>
+                      </TableCell>
+                      
+                      <TableCell align="center">
+                        <Stack direction="row" spacing={0.5} justifyContent="center">
+                          {onVer && (
+                            <Tooltip title="Ver detalles">
+                              <IconButton 
+                                size="small"
+                                onClick={() => onVer(contribuyente.codigo)}
+                                sx={{ color: theme.palette.info.main }}
+                              >
+                                <VisibilityIcon sx={{ fontSize: 18 }} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          <Tooltip title="Editar">
+                            <IconButton 
+                              size="small"
+                              onClick={() => onEditar(contribuyente.codigo)}
+                              sx={{ color: theme.palette.primary.main }}
+                            >
+                              <EditIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                          </Tooltip>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleMenuOpen(e, contribuyente.codigo)}
+                          >
+                            <MoreVertIcon sx={{ fontSize: 18 }} />
+                          </IconButton>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
 
-                  {/* Acciones */}
-                  <TableCell align="center">
-                    <IconButton
-                      size="small"
-                      onClick={(e) => handleMenuOpen(e, contribuyente.codigo)}
-                    >
-                      <MoreVertIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      {/* Paginación */}
-      <TablePagination
-        component="div"
-        count={contribuyentes.length}
-        page={page}
-        onPageChange={handleChangePage}
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
-        labelRowsPerPage="Filas por página:"
-        labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
-        rowsPerPageOptions={[5, 10, 25, 50]}
-      />
-
-      {/* Menú de acciones */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'right',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'right',
-        }}
-      >
-        {onVer && (
-          <MenuItem onClick={() => handleMenuAction('ver')}>
-            <ListItemIcon>
-              <VisibilityIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Ver detalles</ListItemText>
-          </MenuItem>
+            <TablePagination
+              component="div"
+              count={contribuyentes.length}
+              page={page}
+              onPageChange={handleChangePage}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+              rowsPerPageOptions={[5, 10, 25]}
+              labelRowsPerPage="Filas por página:"
+              labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+              sx={{ 
+                borderTop: `1px solid ${theme.palette.divider}`,
+                '& .MuiTablePagination-toolbar': { minHeight: 48 },
+                '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+                  fontSize: '0.813rem'
+                }
+              }}
+            />
+          </>
         )}
-        <MenuItem onClick={() => handleMenuAction('editar')}>
-          <ListItemIcon>
-            <EditIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Editar</ListItemText>
-        </MenuItem>
-      </Menu>
-    </Paper>
+
+        {/* Menú de acciones */}
+        <Menu
+          anchorEl={anchorEl}
+          open={Boolean(anchorEl)}
+          onClose={handleMenuClose}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'right',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'right',
+          }}
+        >
+          {onVer && (
+            <MenuItem onClick={() => handleMenuAction('ver')}>
+              <ListItemIcon>
+                <VisibilityIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Ver detalles</ListItemText>
+            </MenuItem>
+          )}
+          <MenuItem onClick={() => handleMenuAction('editar')}>
+            <ListItemIcon>
+              <EditIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Editar</ListItemText>
+          </MenuItem>
+        </Menu>
+      </Paper>
+    </Box>
   );
 };
 
