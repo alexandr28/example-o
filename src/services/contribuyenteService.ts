@@ -1,5 +1,5 @@
 // src/services/contribuyenteService.ts
-import { apiGet, apiPost, API_BASE_URL } from '../components/utils/apiRequest';
+import { apiGet, apiPost, API_BASE_URL } from '../utils/api';
 
 // Interfaces
 export interface ContribuyenteData {

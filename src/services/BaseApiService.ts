@@ -1,6 +1,7 @@
 // src/services/BaseApiService.ts
 import { connectivityService } from './connectivityService';
 import { NotificationService } from '../components/utils/Notification';
+import { apiGet, apiPost, API_BASE_URL } from '../utils/api';
 
 // Tipos base para los servicios
 export interface NormalizeOptions<T> {

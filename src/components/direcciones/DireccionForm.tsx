@@ -1,415 +1,423 @@
-// src/components/direcciones/DireccionForm.tsx - VERSIÓN CORREGIDA
+// src/components/direccion/DireccionForm.tsx
 import React, { useState, useEffect } from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Box,
+  Grid,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Button,
+  Typography,
+  IconButton,
+  Divider,
+  FormHelperText,
+  SelectChangeEvent,
+  Autocomplete
+} from '@mui/material';
+import {
+  Close as CloseIcon,
+  Save as SaveIcon,
+  Edit as EditIcon,
+  Add as AddIcon
+} from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import Button from '../ui/Button';
-import { Direccion, Sector, Barrio, Calle, LadoDireccion } from '../../models';
-import { DireccionFormData } from '../../models/Direcciones';
+import * as z from 'zod';
 
-// Schema de validación
+// Esquema de validación
 const direccionSchema = z.object({
-  sectorId: z.string().min(1, 'Debe seleccionar un sector'),
-  barrioId: z.string().min(1, 'Debe seleccionar un barrio'),
-  calleId: z.string().min(1, 'Debe seleccionar una calle'),
-  cuadra: z.string().min(1, 'La cuadra es requerida'),
-  lado: z.nativeEnum(LadoDireccion),
-  loteInicial: z.string()
-    .min(1, 'El lote inicial es requerido')
-    .refine(val => !isNaN(parseInt(val)) && parseInt(val) >= 0, 'Debe ser un número mayor o igual a 0'),
-  loteFinal: z.string()
-    .min(1, 'El lote final es requerido')
-    .refine(val => !isNaN(parseInt(val)) && parseInt(val) >= 0, 'Debe ser un número mayor o igual a 0'),
-}).refine(data => {
-  const loteInicial = parseInt(data.loteInicial);
-  const loteFinal = parseInt(data.loteFinal);
-  return loteFinal >= loteInicial;
-}, {
-  message: "El lote final debe ser mayor o igual al lote inicial",
-  path: ["loteFinal"],
+  sector: z.string().min(1, 'El sector es requerido'),
+  barrio: z.string().min(1, 'El barrio es requerido'),
+  calleMz: z.string().min(1, 'La calle/Mz es requerida'),
+  cuadra: z.string().optional(),
+  lado: z.enum(['Ninguno', 'Izquierdo', 'Derecho', 'Ambos']).default('Ninguno'),
+  loteInicial: z.number().min(1, 'El lote inicial debe ser mayor a 0'),
+  loteFinal: z.number().min(1, 'El lote final debe ser mayor a 0')
+}).refine((data) => data.loteFinal >= data.loteInicial, {
+  message: 'El lote final debe ser mayor o igual al lote inicial',
+  path: ['loteFinal']
 });
 
-type FormValues = z.infer<typeof direccionSchema>;
+// Tipos
+type DireccionFormData = z.infer<typeof direccionSchema>;
 
 interface DireccionFormProps {
-  direccionSeleccionada: Direccion | null;
-  sectores: Sector[];
-  barrios: Barrio[];
-  calles: Calle[];
-  lados: { value: string, label: string }[];
-  sectorSeleccionado: number | null;
-  onSectorChange: (sectorId: number) => void;
-  onGuardar: (data: DireccionFormData) => void;
-  onNuevo: () => void;
-  onEditar: () => void;
-  loading?: boolean;
+  open: boolean;
+  onClose: () => void;
+  onSave: (data: DireccionFormData) => void;
+  initialData?: Partial<DireccionFormData>;
+  title?: string;
+  mode?: 'create' | 'edit';
 }
 
+// Mock data - Esto vendría de tu API
+const mockSectores = [
+  { id: 1, nombre: 'Sector Centro' },
+  { id: 2, nombre: 'Sector Norte' },
+  { id: 3, nombre: 'Sector Sur' },
+  { id: 4, nombre: 'Sector Este' },
+  { id: 5, nombre: 'Sector Oeste' }
+];
+
+const mockBarrios = [
+  { id: 1, nombre: 'Barrio San José', sectorId: 1 },
+  { id: 2, nombre: 'Barrio Las Flores', sectorId: 1 },
+  { id: 3, nombre: 'Barrio El Carmen', sectorId: 2 },
+  { id: 4, nombre: 'Barrio La Victoria', sectorId: 2 },
+  { id: 5, nombre: 'Barrio San Martín', sectorId: 3 }
+];
+
+const mockCalles = [
+  { id: 1, nombre: 'Av. Principal', barrioId: 1 },
+  { id: 2, nombre: 'Jr. Los Olivos', barrioId: 1 },
+  { id: 3, nombre: 'Calle Las Rosas', barrioId: 2 },
+  { id: 4, nombre: 'Mz. A', barrioId: 2 },
+  { id: 5, nombre: 'Mz. B', barrioId: 2 }
+];
+
+const ladoOptions = [
+  { value: 'Ninguno', label: 'Ninguno' },
+  { value: 'Izquierdo', label: 'Izquierdo' },
+  { value: 'Derecho', label: 'Derecho' },
+  { value: 'Ambos', label: 'Ambos' }
+];
+
 const DireccionForm: React.FC<DireccionFormProps> = ({
-  direccionSeleccionada,
-  sectores = [], // Valor por defecto
-  barrios = [],  // Valor por defecto
-  calles = [],   // Valor por defecto
-  lados = [],    // Valor por defecto
-  sectorSeleccionado,
-  onSectorChange,
-  onGuardar,
-  onNuevo,
-  onEditar,
-  loading = false,
+  open,
+  onClose,
+  onSave,
+  initialData,
+  title = 'Nueva Dirección',
+  mode = 'create'
 }) => {
-  const { control, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm<FormValues>({
+  const [barriosFiltrados, setBarriosFiltrados] = useState(mockBarrios);
+  const [callesFiltradas, setCallesFiltradas] = useState(mockCalles);
+
+  const {
+    control,
+    handleSubmit,
+    watch,
+    reset,
+    setValue,
+    formState: { errors, isSubmitting }
+  } = useForm<DireccionFormData>({
     resolver: zodResolver(direccionSchema),
     defaultValues: {
-      sectorId: '',
-      barrioId: '',
-      calleId: '',
+      sector: '',
+      barrio: '',
+      calleMz: '',
       cuadra: '',
-      lado: LadoDireccion.NINGUNO,
-      loteInicial: '1',
-      loteFinal: '1',
+      lado: 'Ninguno',
+      loteInicial: 1,
+      loteFinal: 1,
+      ...initialData
     }
   });
 
-  // Estados locales
-  const [isEditMode, setIsEditMode] = useState(true);
-  const [barriosFiltrados, setBarriosFiltrados] = useState<Barrio[]>([]);
-  const [callesFiltradas, setCallesFiltradas] = useState<Calle[]>([]);
+  const sectorValue = watch('sector');
+  const barrioValue = watch('barrio');
 
-  // Observar cambios
-  const watchedSectorId = watch('sectorId');
-  const watchedBarrioId = watch('barrioId');
-
-  // Filtrar barrios según el sector seleccionado
+  // Filtrar barrios cuando cambia el sector
   useEffect(() => {
-    if (watchedSectorId && Array.isArray(barrios)) {
-      const filtered = barrios.filter(b => b.sectorId === parseInt(watchedSectorId));
-      setBarriosFiltrados(filtered);
+    if (sectorValue) {
+      const sectorId = mockSectores.find(s => s.nombre === sectorValue)?.id;
+      const barriosDelSector = mockBarrios.filter(b => b.sectorId === sectorId);
+      setBarriosFiltrados(barriosDelSector);
       
-      // Si el barrio actual no pertenece al sector, limpiar selección
-      const currentBarrioId = watch('barrioId');
-      if (currentBarrioId && !filtered.find(b => b.id && b.id.toString() === currentBarrioId)) {
-        setValue('barrioId', '');
-      }
-    } else {
-      setBarriosFiltrados([]);
-      setValue('barrioId', '');
+      // Limpiar barrio y calle si el sector cambió
+      setValue('barrio', '');
+      setValue('calleMz', '');
     }
-  }, [watchedSectorId, barrios, setValue, watch]);
+  }, [sectorValue, setValue]);
 
-  // Filtrar calles según el barrio seleccionado
+  // Filtrar calles cuando cambia el barrio
   useEffect(() => {
-    if (watchedBarrioId && Array.isArray(calles)) {
-      const filtered = calles.filter(c => c.barrioId === parseInt(watchedBarrioId));
-      setCallesFiltradas(filtered);
+    if (barrioValue) {
+      const barrioId = mockBarrios.find(b => b.nombre === barrioValue)?.id;
+      const callesDelBarrio = mockCalles.filter(c => c.barrioId === barrioId);
+      setCallesFiltradas(callesDelBarrio);
       
-      // Si la calle actual no pertenece al barrio, limpiar selección
-      const currentCalleId = watch('calleId');
-      if (currentCalleId && !filtered.find(c => c.id && c.id.toString() === currentCalleId)) {
-        setValue('calleId', '');
-      }
-    } else {
-      setCallesFiltradas([]);
-      setValue('calleId', '');
+      // Limpiar calle si el barrio cambió
+      setValue('calleMz', '');
     }
-  }, [watchedBarrioId, calles, setValue, watch]);
+  }, [barrioValue, setValue]);
 
-  // Cargar datos cuando se selecciona una dirección
-  useEffect(() => {
-    if (direccionSeleccionada) {
-      reset({
-        sectorId: direccionSeleccionada.sectorId?.toString() || '',
-        barrioId: direccionSeleccionada.barrioId?.toString() || '',
-        calleId: direccionSeleccionada.calleId?.toString() || '',
-        cuadra: direccionSeleccionada.cuadra || '',
-        lado: direccionSeleccionada.lado || LadoDireccion.NINGUNO,
-        loteInicial: direccionSeleccionada.loteInicial?.toString() || '1',
-        loteFinal: direccionSeleccionada.loteFinal?.toString() || '1',
-      });
-      setIsEditMode(false);
+  const onSubmit = async (data: DireccionFormData) => {
+    try {
+      await onSave(data);
+      reset();
+      onClose();
+    } catch (error) {
+      console.error('Error al guardar dirección:', error);
     }
-  }, [direccionSeleccionada, reset]);
-
-  // Manejar el cambio de sector desde el exterior
-  useEffect(() => {
-    if (sectorSeleccionado) {
-      setValue('sectorId', sectorSeleccionado.toString());
-      onSectorChange(sectorSeleccionado);
-    }
-  }, [sectorSeleccionado, setValue, onSectorChange]);
-
-  // Submit del formulario
-  const onSubmit = (data: FormValues) => {
-    const formData: DireccionFormData = {
-      sectorId: parseInt(data.sectorId),
-      barrioId: parseInt(data.barrioId),
-      calleId: parseInt(data.calleId),
-      cuadra: data.cuadra,
-      lado: data.lado,
-      loteInicial: parseInt(data.loteInicial),
-      loteFinal: parseInt(data.loteFinal),
-    };
-    
-    onGuardar(formData);
   };
 
-  // Handlers
   const handleNuevo = () => {
-    reset();
-    setIsEditMode(true);
-    onNuevo();
+    reset({
+      sector: '',
+      barrio: '',
+      calleMz: '',
+      cuadra: '',
+      lado: 'Ninguno',
+      loteInicial: 1,
+      loteFinal: 1
+    });
   };
-
-  const handleEditar = () => {
-    setIsEditMode(true);
-    onEditar();
-  };
-
-  const isFormDisabled = loading || !isEditMode;
-
-  // Asegurar que lados tenga un valor por defecto
-  const ladosOptions = lados.length > 0 ? lados : [
-    { value: LadoDireccion.NINGUNO, label: 'Ninguno' },
-    { value: LadoDireccion.IZQUIERDO, label: 'Izquierdo' },
-    { value: LadoDireccion.DERECHO, label: 'Derecho' },
-    { value: LadoDireccion.PAR, label: 'Par' },
-    { value: LadoDireccion.IMPAR, label: 'Impar' }
-  ];
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow">
-      <h2 className="text-xl font-semibold mb-4">
-        {direccionSeleccionada && !isEditMode ? 'Dirección Seleccionada' : 
-         isEditMode && direccionSeleccionada ? 'Editar Dirección' : 'Nueva Dirección'}
-      </h2>
+    <Dialog 
+      open={open} 
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 2,
+          boxShadow: 3
+        }
+      }}
+    >
+      <DialogTitle sx={{ m: 0, p: 2 }}>
+        <Box display="flex" alignItems="center" justifyContent="space-between">
+          <Typography variant="h6" component="div" fontWeight={600}>
+            {title}
+          </Typography>
+          <IconButton
+            aria-label="cerrar"
+            onClick={onClose}
+            sx={{
+              color: (theme) => theme.palette.grey[500],
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+      
+      <Divider />
+      
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <DialogContent sx={{ pt: 3 }}>
+          <Grid container spacing={3}>
+            {/* Primera fila: Sector, Barrio, Calle/Mz */}
+            <Grid item xs={12} md={4}>
+              <Controller
+                name="sector"
+                control={control}
+                render={({ field }) => (
+                  <FormControl fullWidth error={!!errors.sector}>
+                    <InputLabel required>Sector</InputLabel>
+                    <Select
+                      {...field}
+                      label="Sector"
+                      displayEmpty
+                    >
+                      <MenuItem value="" disabled>
+                        <em>Seleccione un sector</em>
+                      </MenuItem>
+                      {mockSectores.map((sector) => (
+                        <MenuItem key={sector.id} value={sector.nombre}>
+                          {sector.nombre}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    {errors.sector && (
+                      <FormHelperText>{errors.sector.message}</FormHelperText>
+                    )}
+                  </FormControl>
+                )}
+              />
+            </Grid>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {/* Primera fila */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Sector */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Sector <span className="text-red-500">*</span>
-            </label>
-            <Controller
-              name="sectorId"
-              control={control}
-              render={({ field }) => (
-                <select
-                  {...field}
-                  disabled={isFormDisabled}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                >
-                  <option value="">Seleccione un sector</option>
-                  {Array.isArray(sectores) && sectores.map(sector => (
-                    <option key={sector.id} value={sector.id.toString()}>
-                      {sector.nombre}
-                    </option>
-                  ))}
-                </select>
-              )}
-            />
-            {errors.sectorId && (
-              <p className="mt-1 text-sm text-red-600">{errors.sectorId.message}</p>
-            )}
-          </div>
+            <Grid item xs={12} md={4}>
+              <Controller
+                name="barrio"
+                control={control}
+                render={({ field }) => (
+                  <FormControl fullWidth error={!!errors.barrio} disabled={!sectorValue}>
+                    <InputLabel required>Barrio</InputLabel>
+                    <Select
+                      {...field}
+                      label="Barrio"
+                      displayEmpty
+                    >
+                      <MenuItem value="" disabled>
+                        <em>Seleccione un barrio</em>
+                      </MenuItem>
+                      {barriosFiltrados.map((barrio) => (
+                        <MenuItem key={barrio.id} value={barrio.nombre}>
+                          {barrio.nombre}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    {errors.barrio && (
+                      <FormHelperText>{errors.barrio.message}</FormHelperText>
+                    )}
+                  </FormControl>
+                )}
+              />
+            </Grid>
 
-          {/* Barrio */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Barrio <span className="text-red-500">*</span>
-            </label>
-            <Controller
-              name="barrioId"
-              control={control}
-              render={({ field }) => (
-                <select
-                  {...field}
-                  disabled={isFormDisabled || !watchedSectorId}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                >
-                  <option value="">Seleccione un barrio</option>
-                  {barriosFiltrados.map(barrio => {
-                    // Verificar que el barrio tenga id antes de usarlo
-                    if (!barrio.id) return null;
-                    return (
-                      <option key={barrio.id} value={barrio.id.toString()}>
-                        {barrio.nombre || barrio.nombreBarrio || `Barrio ${barrio.id}`}
-                      </option>
-                    );
-                  })}
-                </select>
-              )}
-            />
-            {errors.barrioId && (
-              <p className="mt-1 text-sm text-red-600">{errors.barrioId.message}</p>
-            )}
-          </div>
+            <Grid item xs={12} md={4}>
+              <Controller
+                name="calleMz"
+                control={control}
+                render={({ field }) => (
+                  <FormControl fullWidth error={!!errors.calleMz} disabled={!barrioValue}>
+                    <InputLabel required>Calle / Mz</InputLabel>
+                    <Select
+                      {...field}
+                      label="Calle / Mz"
+                      displayEmpty
+                    >
+                      <MenuItem value="" disabled>
+                        <em>Seleccione una calle</em>
+                      </MenuItem>
+                      {callesFiltradas.map((calle) => (
+                        <MenuItem key={calle.id} value={calle.nombre}>
+                          {calle.nombre}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    {errors.calleMz && (
+                      <FormHelperText>{errors.calleMz.message}</FormHelperText>
+                    )}
+                  </FormControl>
+                )}
+              />
+            </Grid>
 
-          {/* Calle / Mz */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Calle / Mz <span className="text-red-500">*</span>
-            </label>
-            <Controller
-              name="calleId"
-              control={control}
-              render={({ field }) => (
-                <select
-                  {...field}
-                  disabled={isFormDisabled || !watchedBarrioId}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                >
-                  <option value="">Seleccione una calle</option>
-                  {callesFiltradas.map(calle => {
-                    // Verificar que la calle tenga id antes de usarlo
-                    if (!calle.id) return null;
-                    return (
-                      <option key={calle.id} value={calle.id.toString()}>
-                        {calle.tipoVia} {calle.nombre}
-                      </option>
-                    );
-                  })}
-                </select>
-              )}
-            />
-            {errors.calleId && (
-              <p className="mt-1 text-sm text-red-600">{errors.calleId.message}</p>
-            )}
-          </div>
-        </div>
+            {/* Segunda fila: Cuadra, Lado, Lote inicial, Lote final */}
+            <Grid item xs={12} md={3}>
+              <Controller
+                name="cuadra"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="Cuadra"
+                    placeholder="Ej: 20"
+                    error={!!errors.cuadra}
+                    helperText={errors.cuadra?.message}
+                  />
+                )}
+              />
+            </Grid>
 
-        {/* Segunda fila */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Cuadra */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Cuadra <span className="text-red-500">*</span>
-            </label>
-            <Controller
-              name="cuadra"
-              control={control}
-              render={({ field }) => (
-                <input
-                  {...field}
-                  type="text"
-                  disabled={isFormDisabled}
-                  placeholder="Ej: 20"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                />
-              )}
-            />
-            {errors.cuadra && (
-              <p className="mt-1 text-sm text-red-600">{errors.cuadra.message}</p>
-            )}
-          </div>
+            <Grid item xs={12} md={3}>
+              <Controller
+                name="lado"
+                control={control}
+                render={({ field }) => (
+                  <FormControl fullWidth error={!!errors.lado}>
+                    <InputLabel required>Lado</InputLabel>
+                    <Select
+                      {...field}
+                      label="Lado"
+                    >
+                      {ladoOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    {errors.lado && (
+                      <FormHelperText>{errors.lado.message}</FormHelperText>
+                    )}
+                  </FormControl>
+                )}
+              />
+            </Grid>
 
-          {/* Lado */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Lado <span className="text-red-500">*</span>
-            </label>
-            <Controller
-              name="lado"
-              control={control}
-              render={({ field }) => (
-                <select
-                  {...field}
-                  disabled={isFormDisabled}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                >
-                  {ladosOptions.map(lado => (
-                    <option key={lado.value} value={lado.value}>
-                      {lado.label}
-                    </option>
-                  ))}
-                </select>
-              )}
-            />
-            {errors.lado && (
-              <p className="mt-1 text-sm text-red-600">{errors.lado.message}</p>
-            )}
-          </div>
+            <Grid item xs={12} md={3}>
+              <Controller
+                name="loteInicial"
+                control={control}
+                render={({ field: { onChange, value, ...field } }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="Lote inicial"
+                    type="number"
+                    required
+                    value={value}
+                    onChange={(e) => onChange(parseInt(e.target.value) || 1)}
+                    error={!!errors.loteInicial}
+                    helperText={errors.loteInicial?.message}
+                    inputProps={{ min: 1 }}
+                  />
+                )}
+              />
+            </Grid>
 
-          {/* Lote inicial */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Lote inicial <span className="text-red-500">*</span>
-            </label>
-            <Controller
-              name="loteInicial"
-              control={control}
-              render={({ field }) => (
-                <input
-                  {...field}
-                  type="number"
-                  min="0"
-                  disabled={isFormDisabled}
-                  placeholder="1"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                />
-              )}
-            />
-            {errors.loteInicial && (
-              <p className="mt-1 text-sm text-red-600">{errors.loteInicial.message}</p>
-            )}
-          </div>
+            <Grid item xs={12} md={3}>
+              <Controller
+                name="loteFinal"
+                control={control}
+                render={({ field: { onChange, value, ...field } }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="Lote final"
+                    type="number"
+                    required
+                    value={value}
+                    onChange={(e) => onChange(parseInt(e.target.value) || 1)}
+                    error={!!errors.loteFinal}
+                    helperText={errors.loteFinal?.message}
+                    inputProps={{ min: 1 }}
+                  />
+                )}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
 
-          {/* Lote final */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Lote final <span className="text-red-500">*</span>
-            </label>
-            <Controller
-              name="loteFinal"
-              control={control}
-              render={({ field }) => (
-                <input
-                  {...field}
-                  type="number"
-                  min="0"
-                  disabled={isFormDisabled}
-                  placeholder="10"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                />
-              )}
-            />
-            {errors.loteFinal && (
-              <p className="mt-1 text-sm text-red-600">{errors.loteFinal.message}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Botones */}
-        <div className="flex justify-center gap-4 mt-6">
+        <DialogActions sx={{ p: 3, pt: 2 }}>
           <Button
-            type="submit"
-            variant="primary"
-            disabled={isFormDisabled}
+            onClick={handleSubmit(onSubmit)}
+            variant="contained"
+            color="success"
+            startIcon={<SaveIcon />}
+            disabled={isSubmitting}
+            sx={{ minWidth: 120 }}
           >
             Guardar
           </Button>
           
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleEditar}
-            disabled={!direccionSeleccionada || isEditMode || loading}
-          >
-            Editar
-          </Button>
-          
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleNuevo}
-            disabled={loading}
-          >
-            Nuevo
-          </Button>
-        </div>
+          {mode === 'create' && (
+            <>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<EditIcon />}
+                disabled
+                sx={{ minWidth: 120 }}
+              >
+                Editar
+              </Button>
+              
+              <Button
+                onClick={handleNuevo}
+                variant="contained"
+                color="inherit"
+                startIcon={<AddIcon />}
+                sx={{ minWidth: 120 }}
+              >
+                Nuevo
+              </Button>
+            </>
+          )}
+        </DialogActions>
       </form>
-    </div>
+    </Dialog>
   );
 };
 
