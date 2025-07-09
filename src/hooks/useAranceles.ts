@@ -9,19 +9,7 @@ export interface Arancel {
   anio: number;
   direccionId: number;
   monto: number;
-  estado: boolean;
-  // Datos adicionales de la dirección
-  direccion?: {
-    codigo: string;
-    sector: string;
-    barrio: string;
-    tipoVia: string;
-    nombreVia: string;
-    cuadra: number;
-    lado: string;
-    loteInicial: number;
-    loteFinal: number;
-  };
+  estado?: boolean;
 }
 
 export interface ArancelFormData {
@@ -47,15 +35,11 @@ export interface ArancelDireccion {
 }
 
 export const useAranceles = () => {
-  // Estados
   const [aranceles, setAranceles] = useState<Arancel[]>([]);
   const [arancelesPorDireccion, setArancelesPorDireccion] = useState<ArancelDireccion[]>([]);
   const [arancelSeleccionado, setArancelSeleccionado] = useState<Arancel | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Cache key
-  const CACHE_KEY = 'aranceles_cache';
 
   // Cargar todos los aranceles
   const cargarAranceles = useCallback(async () => {
@@ -63,36 +47,30 @@ export const useAranceles = () => {
       setLoading(true);
       setError(null);
       
-      const data = await arancelService.obtenerTodos();
-      setAranceles(data);
+      const response = await arancelService.obtenerTodos();
       
-      // Guardar en caché
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
-      } catch (e) {
-        console.warn('No se pudo guardar en caché:', e);
-      }
+      // Mapear los datos de la API al formato esperado
+      const arancelesMapeados = response.data.map(item => ({
+        id: item.codArancel || 0,
+        anio: item.anio,
+        direccionId: item.codDireccion,
+        monto: item.costo || item.costoArancel || 0,
+        estado: true
+      }));
+      
+      setAranceles(arancelesMapeados);
+      console.log(`✅ ${arancelesMapeados.length} aranceles cargados`);
       
     } catch (err: any) {
       console.error('Error al cargar aranceles:', err);
       setError(err.message || 'Error al cargar aranceles');
-      
-      // Intentar cargar desde caché
-      try {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-          setAranceles(JSON.parse(cached));
-          NotificationService.warning('Trabajando sin conexión');
-        }
-      } catch (e) {
-        console.error('Error al cargar caché:', e);
-      }
+      NotificationService.error('Error al cargar aranceles');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Buscar aranceles por año y dirección
+  // Buscar aranceles por año (para la lista)
   const buscarArancelesPorDireccion = useCallback(async (anio: number) => {
     try {
       setLoading(true);
@@ -100,29 +78,34 @@ export const useAranceles = () => {
       
       const data = await arancelService.buscarPorAnio(anio);
       
-      // Mapear los datos para incluir información de dirección expandida
+      // Mapear los datos para la tabla (simulando datos de dirección)
       const arancelesConDireccion: ArancelDireccion[] = data.map(arancel => ({
-        id: arancel.id,
+        id: arancel.codArancel || 0,
         anio: arancel.anio,
-        direccion: formatearDireccionCompleta(arancel.direccion),
-        sector: arancel.direccion?.sector || '',
-        barrio: arancel.direccion?.barrio || '',
-        tipoVia: arancel.direccion?.tipoVia || '',
-        nombreVia: arancel.direccion?.nombreVia || '',
-        cuadra: arancel.direccion?.cuadra || 0,
-        lado: arancel.direccion?.lado || '',
-        loteInicial: arancel.direccion?.loteInicial || 0,
-        loteFinal: arancel.direccion?.loteFinal || 0,
-        monto: arancel.monto,
-        estado: arancel.estado
+        direccion: `Dirección ${arancel.codDireccion}`,
+        sector: 'Centro', // Estos datos deberían venir de la API
+        barrio: 'San Juan',
+        tipoVia: 'Calle',
+        nombreVia: 'Principal',
+        cuadra: 1,
+        lado: 'Derecho',
+        loteInicial: 1,
+        loteFinal: 10,
+        monto: arancel.costo || arancel.costoArancel || 0,
+        estado: true
       }));
       
       setArancelesPorDireccion(arancelesConDireccion);
+      
+      if (arancelesConDireccion.length === 0) {
+        NotificationService.info(`No se encontraron aranceles para el año ${anio}`);
+      }
       
     } catch (err: any) {
       console.error('Error al buscar aranceles:', err);
       setError(err.message || 'Error al buscar aranceles');
       setArancelesPorDireccion([]);
+      NotificationService.error('Error al buscar aranceles');
     } finally {
       setLoading(false);
     }
@@ -134,20 +117,32 @@ export const useAranceles = () => {
       setLoading(true);
       setError(null);
       
-      const nuevoArancel = await arancelService.crear(datos);
+      // Preparar datos para la API
+      const datosAPI = {
+        anio: datos.anio,
+        codDireccion: datos.direccionId,
+        codUsuario: 1 // Usuario por defecto
+      };
       
-      // Actualizar lista
-      setAranceles(prev => [...prev, nuevoArancel]);
+      const nuevoArancel = await arancelService.crear(datosAPI);
       
-      // Limpiar caché para forzar recarga
-      localStorage.removeItem(CACHE_KEY);
+      // Mapear y agregar a la lista
+      const arancelMapeado: Arancel = {
+        id: nuevoArancel.codArancel || 0,
+        anio: nuevoArancel.anio,
+        direccionId: nuevoArancel.codDireccion,
+        monto: nuevoArancel.costo || nuevoArancel.costoArancel || 0,
+        estado: true
+      };
+      
+      setAranceles(prev => [...prev, arancelMapeado]);
       
       NotificationService.success('Arancel creado exitosamente');
       
       // Recargar datos
       await cargarAranceles();
       
-      return nuevoArancel;
+      return arancelMapeado;
       
     } catch (err: any) {
       console.error('Error al crear arancel:', err);
@@ -166,22 +161,31 @@ export const useAranceles = () => {
       setLoading(true);
       setError(null);
       
-      const arancelActualizado = await arancelService.actualizar(id, datos);
+      const datosAPI: any = {};
+      if (datos.anio) datosAPI.anio = datos.anio;
+      if (datos.monto !== undefined) datosAPI.costo = datos.monto;
       
-      // Actualizar en la lista
+      const arancelActualizado = await arancelService.actualizar(id, datosAPI);
+      
+      // Mapear y actualizar en la lista
+      const arancelMapeado: Arancel = {
+        id: arancelActualizado.codArancel || id,
+        anio: arancelActualizado.anio,
+        direccionId: arancelActualizado.codDireccion,
+        monto: arancelActualizado.costo || arancelActualizado.costoArancel || 0,
+        estado: true
+      };
+      
       setAranceles(prev => 
-        prev.map(a => a.id === id ? arancelActualizado : a)
+        prev.map(a => a.id === id ? arancelMapeado : a)
       );
-      
-      // Limpiar caché
-      localStorage.removeItem(CACHE_KEY);
       
       NotificationService.success('Arancel actualizado exitosamente');
       
       // Recargar datos
       await cargarAranceles();
       
-      return arancelActualizado;
+      return arancelMapeado;
       
     } catch (err: any) {
       console.error('Error al actualizar arancel:', err);
@@ -206,9 +210,6 @@ export const useAranceles = () => {
       setAranceles(prev => prev.filter(a => a.id !== id));
       setArancelesPorDireccion(prev => prev.filter(a => a.id !== id));
       
-      // Limpiar caché
-      localStorage.removeItem(CACHE_KEY);
-      
       NotificationService.success('Arancel eliminado exitosamente');
       
     } catch (err: any) {
@@ -231,13 +232,6 @@ export const useAranceles = () => {
   const limpiarSeleccion = useCallback(() => {
     setArancelSeleccionado(null);
   }, []);
-
-  // Formatear dirección completa
-  const formatearDireccionCompleta = (direccion: any): string => {
-    if (!direccion) return '';
-    
-    return `${direccion.sector} + ${direccion.barrio} + ${direccion.tipoVia} + ${direccion.nombreVia} + CUADRA ${direccion.cuadra} + LADO ${direccion.lado} + LT ${direccion.loteInicial} - ${direccion.loteFinal}`;
-  };
 
   // Cargar datos iniciales
   useEffect(() => {

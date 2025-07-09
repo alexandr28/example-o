@@ -1,5 +1,5 @@
 // src/components/mantenedores/aranceles/AsignacionArancelForm.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -9,28 +9,24 @@ import {
   Button,
   Stack,
   InputAdornment,
-  Divider,
   Alert
 } from '@mui/material';
 import { Save as SaveIcon, Edit as EditIcon, Add as AddIcon } from '@mui/icons-material';
 import SearchableSelect from '../ui/SearchableSelect';
 import { useAranceles } from '../../hooks/useAranceles';
-
+// Importar el modal correctamente - ajusta la ruta según tu estructura
+// Si el modal está en src/components/modal/SelectorDirecciones.tsx
 import SelectorDirecciones from '../modal/SelectorDirecciones';
 
 interface ArancelFormData {
-  anio: number | null;
+  anio: {id: number, value: number, label: string} | null;
   direccionId: number | null;
   monto: number;
 }
 
 export const AsignacionArancelForm: React.FC = () => {
   // Estados
-  const [formData, setFormData] = useState<{
-    anio: {id: number, value: number, label: string} | null;
-    direccionId: number | null;
-    monto: number;
-  }>({
+  const [formData, setFormData] = useState<ArancelFormData>({
     anio: null,
     direccionId: null,
     monto: 0
@@ -143,6 +139,7 @@ export const AsignacionArancelForm: React.FC = () => {
                   error={!!errors.anio}
                   helperText={errors.anio}
                   required
+                  fullWidth
                 />
               </Box>
               <Box sx={{ flex: 1 }}>
@@ -154,9 +151,11 @@ export const AsignacionArancelForm: React.FC = () => {
                   error={!!errors.monto}
                   helperText={errors.monto}
                   fullWidth
-                  inputProps={{ min: 0, step: 0.01 }}
-                  InputProps={{
-                    startAdornment: <InputAdornment position="start">S/</InputAdornment>
+                  slotProps={{
+                    input: {
+                      startAdornment: <InputAdornment position="start">S/</InputAdornment>,
+                      inputProps: { min: 0, step: 0.01 }
+                    }
                   }}
                 />
               </Box>

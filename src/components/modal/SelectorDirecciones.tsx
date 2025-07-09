@@ -1,5 +1,5 @@
 // src/components/modal/SelectorDirecciones.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -8,7 +8,6 @@ import {
   Button,
   TextField,
   Box,
-  Grid,
   Table,
   TableBody,
   TableCell,
@@ -22,7 +21,12 @@ import {
   IconButton,
   Chip,
   CircularProgress,
-  Alert
+  Alert,
+  Stack,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -30,9 +34,6 @@ import {
   LocationOn as LocationIcon,
   Clear as ClearIcon
 } from '@mui/icons-material';
-import { useDirecciones } from '../../hooks/useDirecciones';
-import { useSectores } from '../../hooks/useSectores';
-import { useBarrios } from '../../hooks/useBarrios';
 
 interface Direccion {
   id: number;
@@ -43,9 +44,9 @@ interface Direccion {
   nombreVia: string;
   cuadra: number;
   lado: string;
-  loteInicial?: number;
-  loteFinal?: number;
-  estado?: number;
+  loteInicial: number;
+  loteFinal: number;
+  estado?: boolean;
 }
 
 interface SelectorDireccionesProps {
@@ -54,6 +55,65 @@ interface SelectorDireccionesProps {
   onSelectDireccion: (direccion: Direccion) => void;
   direccionSeleccionada?: Direccion | null;
 }
+
+// Datos de ejemplo para desarrollo
+const direccionesEjemplo: Direccion[] = [
+  {
+    id: 1,
+    codigo: '001',
+    sector: 'Centro',
+    barrio: 'San Juan',
+    tipoVia: 'Calle',
+    nombreVia: 'Los Álamos',
+    cuadra: 1,
+    lado: 'Derecho',
+    loteInicial: 1,
+    loteFinal: 10,
+    estado: true
+  },
+  {
+    id: 2,
+    codigo: '002',
+    sector: 'Norte',
+    barrio: 'Las Flores',
+    tipoVia: 'Avenida',
+    nombreVia: 'Principal',
+    cuadra: 2,
+    lado: 'Izquierdo',
+    loteInicial: 1,
+    loteFinal: 20,
+    estado: true
+  },
+  {
+    id: 3,
+    codigo: '003',
+    sector: 'Sur',
+    barrio: 'Villa Sol',
+    tipoVia: 'Jirón',
+    nombreVia: 'Las Palmeras',
+    cuadra: 3,
+    lado: 'Ambos',
+    loteInicial: 1,
+    loteFinal: 15,
+    estado: true
+  }
+];
+
+const sectoresEjemplo = [
+  { id: 1, nombre: 'Centro' },
+  { id: 2, nombre: 'Norte' },
+  { id: 3, nombre: 'Sur' },
+  { id: 4, nombre: 'Este' },
+  { id: 5, nombre: 'Oeste' }
+];
+
+const barriosEjemplo = [
+  { id: 1, nombre: 'San Juan' },
+  { id: 2, nombre: 'Las Flores' },
+  { id: 3, nombre: 'Villa Sol' },
+  { id: 4, nombre: 'Los Pinos' },
+  { id: 5, nombre: 'Santa Rosa' }
+];
 
 const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
   open,
@@ -66,54 +126,55 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [sectorFilter, setSectorFilter] = useState('');
   const [barrioFilter, setBarrioFilter] = useState('');
+  const [direcciones, setDirecciones] = useState<Direccion[]>(direccionesEjemplo);
+  const [loading, setLoading] = useState(false);
 
-  // Hooks
-  const { direcciones, loading, buscarPorNombreVia, cargarDirecciones } = useDirecciones();
-  const { sectores } = useSectores();
-  const { barrios } = useBarrios();
-
-  // Cargar direcciones al abrir
+  // Efecto para establecer la dirección seleccionada al abrir
   useEffect(() => {
-    if (open) {
-      cargarDirecciones();
-      if (direccionSeleccionada) {
-        setSelectedDireccion(direccionSeleccionada);
-      }
+    if (open && direccionSeleccionada) {
+      setSelectedDireccion(direccionSeleccionada);
     }
   }, [open, direccionSeleccionada]);
 
-  // Buscar direcciones
-  const handleSearch = useCallback(() => {
-    if (searchTerm.trim().length >= 2) {
-      buscarPorNombreVia(searchTerm);
-    } else {
-      cargarDirecciones();
-    }
-  }, [searchTerm, buscarPorNombreVia, cargarDirecciones]);
-
-  // Efecto para búsqueda con debounce
+  // Efecto para simular búsqueda
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      handleSearch();
+    const timer = setTimeout(() => {
+      buscarDirecciones();
     }, 300);
 
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm, handleSearch]);
+    return () => clearTimeout(timer);
+  }, [searchTerm, sectorFilter, barrioFilter]);
 
-  // Filtrar direcciones localmente
-  const direccionesFiltradas = React.useMemo(() => {
-    let filtered = direcciones;
+  // Buscar direcciones (simulado)
+  const buscarDirecciones = () => {
+    setLoading(true);
+    
+    setTimeout(() => {
+      let filtered = [...direccionesEjemplo];
 
-    if (sectorFilter) {
-      filtered = filtered.filter(d => d.sector === sectorFilter);
-    }
+      // Filtrar por término de búsqueda
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        filtered = filtered.filter(d => 
+          d.nombreVia.toLowerCase().includes(term) ||
+          d.codigo.toLowerCase().includes(term)
+        );
+      }
 
-    if (barrioFilter) {
-      filtered = filtered.filter(d => d.barrio === barrioFilter);
-    }
+      // Filtrar por sector
+      if (sectorFilter) {
+        filtered = filtered.filter(d => d.sector === sectorFilter);
+      }
 
-    return filtered;
-  }, [direcciones, sectorFilter, barrioFilter]);
+      // Filtrar por barrio
+      if (barrioFilter) {
+        filtered = filtered.filter(d => d.barrio === barrioFilter);
+      }
+
+      setDirecciones(filtered);
+      setLoading(false);
+    }, 500);
+  };
 
   // Handlers
   const handleSelectDireccion = (direccion: Direccion) => {
@@ -139,12 +200,11 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
     setSearchTerm('');
     setSectorFilter('');
     setBarrioFilter('');
-    cargarDirecciones();
   };
 
   // Formatear dirección para mostrar
   const formatDireccion = (direccion: Direccion) => {
-    return `${direccion.tipoVia} ${direccion.nombreVia} - Cuadra ${direccion.cuadra} - Lado ${direccion.lado} - Lotes ${(direccion.loteInicial ?? '-')} - ${(direccion.loteFinal ?? '-')}`;
+    return `${direccion.tipoVia} ${direccion.nombreVia} - Cuadra ${direccion.cuadra} - Lado ${direccion.lado} - Lotes ${direccion.loteInicial}-${direccion.loteFinal}`;
   };
 
   return (
@@ -172,81 +232,63 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
       <DialogContent dividers>
         {/* Filtros de búsqueda */}
         <Box mb={3}>
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Buscar por nombre de vía..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label="Sector"
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Buscar por nombre de vía o código..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel>Sector</InputLabel>
+              <Select
                 value={sectorFilter}
                 onChange={(e) => setSectorFilter(e.target.value)}
-                SelectProps={{
-                  native: true,
-                }}
-                inputProps={{
-                  'aria-label': 'Sector'
-                }}
+                label="Sector"
               >
-                <option value="">Todos</option>
-                {sectores.map((sector) => (
-                  <option key={sector.id} value={sector.nombre}>
+                <MenuItem value="">Todos</MenuItem>
+                {sectoresEjemplo.map((sector) => (
+                  <MenuItem key={sector.id} value={sector.nombre}>
                     {sector.nombre}
-                  </option>
+                  </MenuItem>
                 ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label="Barrio"
+              </Select>
+            </FormControl>
+            
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel>Barrio</InputLabel>
+              <Select
                 value={barrioFilter}
                 onChange={(e) => setBarrioFilter(e.target.value)}
-                SelectProps={{
-                  native: true,
-                }}
-                inputProps={{
-                  'aria-label': 'Barrio'
-                }}
+                label="Barrio"
               >
-                <option value="">Todos</option>
-                {barrios.map((barrio) => (
-                  <option key={barrio.id} value={barrio.nombre}>
+                <MenuItem value="">Todos</MenuItem>
+                {barriosEjemplo.map((barrio) => (
+                  <MenuItem key={barrio.id} value={barrio.nombre}>
                     {barrio.nombre}
-                  </option>
+                  </MenuItem>
                 ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <Button
-                fullWidth
-                variant="outlined"
-                startIcon={<ClearIcon />}
-                onClick={handleClearFilters}
-                size="small"
-              >
-                Limpiar
-              </Button>
-            </Grid>
-          </Grid>
+              </Select>
+            </FormControl>
+            
+            <Button
+              variant="outlined"
+              startIcon={<ClearIcon />}
+              onClick={handleClearFilters}
+              size="small"
+            >
+              Limpiar
+            </Button>
+          </Stack>
         </Box>
 
         {/* Tabla de direcciones */}
@@ -269,7 +311,7 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
                     <CircularProgress />
                   </TableCell>
                 </TableRow>
-              ) : direccionesFiltradas.length === 0 ? (
+              ) : direcciones.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                     <Typography variant="body2" color="text.secondary">
@@ -278,7 +320,7 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
                   </TableCell>
                 </TableRow>
               ) : (
-                direccionesFiltradas.map((direccion) => (
+                direcciones.map((direccion) => (
                   <TableRow
                     key={direccion.id}
                     hover
@@ -303,9 +345,9 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
                     <TableCell>{formatDireccion(direccion)}</TableCell>
                     <TableCell align="center">
                       <Chip
-                        label={direccion.estado === 1 ? 'Activo' : 'Inactivo'}
+                        label={direccion.estado !== false ? 'Activo' : 'Inactivo'}
                         size="small"
-                        color={direccion.estado === 1 ? 'success' : 'default'}
+                        color={direccion.estado !== false ? 'success' : 'default'}
                       />
                     </TableCell>
                   </TableRow>

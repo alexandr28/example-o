@@ -63,7 +63,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     return value as Option;
   }, [value, multiple]);
 
-  const handleChange = (_: any, newValue: Option | Option[] | null) => {
+  const handleChange = (event: any, newValue: Option | Option[] | null) => {
     onChange(newValue);
   };
 

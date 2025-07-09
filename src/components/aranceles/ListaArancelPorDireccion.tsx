@@ -13,13 +13,16 @@ import {
   TableHead,
   TableRow,
   Paper,
-  Chip,
-  InputAdornment,
   IconButton,
   Tooltip,
   TablePagination,
   Skeleton,
-  Stack
+  Stack,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  InputAdornment
 } from '@mui/material';
 import { 
   Search as SearchIcon,
@@ -27,8 +30,7 @@ import {
   Delete as DeleteIcon,
   AttachMoney as MoneyIcon
 } from '@mui/icons-material';
-import SearchableSelect from '../ui/SearchableSelect';
-import { useAranceles } from '../..//hooks/useAranceles';
+import { useAranceles } from '../../hooks/useAranceles';
 import { formatCurrency } from '../../utils/formatters';
 
 interface ArancelDireccion {
@@ -49,7 +51,7 @@ interface ArancelDireccion {
 
 export const ListaArancelesPorDireccion: React.FC = () => {
   // Estados
-  const [anioSeleccionado, setAnioSeleccionado] = useState<{id: number, value: number, label: string} | null>(null);
+  const [anioSeleccionado, setAnioSeleccionado] = useState<number | ''>('');
   const [busqueda, setBusqueda] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -59,18 +61,14 @@ export const ListaArancelesPorDireccion: React.FC = () => {
 
   // Generar opciones de años
   const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: 10 }, (_, i) => ({
-    id: currentYear - i,
-    value: currentYear - i,
-    label: (currentYear - i).toString()
-  }));
+  const years = Array.from({ length: 10 }, (_, i) => currentYear - i);
 
   // Efecto para buscar cuando cambia el año
   useEffect(() => {
-    if (anioSeleccionado?.value) {
-      buscarArancelesPorDireccion(anioSeleccionado.value);
+    if (anioSeleccionado && anioSeleccionado !== '') {
+      buscarArancelesPorDireccion(anioSeleccionado);
     }
-  }, [anioSeleccionado]);
+  }, [anioSeleccionado, buscarArancelesPorDireccion]);
 
   // Filtrar aranceles según búsqueda
   const arancelesFiltrados = useMemo(() => {
@@ -115,15 +113,24 @@ export const ListaArancelesPorDireccion: React.FC = () => {
         {/* Controles de búsqueda compactados */}
         <Box sx={{ mb: 3, mt: 2, maxWidth: '50%' }}>
           <Stack direction="row" spacing={2}>
-            <Box sx={{ flex: 1 }}>
-              <SearchableSelect
-                label="Año"
-                options={yearOptions}
+            <FormControl size="small" sx={{ flex: 1 }}>
+              <InputLabel>Año</InputLabel>
+              <Select
                 value={anioSeleccionado}
-                onChange={(option) => setAnioSeleccionado(option)}
-                placeholder="Seleccione"
-              />
-            </Box>
+                onChange={(e) => setAnioSeleccionado(e.target.value as number)}
+                label="Año"
+              >
+                <MenuItem value="">
+                  <em>Seleccione</em>
+                </MenuItem>
+                {years.map((year) => (
+                  <MenuItem key={year} value={year}>
+                    {year}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
             <Box sx={{ flex: 1 }}>
               <TextField
                 fullWidth
