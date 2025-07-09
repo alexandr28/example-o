@@ -5,7 +5,7 @@
  */
 
 import { API_CONFIG } from '../config/api.config';
-import { ApiResponse, ApiErrorResponse } from '../types/apiTypes';
+import { type ApiResponse, type ApiErrorResponse } from '../types/apiTypes';
 
 // URL base del backend - Priorizar variable de entorno
 export const API_BASE_URL = import.meta.env.VITE_API_URL || API_CONFIG?.baseURL || 'http://192.168.20.160:8080';

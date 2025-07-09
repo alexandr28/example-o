@@ -1,339 +1,330 @@
-// src/hooks/useDirecciones.ts
-import { useState, useCallback, useEffect } from 'react';
-import { NotificationService } from '../components/utils/Notification';
-import { LadoDireccion } from '../models';
-import { DireccionFormData } from '../models/Direcciones';
+// src/services/direccionService.ts - VERSIÓN CORREGIDA
+import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api';
+import { API_CONFIG } from '../config/api.config';
 
-// Importar el servicio de direcciones actualizado
-import { DireccionService, Direccion } from '../services/direccionService';
+// Tipos de la API
+export interface DireccionData {
+  codDireccion?: number;
+  codSector: number;
+  nombreSector?: string;
+  codBarrio: number;
+  nombreBarrio?: string;
+  codTipoVia: number;
+  tipoVia?: string;
+  nombreVia: string;
+  cuadra: number;
+  lado: string;
+  loteInicial: number;
+  loteFinal: number;
+  estado?: number;
+  fechaRegistro?: string;
+  usuarioRegistro?: string;
+}
 
-// Crear instancia del servicio de direcciones
-const direccionService = DireccionService.getInstance();
+// Tipo para el frontend (lo que espera el hook)
+export interface Direccion {
+  id: number;
+  codigo: string;
+  sector: string;
+  barrio: string;
+  tipoVia: string;
+  nombreVia: string;
+  cuadra: number;
+  lotes: string;
+  lado: string;
+  estado: number;
+  // Datos adicionales para edición
+  codSector?: number;
+  codBarrio?: number;
+  codTipoVia?: number;
+  loteInicial?: number;
+  loteFinal?: number;
+}
 
-// Opciones de lado por defecto
-const LADOS_OPTIONS = [
-  { value: LadoDireccion.NINGUNO, label: 'Ninguno' },
-  { value: LadoDireccion.IZQUIERDO, label: 'Izquierdo' },
-  { value: LadoDireccion.DERECHO, label: 'Derecho' },
-  { value: LadoDireccion.PAR, label: 'Par' },
-  { value: LadoDireccion.IMPAR, label: 'Impar' }
-];
+export interface DireccionFormData {
+  sector: string;
+  barrio: string;
+  calleMz: string;
+  cuadra: string;
+  lado: string;
+  loteInicial: number;
+  loteFinal: number;
+}
 
 /**
- * Hook para gestionar direcciones usando solo el servicio real
+ * Servicio para gestión de direcciones
  */
-export const useDirecciones = () => {
-  // Estados principales
-  const [direcciones, setDirecciones] = useState<Direccion[]>([]);
-  const [direccionSeleccionada, setDireccionSeleccionada] = useState<Direccion | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [conectado, setConectado] = useState(false);
+class DireccionServiceClass {
+  private static instance: DireccionServiceClass;
+  private readonly API_ENDPOINT = `${API_CONFIG.baseURL}/api/direccion`;
+
+  private constructor() {}
 
   /**
-   * Verifica la conexión con el servidor
+   * Obtiene la instancia única del servicio
    */
-  const verificarConexion = useCallback(async () => {
-    try {
-      const estaConectado = await direccionService.verificarConexion();
-      setConectado(estaConectado);
-      return estaConectado;
-    } catch (error) {
-      setConectado(false);
-      return false;
+  public static getInstance(): DireccionServiceClass {
+    if (!DireccionServiceClass.instance) {
+      DireccionServiceClass.instance = new DireccionServiceClass();
     }
-  }, []);
+    return DireccionServiceClass.instance;
+  }
 
   /**
-   * Carga todas las direcciones del servidor
+   * Obtiene los headers para las peticiones
    */
-  const cargarDirecciones = useCallback(async () => {
+  private getHeaders(): HeadersInit {
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    };
+  }
+
+  /**
+   * Mapea los datos de la API al formato esperado por el frontend
+   * IMPORTANTE: Este método convierte DireccionData a Direccion
+   */
+  private mapearDireccion(direccion: DireccionData): Direccion {
+    return {
+      id: direccion.codDireccion || 0,
+      codigo: direccion.codDireccion?.toString() || '',
+      sector: direccion.nombreSector || '',
+      barrio: direccion.nombreBarrio || '',
+      tipoVia: direccion.tipoVia || '',
+      nombreVia: direccion.nombreVia || '',
+      cuadra: direccion.cuadra || 0,
+      lotes: `${direccion.loteInicial} - ${direccion.loteFinal}`,
+      lado: direccion.lado,
+      estado: direccion.estado || 1,
+      // Datos adicionales para edición
+      codSector: direccion.codSector,
+      codBarrio: direccion.codBarrio,
+      codTipoVia: direccion.codTipoVia,
+      loteInicial: direccion.loteInicial,
+      loteFinal: direccion.loteFinal
+    };
+  }
+
+  /**
+   * Obtiene todas las direcciones
+   * @returns Promise<Direccion[]> - Array de direcciones mapeadas
+   */
+  async obtenerTodas(): Promise<Direccion[]> {
     try {
-      setLoading(true);
-      setError(null);
+      console.log('📡 [DireccionService] Obteniendo todas las direcciones');
       
-      console.log('🔄 [useDirecciones] Cargando direcciones...');
+      const response = await apiGet(this.API_ENDPOINT, this.getHeaders());
       
-      const data = await direccionService.obtenerTodas();
-      
-      if (data && data.length > 0) {
-        console.log(`✅ [useDirecciones] ${data.length} direcciones cargadas`);
-        setDirecciones(data);
-        setConectado(true);
-      } else {
-        console.warn('⚠️ [useDirecciones] No se encontraron direcciones');
-        setDirecciones([]);
-        NotificationService.info('No se encontraron direcciones registradas');
+      if (response.success && response.data) {
+        const direcciones = Array.isArray(response.data) ? 
+          response.data : [response.data];
+        
+        // IMPORTANTE: Mapear cada dirección al formato correcto
+        const direccionesMapeadas = direcciones.map(dir => this.mapearDireccion(dir));
+        
+        console.log(`✅ [DireccionService] ${direccionesMapeadas.length} direcciones obtenidas`);
+        return direccionesMapeadas;
       }
       
+      return [];
     } catch (error: any) {
-      console.error('❌ [useDirecciones] Error:', error);
-      setError('Error al cargar direcciones');
-      NotificationService.error('Error al cargar las direcciones');
-      setDirecciones([]);
-      setConectado(false);
-    } finally {
-      setLoading(false);
+      console.error('❌ [DireccionService] Error al obtener direcciones:', error);
+      throw new Error(error.message || 'Error al obtener direcciones');
     }
-  }, []); // Sin dependencias para evitar recreación
+  }
 
   /**
-   * Busca direcciones por nombre de vía
+   * Busca direcciones con filtros
+   * @returns Promise<Direccion[]> - Array de direcciones mapeadas
    */
-  const buscarPorNombreVia = useCallback(async (nombreVia: string) => {
-    if (!nombreVia || nombreVia.trim().length < 1) {
-      await cargarDirecciones();
-      return;
-    }
-    
+  async buscar(filtros: any): Promise<Direccion[]> {
     try {
-      setLoading(true);
-      setError(null);
+      console.log('🔍 [DireccionService] Buscando direcciones con filtros:', filtros);
       
-      console.log(`🔍 [useDirecciones] Buscando: "${nombreVia}"`);
+      const params = new URLSearchParams();
       
-      const resultados = await direccionService.buscarPorNombreVia(nombreVia);
+      if (filtros.sector) params.append('sector', filtros.sector);
+      if (filtros.barrio) params.append('barrio', filtros.barrio);
+      if (filtros.nombreVia) params.append('nombreVia', filtros.nombreVia);
+      if (filtros.busqueda) params.append('q', filtros.busqueda);
       
-      console.log(`✅ [useDirecciones] ${resultados.length} direcciones encontradas`);
-      setDirecciones(resultados);
+      const endpoint = params.toString() ? `${this.API_ENDPOINT}?${params}` : this.API_ENDPOINT;
+      const response = await apiGet(endpoint, this.getHeaders());
       
-      if (resultados.length === 0) {
-        NotificationService.info(`No se encontraron direcciones con "${nombreVia}"`);
+      if (response.success && response.data) {
+        const direcciones = Array.isArray(response.data) ? response.data : [response.data];
+        // IMPORTANTE: Mapear cada dirección
+        const direccionesMapeadas = direcciones.map(dir => this.mapearDireccion(dir));
+        
+        console.log(`✅ [DireccionService] ${direccionesMapeadas.length} direcciones encontradas`);
+        return direccionesMapeadas;
       }
       
+      return [];
     } catch (error: any) {
-      console.error('❌ [useDirecciones] Error en búsqueda:', error);
-      setError('Error al buscar direcciones');
-      setDirecciones([]);
-    } finally {
-      setLoading(false);
+      console.error('❌ [DireccionService] Error en búsqueda:', error);
+      throw new Error(error.message || 'Error al buscar direcciones');
     }
-  }, [cargarDirecciones]);
+  }
 
   /**
-   * Busca direcciones por tipo de vía
+   * Busca direcciones por nombre de vía (usando endpoint específico si existe)
+   * @returns Promise<Direccion[]> - Array de direcciones mapeadas
    */
-  const buscarPorTipoVia = useCallback(async (tipoVia: string) => {
-    if (!tipoVia) {
-      await cargarDirecciones();
-      return;
-    }
-    
+  async buscarPorNombreVia(nombreVia: string): Promise<Direccion[]> {
     try {
-      setLoading(true);
-      setError(null);
+      if (!nombreVia || nombreVia.trim().length < 2) {
+        return [];
+      }
+
+      const endpoint = `${API_CONFIG.baseURL}${API_CONFIG.endpoints.direcciones.listarPorNombreVia}`;
+      console.log(`📡 [DireccionService] Buscando por nombre de vía: ${nombreVia}`);
       
-      console.log(`🔍 [useDirecciones] Buscando por tipo: "${tipoVia}"`);
+      const url = `${endpoint}?nombreVia=${encodeURIComponent(nombreVia.trim())}`;
+      const response = await apiGet(url, this.getHeaders());
       
-      const resultados = await direccionService.buscarPorTipoVia(tipoVia);
-      
-      console.log(`✅ [useDirecciones] ${resultados.length} direcciones encontradas`);
-      setDirecciones(resultados);
-      
-      if (resultados.length === 0) {
-        NotificationService.info(`No se encontraron direcciones tipo "${tipoVia}"`);
+      if (response.success && response.data) {
+        const direcciones = Array.isArray(response.data) ? 
+          response.data : [response.data];
+        return direcciones.map(dir => this.mapearDireccion(dir));
       }
       
+      return [];
     } catch (error: any) {
-      console.error('❌ [useDirecciones] Error en búsqueda:', error);
-      setError('Error al buscar direcciones');
-      setDirecciones([]);
-    } finally {
-      setLoading(false);
+      console.error('❌ [DireccionService] Error al buscar por nombre de vía:', error);
+      // Si falla el endpoint específico, usar el método buscar genérico
+      return this.buscar({ nombreVia });
     }
-  }, [cargarDirecciones]);
+  }
 
   /**
-   * Busca direcciones con filtros combinados
+   * Obtiene una dirección por su código
+   * @returns Promise<Direccion> - Dirección mapeada
    */
-  const buscarConFiltros = useCallback(async (filtros: {
-    tipo?: string;
-    nombre?: string;
-  }) => {
+  async obtenerPorCodigo(codigo: number): Promise<Direccion> {
     try {
-      setLoading(true);
-      setError(null);
+      const endpoint = `${API_CONFIG.baseURL}${API_CONFIG.endpoints.direcciones.obtenerPorCodigo}/${codigo}`;
+      console.log(`📡 [DireccionService] Obteniendo dirección con código: ${codigo}`);
       
-      console.log('🔍 [useDirecciones] Buscando con filtros:', filtros);
+      const response = await apiGet(endpoint, this.getHeaders());
       
-      const resultados = await direccionService.buscarConFiltros(filtros);
-      
-      console.log(`✅ [useDirecciones] ${resultados.length} direcciones encontradas`);
-      setDirecciones(resultados);
-      
-      if (resultados.length === 0) {
-        NotificationService.info('No se encontraron direcciones con los criterios especificados');
+      if (response.success && response.data) {
+        return this.mapearDireccion(response.data);
       }
       
+      throw new Error('Dirección no encontrada');
     } catch (error: any) {
-      console.error('❌ [useDirecciones] Error en búsqueda:', error);
-      setError('Error al buscar direcciones');
-      setDirecciones([]);
-    } finally {
-      setLoading(false);
+      console.error(`❌ [DireccionService] Error al obtener dirección ${codigo}:`, error);
+      throw new Error(error.message || 'Error al obtener dirección');
     }
-  }, []);
-
-  /**
-   * Selecciona una dirección
-   */
-  const seleccionarDireccion = useCallback((direccion: Direccion) => {
-    console.log('📍 [useDirecciones] Dirección seleccionada:', direccion);
-    setDireccionSeleccionada(direccion);
-  }, []);
-
-  /**
-   * Limpia la selección actual
-   */
-  const limpiarSeleccion = useCallback(() => {
-    console.log('🧹 [useDirecciones] Limpiando selección');
-    setDireccionSeleccionada(null);
-  }, []);
+  }
 
   /**
    * Crea una nueva dirección
+   * @returns Promise<Direccion> - Dirección creada y mapeada
    */
-  const crearDireccion = useCallback(async (datos: {
-    codBarrioVia: number;
-    cuadra: number;
-    codLado?: string;
-    loteInicial: number;
-    loteFinal: number;
-    codSector: number;
-    codBarrio: number;
-  }) => {
+  async crear(datos: DireccionFormData): Promise<Direccion> {
     try {
-      setLoading(true);
-      setError(null);
+      console.log('📡 [DireccionService] Creando nueva dirección:', datos);
       
-      console.log('➕ [useDirecciones] Creando dirección:', datos);
-      
-      // Agregar codUsuario (por defecto 1)
-      const datosCompletos = {
-        ...datos,
-        codUsuario: 1
+      // Mapear datos del formulario al formato de la API
+      const payload = {
+        codSector: parseInt(datos.sector),
+        codBarrio: parseInt(datos.barrio),
+        codTipoVia: this.obtenerCodigoTipoVia(datos.calleMz),
+        nombreVia: this.obtenerNombreVia(datos.calleMz),
+        cuadra: parseInt(datos.cuadra),
+        lado: datos.lado,
+        loteInicial: datos.loteInicial,
+        loteFinal: datos.loteFinal,
+        estado: 1
       };
       
-      const nuevaDireccion = await direccionService.crear(datosCompletos);
+      const response = await apiPost(this.API_ENDPOINT, payload, this.getHeaders());
       
-      console.log('✅ [useDirecciones] Dirección creada:', nuevaDireccion);
+      if (response.success && response.data) {
+        // IMPORTANTE: Mapear la respuesta
+        return this.mapearDireccion(response.data);
+      }
       
-      // Recargar la lista de direcciones
-      await cargarDirecciones();
-      
-      return nuevaDireccion;
-      
+      throw new Error(response.message || 'Error al crear dirección');
     } catch (error: any) {
-      console.error('❌ [useDirecciones] Error al crear:', error);
-      setError('Error al crear la dirección');
-      throw error;
-    } finally {
-      setLoading(false);
+      console.error('❌ [DireccionService] Error al crear dirección:', error);
+      throw new Error(error.message || 'Error al crear dirección');
     }
-  }, [cargarDirecciones]);
+  }
 
   /**
    * Actualiza una dirección existente
+   * @returns Promise<Direccion> - Dirección actualizada y mapeada
    */
-  const actualizarDireccion = useCallback(async (
-    id: number,
-    datos: Partial<{
-      codBarrioVia: number;
-      cuadra: number;
-      codLado: string;
-      loteInicial: number;
-      loteFinal: number;
-      codSector: number;
-      codBarrio: number;
-    }>
-  ) => {
+  async actualizar(codigo: number, datos: DireccionFormData): Promise<Direccion> {
     try {
-      setLoading(true);
-      setError(null);
+      console.log(`📡 [DireccionService] Actualizando dirección ${codigo}:`, datos);
       
-      console.log(`📝 [useDirecciones] Actualizando dirección ${id}:`, datos);
+      const payload = {
+        codDireccion: codigo,
+        codSector: parseInt(datos.sector),
+        codBarrio: parseInt(datos.barrio),
+        codTipoVia: this.obtenerCodigoTipoVia(datos.calleMz),
+        nombreVia: this.obtenerNombreVia(datos.calleMz),
+        cuadra: parseInt(datos.cuadra),
+        lado: datos.lado,
+        loteInicial: datos.loteInicial,
+        loteFinal: datos.loteFinal,
+        estado: 1
+      };
       
-      const direccionActualizada = await direccionService.actualizar(id, datos);
+      const endpoint = `${this.API_ENDPOINT}/${codigo}`;
+      const response = await apiPut(endpoint, payload, this.getHeaders());
       
-      console.log('✅ [useDirecciones] Dirección actualizada:', direccionActualizada);
+      if (response.success && response.data) {
+        // IMPORTANTE: Mapear la respuesta
+        return this.mapearDireccion(response.data);
+      }
       
-      // Recargar la lista de direcciones
-      await cargarDirecciones();
-      
-      return direccionActualizada;
-      
+      throw new Error(response.message || 'Error al actualizar dirección');
     } catch (error: any) {
-      console.error('❌ [useDirecciones] Error al actualizar:', error);
-      setError('Error al actualizar la dirección');
-      throw error;
-    } finally {
-      setLoading(false);
+      console.error(`❌ [DireccionService] Error al actualizar dirección ${codigo}:`, error);
+      throw new Error(error.message || 'Error al actualizar dirección');
     }
-  }, [cargarDirecciones]);
+  }
 
   /**
    * Elimina una dirección
    */
-  const eliminarDireccion = useCallback(async (id: number) => {
+  async eliminar(codigo: number): Promise<void> {
     try {
-      setLoading(true);
-      setError(null);
+      console.log(`📡 [DireccionService] Eliminando dirección ${codigo}`);
       
-      console.log(`🗑️ [useDirecciones] Eliminando dirección ${id}`);
+      const endpoint = `${this.API_ENDPOINT}/${codigo}`;
+      const response = await apiDelete(endpoint, this.getHeaders());
       
-      await direccionService.eliminar(id);
-      
-      console.log('✅ [useDirecciones] Dirección eliminada');
-      
-      // Recargar la lista de direcciones
-      await cargarDirecciones();
-      
-      // Limpiar selección si era la dirección eliminada
-      if (direccionSeleccionada?.codDireccion === id) {
-        limpiarSeleccion();
+      if (!response.success) {
+        throw new Error(response.message || 'Error al eliminar dirección');
       }
-      
     } catch (error: any) {
-      console.error('❌ [useDirecciones] Error al eliminar:', error);
-      setError('Error al eliminar la dirección');
-      throw error;
-    } finally {
-      setLoading(false);
+      console.error(`❌ [DireccionService] Error al eliminar dirección ${codigo}:`, error);
+      throw new Error(error.message || 'Error al eliminar dirección');
     }
-  }, [cargarDirecciones, direccionSeleccionada, limpiarSeleccion]);
+  }
 
   /**
-   * Efecto para verificar conexión al montar
+   * Métodos auxiliares para parsear el campo calleMz
    */
-  useEffect(() => {
-    verificarConexion();
-  }, [verificarConexion]);
+  private obtenerCodigoTipoVia(calleMz: string): number {
+    // Parsear formato "id:nombre"
+    const partes = calleMz.split(':');
+    return partes.length > 0 ? parseInt(partes[0]) : 1;
+  }
 
-  return {
-    // Estados principales
-    direcciones,
-    direccionSeleccionada,
-    loading,
-    error,
-    conectado,
-    
-    // Acciones principales
-    cargarDirecciones,
-    seleccionarDireccion,
-    limpiarSeleccion,
-    
-    // CRUD
-    crearDireccion,
-    actualizarDireccion,
-    eliminarDireccion,
-    
-    // Búsquedas
-    buscarPorNombreVia,
-    buscarPorTipoVia,
-    buscarConFiltros,
-    
-    // Utilidades
-    verificarConexion,
-    totalDirecciones: direcciones.length
-  };
-};
+  private obtenerNombreVia(calleMz: string): string {
+    // Parsear formato "id:nombre"
+    const partes = calleMz.split(':');
+    return partes.length > 1 ? partes[1].trim() : calleMz;
+  }
+}
+
+// Exportar instancia única
+export const DireccionService = DireccionServiceClass.getInstance();
+export const direccionService = DireccionService; // Alias para compatibilidad

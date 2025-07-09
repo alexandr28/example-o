@@ -1,195 +1,281 @@
-import React, { useState } from 'react';
-import { Input, Select, Button } from '../';
-import { Arancel } from '../../models';
+// src/components/mantenedores/aranceles/ListaArancelesPorDireccion.tsx
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  InputAdornment,
+  IconButton,
+  Tooltip,
+  TablePagination,
+  Skeleton,
+  Stack
+} from '@mui/material';
+import { 
+  Search as SearchIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  AttachMoney as MoneyIcon
+} from '@mui/icons-material';
+import SearchableSelect from '../ui/SearchableSelect';
+import { useAranceles } from '../..//hooks/useAranceles';
+import { formatCurrency } from '../../utils/formatters';
 
-interface ArancelListProps {
-  aranceles: Arancel[];
-  años: { value: string, label: string }[];
-  onSelectArancel: (arancel: Arancel) => void;
-  onFilter: (año?: number, terminoBusqueda?: string) => Arancel[];
-  loading?: boolean;
+interface ArancelDireccion {
+  id: number;
+  anio: number;
+  direccion: string;
+  sector: string;
+  barrio: string;
+  tipoVia: string;
+  nombreVia: string;
+  cuadra: number;
+  lado: string;
+  loteInicial: number;
+  loteFinal: number;
+  monto: number;
+  estado: boolean;
 }
 
-const ArancelList: React.FC<ArancelListProps> = ({ 
-  aranceles, 
-  años,
-  onSelectArancel,
-  onFilter,
-  loading = false 
-}) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAño, setSelectedAño] = useState<string>('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+export const ListaArancelesPorDireccion: React.FC = () => {
+  // Estados
+  const [anioSeleccionado, setAnioSeleccionado] = useState<{id: number, value: number, label: string} | null>(null);
+  const [busqueda, setBusqueda] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Filtrar aranceles según los criterios
-  const filteredAranceles = onFilter(
-    selectedAño ? parseInt(selectedAño) : undefined,
-    searchTerm
-  );
+  // Hook
+  const { arancelesPorDireccion, loading, buscarArancelesPorDireccion } = useAranceles();
 
-  // Calcular la cantidad de páginas
-  const totalPages = Math.ceil(filteredAranceles.length / itemsPerPage);
-  
-  // Obtener los elementos de la página actual
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredAranceles.slice(indexOfFirstItem, indexOfLastItem);
+  // Generar opciones de años
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 10 }, (_, i) => ({
+    id: currentYear - i,
+    value: currentYear - i,
+    label: (currentYear - i).toString()
+  }));
 
-  // Cambiar de página
-  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+  // Efecto para buscar cuando cambia el año
+  useEffect(() => {
+    if (anioSeleccionado?.value) {
+      buscarArancelesPorDireccion(anioSeleccionado.value);
+    }
+  }, [anioSeleccionado]);
 
-  // Manejar búsqueda
-  const handleSearch = () => {
-    setCurrentPage(1); // Resetear a primera página cuando se realiza una búsqueda
+  // Filtrar aranceles según búsqueda
+  const arancelesFiltrados = useMemo(() => {
+    if (!busqueda) return arancelesPorDireccion;
+    
+    const searchTerm = busqueda.toLowerCase();
+    return arancelesPorDireccion.filter(arancel => {
+      const direccionCompleta = `${arancel.sector} ${arancel.barrio} ${arancel.tipoVia} ${arancel.nombreVia} ${arancel.cuadra} ${arancel.lado}`.toLowerCase();
+      return direccionCompleta.includes(searchTerm) || 
+             arancel.monto.toString().includes(searchTerm);
+    });
+  }, [arancelesPorDireccion, busqueda]);
+
+  // Paginación
+  const arancelesPaginados = useMemo(() => {
+    const start = page * rowsPerPage;
+    const end = start + rowsPerPage;
+    return arancelesFiltrados.slice(start, end);
+  }, [arancelesFiltrados, page, rowsPerPage]);
+
+  // Handlers
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
   };
 
-  // Manejar cambio de año
-  const handleAñoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedAño(e.target.value);
-    setCurrentPage(1); // Resetear a primera página cuando cambia el año
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const formatearDireccion = (arancel: ArancelDireccion) => {
+    return `${arancel.sector} + ${arancel.barrio} + ${arancel.tipoVia} + ${arancel.nombreVia} + CUADRA ${arancel.cuadra} + LADO ${arancel.lado} + LT ${arancel.loteInicial} - ${arancel.loteFinal}`;
   };
 
   return (
-    <div className="bg-white rounded-md shadow-sm overflow-hidden mt-6">
-      <div className="px-6 py-4 bg-gray-50 border-b">
-        <h2 className="text-lg font-medium text-gray-800">Lista de aranceles por dirección</h2>
-      </div>
-      
-      <div className="p-6">
-        <div className="mb-4 flex flex-wrap items-end gap-4">
-          <div className="w-40">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Año</label>
-            <Select
-              options={[{ value: '', label: 'Todos' }, ...años]}
-              value={selectedAño}
-              onChange={handleAñoChange}
-              disabled={loading}
-            />
-          </div>
-          
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Buscar por</label>
-            <div className="flex">
-              <Input
-                placeholder="Ingresar dirección"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                disabled={loading}
-                className="rounded-r-none"
+    <Card>
+      <CardContent>
+        <Typography variant="h5" gutterBottom>
+          Lista de aranceles por dirección
+        </Typography>
+
+        {/* Controles de búsqueda compactados */}
+        <Box sx={{ mb: 3, mt: 2, maxWidth: '50%' }}>
+          <Stack direction="row" spacing={2}>
+            <Box sx={{ flex: 1 }}>
+              <SearchableSelect
+                label="Año"
+                options={yearOptions}
+                value={anioSeleccionado}
+                onChange={(option) => setAnioSeleccionado(option)}
+                placeholder="Seleccione"
               />
-              <Button
-                type="button"
-                onClick={handleSearch}
-                disabled={loading}
-                className="rounded-l-none"
-              >
-                Buscar
-              </Button>
-            </div>
-          </div>
-        </div>
-        
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <svg className="animate-spin h-8 w-8 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Año
-                    <span className="ml-1">▼</span>
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Dirección
-                    <span className="ml-1">▼</span>
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Monto
-                    <span className="ml-1">▼</span>
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
-                    <span className="ml-1">▼</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {currentItems.map((arancel) => (
-                  <tr
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <TextField
+                fullWidth
+                placeholder="Buscar por dirección..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon />
+                      </InputAdornment>
+                    ),
+                  }
+                }}
+                size="small"
+              />
+            </Box>
+          </Stack>
+        </Box>
+
+        {/* Tabla de resultados */}
+        <TableContainer component={Paper} variant="outlined">
+          <Table>
+            <TableHead>
+              <TableRow sx={{ bgcolor: 'grey.100' }}>
+                <TableCell>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <Typography variant="subtitle2">AÑO</Typography>
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <Typography variant="subtitle2">DIRECCIÓN</Typography>
+                  </Box>
+                </TableCell>
+                <TableCell align="right">
+                  <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1}>
+                    <MoneyIcon fontSize="small" />
+                    <Typography variant="subtitle2">MONTO</Typography>
+                  </Box>
+                </TableCell>
+                <TableCell align="center" width={120}>
+                  <Typography variant="subtitle2">ACCIONES</Typography>
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                // Skeletons de carga
+                Array.from({ length: 5 }).map((_, index) => (
+                  <TableRow key={index}>
+                    <TableCell><Skeleton width={60} /></TableCell>
+                    <TableCell><Skeleton /></TableCell>
+                    <TableCell align="right"><Skeleton width={80} /></TableCell>
+                    <TableCell align="center"><Skeleton width={80} /></TableCell>
+                  </TableRow>
+                ))
+              ) : arancelesPaginados.length > 0 ? (
+                arancelesPaginados.map((arancel) => (
+                  <TableRow 
                     key={arancel.id}
-                    className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => onSelectArancel(arancel)}
+                    sx={{ 
+                      '&:hover': { bgcolor: 'action.hover' },
+                      '&:last-child td, &:last-child th': { border: 0 } 
+                    }}
                   >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {arancel.año}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {arancel.direccion?.descripcion || `Dirección ID: ${arancel.direccionId}`}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {arancel.monto.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        arancel.estado === 'ACTIVO' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {arancel.estado}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {currentItems.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
-                      No se encontraron resultados
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-        
+                    <TableCell>
+                      <Typography variant="body2" fontWeight="medium">
+                        {arancel.anio}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {formatearDireccion(arancel)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body2" fontWeight="medium" color="primary">
+                        {formatCurrency(arancel.monto)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Box display="flex" justifyContent="center" gap={1}>
+                        <Tooltip title="Editar">
+                          <IconButton size="small" color="primary">
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Eliminar">
+                          <IconButton size="small" color="error">
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} align="center">
+                    <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
+                      {anioSeleccionado 
+                        ? 'No se encontraron aranceles para el año seleccionado'
+                        : 'Seleccione un año para ver los aranceles'}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
         {/* Paginación */}
-        {!loading && totalPages > 1 && (
-          <div className="mt-4 flex justify-between items-center">
-            <div className="text-sm text-gray-500">
-              Mostrar de {indexOfFirstItem + 1} a {Math.min(indexOfLastItem, filteredAranceles.length)} de {filteredAranceles.length} datos
-            </div>
-            <nav className="flex space-x-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((number) => (
-                <Button
-                  key={number}
-                  onClick={() => paginate(number)}
-                  className={`px-3 py-1 rounded ${
-                    currentPage === number
-                      ? 'bg-gray-200 text-gray-700'
-                      : 'text-gray-500 hover:bg-gray-100'
-                  }`}
-                >
-                  {number}
-                </Button>
-              ))}
-              <Button
-                onClick={() => paginate(Math.min(currentPage + 1, totalPages))}
-                className="px-3 py-1 rounded text-gray-500 hover:bg-gray-100"
-                disabled={currentPage === totalPages}
-              >
-                <span aria-hidden="true">&gt;</span>
-              </Button>
-            </nav>
-          </div>
+        {arancelesFiltrados.length > 0 && (
+          <TablePagination
+            component="div"
+            count={arancelesFiltrados.length}
+            page={page}
+            onPageChange={handleChangePage}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            labelRowsPerPage="Filas por página:"
+            labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+          />
         )}
-      </div>
-    </div>
+
+        {/* Resumen usando Stack en lugar de Grid */}
+        {arancelesFiltrados.length > 0 && (
+          <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+            <Stack 
+              direction={{ xs: 'column', sm: 'row' }} 
+              spacing={2}
+              justifyContent="space-between"
+            >
+              <Typography variant="body2" color="text.secondary">
+                Total de direcciones: <strong>{arancelesFiltrados.length}</strong>
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Monto total: <strong>{formatCurrency(
+                  arancelesFiltrados.reduce((sum, a) => sum + a.monto, 0)
+                )}</strong>
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Monto promedio: <strong>{formatCurrency(
+                  arancelesFiltrados.reduce((sum, a) => sum + a.monto, 0) / arancelesFiltrados.length
+                )}</strong>
+              </Typography>
+            </Stack>
+          </Box>
+        )}
+      </CardContent>
+    </Card>
   );
 };
-
-export default ArancelList;

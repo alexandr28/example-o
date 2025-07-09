@@ -1,264 +1,250 @@
-import React, { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { Input, Select, Button,SelectorDirecciones } from '../';
-import { Arancel, LadoDireccion } from '../../models';
-import { Direccion as ModelDireccion } from '../../models/';
-import { Direccion as TypeDireccion } from '../../types/formTypes';
+// src/components/mantenedores/aranceles/AsignacionArancelForm.tsx
+import React, { useState } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  Button,
+  Stack,
+  InputAdornment,
+  Divider,
+  Alert
+} from '@mui/material';
+import { Save as SaveIcon, Edit as EditIcon, Add as AddIcon } from '@mui/icons-material';
+import SearchableSelect from '../ui/SearchableSelect';
+import { useAranceles } from '../../hooks/useAranceles';
 
+import SelectorDirecciones from '../modal/SelectorDirecciones';
 
-// Schema simplificado para evitar problemas de tipado
-const arancelSchema = z.object({
-  año: z.string().min(1, 'El año es requerido'),
-  direccionId: z.string().min(1, 'Debe seleccionar una dirección'),
-  lado: z.string().min(1, 'El lado es requerido'),
-  loteInicial: z.string().refine(val => !isNaN(Number(val)), {
-    message: 'Debe ser un número'
-  }),
-  loteFinal: z.string().refine(val => !isNaN(Number(val)), {
-    message: 'Debe ser un número'
-  }),
-  monto: z.string().refine(val => !isNaN(Number(val)), {
-    message: 'Debe ser un número'
-  }),
-}).refine(data => {
-  const loteInicial = Number(data.loteInicial);
-  const loteFinal = Number(data.loteFinal);
-  return loteInicial <= loteFinal;
-}, {
-  message: 'El lote inicial debe ser menor o igual al lote final',
-  path: ['loteInicial']
-});
-
-type FormValues = z.infer<typeof arancelSchema>;
-
-interface ArancelFormProps {
-  arancelSeleccionado?: Arancel | null;
-  direcciones: ModelDireccion[];
-  direccionSeleccionada: ModelDireccion | null;
-  años: { value: string, label: string }[];
-  onGuardar: (data: any) => void;
-  onSelectDireccion: (direccion: ModelDireccion) => void;
-  onNuevo: () => void;
-  onEditar: () => void;
-  loading?: boolean;
+interface ArancelFormData {
+  anio: number | null;
+  direccionId: number | null;
+  monto: number;
 }
 
-const ArancelForm: React.FC<ArancelFormProps> = ({
-  arancelSeleccionado,
-  direcciones,
-  direccionSeleccionada,
-  años,
-  onGuardar,
-  onSelectDireccion,
-  onNuevo,
-  onEditar,
-  loading = false,
-}) => {
-  const { register, handleSubmit, formState: { errors }, reset, setValue, watch, getValues } = useForm<FormValues>({
-    resolver: zodResolver(arancelSchema),
-    defaultValues: {
-      año: '',
-      direccionId: '',
-      lado: '',
-      loteInicial: '0',
-      loteFinal: '0',
-      monto: '0.00',
-    }
+export const AsignacionArancelForm: React.FC = () => {
+  // Estados
+  const [formData, setFormData] = useState<{
+    anio: {id: number, value: number, label: string} | null;
+    direccionId: number | null;
+    monto: number;
+  }>({
+    anio: null,
+    direccionId: null,
+    monto: 0
   });
+  const [direccionSeleccionada, setDireccionSeleccionada] = useState<any>(null);
+  const [modalDireccionOpen, setModalDireccionOpen] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isEditMode, setIsEditMode] = useState(false);
 
-  // Estado local para mostrar la información de la dirección seleccionada
-  const [descripcionDireccion, setDescripcionDireccion] = useState<string>('');
-  
-  // Estado para controlar la visibilidad del modal
-  const [isDireccionModalOpen, setIsDireccionModalOpen] = useState(false);
-  
-  // Convertir las direcciones del modelo al formato necesario para el selector
-  const direccionesParaSelector: TypeDireccion[] = direcciones.map(d => ({
-    id: d.id,
-    descripcion: d.descripcion || `Dirección ${d.id}`,
-    lado: d.lado as string,
-    loteInicial: d.loteInicial,
-    loteFinal: d.loteFinal
+  // Hooks
+  const { crearArancel, actualizarArancel, loading } = useAranceles();
+
+  // Generar opciones de años (últimos 10 años)
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 10 }, (_, i) => ({
+    id: currentYear - i,
+    value: currentYear - i,
+    label: (currentYear - i).toString()
   }));
-  
-  // Actualizar el formulario cuando se selecciona un arancel para editar
-  useEffect(() => {
-    if (arancelSeleccionado) {
-      setValue('año', arancelSeleccionado.año.toString());
-      setValue('direccionId', arancelSeleccionado.direccionId.toString());
-      setValue('lado', arancelSeleccionado.lado);
-      setValue('loteInicial', arancelSeleccionado.loteInicial.toString());
-      setValue('loteFinal', arancelSeleccionado.loteFinal.toString());
-      setValue('monto', arancelSeleccionado.monto.toString());
-      
-      // Actualizar descripción de la dirección
-      const direccion = direcciones.find(d => d.id === arancelSeleccionado.direccionId);
-      if (direccion) {
-        setDescripcionDireccion(direccion.descripcion || '');
-      }
-    }
-  }, [arancelSeleccionado, setValue, direcciones]);
 
-  const onSubmit = (data: FormValues) => {
-    // Convertimos manualmente a los tipos correctos
-    const formattedData = {
-      año: parseInt(data.año),
-      direccionId: parseInt(data.direccionId),
-      lado: data.lado,
-      loteInicial: parseInt(data.loteInicial),
-      loteFinal: parseInt(data.loteFinal),
-      monto: parseFloat(data.monto),
-    };
-    
-    onGuardar(formattedData);
-    reset();
-    setDescripcionDireccion('');
+  // Validación del formulario
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.anio) {
+      newErrors.anio = 'El año es requerido';
+    }
+    if (!formData.direccionId) {
+      newErrors.direccion = 'La dirección es requerida';
+    }
+    if (formData.monto < 0) {
+      newErrors.monto = 'El monto no puede ser negativo';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Handlers
+  const handleAnioChange = (option: any) => {
+    setFormData(prev => ({ ...prev, anio: option }));
+    setErrors(prev => ({ ...prev, anio: '' }));
+  };
+
+  const handleMontoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseFloat(e.target.value) || 0;
+    setFormData(prev => ({ ...prev, monto: value }));
+    setErrors(prev => ({ ...prev, monto: '' }));
+  };
+
+  const handleSelectDireccion = (direccion: any) => {
+    setDireccionSeleccionada(direccion);
+    setFormData(prev => ({ ...prev, direccionId: direccion.id }));
+    setErrors(prev => ({ ...prev, direccion: '' }));
+    setModalDireccionOpen(false);
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+
+    try {
+      if (isEditMode && formData.direccionId) {
+        await actualizarArancel(formData.direccionId, {
+          anio: formData.anio!.value,
+          monto: formData.monto
+        });
+      } else {
+        await crearArancel({
+          anio: formData.anio!.value,
+          direccionId: formData.direccionId!,
+          monto: formData.monto
+        });
+      }
+
+      // Limpiar formulario
+      handleNuevo();
+    } catch (error) {
+      console.error('Error al guardar arancel:', error);
+    }
   };
 
   const handleNuevo = () => {
-    reset();
-    setDescripcionDireccion('');
-    onNuevo();
+    setFormData({
+      anio: null,
+      direccionId: null,
+      monto: 0
+    });
+    setDireccionSeleccionada(null);
+    setIsEditMode(false);
+    setErrors({});
   };
-
-  // Manejadores para el modal de dirección
-  const handleOpenDireccionModal = () => {
-    setIsDireccionModalOpen(true);
-  };
-
-  const handleCloseDireccionModal = () => {
-    setIsDireccionModalOpen(false);
-  };
-
-  // Manejador para seleccionar una dirección desde el modal
-  const handleSelectDireccion = (direccion: TypeDireccion) => {
-    setValue('direccionId', direccion.id.toString());
-    setDescripcionDireccion(direccion.descripcion || `Dirección ${direccion.id}`);
-    
-    // Buscar la dirección completa en el modelo
-    const modelDireccion = direcciones.find(d => d.id === direccion.id);
-    if (modelDireccion) {
-      onSelectDireccion(modelDireccion);
-    }
-    
-    handleCloseDireccionModal();
-  };
-
-  // Opciones para el selector de lado utilizando el enum
-  const ladoOptions = [
-    { value: LadoDireccion.IZQUIERDO, label: 'Izquierdo' },
-    { value: LadoDireccion.DERECHO, label: 'Derecho' },
-    { value: LadoDireccion.PAR, label: 'Par' },
-    { value: LadoDireccion.IMPAR, label: 'Impar' },
-    { value: LadoDireccion.NINGUNO, label: 'Ninguno' },
-  ];
 
   return (
-    <div className="bg-white rounded-md shadow-sm overflow-hidden">
-      <div className="px-6 py-4 bg-gray-50 border-b">
-        <h2 className="text-lg font-medium text-gray-800">Asignación de aranceles</h2>
-      </div>
-      
-      <form onSubmit={handleSubmit(onSubmit)} className="p-6">
-        <div className="flex flex-col space-y-6">
-          {/* Año */}
-          <div className="w-1/4">
-            <Select
-              label="Año"
-              options={años}
-              error={errors.año?.message}
-              disabled={loading}
-              {...register('año')}
-            />
-          </div>
-          
-          {/* Dirección */}
-          <div className="border p-4 rounded-md">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="col-span-4">
-                <div className="mb-1 text-sm font-medium text-gray-700">Vía</div>
-                <div className="flex">
-                  <button
-                    type="button"
-                    className="bg-gray-300 text-gray-700 px-3 py-2 rounded-l-md hover:bg-gray-400"
-                    onClick={handleOpenDireccionModal}
-                  >
-                    Seleccionar dirección
-                  </button>
-                  <Input
-                    value={descripcionDireccion}
-                    disabled={true}
-                    className="rounded-l-none bg-gray-100"
-                    placeholder="Seleccione una dirección"
-                  />
-                  <input 
-                    type="hidden" 
-                    {...register('direccionId')}
-                  />
-                </div>
-                {errors.direccionId && (
-                  <p className="mt-1 text-sm text-red-600">{errors.direccionId.message}</p>
-                )}
-              </div>
-              
-             
-            </div>
-          </div>
-          
-          {/* Monto */}
-          <div className="w-1/4">
-            <Input
-              label="Monto"
-              type="number"
-              step="0.01"
-              placeholder="Ingresar monto"
-              error={errors.monto?.message}
-              disabled={loading}
-              {...register('monto')}
-            />
-          </div>
-        </div>
+    <Card sx={{ maxWidth: 800, mx: 'auto' }}>
+      <CardContent>
+        <Typography variant="h5" gutterBottom>
+          Asignación de aranceles
+        </Typography>
         
-        <div className="flex justify-center space-x-4 mt-6">
-          <Button 
-            type="submit" 
-            variant="primary"
-            disabled={loading}
-          >
-            Guardar
-          </Button>
-          
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onEditar}
-            disabled={loading || !arancelSeleccionado}
-          >
-            Editar
-          </Button>
-          
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleNuevo}
-            disabled={loading}
-          >
-            Nuevo
-          </Button>
-        </div>
-      </form>
+        <Box component="form" noValidate sx={{ mt: 3 }}>
+          {/* Fila 1: Año y Monto (compactado a la mitad) */}
+          <Box sx={{ maxWidth: '50%', mb: 3 }}>
+            <Stack direction="row" spacing={2}>
+              <Box sx={{ flex: 1 }}>
+                <SearchableSelect
+                  label="Año"
+                  options={yearOptions}
+                  value={formData.anio}
+                  onChange={handleAnioChange}
+                  error={!!errors.anio}
+                  helperText={errors.anio}
+                  required
+                />
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <TextField
+                  label="Monto"
+                  type="number"
+                  value={formData.monto}
+                  onChange={handleMontoChange}
+                  error={!!errors.monto}
+                  helperText={errors.monto}
+                  fullWidth
+                  inputProps={{ min: 0, step: 0.01 }}
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start">S/</InputAdornment>
+                  }}
+                />
+              </Box>
+            </Stack>
+          </Box>
 
-      {/* Modal para selección de dirección */}
+          {/* Fila 2: Dirección */}
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              Vía
+            </Typography>
+            <Box 
+              display="flex" 
+              alignItems="center" 
+              gap={2}
+              sx={{
+                p: 2,
+                border: 1,
+                borderColor: errors.direccion ? 'error.main' : 'divider',
+                borderRadius: 1,
+                bgcolor: 'grey.50',
+                cursor: 'pointer',
+                '&:hover': {
+                  bgcolor: 'grey.100'
+                }
+              }}
+              onClick={() => setModalDireccionOpen(true)}
+            >
+              <Button
+                variant="contained"
+                color="primary"
+                size="small"
+              >
+                Seleccionar dirección
+              </Button>
+              
+              <Typography variant="body1" color="text.secondary" sx={{ flexGrow: 1 }}>
+                {direccionSeleccionada ? 
+                  `${direccionSeleccionada.sector} + ${direccionSeleccionada.barrio} + ${direccionSeleccionada.tipoVia} + ${direccionSeleccionada.nombreVia} + CUADRA ${direccionSeleccionada.cuadra} + LADO ${direccionSeleccionada.lado} + LT ${direccionSeleccionada.loteInicial} - ${direccionSeleccionada.loteFinal}`
+                  : 'Seleccione una dirección'
+                }
+              </Typography>
+            </Box>
+            {errors.direccion && (
+              <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
+                {errors.direccion}
+              </Typography>
+            )}
+          </Box>
+
+          {/* Botones de acción */}
+          <Box sx={{ mt: 4, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<SaveIcon />}
+              onClick={handleSubmit}
+              disabled={loading}
+            >
+              Guardar
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<EditIcon />}
+              disabled={!direccionSeleccionada || loading}
+            >
+              Editar
+            </Button>
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={<AddIcon />}
+              onClick={handleNuevo}
+              disabled={loading}
+            >
+              Nuevo
+            </Button>
+          </Box>
+        </Box>
+      </CardContent>
+
+      {/* Modal de selección de dirección */}
       <SelectorDirecciones
-        isOpen={isDireccionModalOpen}
-        onClose={handleCloseDireccionModal}
+        open={modalDireccionOpen}
+        onClose={() => setModalDireccionOpen(false)}
         onSelectDireccion={handleSelectDireccion}
-        direcciones={direccionesParaSelector}
       />
-    </div>
+    </Card>
   );
 };
-
-export default ArancelForm;
