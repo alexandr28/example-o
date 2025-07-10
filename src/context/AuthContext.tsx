@@ -1,305 +1,125 @@
-// src/services/authService.ts
-import { NotificationService } from '../components/utils/Notification';
+// src/context/AuthContext.tsx
+import  { createContext, useContext, ReactNode, useState, useEffect } from 'react';
+import { AuthUser, AuthCredentials, AuthResult } from '../models/Auth';
+import useAuth from '../hooks/useAuth';
 
-// Configuración de autenticación
-const AUTH_CONFIG = {
-  TOKEN_EXPIRY_HOURS: 6, // 6 horas de duración del token
-  TOKEN_RENEWAL_THRESHOLD_MINUTES: 30, // Renovar cuando falten 30 minutos
-  API_BASE_URL: 'http://192.168.20.160:8080',
-  ENDPOINTS: {
-    LOGIN: '/auth/login',
-    REFRESH: '/auth/refresh',
-    LOGOUT: '/auth/logout'
+// Tipo para el contexto de autenticación
+interface AuthContextType {
+  user: AuthUser | null;
+  token: string | null;
+  loading: boolean;
+  error: string | null;
+  isAuthenticated: boolean;
+  login: (credentials: AuthCredentials) => Promise<AuthResult>;
+  logout: () => void;
+  renewToken: () => Promise<boolean>;
+  checkSession: () => Promise<boolean>;
+}
+
+// Crear el contexto
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Hook personalizado para usar el contexto de autenticación
+export const useAuthContext = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuthContext debe ser utilizado dentro de un AuthProvider');
   }
+  return context;
 };
 
-export interface AuthCredentials {
-  username: string;
-  password: string;
+// Definir explícitamente el tipo de las props
+interface AuthProviderProps {
+  children: ReactNode;
 }
 
-export interface AuthResponse {
-  success: boolean;
-  token?: string;
-  user?: {
-    id: string;
-    username: string;
-    nombreCompleto?: string;
-    roles?: string[];
-  };
-  message?: string;
-}
+// Componente proveedor de autenticación
+export const AuthProvider = ({ children }: AuthProviderProps) => {
+  const auth = useAuth();
+  // Ya no necesitamos este estado aquí, está en useAuth
+  // const [authToken, setAuthToken] = useState<string | null>(null);
+  // Estado para indicar si hemos verificado la sesión
+  const [sessionChecked, setSessionChecked] = useState(false);
+  
+  // Para depuración
+  useEffect(() => {
+    console.log('AuthProvider state:', { 
+      isAuthenticated: auth.isAuthenticated, 
+      user: auth.user?.username || 'none',
+      loading: auth.loading,
+      tokenInMemory: !!auth.authToken,
+      tokenInStorage: !!localStorage.getItem('auth_token')
+    });
+  }, [auth.isAuthenticated, auth.user, auth.loading, auth.authToken]);
 
-export class AuthService {
-  private static instance: AuthService;
-  
-  private constructor() {
-    console.log('🔧 [AuthService] Inicializado');
-    console.log(`⏰ [AuthService] Tokens expirarán en ${AUTH_CONFIG.TOKEN_EXPIRY_HOURS} horas`);
-  }
-  
-  static getInstance(): AuthService {
-    if (!AuthService.instance) {
-      AuthService.instance = new AuthService();
-    }
-    return AuthService.instance;
-  }
-  
-  /**
-   * Calcula la fecha de expiración del token (6 horas desde ahora)
-   */
-  private calculateTokenExpiry(): Date {
-    const expiry = new Date();
-    expiry.setHours(expiry.getHours() + AUTH_CONFIG.TOKEN_EXPIRY_HOURS);
-    return expiry;
-  }
-  
-  /**
-   * Guarda el token con su fecha de expiración
-   */
-  private saveTokenData(token: string, user: any): void {
-    const expiryTime = this.calculateTokenExpiry();
-    
-    // Guardar en localStorage
-    localStorage.setItem('auth_token', token);
-    localStorage.setItem('auth_token_expiry', expiryTime.toISOString());
-    localStorage.setItem('auth_user', JSON.stringify(user));
-    
-    console.log(`✅ [AuthService] Token guardado. Expira: ${expiryTime.toLocaleString()}`);
-    console.log(`⏱️ [AuthService] Duración: ${AUTH_CONFIG.TOKEN_EXPIRY_HOURS} horas`);
-  }
-  
-  /**
-   * Verifica si el token está próximo a expirar o ya expiró
-   */
-  isTokenExpired(): boolean {
-    const expiryStr = localStorage.getItem('auth_token_expiry');
-    if (!expiryStr) return true;
-    
-    const expiry = new Date(expiryStr);
-    const now = new Date();
-    
-    return expiry <= now;
-  }
-  
-  /**
-   * Verifica si el token necesita renovación (30 minutos antes de expirar)
-   */
-  needsTokenRenewal(): boolean {
-    const expiryStr = localStorage.getItem('auth_token_expiry');
-    if (!expiryStr) return true;
-    
-    const expiry = new Date(expiryStr);
-    const now = new Date();
-    const threshold = new Date(now.getTime() + (AUTH_CONFIG.TOKEN_RENEWAL_THRESHOLD_MINUTES * 60 * 1000));
-    
-    return expiry <= threshold;
-  }
-  
-  /**
-   * Obtiene el tiempo restante del token en minutos
-   */
-  getTokenRemainingTime(): number {
-    const expiryStr = localStorage.getItem('auth_token_expiry');
-    if (!expiryStr) return 0;
-    
-    const expiry = new Date(expiryStr);
-    const now = new Date();
-    const diffMs = expiry.getTime() - now.getTime();
-    
-    return Math.max(0, Math.floor(diffMs / 60000)); // Convertir a minutos
-  }
-  
-  /**
-   * Realiza el login y guarda el token con expiración de 6 horas
-   */
-  async login(credentials: AuthCredentials): Promise<AuthResponse> {
+  // Función para verificar la sesión
+  const checkSession = async (): Promise<boolean> => {
     try {
-      console.log('🔐 [AuthService] Iniciando sesión para:', credentials.username);
-      
-      const response = await fetch(`${AUTH_CONFIG.API_BASE_URL}${AUTH_CONFIG.ENDPOINTS.LOGIN}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(credentials)
-      });
-      
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Usuario o contraseña incorrectos');
-        }
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      // Extraer token de diferentes posibles ubicaciones
-      const token = data.token || data.access_token || data.accessToken;
-      
-      if (!token) {
-        throw new Error('No se recibió token del servidor');
-      }
-      
-      // Crear objeto de usuario
-      const user = {
-        id: data.userId || data.user?.id || '1',
-        username: credentials.username,
-        nombreCompleto: data.nombreCompleto || data.user?.nombreCompleto || credentials.username,
-        roles: data.roles || data.user?.roles || ['USER']
-      };
-      
-      // Guardar token con expiración de 6 horas
-      this.saveTokenData(token, user);
-      
-      // Limpiar marcas de logout
-      localStorage.removeItem('explicit_logout');
-      localStorage.removeItem('explicit_logout_time');
-      
-      NotificationService.success(`Bienvenido ${user.nombreCompleto}. Su sesión durará ${AUTH_CONFIG.TOKEN_EXPIRY_HOURS} horas.`);
-      
-      return {
-        success: true,
-        token,
-        user
-      };
-      
-    } catch (error: any) {
-      console.error('❌ [AuthService] Error en login:', error);
-      NotificationService.error(error.message || 'Error al iniciar sesión');
-      
-      return {
-        success: false,
-        message: error.message || 'Error al iniciar sesión'
-      };
-    }
-  }
-  
-  /**
-   * Renueva el token antes de que expire
-   */
-  async refreshToken(): Promise<boolean> {
-    try {
-      const currentToken = localStorage.getItem('auth_token');
-      if (!currentToken) {
-        console.log('❌ [AuthService] No hay token para renovar');
+      // Si no hay token, no hay sesión
+      if (!auth.authToken && !localStorage.getItem('auth_token')) {
         return false;
       }
       
-      console.log('🔄 [AuthService] Renovando token...');
-      const remainingTime = this.getTokenRemainingTime();
-      console.log(`⏰ [AuthService] Tiempo restante: ${remainingTime} minutos`);
-      
-      const response = await fetch(`${AUTH_CONFIG.API_BASE_URL}${AUTH_CONFIG.ENDPOINTS.REFRESH}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${currentToken}`
+      // Verificar si el token ha expirado
+      const tokenExpiry = localStorage.getItem('auth_token_expiry');
+      if (tokenExpiry && new Date(tokenExpiry) < new Date()) {
+        // Intentar renovar el token
+        const renewed = await auth.renewToken();
+        if (renewed) {
+          return true;
+        } else {
+          return false;
         }
-      });
-      
-      if (!response.ok) {
-        throw new Error('No se pudo renovar el token');
       }
-      
-      const data = await response.json();
-      const newToken = data.token || data.access_token || data.accessToken;
-      
-      if (!newToken) {
-        throw new Error('No se recibió nuevo token');
-      }
-      
-      // Obtener usuario actual
-      const userStr = localStorage.getItem('auth_user');
-      const user = userStr ? JSON.parse(userStr) : null;
-      
-      // Guardar nuevo token con nueva expiración de 6 horas
-      this.saveTokenData(newToken, user);
-      
-      console.log('✅ [AuthService] Token renovado exitosamente');
-      NotificationService.info('Sesión renovada automáticamente');
       
       return true;
-      
-    } catch (error: any) {
-      console.error('❌ [AuthService] Error al renovar token:', error);
+    } catch (error) {
+      console.error('Error al verificar sesión:', error);
       return false;
+    } finally {
+      setSessionChecked(true);
     }
-  }
+  };
   
-  /**
-   * Cierra la sesión
-   */
-  logout(): void {
-    console.log('🔒 [AuthService] Cerrando sesión...');
-    
-    // Limpiar datos de autenticación
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_token_expiry');
-    localStorage.removeItem('auth_user');
-    
-    // Marcar logout explícito
-    localStorage.setItem('explicit_logout', 'true');
-    localStorage.setItem('explicit_logout_time', new Date().toISOString());
-    
-    console.log('✅ [AuthService] Sesión cerrada');
-    NotificationService.info('Sesión cerrada correctamente');
-  }
-  
-  /**
-   * Inicia el monitor de expiración del token
-   */
-  startTokenExpiryMonitor(onTokenExpired?: () => void): () => void {
-    console.log('👁️ [AuthService] Iniciando monitor de expiración de token');
-    
-    // Verificar cada minuto
-    const interval = setInterval(() => {
-      const remainingTime = this.getTokenRemainingTime();
-      
-      // Log cada 30 minutos
-      if (remainingTime % 30 === 0 && remainingTime > 0) {
-        console.log(`⏰ [AuthService] Token expira en ${remainingTime} minutos`);
-      }
-      
-      // Notificar cuando queden 30 minutos
-      if (remainingTime === 30) {
-        NotificationService.warning('Su sesión expirará en 30 minutos');
-      }
-      
-      // Notificar cuando queden 5 minutos
-      if (remainingTime === 5) {
-        NotificationService.warning('Su sesión expirará en 5 minutos. Por favor, guarde su trabajo.');
-      }
-      
-      // Si el token expiró
-      if (this.isTokenExpired()) {
-        console.log('⚠️ [AuthService] Token expirado');
-        NotificationService.error('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
-        
-        if (onTokenExpired) {
-          onTokenExpired();
-        }
-        
-        clearInterval(interval);
-      }
-      
-      // Si necesita renovación (30 minutos antes de expirar)
-      if (this.needsTokenRenewal() && !this.isTokenExpired()) {
-        console.log('🔄 [AuthService] Token próximo a expirar, intentando renovar...');
-        this.refreshToken();
-      }
-      
-    }, 60000); // Verificar cada minuto
-    
-    // Retornar función para detener el monitor
-    return () => {
-      console.log('🛑 [AuthService] Deteniendo monitor de expiración');
-      clearInterval(interval);
-    };
-  }
-}
+  // Verificar la sesión al iniciar
+  useEffect(() => {
+    if (!sessionChecked) {
+      checkSession();
+    }
+  }, [sessionChecked]);
 
-// Exportar instancia singleton
-export const authService = AuthService.getInstance();
+  // Función mejorada para login
+  const login = async (credentials: AuthCredentials): Promise<AuthResult> => {
+    try {
+      const result = await auth.login(credentials);
+      return result;
+    } catch (error) {
+      console.error('Error en login desde AuthContext:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Error desconocido en login' 
+      };
+    }
+  };
+
+  // Crear un objeto que cumpla exactamente con el tipo AuthContextType
+  const authContextValue: AuthContextType = {
+    user: auth.user || null, // Convertir undefined a null
+    token: auth.authToken, // Token en memoria
+    loading: auth.loading,
+    error: auth.error,
+    isAuthenticated: auth.isAuthenticated,
+    login,
+    logout: auth.logout,
+    renewToken: auth.renewToken,
+    checkSession
+  };
+
+  return (
+    <AuthContext.Provider value={authContextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export default AuthContext;

@@ -12,7 +12,7 @@ import AppSidebar from './AppSidebar';
 import Header from './Header';
 import { useAuthContext } from '../context/AuthContext';
 import { useSidebar } from '../context/SidebarContext';
-import FormContextDebug from '../components/debug/FormContextDebug';
+
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -119,7 +119,7 @@ const MainLayout: FC<MainLayoutProps> = memo(({
       </Box>
 
       {/* Debug del FormContext en desarrollo */}
-      <FormContextDebug />
+ 
     </Box>
   );
 });

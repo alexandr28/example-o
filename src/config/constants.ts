@@ -17,21 +17,20 @@ export const API_ENDPOINTS = {
   SECTOR: `/api/sector`,
   VIA: `/api/via`,
   CALLE: `/api/calle`,
-  DIRECCION: `/api/direccion/listarDireccionPorNombreVia`,
-  
-  // Contribuyentes (con autenticación)
+  DIRECCION: [`api/direccion/listarDireccionPorTipoVia?parametrosBusqueda=a&codUsuario=1`, `api/direccion/listarDireccionPorNombreVia`],
   CONTRIBUYENTE: `/api/contribuyente`,
-  
-  // Predio (con autenticación)
-  PREDIO: `/api/predio`,
-  
-  // Autenticación (referencia a AUTH_ENDPOINTS)
-  AUTH: `/auth`,
-  
-  // Otros (con autenticación)
-  ARANCEL: `/api/arancel`,
-  VALOR_UNITARIO: `/api/valor-unitario`,
-  UIT: `/api/uit`,
+  PERSONA:[`/api/persona/listarPersonaPorTipoPersonaNombreRazon`,`/api/persona/listarPersonaPorTipoPersonaNombreRazonContribuyente`,`api/persona/listarPersonaPorTipoPersonaNombreVia`],
+   ARANCEL: `/api/arancel`,
+  VALOR_UNITARIO: `/api/valoresunitarios`,
+  UIT: `/api/uitEpa`,
   ALCABALA: `/api/alcabala`,
   DEPRECIACION: `/api/depreciacion`,
+  PREDIO: `/api/predio`,
+  PISO: `/api/piso`,
+  CONSTANTE: [`/api/constante/listarConstantePadre`,`/api/constante/listarConstanteHijo`],
+
+  // Autenticación (referencia a AUTH_ENDPOINTS)
+  AUTH: `/auth`,
+
+
 };

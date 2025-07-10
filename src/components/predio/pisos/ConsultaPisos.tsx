@@ -1,10 +1,45 @@
 // src/components/predio/pisos/ConsultaPisos.tsx
-
-import React, { useState, useEffect, useCallback } from 'react';
-import { Edit2, Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Paper,
+  Typography,
+  Grid,
+  TextField,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  Stack,
+  Chip,
+  Alert,
+  LinearProgress,
+  Tooltip,
+  useTheme,
+  alpha,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Card,
+  CardContent
+} from '@mui/material';
+import {
+  Search as SearchIcon,
+  Edit as EditIcon,
+  Home as HomeIcon,
+  CalendarMonth as CalendarIcon,
+  Domain as DomainIcon,
+  LocationOn as LocationIcon
+} from '@mui/icons-material';
+import { usePisos } from '../../../hooks/usePisos';
 import SelectorPredios from './SelectorPredios';
 
-// Interfaz para los datos del piso
+// Interfaces
 interface Piso {
   id: number;
   item: number;
@@ -16,7 +51,6 @@ interface Piso {
   valorAreaConstruida: number;
 }
 
-// Interfaz para el predio
 interface Predio {
   id: number | string;
   codigoPredio: string;
@@ -26,279 +60,241 @@ interface Predio {
   areaTerreno?: number;
 }
 
-// Componente principal
 const ConsultaPisos: React.FC = () => {
-  const [loading, setLoading] = useState(false);
+  const theme = useTheme();
+  const { buscarPisos, loading } = usePisos();
+  
+  // Estados
   const [predio, setPredio] = useState<Predio | null>(null);
   const [pisos, setPisos] = useState<Piso[]>([]);
-  const [anioSeleccionado, setAnioSeleccionado] = useState<string>('');
+  const [anioSeleccionado, setAnioSeleccionado] = useState<string>(new Date().getFullYear().toString());
   const [showSelectorPredios, setShowSelectorPredios] = useState(false);
   
-  // Años disponibles
-  const anios = Array.from({ length: 10 }, (_, i) => {
-    const year = new Date().getFullYear() - i;
-    return { value: year.toString(), label: year.toString() };
-  });
+  // Generar años disponibles
+  const currentYear = new Date().getFullYear();
+  const anios = Array.from({ length: 10 }, (_, i) => ({
+    value: (currentYear - i).toString(),
+    label: (currentYear - i).toString()
+  }));
 
-  // Datos de ejemplo
-  const pisosData: Piso[] = [
-    {
-      id: 1,
-      item: 1,
-      descripcion: 'Primer piso',
-      valorUnitario: 731.52,
-      incremento: 0.00,
-      porcentajeDepreciacion: 0.32,
-      valorUnicoDepreciado: 497.53,
-      valorAreaConstruida: 40500.75
-    },
-    {
-      id: 2,
-      item: 2,
-      descripcion: 'Segundo piso',
-      valorUnitario: 731.52,
-      incremento: 0.00,
-      porcentajeDepreciacion: 0.32,
-      valorUnicoDepreciado: 497.53,
-      valorAreaConstruida: 40500.75
-    }
-  ];
-
-  // Cargar datos iniciales
-  useEffect(() => {
-    // Establecer año actual por defecto
-    setAnioSeleccionado(new Date().getFullYear().toString());
-  }, []);
-
-  // Función para buscar pisos
+  // Buscar pisos
   const handleBuscar = async () => {
     if (!predio) {
-      alert('Por favor seleccione un predio');
-      return;
-    }
-    
-    if (!anioSeleccionado) {
-      alert('Por favor seleccione un año');
       return;
     }
 
-    setLoading(true);
     try {
-      // Simular búsqueda
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setPisos(pisosData);
+      const resultado = await buscarPisos(predio.codigoPredio, parseInt(anioSeleccionado));
+      setPisos(resultado);
     } catch (error) {
       console.error('Error al buscar pisos:', error);
-      alert('Error al buscar pisos');
-    } finally {
-      setLoading(false);
     }
   };
 
-  // Función para manejar selección de predio
+  // Seleccionar predio
   const handleSelectPredio = (predioSeleccionado: Predio) => {
     setPredio(predioSeleccionado);
     setPisos([]); // Limpiar pisos al cambiar de predio
   };
 
-  // Función para editar piso
+  // Editar piso
   const handleEdit = (piso: Piso) => {
     console.log('Editar piso:', piso);
+    // Aquí iría la navegación o apertura de modal de edición
   };
 
   // Formatear número
   const formatNumber = (value: number, decimals: number = 2) => {
-    return value.toFixed(decimals);
+    return new Intl.NumberFormat('es-PE', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    }).format(value);
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Breadcrumb */}
-      <nav className="flex mb-6" aria-label="Breadcrumb">
-        <ol className="inline-flex items-center space-x-1 md:space-x-3">
-          <li className="inline-flex items-center">
-            <span className="text-gray-700 dark:text-gray-300">Módulo</span>
-          </li>
-          <li>
-            <div className="flex items-center">
-              <span className="mx-2 text-gray-400">/</span>
-              <span className="text-gray-700 dark:text-gray-300">Predio</span>
-            </div>
-          </li>
-          <li>
-            <div className="flex items-center">
-              <span className="mx-2 text-gray-400">/</span>
-              <span className="text-gray-700 dark:text-gray-300">Pisos</span>
-            </div>
-          </li>
-          <li>
-            <div className="flex items-center">
-              <span className="mx-2 text-gray-400">/</span>
-              <span className="text-gray-500">Consultar piso</span>
-            </div>
-          </li>
-        </ol>
-      </nav>
-
+    <Box sx={{ p: 3 }}>
       {/* Sección: Seleccionar predio */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-        <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">
-          Seleccionar predio
-        </h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-          <button
-            type="button"
-            onClick={() => setShowSelectorPredios(true)}
-            className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:ring-2 focus:ring-blue-500"
-          >
-            Seleccionar predio
-          </button>
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Stack direction="row" alignItems="center" spacing={1} mb={3}>
+            <DomainIcon color="primary" />
+            <Typography variant="h6" fontWeight={600}>
+              Seleccionar predio
+            </Typography>
+          </Stack>
           
-          <input
-            type="text"
-            placeholder="Código de predio"
-            value={predio?.codigoPredio || ''}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
-            readOnly
-          />
-          
-          <input
-            type="text"
-            placeholder="Dirección predial"
-            value={predio?.direccion || ''}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
-            readOnly
-          />
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Año
-            </label>
-            <select
-              value={anioSeleccionado}
-              onChange={(e) => setAnioSeleccionado(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="">Seleccione</option>
-              {anios.map(anio => (
-                <option key={anio.value} value={anio.value}>
-                  {anio.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <button
-            type="button"
-            onClick={handleBuscar}
-            disabled={loading || !predio || !anioSeleccionado}
-            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Buscando...' : 'Buscar'}
-          </button>
-        </div>
-      </div>
+          <Grid container spacing={2} alignItems="flex-end">
+            <Grid item xs={12} md={2}>
+              <Button
+                fullWidth
+                variant="outlined"
+                onClick={() => setShowSelectorPredios(true)}
+                startIcon={<SearchIcon />}
+                sx={{ height: 56 }}
+              >
+                Seleccionar predio
+              </Button>
+            </Grid>
+            
+            <Grid item xs={12} md={3}>
+              <TextField
+                fullWidth
+                label="Código de predio"
+                value={predio?.codigoPredio || ''}
+                placeholder="Código de predio"
+                InputProps={{
+                  readOnly: true,
+                  startAdornment: (
+                    <HomeIcon sx={{ mr: 1, color: 'action.active' }} />
+                  )
+                }}
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={3}>
+              <TextField
+                fullWidth
+                label="Dirección predial"
+                value={predio?.direccion || ''}
+                placeholder="Dirección predial"
+                InputProps={{
+                  readOnly: true,
+                  startAdornment: (
+                    <LocationIcon sx={{ mr: 1, color: 'action.active' }} />
+                  )
+                }}
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={2}>
+              <FormControl fullWidth>
+                <InputLabel>Año</InputLabel>
+                <Select
+                  value={anioSeleccionado}
+                  onChange={(e) => setAnioSeleccionado(e.target.value)}
+                  label="Año"
+                  startAdornment={
+                    <CalendarIcon sx={{ ml: 1, mr: -0.5, color: 'action.active' }} />
+                  }
+                >
+                  {anios.map(anio => (
+                    <MenuItem key={anio.value} value={anio.value}>
+                      {anio.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} md={2}>
+              <Button
+                fullWidth
+                variant="contained"
+                onClick={handleBuscar}
+                disabled={loading || !predio}
+                startIcon={loading ? null : <SearchIcon />}
+                sx={{ height: 56 }}
+              >
+                {loading ? 'Buscando...' : 'Buscar'}
+              </Button>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
 
       {/* Sección: Datos del piso */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+      <Paper sx={{ overflow: 'hidden' }}>
+        <Box
+          sx={{
+            p: 2,
+            bgcolor: alpha(theme.palette.primary.main, 0.04),
+            borderBottom: 1,
+            borderColor: 'divider'
+          }}
+        >
+          <Typography variant="h6" fontWeight={600}>
             Datos del piso
-          </h3>
-        </div>
+          </Typography>
+        </Box>
 
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-          </div>
-        ) : pisos.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Item
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Descripción
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Valor unitario
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Incremento 5%
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    % Depreciación
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Valor Único Depreciado
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Valor Área<br/>Construida
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+        {loading && <LinearProgress />}
+
+        <TableContainer>
+          {pisos.length > 0 ? (
+            <Table>
+              <TableHead>
+                <TableRow sx={{ bgcolor: 'grey.50' }}>
+                  <TableCell align="center">ITEM</TableCell>
+                  <TableCell>DESCRIPCIÓN</TableCell>
+                  <TableCell align="center">VALOR UNITARIO</TableCell>
+                  <TableCell align="center">INCREMENTO %</TableCell>
+                  <TableCell align="center">% DEPRECIACIÓN</TableCell>
+                  <TableCell align="center">VALOR ÚNICO DEPRECIADO</TableCell>
+                  <TableCell align="center">VALOR ÁREA CONSTRUIDA</TableCell>
+                  <TableCell align="center">ACCIONES</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
                 {pisos.map((piso) => (
-                  <tr key={piso.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white text-center">
-                      {piso.item}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {piso.descripcion}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">
+                  <TableRow key={piso.id} hover>
+                    <TableCell align="center">
+                      <Chip label={piso.item} size="small" color="primary" />
+                    </TableCell>
+                    <TableCell>{piso.descripcion}</TableCell>
+                    <TableCell align="center">
                       {formatNumber(piso.valorUnitario)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">
-                      {formatNumber(piso.incremento)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">
-                      {formatNumber(piso.porcentajeDepreciacion)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">
+                    </TableCell>
+                    <TableCell align="center">
+                      {formatNumber(piso.incremento)}%
+                    </TableCell>
+                    <TableCell align="center">
+                      {formatNumber(piso.porcentajeDepreciacion)}%
+                    </TableCell>
+                    <TableCell align="center">
                       {formatNumber(piso.valorUnicoDepreciado)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">
-                      {formatNumber(piso.valorAreaConstruida)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">
-                      <button
-                        onClick={() => handleEdit(piso)}
-                        className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                        title="Editar"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography fontWeight={600} color="primary">
+                        {formatNumber(piso.valorAreaConstruida)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Tooltip title="Editar">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleEdit(piso)}
+                          color="primary"
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-64 text-gray-500 dark:text-gray-400">
-            <Search className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" />
-            <p className="text-lg font-medium">No hay datos para mostrar</p>
-            <p className="text-sm mt-2">Seleccione un predio y año, luego presione buscar</p>
-          </div>
-        )}
-      </div>
+              </TableBody>
+            </Table>
+          ) : (
+            <Box sx={{ p: 8, textAlign: 'center' }}>
+              <SearchIcon sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                No hay datos para mostrar
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Seleccione un predio y año, luego presione buscar
+              </Typography>
+            </Box>
+          )}
+        </TableContainer>
+      </Paper>
 
       {/* Modal de selección de predios */}
       <SelectorPredios
-        isOpen={showSelectorPredios}
+        open={showSelectorPredios}
         onClose={() => setShowSelectorPredios(false)}
         onSelect={handleSelectPredio}
       />
-    </div>
+    </Box>
   );
 };
 
-// Exportación por defecto
 export default ConsultaPisos;

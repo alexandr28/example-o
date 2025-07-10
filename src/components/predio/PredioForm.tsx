@@ -1,20 +1,56 @@
-// src/components/predio/PredioForm.tsx - Ejemplo actualizado
+// src/components/predio/PredioForm.tsx
 import React, { useState, useCallback, memo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
+import {
+  Box,
+  Card,
+  CardContent,
+  Grid,
+  TextField,
+  Button,
+  Stack,
+  Typography,
+  Divider,
+  InputAdornment,
+  Chip,
+  Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormHelperText
+} from '@mui/material';
+import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { es } from 'date-fns/locale';
+import {
+  Save as SaveIcon,
+  Cancel as CancelIcon,
+  Assignment as AssignmentIcon,
+  Domain as DomainIcon,
+  CalendarMonth as CalendarIcon,
+  Search as SearchIcon,
+  LocationOn as LocationIcon,
+  Terrain as TerrainIcon,
+  Home as HomeIcon,
+  Groups as GroupsIcon,
+  ApartmentOutlined as ApartmentIcon
+} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { useFormWrapper } from '../../hooks/useFormWrapper';
-import FormSection from '../utils/FormSecction';
-import Button from '../ui/Button';
-import Input from '../ui/Input';
-import Select from '../ui/Select';
-import CalendarInput from '../utils/CalendarInput';
-import SelectorDirecciones from '../modal/SelectorDirecciones';
+import { usePredioAPI } from '../../hooks/usePredioAPI';
 import { NotificationService } from '../utils/Notification';
-import { Direccion } from '../../types/formTypes';
+import SelectorDirecciones from '../modal/SelectorDirecciones';
 
-// Tipos para el formulario
+// Interfaces
+interface Direccion {
+  id: number;
+  codDireccion?: number;
+  descripcion: string;
+  nombreCalle?: string;
+  numeracion?: string;
+}
+
 interface PredioFormData {
-  // Datos del predio
   anioAdquisicion: string;
   fechaAdquisicion: Date | null;
   condicionPropiedad: string;
@@ -22,18 +58,19 @@ interface PredioFormData {
   nFinca: string;
   otroNumero: string;
   arancel: number;
-  
-  // Otros datos
   tipoPredio: string;
   conductor: string;
   usoPredio: string;
   areaTerreno: number;
   numeroPisos: number;
   numeroCondominos: number;
-  
-  // Imágenes
   rutaFotografiaPredio?: string;
   rutaPlanoPredio?: string;
+}
+
+// Props del componente
+interface PredioFormProps {
+  codPersona?: number; // ID del contribuyente seleccionado
 }
 
 // Opciones para los selects
@@ -71,17 +108,20 @@ const USO_PREDIO_OPTIONS = [
 ];
 
 /**
- * Formulario principal de registro de predio
+ * Formulario de registro de predio con Material-UI
  */
-const PredioForm: React.FC = memo(() => {
+const PredioForm: React.FC<PredioFormProps> = memo(({ codPersona }) => {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Hook para la API
+  const { guardarPredio } = usePredioAPI(codPersona);
 
-  // Inicializar react-hook-form
-  const baseForm = useForm<PredioFormData>({
+  // React Hook Form
+  const { control, handleSubmit, setValue, watch, formState: { errors } } = useForm<PredioFormData>({
     defaultValues: {
-      anioAdquisicion: '',
+      anioAdquisicion: new Date().getFullYear().toString(),
       fechaAdquisicion: null,
       condicionPropiedad: '',
       direccion: null,
@@ -97,36 +137,23 @@ const PredioForm: React.FC = memo(() => {
     }
   });
 
-  // Usar el wrapper para integrar con FormContext
-  const form = useFormWrapper({
-    formId: 'predio-form',
-    form: baseForm
-  });
+  // Generar años disponibles
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 50 }, (_, i) => ({
+    value: (currentYear - i).toString(),
+    label: (currentYear - i).toString()
+  }));
 
-  const { control, handleSubmit, setValue, watch, markSaved } = form;
+  // Observar valores del formulario
+  const direccionSeleccionada = watch('direccion');
 
   // Manejar el envío del formulario
   const onSubmit = async (data: PredioFormData) => {
     setIsSubmitting(true);
     try {
-      console.log('Datos del formulario:', data);
-      
-      // Aquí iría la llamada a la API para guardar
-      // await api.savePredio(data);
-      
-      // Simular guardado
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      NotificationService.success('Predio registrado exitosamente');
-      
-      // Marcar el formulario como guardado
-      markSaved();
-      
-      // Navegar a la lista después de guardar
-      navigate('/predio/consulta');
+      await guardarPredio(data);
     } catch (error) {
-      console.error('Error al guardar:', error);
-      NotificationService.error('Error al registrar el predio');
+      console.error('Error en formulario:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -136,222 +163,449 @@ const PredioForm: React.FC = memo(() => {
   const handleDireccionSelect = useCallback((direccion: Direccion) => {
     setValue('direccion', direccion, { shouldDirty: true });
     setIsModalOpen(false);
+    NotificationService.info('Dirección seleccionada correctamente');
   }, [setValue]);
 
-  // Observar el valor de la dirección
-  const direccionSeleccionada = watch('direccion');
+  // Obtener texto de la dirección
+  const getDireccionTexto = () => {
+    if (!direccionSeleccionada) return '';
+    return direccionSeleccionada.descripcion || 
+           `${direccionSeleccionada.nombreCalle || ''} ${direccionSeleccionada.numeracion || ''}`.trim();
+  };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      {/* Sección: Datos del Predio */}
-      <FormSection title="Datos del Predio">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Controller
-            name="anioAdquisicion"
-            control={control}
-            rules={{ required: 'El año de adquisición es requerido' }}
-            render={({ field, fieldState: { error } }) => (
-              <Input
-                {...field}
-                label="Año de Adquisición"
-                type="number"
-                placeholder="2024"
-                error={error?.message}
-              />
-            )}
-          />
+    <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
+      <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ p: 3 }}>
+        <Grid container spacing={3}>
+          {/* Sección: Datos del Predio */}
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+                  <AssignmentIcon color="primary" />
+                  <Typography variant="h6" fontWeight={600}>
+                    Datos del Predio
+                  </Typography>
+                </Stack>
+                <Divider sx={{ mb: 3 }} />
+                
+                <Grid container spacing={3}>
+                  {/* Año de Adquisición */}
+                  <Grid item xs={12} md={4}>
+                    <Controller
+                      name="anioAdquisicion"
+                      control={control}
+                      rules={{ required: 'El año es requerido' }}
+                      render={({ field }) => (
+                        <FormControl fullWidth error={!!errors.anioAdquisicion}>
+                          <InputLabel>Año de Adquisición</InputLabel>
+                          <Select
+                            {...field}
+                            label="Año de Adquisición"
+                            startAdornment={
+                              <InputAdornment position="start">
+                                <CalendarIcon fontSize="small" />
+                              </InputAdornment>
+                            }
+                          >
+                            {yearOptions.map(year => (
+                              <MenuItem key={year.value} value={year.value}>
+                                {year.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                          {errors.anioAdquisicion && (
+                            <FormHelperText>{errors.anioAdquisicion.message}</FormHelperText>
+                          )}
+                        </FormControl>
+                      )}
+                    />
+                  </Grid>
 
-          <Controller
-            name="fechaAdquisicion"
-            control={control}
-            rules={{ required: 'La fecha de adquisición es requerida' }}
-            render={({ field, fieldState: { error } }) => (
-              <CalendarInput
-                {...field}
-                label="Fecha de Adquisición"
-                placeholder="Seleccione fecha"
-                error={error?.message}
-              />
-            )}
-          />
+                  {/* Fecha de Adquisición */}
+                  <Grid item xs={12} md={4}>
+                    <Controller
+                      name="fechaAdquisicion"
+                      control={control}
+                      rules={{ required: 'La fecha es requerida' }}
+                      render={({ field }) => (
+                        <DatePicker
+                          {...field}
+                          label="Fecha de Adquisición"
+                          format="dd/MM/yyyy"
+                          slotProps={{
+                            textField: {
+                              fullWidth: true,
+                              error: !!errors.fechaAdquisicion,
+                              helperText: errors.fechaAdquisicion?.message,
+                              placeholder: "dd/mm/aaaa",
+                              InputProps: {
+                                startAdornment: (
+                                  <InputAdornment position="start">
+                                    <CalendarIcon fontSize="small" />
+                                  </InputAdornment>
+                                )
+                              }
+                            }
+                          }}
+                        />
+                      )}
+                    />
+                  </Grid>
 
-          <Controller
-            name="condicionPropiedad"
-            control={control}
-            rules={{ required: 'La condición de propiedad es requerida' }}
-            render={({ field, fieldState: { error } }) => (
-              <Select
-                {...field}
-                label="Condición de Propiedad"
-                options={CONDICION_PROPIEDAD_OPTIONS}
-                placeholder="Seleccione condición"
-                error={error?.message}
-              />
-            )}
-          />
+                  {/* Condición de Propiedad */}
+                  <Grid item xs={12} md={4}>
+                    <Controller
+                      name="condicionPropiedad"
+                      control={control}
+                      rules={{ required: 'La condición es requerida' }}
+                      render={({ field }) => (
+                        <FormControl fullWidth error={!!errors.condicionPropiedad}>
+                          <InputLabel>Condición de Propiedad</InputLabel>
+                          <Select
+                            {...field}
+                            label="Condición de Propiedad"
+                          >
+                            <MenuItem value="">
+                              <em>Seleccione condición</em>
+                            </MenuItem>
+                            {CONDICION_PROPIEDAD_OPTIONS.map(option => (
+                              <MenuItem key={option.value} value={option.value}>
+                                {option.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                          {errors.condicionPropiedad && (
+                            <FormHelperText>{errors.condicionPropiedad.message}</FormHelperText>
+                          )}
+                        </FormControl>
+                      )}
+                    />
+                    <Box sx={{ mt: 1 }}>
+                      <Chip
+                        size="small"
+                        label={`${CONDICION_PROPIEDAD_OPTIONS.length} opciones`}
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </Box>
+                  </Grid>
 
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Dirección del Predio
-            </label>
-            <div className="flex gap-2">
-              <Input
-                value={direccionSeleccionada ? 
-                  `${direccionSeleccionada.nombreCalle} ${direccionSeleccionada.numeracion || ''}` : 
-                  ''
-                }
-                placeholder="Seleccione una dirección"
-                readOnly
-              />
+                  {/* Dirección del Predio */}
+                  <Grid item xs={12} md={8}>
+                    <Controller
+                      name="direccion"
+                      control={control}
+                      rules={{ required: 'La dirección es requerida' }}
+                      render={({ field }) => (
+                        <TextField
+                          fullWidth
+                          label="Dirección del Predio"
+                          value={getDireccionTexto()}
+                          placeholder="Seleccione una dirección"
+                          error={!!errors.direccion}
+                          helperText={errors.direccion?.message}
+                          InputProps={{
+                            readOnly: true,
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <LocationIcon fontSize="small" />
+                              </InputAdornment>
+                            ),
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <Button
+                                  variant="contained"
+                                  size="small"
+                                  onClick={() => setIsModalOpen(true)}
+                                  startIcon={<SearchIcon />}
+                                  disabled={isSubmitting}
+                                >
+                                  Buscar
+                                </Button>
+                              </InputAdornment>
+                            )
+                          }}
+                        />
+                      )}
+                    />
+                  </Grid>
+
+                  {/* N° Finca */}
+                  <Grid item xs={12} md={4}>
+                    <Controller
+                      name="nFinca"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          fullWidth
+                          label="N° Finca"
+                          placeholder="Número de finca"
+                        />
+                      )}
+                    />
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Sección: Otros Datos */}
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+                  <DomainIcon color="primary" />
+                  <Typography variant="h6" fontWeight={600}>
+                    Otros Datos
+                  </Typography>
+                </Stack>
+                <Divider sx={{ mb: 3 }} />
+                
+                <Grid container spacing={3}>
+                  {/* Tipo de Predio */}
+                  <Grid item xs={12} md={4}>
+                    <Controller
+                      name="tipoPredio"
+                      control={control}
+                      rules={{ required: 'El tipo es requerido' }}
+                      render={({ field }) => (
+                        <FormControl fullWidth error={!!errors.tipoPredio}>
+                          <InputLabel>Tipo de Predio</InputLabel>
+                          <Select
+                            {...field}
+                            label="Tipo de Predio"
+                            startAdornment={
+                              <InputAdornment position="start">
+                                <ApartmentIcon fontSize="small" />
+                              </InputAdornment>
+                            }
+                          >
+                            <MenuItem value="">
+                              <em>Seleccione tipo</em>
+                            </MenuItem>
+                            {TIPO_PREDIO_OPTIONS.map(option => (
+                              <MenuItem key={option.value} value={option.value}>
+                                {option.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                          {errors.tipoPredio && (
+                            <FormHelperText>{errors.tipoPredio.message}</FormHelperText>
+                          )}
+                        </FormControl>
+                      )}
+                    />
+                    <Box sx={{ mt: 1 }}>
+                      <Chip
+                        size="small"
+                        label={`${TIPO_PREDIO_OPTIONS.length} opciones`}
+                        color="secondary"
+                        variant="outlined"
+                      />
+                    </Box>
+                  </Grid>
+
+                  {/* Conductor */}
+                  <Grid item xs={12} md={4}>
+                    <Controller
+                      name="conductor"
+                      control={control}
+                      rules={{ required: 'El conductor es requerido' }}
+                      render={({ field }) => (
+                        <FormControl fullWidth error={!!errors.conductor}>
+                          <InputLabel>Conductor</InputLabel>
+                          <Select
+                            {...field}
+                            label="Conductor"
+                            startAdornment={
+                              <InputAdornment position="start">
+                                <GroupsIcon fontSize="small" />
+                              </InputAdornment>
+                            }
+                          >
+                            <MenuItem value="">
+                              <em>Seleccione conductor</em>
+                            </MenuItem>
+                            {CONDUCTOR_OPTIONS.map(option => (
+                              <MenuItem key={option.value} value={option.value}>
+                                {option.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                          {errors.conductor && (
+                            <FormHelperText>{errors.conductor.message}</FormHelperText>
+                          )}
+                        </FormControl>
+                      )}
+                    />
+                    <Box sx={{ mt: 1 }}>
+                      <Chip
+                        size="small"
+                        label={`${CONDUCTOR_OPTIONS.length} opciones`}
+                        color="info"
+                        variant="outlined"
+                      />
+                    </Box>
+                  </Grid>
+
+                  {/* Uso del Predio */}
+                  <Grid item xs={12} md={4}>
+                    <Controller
+                      name="usoPredio"
+                      control={control}
+                      rules={{ required: 'El uso es requerido' }}
+                      render={({ field }) => (
+                        <FormControl fullWidth error={!!errors.usoPredio}>
+                          <InputLabel>Uso del Predio</InputLabel>
+                          <Select
+                            {...field}
+                            label="Uso del Predio"
+                          >
+                            <MenuItem value="">
+                              <em>Seleccione uso</em>
+                            </MenuItem>
+                            {USO_PREDIO_OPTIONS.map(option => (
+                              <MenuItem key={option.value} value={option.value}>
+                                {option.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                          {errors.usoPredio && (
+                            <FormHelperText>{errors.usoPredio.message}</FormHelperText>
+                          )}
+                        </FormControl>
+                      )}
+                    />
+                    <Box sx={{ mt: 1 }}>
+                      <Chip
+                        size="small"
+                        label={`${USO_PREDIO_OPTIONS.length} opciones`}
+                        color="success"
+                        variant="outlined"
+                      />
+                    </Box>
+                  </Grid>
+
+                  {/* Área del Terreno */}
+                  <Grid item xs={12} md={4}>
+                    <Controller
+                      name="areaTerreno"
+                      control={control}
+                      rules={{ 
+                        required: 'El área es requerida',
+                        min: { value: 0.01, message: 'El área debe ser mayor a 0' }
+                      }}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          fullWidth
+                          label="Área del Terreno (m²)"
+                          type="number"
+                          error={!!errors.areaTerreno}
+                          helperText={errors.areaTerreno?.message}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <TerrainIcon fontSize="small" />
+                              </InputAdornment>
+                            ),
+                            inputProps: { min: 0, step: 0.01 }
+                          }}
+                        />
+                      )}
+                    />
+                  </Grid>
+
+                  {/* Número de Pisos */}
+                  <Grid item xs={12} md={4}>
+                    <Controller
+                      name="numeroPisos"
+                      control={control}
+                      rules={{ 
+                        required: 'El número de pisos es requerido',
+                        min: { value: 1, message: 'Debe haber al menos 1 piso' }
+                      }}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          fullWidth
+                          label="Número de Pisos"
+                          type="number"
+                          error={!!errors.numeroPisos}
+                          helperText={errors.numeroPisos?.message}
+                          InputProps={{
+                            inputProps: { min: 0, max: 50 }
+                          }}
+                        />
+                      )}
+                    />
+                  </Grid>
+
+                  {/* Número de Condóminos */}
+                  <Grid item xs={12} md={4}>
+                    <Controller
+                      name="numeroCondominos"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          fullWidth
+                          label="Número de Condóminos"
+                          type="number"
+                          InputProps={{
+                            inputProps: { min: 0 }
+                          }}
+                        />
+                      )}
+                    />
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Mensaje informativo si no hay contribuyente */}
+          {!codPersona && (
+            <Grid item xs={12}>
+              <Alert severity="warning">
+                Debe seleccionar un contribuyente antes de registrar un predio
+              </Alert>
+            </Grid>
+          )}
+
+          {/* Botones de Acción */}
+          <Grid item xs={12}>
+            <Stack direction="row" spacing={2} justifyContent="flex-end">
               <Button
-                type="button"
-                onClick={() => setIsModalOpen(true)}
-                variant="secondary"
+                variant="outlined"
+                onClick={() => navigate('/predio/consulta')}
+                startIcon={<CancelIcon />}
+                disabled={isSubmitting}
               >
-                Buscar
+                Cancelar
               </Button>
-            </div>
-          </div>
+              <Button
+                type="submit"
+                variant="contained"
+                startIcon={<SaveIcon />}
+                disabled={isSubmitting || !codPersona}
+              >
+                {isSubmitting ? 'Guardando...' : 'Guardar Predio'}
+              </Button>
+            </Stack>
+          </Grid>
+        </Grid>
 
-          <Controller
-            name="nFinca"
-            control={control}
-            render={({ field }) => (
-              <Input
-                {...field}
-                label="N° Finca"
-                placeholder="Número de finca"
-              />
-            )}
-          />
-        </div>
-      </FormSection>
-
-      {/* Sección: Otros Datos */}
-      <FormSection title="Otros Datos">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Controller
-            name="tipoPredio"
-            control={control}
-            rules={{ required: 'El tipo de predio es requerido' }}
-            render={({ field, fieldState: { error } }) => (
-              <Select
-                {...field}
-                label="Tipo de Predio"
-                options={TIPO_PREDIO_OPTIONS}
-                placeholder="Seleccione tipo"
-                error={error?.message}
-              />
-            )}
-          />
-
-          <Controller
-            name="conductor"
-            control={control}
-            rules={{ required: 'El conductor es requerido' }}
-            render={({ field, fieldState: { error } }) => (
-              <Select
-                {...field}
-                label="Conductor"
-                options={CONDUCTOR_OPTIONS}
-                placeholder="Seleccione conductor"
-                error={error?.message}
-              />
-            )}
-          />
-
-          <Controller
-            name="usoPredio"
-            control={control}
-            rules={{ required: 'El uso del predio es requerido' }}
-            render={({ field, fieldState: { error } }) => (
-              <Select
-                {...field}
-                label="Uso del Predio"
-                options={USO_PREDIO_OPTIONS}
-                placeholder="Seleccione uso"
-                error={error?.message}
-              />
-            )}
-          />
-
-          <Controller
-            name="areaTerreno"
-            control={control}
-            rules={{ 
-              required: 'El área del terreno es requerida',
-              min: { value: 1, message: 'El área debe ser mayor a 0' }
-            }}
-            render={({ field, fieldState: { error } }) => (
-              <Input
-                {...field}
-                label="Área del Terreno (m²)"
-                type="number"
-                placeholder="0.00"
-                error={error?.message}
-              />
-            )}
-          />
-
-          <Controller
-            name="numeroPisos"
-            control={control}
-            rules={{ 
-              required: 'El número de pisos es requerido',
-              min: { value: 1, message: 'Debe haber al menos 1 piso' }
-            }}
-            render={({ field, fieldState: { error } }) => (
-              <Input
-                {...field}
-                label="Número de Pisos"
-                type="number"
-                placeholder="1"
-                error={error?.message}
-              />
-            )}
-          />
-
-          <Controller
-            name="numeroCondominos"
-            control={control}
-            render={({ field }) => (
-              <Input
-                {...field}
-                label="Número de Condóminos"
-                type="number"
-                placeholder="0"
-              />
-            )}
-          />
-        </div>
-      </FormSection>
-
-      {/* Botones de acción */}
-      <div className="flex justify-end gap-4 pt-6">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => navigate('/predio/consulta')}
-        >
-          Cancelar
-        </Button>
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? 'Guardando...' : 'Guardar Predio'}
-        </Button>
-      </div>
-
-      {/* Modal de selección de dirección */}
-      <SelectorDirecciones
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSelect={handleDireccionSelect}
-        title="Seleccionar Dirección del Predio"
-      />
-    </form>
+        {/* Modal de selección de dirección */}
+        <SelectorDirecciones
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSelectDireccion={handleDireccionSelect}
+        />
+      </Box>
+    </LocalizationProvider>
   );
 });
 

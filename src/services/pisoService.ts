@@ -2,7 +2,7 @@
 
 import { BaseApiService } from './BaseApiService';
 import { Piso, PisoFormData } from '../models/Piso';
-import { API_CONFIG } from '../config/api.config';
+import { API_CONFIG } from '../utils/api';
 import { NotificationService } from '../components/utils/Notification';
 
 /**

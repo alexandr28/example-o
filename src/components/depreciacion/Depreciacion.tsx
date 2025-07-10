@@ -49,8 +49,8 @@ interface EstadoConservacion {
  * Componente para capturar los datos de depreciación con Material-UI
  */
 const Depreciacion: React.FC<DepreciacionProps> = ({
-  aniosDisponibles,
-  tiposCasa,
+  aniosDisponibles = [], // Valor por defecto
+  tiposCasa = [], // Valor por defecto
   anioSeleccionado,
   tipoCasaSeleccionado,
   onAnioChange,
@@ -88,134 +88,117 @@ const Depreciacion: React.FC<DepreciacionProps> = ({
     }
   ]);
 
-  // Convertir opciones al formato de SearchableSelect
-  const anioOptions = aniosDisponibles.map(anio => ({
+  // Convertir opciones al formato de SearchableSelect con validación
+  const anioOptions = (aniosDisponibles || []).map(anio => ({
     id: anio.value,
     value: parseInt(anio.value),
     label: anio.label,
     description: anio.value === new Date().getFullYear().toString() ? 'Año actual' : undefined
   }));
 
-  const tipoCasaOptions = tiposCasa.map(tipo => ({
+  const tipoCasaOptions = (tiposCasa || []).map(tipo => ({
     id: tipo.value,
     value: tipo.value,
-    label: tipo.label,
-    description: getTipoCasaDescription(tipo.value)
+    label: tipo.label
   }));
 
-  // Helper para descripciones de tipos de casa
-  function getTipoCasaDescription(tipo: string): string {
-    const descripciones: Record<string, string> = {
-      'Casa-Habitación': 'Vivienda unifamiliar',
-      'Comercio': 'Locales comerciales',
-      'Industria': 'Instalaciones industriales',
-      'Otros': 'Otros tipos de construcción'
-    };
-    return descripciones[tipo] || '';
-  }
+  const handleAnioSelect = (option: any) => {
+    onAnioChange(option ? option.value : null);
+  };
 
-  // Manejar cambio de valores de conservación
+  const handleTipoCasaSelect = (option: any) => {
+    onTipoCasaChange(option ? option.value : null);
+  };
+
   const handleConservacionChange = (index: number, value: string) => {
-    if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
-      const newEstados = [...estadosConservacion];
-      newEstados[index].value = parseFloat(value) || 0;
-      setEstadosConservacion(newEstados);
-    }
+    const nuevosEstados = [...estadosConservacion];
+    nuevosEstados[index].value = parseFloat(value) || 0;
+    setEstadosConservacion(nuevosEstados);
   };
 
   return (
     <Paper 
-      elevation={1}
+      elevation={2}
       sx={{ 
-        overflow: 'hidden',
-        border: `1px solid ${theme.palette.divider}`
+        p: 3,
+        background: theme.palette.mode === 'dark' 
+          ? 'rgba(255, 255, 255, 0.05)' 
+          : 'rgba(255, 255, 255, 0.9)',
+        backdropFilter: 'blur(10px)'
       }}
     >
-      <Box 
-        sx={{ 
-          px: 3, 
-          py: 2, 
-          bgcolor: alpha(theme.palette.primary.main, 0.04),
-          borderBottom: `1px solid ${theme.palette.divider}`
-        }}
-      >
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <TrendingDownIcon color="primary" fontSize="small" />
-          <Typography variant="h6" fontWeight={500}>
-            Datos de depreciación
-          </Typography>
-        </Stack>
-      </Box>
-      
-      <Box sx={{ p: 3 }}>
-        <Stack spacing={3}>
-          {/* Selectores */}
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={6}>
-              <SearchableSelect
-                label="Año"
-                options={anioOptions}
-                value={anioSeleccionado ? anioOptions.find(opt => opt.value === anioSeleccionado) || null : null}
-                onChange={(option) => onAnioChange(option ? option.value : null)}
-                placeholder="Seleccione el año"
-                disabled={loading}
-                required
-                renderOption={(props, option) => (
-                  <Box component="li" {...props}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <CalendarIcon fontSize="small" color="action" />
-                      <Box>
-                        <Typography variant="body2">{option.label}</Typography>
-                        {option.description && (
-                          <Typography variant="caption" color="text.secondary">
-                            {option.description}
-                          </Typography>
-                        )}
-                      </Box>
-                    </Stack>
-                  </Box>
-                )}
-              />
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <SearchableSelect
-                label="Tipos de casa"
-                options={tipoCasaOptions}
-                value={tipoCasaSeleccionado ? tipoCasaOptions.find(opt => opt.value === tipoCasaSeleccionado) || null : null}
-                onChange={(option) => onTipoCasaChange(option ? option.value : null)}
-                placeholder="Seleccione el tipo"
-                disabled={loading}
-                required
-                renderOption={(props, option) => (
-                  <Box component="li" {...props}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <HomeIcon fontSize="small" color="action" />
-                      <Box>
-                        <Typography variant="body2">{option.label}</Typography>
-                        {option.description && (
-                          <Typography variant="caption" color="text.secondary">
-                            {option.description}
-                          </Typography>
-                        )}
-                      </Box>
-                    </Stack>
-                  </Box>
-                )}
-              />
-            </Grid>
-          </Grid>
-
-          <Divider />
-
-          {/* Estados de conservación */}
+      <Box>
+        {/* Título de la sección */}
+        <Stack direction="row" alignItems="center" spacing={2} mb={3}>
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: 2,
+              bgcolor: alpha(theme.palette.primary.main, 0.1),
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <TrendingDownIcon color="primary" />
+          </Box>
           <Box>
-            <Typography variant="subtitle1" fontWeight={500} gutterBottom>
-              Estados de conservación
+            <Typography variant="h6" fontWeight={600}>
+              Registrar Depreciación
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Configure los valores de depreciación por estado
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Divider sx={{ mb: 3 }} />
+
+        {/* Formulario */}
+        <Stack spacing={3}>
+          {/* Selección de Año */}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={500} mb={1}>
+              Año
+            </Typography>
+            <SearchableSelect
+              options={anioOptions}
+              value={anioSeleccionado ? anioOptions.find(opt => opt.value === anioSeleccionado) : null}
+              onChange={handleAnioSelect}
+              placeholder="Seleccione el año"
+              label="Año"
+              icon={<CalendarIcon />}
+              disabled={loading}
+              fullWidth
+            />
+          </Box>
+
+          {/* Selección de Tipo de Casa */}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={500} mb={1}>
+              Tipo de Casa
+            </Typography>
+            <SearchableSelect
+              options={tipoCasaOptions}
+              value={tipoCasaSeleccionado ? tipoCasaOptions.find(opt => opt.value === tipoCasaSeleccionado) : null}
+              onChange={handleTipoCasaSelect}
+              placeholder="Seleccione el tipo de casa"
+              label="Tipo de Casa"
+              icon={<HomeIcon />}
+              disabled={loading || !anioSeleccionado}
+              fullWidth
+            />
+          </Box>
+
+          {/* Estados de Conservación */}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={500} mb={2}>
+              Estados de Conservación
             </Typography>
             <Grid container spacing={2}>
               {estadosConservacion.map((estado, index) => (
-                <Grid item xs={6} md={3} key={estado.nombre}>
+                <Grid item xs={12} sm={6} key={estado.nombre}>
                   <Box>
                     <Stack direction="row" alignItems="center" spacing={1} mb={1}>
                       <Box sx={{ color: estado.color }}>
@@ -286,21 +269,17 @@ const Depreciacion: React.FC<DepreciacionProps> = ({
               size="large"
               onClick={onRegistrar}
               disabled={loading || !anioSeleccionado || !tipoCasaSeleccionado}
-              startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+              startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
               sx={{
-                py: 1.5,
-                bgcolor: theme.palette.success.main,
-                '&:hover': {
-                  bgcolor: theme.palette.success.dark,
-                },
+                height: 48,
                 fontWeight: 600,
-                boxShadow: theme.shadows[2],
-                '&:hover:not(:disabled)': {
-                  boxShadow: theme.shadows[4],
+                boxShadow: theme.shadows[4],
+                '&:hover': {
+                  boxShadow: theme.shadows[8]
                 }
               }}
             >
-              {loading ? 'Registrando...' : 'Registrar'}
+              {loading ? 'Registrando...' : 'Registrar Depreciación'}
             </Button>
           </Box>
         </Stack>

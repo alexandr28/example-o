@@ -40,8 +40,7 @@ export const API_CONFIG = {
     direcciones: {
       base: '/api/direccion',
       listarPorNombreVia: '/api/direccion/listarDireccionPorNombreVia',
-      listarPorTipoVia: '/api/direccion/listarDireccionPorTipoVia',
-      obtenerPorCodigo: '/api/direccion/obtenerPorCodigo',
+      listarPorTipoVia: '/api/direccion/listarDireccionPorTipoVia?parametrosBusqueda=a&codUsuario=1',
       crear: '/api/direccion',
       actualizar: '/api/direccion',
       eliminar: '/api/direccion'
@@ -50,24 +49,30 @@ export const API_CONFIG = {
     // Personas - Endpoint sin autenticación para búsquedas
     personas: {
       base: '/api/persona',
-      listarPorTipoYNombre: '/api/persona/listarPersonaPorTipoPersonaNombreRazon',
-      obtenerPorCodigo: '/api/persona/obtenerPorCodigo',
+      listarPorTipoPersonaRazonSocial: `/api/persona/listarPersonaPorTipoPersonaNombreRazon`,
+      listarPorTipoPersonaContribuyente: '/api/persona/listarPersonaPorTipoPersonaNombreRazonContribuyente',
+      ListarPErsonaTipoVia:`api/persona/listarPersonaPorTipoPersonaNombreVia`,
       crear: '/api/persona',
       actualizar: '/api/persona',
       eliminar: '/api/persona'
     },
     
-    // Contribuyentes (requieren auth para todas las operaciones)
-    contribuyentes: '/api/contribuyente',
+    // Contribuyentes   Endpoints específicos sin autenticación
+    contribuyentes:{
+      base: '/api/contribuyente',
+      listarContribuyente: '/api/contribuyente',
+      actualizar: '/api/contribuyente',
+      eliminar: '/api/contribuyente'
+    } ,
     
-    // Módulos principales (requieren auth)
+    // Módulos principales -  Endpoints específicos sin autenticación
     predios: '/api/predio',
     pisos: '/api/piso',
     
-    // Otros endpoints (requieren auth)
+    // Otros endpoints-  Endpoints específicos sin autenticación
     aranceles: '/api/arancel',
-    valoresUnitarios: '/api/valor-unitario',
-    uit: '/api/uit',
+    valoresUnitarios: '/api/valoresunitarios',
+    uit: '/api/uitEpa',
     alcabala: '/api/alcabala',
     depreciacion: '/api/depreciacion',
     
@@ -97,8 +102,8 @@ export const API_CONFIG = {
     '/api/sector',
     '/api/barrio', 
     '/api/via',
-    '/api/direccion/listarDireccionPorNombreVia',
-    '/api/direccion/listarDireccionPorTipoVia',
+    `api/direccion/listarDireccionPorNombreVia`,
+    `api/direccion/listarDireccionPorTipoVia?parametrosBusqueda=a&codUsuario=1`,
     '/api/persona/listarPersonaPorTipoPersonaNombreRazon',
   ],
   

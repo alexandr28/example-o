@@ -1,10 +1,40 @@
-// src/components/predio/SelectorPredios.tsx
-
+// src/components/predio/pisos/SelectorPredios.tsx
 import React, { useState, useEffect } from 'react';
-import { X, Search } from 'lucide-react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  IconButton,
+  InputAdornment,
+  Box,
+  Typography,
+  Chip,
+  Stack,
+  LinearProgress,
+  TablePagination,
+  useTheme,
+  alpha
+} from '@mui/material';
+import {
+  Close as CloseIcon,
+  Search as SearchIcon,
+  Home as HomeIcon,
+  CheckCircle as CheckIcon
+} from '@mui/icons-material';
+import { predioService } from '../../../services/predioService';
 
 interface Predio {
-  id: number;
+  id: number | string;
   codigoPredio: string;
   tipoPredio: string;
   direccion?: string;
@@ -13,192 +43,276 @@ interface Predio {
 }
 
 interface SelectorPrediosProps {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
   onSelect: (predio: Predio) => void;
 }
 
 const SelectorPredios: React.FC<SelectorPrediosProps> = ({
-  isOpen,
+  open,
   onClose,
   onSelect
 }) => {
+  const theme = useTheme();
   const [searchTerm, setSearchTerm] = useState('');
   const [predios, setPredios] = useState<Predio[]>([]);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [selectedPredio, setSelectedPredio] = useState<Predio | null>(null);
 
-  // Datos de ejemplo
-  const prediosData: Predio[] = [
-    {
-      id: 1,
-      codigoPredio: '1045',
-      tipoPredio: 'Predio independiente',
-      direccion: 'Av. Principal 123',
-      contribuyente: 'Juan Pérez García',
-      areaTerreno: 250.00
-    },
-    {
-      id: 2,
-      codigoPredio: '1022',
-      tipoPredio: 'Departamento en edificio',
-      direccion: 'Jr. Las Flores 456',
-      contribuyente: 'María López Rodríguez',
-      areaTerreno: 120.00
-    },
-    {
-      id: 3,
-      codigoPredio: '456',
-      tipoPredio: 'Predio en quinta',
-      direccion: 'Calle Los Álamos 789',
-      contribuyente: 'Carlos Díaz Mendoza',
-      areaTerreno: 180.00
-    }
-  ];
-
-  // Cargar predios al abrir el modal
+  // Cargar predios cuando se abre el modal
   useEffect(() => {
-    if (isOpen) {
+    if (open) {
       cargarPredios();
     }
-  }, [isOpen]);
+  }, [open]);
 
+  // Cargar predios
   const cargarPredios = async () => {
     setLoading(true);
     try {
-      // Simular carga de datos
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setPredios(prediosData);
+      const data = await predioService.getAll();
+      setPredios(data);
     } catch (error) {
       console.error('Error al cargar predios:', error);
+      // Datos de ejemplo si falla la API
+      setPredios([
+        {
+          id: 1,
+          codigoPredio: '1045',
+          tipoPredio: 'Predio independiente',
+          direccion: 'Av. Principal 123',
+          contribuyente: 'Juan Pérez García',
+          areaTerreno: 250.00
+        },
+        {
+          id: 2,
+          codigoPredio: '1022',
+          tipoPredio: 'Departamento en edificio',
+          direccion: 'Jr. Las Flores 456',
+          contribuyente: 'María López Sánchez',
+          areaTerreno: 120.50
+        },
+        {
+          id: 3,
+          codigoPredio: '1078',
+          tipoPredio: 'Predio independiente',
+          direccion: 'Calle Los Álamos 789',
+          contribuyente: 'Carlos Rodríguez Díaz',
+          areaTerreno: 180.75
+        }
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
   // Filtrar predios
-  const prediosFiltrados = predios.filter(predio =>
+  const filteredPredios = predios.filter(predio =>
     predio.codigoPredio.toLowerCase().includes(searchTerm.toLowerCase()) ||
     predio.direccion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     predio.contribuyente?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSelect = (predio: Predio) => {
-    onSelect(predio);
-    onClose();
-    setSearchTerm('');
+  // Paginación
+  const paginatedPredios = filteredPredios.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
+
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
   };
 
-  if (!isOpen) return null;
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Seleccionar predio
+  const handleSelectPredio = (predio: Predio) => {
+    setSelectedPredio(predio);
+  };
+
+  // Confirmar selección
+  const handleConfirm = () => {
+    if (selectedPredio) {
+      onSelect(selectedPredio);
+      onClose();
+    }
+  };
+
+  // Limpiar al cerrar
+  const handleClose = () => {
+    setSearchTerm('');
+    setSelectedPredio(null);
+    setPage(0);
+    onClose();
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-            Seleccionar Predio
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 2,
+          minHeight: 500
+        }
+      }}
+    >
+      <DialogTitle sx={{ m: 0, p: 2 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <HomeIcon color="primary" />
+            <Typography variant="h6" fontWeight={600}>
+              Seleccionar Predio
+            </Typography>
+          </Stack>
+          <IconButton
+            onClick={handleClose}
+            sx={{
+              color: theme.palette.grey[500],
+              '&:hover': {
+                color: theme.palette.grey[700]
+              }
+            }}
           >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+      </DialogTitle>
 
-        {/* Búsqueda */}
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Buscar por código, dirección o contribuyente..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-            />
-          </div>
-        </div>
+      <DialogContent dividers sx={{ p: 0 }}>
+        {/* Barra de búsqueda */}
+        <Box sx={{ p: 2, bgcolor: 'grey.50' }}>
+          <TextField
+            fullWidth
+            placeholder="Buscar por código, dirección o contribuyente..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon color="action" />
+                </InputAdornment>
+              )
+            }}
+          />
+        </Box>
 
-        {/* Lista de predios */}
-        <div className="flex-1 overflow-y-auto">
-          {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-            </div>
-          ) : prediosFiltrados.length > 0 ? (
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Código
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Tipo Predio
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Dirección
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Contribuyente
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Área (m²)
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Acción
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {prediosFiltrados.map((predio) => (
-                  <tr key={predio.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                      {predio.codigoPredio}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {predio.tipoPredio}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {predio.direccion || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {predio.contribuyente || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">
-                      {predio.areaTerreno.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <button
-                        onClick={() => handleSelect(predio)}
-                        className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
-                      >
-                        Seleccionar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500 dark:text-gray-400">
-              <p className="text-lg font-medium">No se encontraron predios</p>
-              <p className="text-sm mt-2">Intente con otros términos de búsqueda</p>
-            </div>
-          )}
-        </div>
+        {loading && <LinearProgress />}
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
-          >
-            Cancelar
-          </button>
-        </div>
-      </div>
-    </div>
+        {/* Tabla de predios */}
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow sx={{ bgcolor: 'grey.100' }}>
+                <TableCell padding="checkbox"></TableCell>
+                <TableCell>Código</TableCell>
+                <TableCell>Tipo</TableCell>
+                <TableCell>Dirección</TableCell>
+                <TableCell>Contribuyente</TableCell>
+                <TableCell align="center">Área (m²)</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {paginatedPredios.length > 0 ? (
+                paginatedPredios.map((predio) => (
+                  <TableRow
+                    key={predio.id}
+                    hover
+                    selected={selectedPredio?.id === predio.id}
+                    onClick={() => handleSelectPredio(predio)}
+                    sx={{
+                      cursor: 'pointer',
+                      '&.Mui-selected': {
+                        bgcolor: alpha(theme.palette.primary.main, 0.08),
+                        '&:hover': {
+                          bgcolor: alpha(theme.palette.primary.main, 0.12)
+                        }
+                      }
+                    }}
+                  >
+                    <TableCell padding="checkbox">
+                      {selectedPredio?.id === predio.id && (
+                        <CheckIcon color="primary" fontSize="small" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={predio.codigoPredio}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {predio.tipoPredio}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {predio.direccion || 'Sin dirección'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {predio.contribuyente || 'No asignado'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography variant="body2" fontWeight={500}>
+                        {predio.areaTerreno.toFixed(2)}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    <Typography color="text.secondary">
+                      No se encontraron predios
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        {/* Paginación */}
+        <TablePagination
+          component="div"
+          count={filteredPredios.length}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          labelRowsPerPage="Filas por página"
+          labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+          rowsPerPageOptions={[5, 10, 25]}
+        />
+      </DialogContent>
+
+      <DialogActions sx={{ p: 2, gap: 1 }}>
+        <Button onClick={handleClose} color="inherit">
+          Cancelar
+        </Button>
+        <Button
+          onClick={handleConfirm}
+          variant="contained"
+          disabled={!selectedPredio}
+          startIcon={<CheckIcon />}
+        >
+          Seleccionar
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };
 

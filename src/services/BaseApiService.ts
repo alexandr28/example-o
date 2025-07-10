@@ -120,7 +120,7 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
         
         const response = await fetch(fullUrl, {
           ...options,
-          headers,
+          Headers,
           mode: 'cors',
           credentials: 'include'
         });
