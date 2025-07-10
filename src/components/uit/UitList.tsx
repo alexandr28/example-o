@@ -1,4 +1,29 @@
+// src/components/uit/UitList.tsx
 import React from 'react';
+import {
+  Paper,
+  Box,
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Stack,
+  Chip,
+  CircularProgress,
+  useTheme,
+  alpha,
+  Skeleton,
+  Tooltip
+} from '@mui/material';
+import {
+  TrendingUp as TrendingUpIcon,
+  CalendarToday as CalendarIcon,
+  AttachMoney as MoneyIcon,
+  ShowChart as ShowChartIcon
+} from '@mui/icons-material';
 import { UIT } from '../../models/UIT';
 
 interface UitListProps {
@@ -13,93 +38,246 @@ const UitList: React.FC<UitListProps> = ({
   uits,
   loading = false
 }) => {
+  const theme = useTheme();
+
+  // Formatear moneda
+  const formatCurrency = (value: number): string => {
+    return new Intl.NumberFormat('es-PE', {
+      style: 'currency',
+      currency: 'PEN',
+      minimumFractionDigits: 2
+    }).format(value);
+  };
+
+  // Formatear porcentaje
+  const formatPercentage = (value: number): string => {
+    return `${(value * 100).toFixed(1)}%`;
+  };
+
+  // Obtener color según la tasa
+  const getTasaChipColor = (tasa: number): 'success' | 'warning' | 'error' => {
+    if (tasa <= 0.2) return 'success';
+    if (tasa <= 0.6) return 'warning';
+    return 'error';
+  };
+
   return (
-    <div className="bg-white rounded-md shadow-sm overflow-hidden">
-      <div className="px-6 py-4 bg-gray-50 border-b">
-        <h2 className="text-lg font-medium text-gray-800">Lista de UIT</h2>
-      </div>
+    <Paper 
+      elevation={1}
+      sx={{ 
+        overflow: 'hidden',
+        border: `1px solid ${theme.palette.divider}`
+      }}
+    >
+      <Box 
+        sx={{ 
+          px: 3, 
+          py: 2, 
+          bgcolor: alpha(theme.palette.primary.main, 0.04),
+          borderBottom: `1px solid ${theme.palette.divider}`
+        }}
+      >
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <ShowChartIcon color="primary" fontSize="small" />
+          <Typography variant="h6" fontWeight={500}>
+            Lista de UIT
+          </Typography>
+        </Stack>
+      </Box>
       
       {loading ? (
-        <div className="flex justify-center py-8">
-          <svg className="animate-spin h-8 w-8 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-        </div>
+        <Box sx={{ p: 3 }}>
+          <Stack spacing={1}>
+            {[...Array(5)].map((_, index) => (
+              <Skeleton key={index} height={60} animation="wave" />
+            ))}
+          </Stack>
+        </Box>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Año
-                  <span className="ml-1">▼</span>
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+        <TableContainer sx={{ maxHeight: 400 }}>
+          <Table stickyHeader size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell 
+                  sx={{ 
+                    bgcolor: theme.palette.grey[50],
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    color: theme.palette.text.secondary
+                  }}
+                >
+                  <Stack direction="row" alignItems="center" spacing={0.5}>
+                    <CalendarIcon fontSize="small" />
+                    <span>AÑO</span>
+                  </Stack>
+                </TableCell>
+                <TableCell 
+                  align="center"
+                  sx={{ 
+                    bgcolor: theme.palette.grey[50],
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    color: theme.palette.text.secondary
+                  }}
+                >
                   UIT
-                  <span className="ml-1">▼</span>
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tasa
-                  <span className="ml-1">▼</span>
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rango Inicial
-                  <span className="ml-1">▼</span>
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rango Final
-                  <span className="ml-1">▼</span>
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Impuesto Parcial
-                  <span className="ml-1">▼</span>
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Impuesto Acumulado
-                  <span className="ml-1">▼</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+                </TableCell>
+                <TableCell 
+                  align="center"
+                  sx={{ 
+                    bgcolor: theme.palette.grey[50],
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    color: theme.palette.text.secondary
+                  }}
+                >
+                  TASA
+                </TableCell>
+                <TableCell 
+                  align="right"
+                  sx={{ 
+                    bgcolor: theme.palette.grey[50],
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    color: theme.palette.text.secondary
+                  }}
+                >
+                  RANGO INICIAL
+                </TableCell>
+                <TableCell 
+                  align="right"
+                  sx={{ 
+                    bgcolor: theme.palette.grey[50],
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    color: theme.palette.text.secondary
+                  }}
+                >
+                  RANGO FINAL
+                </TableCell>
+                <TableCell 
+                  align="right"
+                  sx={{ 
+                    bgcolor: theme.palette.grey[50],
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    color: theme.palette.text.secondary
+                  }}
+                >
+                  IMPUESTO PARCIAL
+                </TableCell>
+                <TableCell 
+                  align="center"
+                  sx={{ 
+                    bgcolor: theme.palette.grey[50],
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    color: theme.palette.text.secondary
+                  }}
+                >
+                  IMPUESTO ACUMULADO
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
               {uits.length > 0 ? (
                 uits.map((uit, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {uit.anio}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {uit.uit}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {uit.tasa.toFixed(1)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {uit.rangoInicial.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {typeof uit.rangoFinal === 'number' ? uit.rangoFinal.toFixed(2) : uit.rangoFinal}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {uit.impuestoParcial.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {uit.impuestoAcumulado}
-                    </td>
-                  </tr>
+                  <TableRow 
+                    key={index} 
+                    hover
+                    sx={{
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.primary.main, 0.04)
+                      }
+                    }}
+                  >
+                    <TableCell>
+                      <Chip
+                        label={uit.anio}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        sx={{ fontWeight: 500 }}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography variant="body2" fontWeight={500}>
+                        {formatCurrency(uit.uit)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Chip
+                        label={formatPercentage(uit.tasa)}
+                        size="small"
+                        color={getTasaChipColor(uit.tasa)}
+                        sx={{ minWidth: 60 }}
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body2">
+                        {formatCurrency(uit.rangoInicial)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body2">
+                        {typeof uit.rangoFinal === 'number' 
+                          ? formatCurrency(uit.rangoFinal) 
+                          : <Chip label="Sin límite" size="small" />
+                        }
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body2" color="text.secondary">
+                        {formatCurrency(uit.impuestoParcial)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Tooltip title="Estado del impuesto acumulado">
+                        <Chip
+                          label={uit.impuestoAcumulado}
+                          size="small"
+                          color={uit.impuestoAcumulado === 'ACTIVO' ? 'success' : 'default'}
+                          variant={uit.impuestoAcumulado === 'ACTIVO' ? 'filled' : 'outlined'}
+                        />
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
                 ))
               ) : (
-                <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
-                    No hay datos disponibles
-                  </td>
-                </tr>
+                <TableRow>
+                  <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
+                    <Stack alignItems="center" spacing={2}>
+                      <MoneyIcon sx={{ fontSize: 48, color: theme.palette.text.disabled }} />
+                      <Typography variant="body1" color="text.secondary">
+                        No hay datos de UIT disponibles
+                      </Typography>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
-    </div>
+
+      {/* Resumen al pie */}
+      {!loading && uits.length > 0 && (
+        <Box 
+          sx={{ 
+            p: 2, 
+            bgcolor: theme.palette.grey[50],
+            borderTop: `1px solid ${theme.palette.divider}`
+          }}
+        >
+          <Stack direction="row" spacing={2} alignItems="center">
+            <TrendingUpIcon fontSize="small" color="action" />
+            <Typography variant="caption" color="text.secondary">
+              Mostrando {uits.length} registros de UIT
+            </Typography>
+          </Stack>
+        </Box>
+      )}
+    </Paper>
   );
 };
 

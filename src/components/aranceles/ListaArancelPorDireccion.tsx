@@ -1,4 +1,4 @@
-// src/components/mantenedores/aranceles/ListaArancelesPorDireccion.tsx
+// src/components/aranceles/ListaArancelesPorDireccion.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
@@ -18,18 +18,19 @@ import {
   TablePagination,
   Skeleton,
   Stack,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
-  InputAdornment
+  InputAdornment,
+  Chip,
+  Alert
 } from '@mui/material';
 import { 
   Search as SearchIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  AttachMoney as MoneyIcon
+  AttachMoney as MoneyIcon,
+  LocationOn as LocationIcon,
+  CalendarToday as CalendarIcon
 } from '@mui/icons-material';
+import SearchableSelect from '../ui/SearchableSelect';
 import { useAranceles } from '../../hooks/useAranceles';
 import { formatCurrency } from '../../utils/formatters';
 
@@ -46,12 +47,11 @@ interface ArancelDireccion {
   loteInicial: number;
   loteFinal: number;
   monto: number;
-  estado: boolean;
 }
 
 export const ListaArancelesPorDireccion: React.FC = () => {
   // Estados
-  const [anioSeleccionado, setAnioSeleccionado] = useState<number | ''>('');
+  const [anioSeleccionado, setAnioSeleccionado] = useState<{id: number, value: number, label: string} | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -61,12 +61,19 @@ export const ListaArancelesPorDireccion: React.FC = () => {
 
   // Generar opciones de años
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 10 }, (_, i) => currentYear - i);
+  const anioOptions = useMemo(() => {
+    return Array.from({ length: 10 }, (_, i) => ({
+      id: currentYear - i,
+      value: currentYear - i,
+      label: (currentYear - i).toString(),
+      description: i === 0 ? 'Año actual' : `Hace ${i} años`
+    }));
+  }, [currentYear]);
 
   // Efecto para buscar cuando cambia el año
   useEffect(() => {
-    if (anioSeleccionado && anioSeleccionado !== '') {
-      buscarArancelesPorDireccion(anioSeleccionado);
+    if (anioSeleccionado) {
+      buscarArancelesPorDireccion(anioSeleccionado.value);
     }
   }, [anioSeleccionado, buscarArancelesPorDireccion]);
 
@@ -100,189 +107,173 @@ export const ListaArancelesPorDireccion: React.FC = () => {
   };
 
   const formatearDireccion = (arancel: ArancelDireccion) => {
-    return `${arancel.sector} + ${arancel.barrio} + ${arancel.tipoVia} + ${arancel.nombreVia} + CUADRA ${arancel.cuadra} + LADO ${arancel.lado} + LT ${arancel.loteInicial} - ${arancel.loteFinal}`;
+    return `${arancel.sector} + ${arancel.barrio}, ${arancel.tipoVia} ${arancel.nombreVia} - Cuadra ${arancel.cuadra}`;
   };
 
   return (
-    <Card>
-      <CardContent>
-        <Typography variant="h5" gutterBottom>
-          Lista de aranceles por dirección
-        </Typography>
+    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <CardContent sx={{ pb: 0 }}>
+        <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+          <LocationIcon color="primary" />
+          <Typography variant="h6" component="h3">
+            Lista de Aranceles por Dirección
+          </Typography>
+        </Stack>
 
-        {/* Controles de búsqueda compactados */}
-        <Box sx={{ mb: 3, mt: 2, maxWidth: '50%' }}>
-          <Stack direction="row" spacing={2}>
-            <FormControl size="small" sx={{ flex: 1 }}>
-              <InputLabel>Año</InputLabel>
-              <Select
-                value={anioSeleccionado}
-                onChange={(e) => setAnioSeleccionado(e.target.value as number)}
-                label="Año"
-              >
-                <MenuItem value="">
-                  <em>Seleccione</em>
-                </MenuItem>
-                {years.map((year) => (
-                  <MenuItem key={year} value={year}>
-                    {year}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            
-            <Box sx={{ flex: 1 }}>
-              <TextField
-                fullWidth
-                placeholder="Buscar por dirección..."
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon />
-                      </InputAdornment>
-                    ),
-                  }
-                }}
-                size="small"
-              />
-            </Box>
-          </Stack>
-        </Box>
-
-        {/* Tabla de resultados */}
-        <TableContainer component={Paper} variant="outlined">
-          <Table>
-            <TableHead>
-              <TableRow sx={{ bgcolor: 'grey.100' }}>
-                <TableCell>
-                  <Box display="flex" alignItems="center" gap={1}>
-                    <Typography variant="subtitle2">AÑO</Typography>
-                  </Box>
-                </TableCell>
-                <TableCell>
-                  <Box display="flex" alignItems="center" gap={1}>
-                    <Typography variant="subtitle2">DIRECCIÓN</Typography>
-                  </Box>
-                </TableCell>
-                <TableCell align="right">
-                  <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1}>
-                    <MoneyIcon fontSize="small" />
-                    <Typography variant="subtitle2">MONTO</Typography>
-                  </Box>
-                </TableCell>
-                <TableCell align="center" width={120}>
-                  <Typography variant="subtitle2">ACCIONES</Typography>
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
-                // Skeletons de carga
-                Array.from({ length: 5 }).map((_, index) => (
-                  <TableRow key={index}>
-                    <TableCell><Skeleton width={60} /></TableCell>
-                    <TableCell><Skeleton /></TableCell>
-                    <TableCell align="right"><Skeleton width={80} /></TableCell>
-                    <TableCell align="center"><Skeleton width={80} /></TableCell>
-                  </TableRow>
-                ))
-              ) : arancelesPaginados.length > 0 ? (
-                arancelesPaginados.map((arancel) => (
-                  <TableRow 
-                    key={arancel.id}
-                    sx={{ 
-                      '&:hover': { bgcolor: 'action.hover' },
-                      '&:last-child td, &:last-child th': { border: 0 } 
-                    }}
-                  >
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="medium">
-                        {arancel.anio}
+        {/* Controles de búsqueda */}
+        <Stack spacing={2} mb={2}>
+          {/* Selector de año usando SearchableSelect */}
+          <SearchableSelect
+            label="Seleccione el año"
+            options={anioOptions}
+            value={anioSeleccionado}
+            onChange={setAnioSeleccionado}
+            placeholder="Seleccione un año..."
+            required
+            size="small"
+            renderOption={(props, option) => (
+              <Box component="li" {...props}>
+                <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                  <CalendarIcon sx={{ mr: 1, color: 'text.secondary', fontSize: 20 }} />
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography variant="body2">{option.label}</Typography>
+                    {option.description && (
+                      <Typography variant="caption" color="text.secondary">
+                        {option.description}
                       </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {formatearDireccion(arancel)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="body2" fontWeight="medium" color="primary">
-                        {formatCurrency(arancel.monto)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Box display="flex" justifyContent="center" gap={1}>
-                        <Tooltip title="Editar">
-                          <IconButton size="small" color="primary">
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Eliminar">
-                          <IconButton size="small" color="error">
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={4} align="center">
-                    <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
-                      {anioSeleccionado 
-                        ? 'No se encontraron aranceles para el año seleccionado'
-                        : 'Seleccione un año para ver los aranceles'}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        {/* Paginación */}
-        {arancelesFiltrados.length > 0 && (
-          <TablePagination
-            component="div"
-            count={arancelesFiltrados.length}
-            page={page}
-            onPageChange={handleChangePage}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            labelRowsPerPage="Filas por página:"
-            labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+            )}
           />
+
+          {/* Campo de búsqueda */}
+          {anioSeleccionado && arancelesPorDireccion.length > 0 && (
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Buscar por dirección o monto..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          )}
+        </Stack>
+
+        {/* Mensaje informativo */}
+        {!anioSeleccionado && (
+          <Alert severity="info" icon={<CalendarIcon />}>
+            Seleccione un año para ver los aranceles asignados
+          </Alert>
         )}
 
-        {/* Resumen usando Stack en lugar de Grid */}
-        {arancelesFiltrados.length > 0 && (
-          <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-            <Stack 
-              direction={{ xs: 'column', sm: 'row' }} 
-              spacing={2}
-              justifyContent="space-between"
-            >
-              <Typography variant="body2" color="text.secondary">
-                Total de direcciones: <strong>{arancelesFiltrados.length}</strong>
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Monto total: <strong>{formatCurrency(
-                  arancelesFiltrados.reduce((sum, a) => sum + a.monto, 0)
-                )}</strong>
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Monto promedio: <strong>{formatCurrency(
-                  arancelesFiltrados.reduce((sum, a) => sum + a.monto, 0) / arancelesFiltrados.length
-                )}</strong>
-              </Typography>
-            </Stack>
-          </Box>
+        {/* Resumen de resultados */}
+        {anioSeleccionado && !loading && (
+          <Stack direction="row" spacing={1} mb={2}>
+            <Chip
+              size="small"
+              label={`Año: ${anioSeleccionado.label}`}
+              color="primary"
+              icon={<CalendarIcon />}
+            />
+            <Chip
+              size="small"
+              label={`${arancelesFiltrados.length} registros`}
+              color="default"
+            />
+          </Stack>
         )}
       </CardContent>
+
+      {/* Tabla */}
+      <Box sx={{ flexGrow: 1, overflow: 'auto', px: 2, pb: 2 }}>
+        {loading ? (
+          <Box sx={{ p: 2 }}>
+            {[...Array(5)].map((_, index) => (
+              <Skeleton key={index} height={60} sx={{ mb: 1 }} />
+            ))}
+          </Box>
+        ) : anioSeleccionado && arancelesPorDireccion.length > 0 ? (
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Dirección</TableCell>
+                  <TableCell>Sector</TableCell>
+                  <TableCell>Barrio</TableCell>
+                  <TableCell>Cuadra</TableCell>
+                  <TableCell>Lado</TableCell>
+                  <TableCell>Lotes</TableCell>
+                  <TableCell align="right">Monto</TableCell>
+                  <TableCell align="center">Acciones</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {arancelesPaginados.map((arancel) => (
+                  <TableRow key={arancel.id} hover>
+                    <TableCell>
+                      <Typography variant="body2" noWrap sx={{ maxWidth: 250 }}>
+                        {`${arancel.tipoVia} ${arancel.nombreVia}`}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>{arancel.sector}</TableCell>
+                    <TableCell>{arancel.barrio}</TableCell>
+                    <TableCell align="center">{arancel.cuadra}</TableCell>
+                    <TableCell>{arancel.lado}</TableCell>
+                    <TableCell>{`${arancel.loteInicial} - ${arancel.loteFinal}`}</TableCell>
+                    <TableCell align="right">
+                      <Chip
+                        label={formatCurrency(arancel.monto)}
+                        color="success"
+                        size="small"
+                        icon={<MoneyIcon />}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Tooltip title="Editar">
+                        <IconButton size="small" color="primary">
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Eliminar">
+                        <IconButton size="small" color="error">
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ) : anioSeleccionado && arancelesPorDireccion.length === 0 ? (
+          <Alert severity="warning">
+            No se encontraron aranceles para el año {anioSeleccionado.label}
+          </Alert>
+        ) : null}
+      </Box>
+
+      {/* Paginación */}
+      {anioSeleccionado && arancelesPorDireccion.length > 0 && (
+        <TablePagination
+          component="div"
+          count={arancelesFiltrados.length}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          rowsPerPageOptions={[5, 10, 25, 50]}
+          labelRowsPerPage="Filas por página:"
+          labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+        />
+      )}
     </Card>
   );
 };

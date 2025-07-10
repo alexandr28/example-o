@@ -31,6 +31,10 @@ export {  contribuyenteListService } from './contribuyenteListService';
 export { DireccionService} from './direccionService';
 export { pisoService } from './pisoService';
 export { predioService } from './predioService';
+export { arancelService } from './arancelService';
+export { valorUnitarioService } from './valorUnitarioService.ts';
+//export { uitService } from './uitService';
+
 /*
 export { arancelService } from './arancelService';
 export { valorUnitarioService } from './valorUnitarioService';

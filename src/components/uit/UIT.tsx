@@ -1,5 +1,24 @@
+// src/components/uit/UIT.tsx
 import React from 'react';
-import { Select, Input, Button } from '../../components';
+import {
+  Paper,
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Stack,
+  InputAdornment,
+  useTheme,
+  alpha,
+  CircularProgress
+} from '@mui/material';
+import {
+  CalendarToday as CalendarIcon,
+  AttachMoney as MoneyIcon,
+  Calculate as CalculateIcon,
+  AccountBalance as AccountBalanceIcon
+} from '@mui/icons-material';
+import SearchableSelect from '../ui/SearchableSelect';
 
 interface UITProps {
   aniosDisponibles: { value: string, label: string }[];
@@ -23,63 +42,153 @@ const UIT: React.FC<UITProps> = ({
   onCalcular,
   loading = false
 }) => {
-  // Manejar cambio de año
-  const handleAnioChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const anio = e.target.value ? parseInt(e.target.value) : null;
-    onAnioChange(anio);
-  };
+  const theme = useTheme();
+
+  // Convertir opciones de años al formato de SearchableSelect
+  const anioOptions = aniosDisponibles.map(anio => ({
+    id: anio.value,
+    value: parseInt(anio.value),
+    label: anio.label,
+    description: anio.value === new Date().getFullYear().toString() ? 'Año actual' : undefined
+  }));
 
   // Manejar cambio de monto
   const handleMontoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const monto = e.target.value ? parseFloat(e.target.value) : 0;
-    onMontoChange(monto);
+    const value = e.target.value;
+    if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
+      onMontoChange(parseFloat(value) || 0);
+    }
   };
 
   return (
-    <div className="bg-white rounded-md shadow-sm overflow-hidden">
-      <div className="px-6 py-4 bg-gray-50 border-b">
-        <h2 className="text-lg font-medium text-gray-800">Unidad Impositiva Tributaria</h2>
-      </div>
+    <Paper 
+      elevation={1}
+      sx={{ 
+        overflow: 'hidden',
+        border: `1px solid ${theme.palette.divider}`,
+        height: '100%'
+      }}
+    >
+      <Box 
+        sx={{ 
+          px: 3, 
+          py: 2, 
+          bgcolor: alpha(theme.palette.primary.main, 0.04),
+          borderBottom: `1px solid ${theme.palette.divider}`
+        }}
+      >
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <AccountBalanceIcon color="primary" fontSize="small" />
+          <Typography variant="h6" fontWeight={500}>
+            Unidad Impositiva Tributaria
+          </Typography>
+        </Stack>
+      </Box>
       
-      <div className="p-6">
-        <div className="space-y-6">
-          {/* Campo Año */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Año</label>
-            <Select
-              options={aniosDisponibles}
-              value={anioSeleccionado?.toString() || ''}
-              onChange={handleAnioChange}
+      <Box sx={{ p: 3 }}>
+        <Stack spacing={3}>
+          {/* Campo Año con SearchableSelect */}
+          <Box>
+            <SearchableSelect
+              label="Año"
+              options={anioOptions}
+              value={anioSeleccionado ? anioOptions.find(opt => opt.value === anioSeleccionado) || null : null}
+              onChange={(option) => onAnioChange(option ? option.value : null)}
+              placeholder="Seleccione el año"
               disabled={loading}
-              placeholder="Seleccione"
+              required
+              renderOption={(props, option) => (
+                <Box component="li" {...props}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <CalendarIcon fontSize="small" color="action" />
+                    <Box>
+                      <Typography variant="body2">{option.label}</Typography>
+                      {option.description && (
+                        <Typography variant="caption" color="text.secondary">
+                          {option.description}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Stack>
+                </Box>
+              )}
             />
-          </div>
+          </Box>
           
           {/* Campo Monto */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Monto</label>
-            <Input
+          <Box>
+            <TextField
+              fullWidth
+              label="Monto"
               type="number"
               value={montoCalculo || ''}
               onChange={handleMontoChange}
               disabled={loading}
               placeholder="Ingresar monto"
+              required
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <MoneyIcon color="action" />
+                  </InputAdornment>
+                ),
+                endAdornment: <InputAdornment position="end">S/</InputAdornment>
+              }}
+              inputProps={{
+                step: 0.01,
+                min: 0
+              }}
+              helperText={anioSeleccionado ? "Ingrese el monto para calcular el impuesto" : "Seleccione primero el año"}
             />
-          </div>
+          </Box>
           
           {/* Botón Calcular */}
-          <div>
+          <Box>
             <Button
+              fullWidth
+              variant="contained"
+              size="large"
               onClick={onCalcular}
               disabled={loading || !anioSeleccionado || montoCalculo <= 0}
-              className="w-full bg-green-400 hover:bg-green-500"
+              startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <CalculateIcon />}
+              sx={{
+                py: 1.5,
+                bgcolor: theme.palette.success.main,
+                '&:hover': {
+                  bgcolor: theme.palette.success.dark,
+                },
+                '&:disabled': {
+                  bgcolor: theme.palette.action.disabledBackground,
+                },
+                fontWeight: 600,
+                boxShadow: theme.shadows[2],
+                '&:hover:not(:disabled)': {
+                  boxShadow: theme.shadows[4],
+                }
+              }}
             >
-              Calcular
+              {loading ? 'Calculando...' : 'Calcular'}
             </Button>
-          </div>
-        </div>
-      </div>
-    </div>
+          </Box>
+
+          {/* Información adicional */}
+          {anioSeleccionado && (
+            <Box 
+              sx={{ 
+                p: 2, 
+                bgcolor: alpha(theme.palette.info.main, 0.08),
+                borderRadius: 1,
+                border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
+              }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                El cálculo se realizará basado en las alícuotas vigentes para el año {anioSeleccionado}
+              </Typography>
+            </Box>
+          )}
+        </Stack>
+      </Box>
+    </Paper>
   );
 };
 

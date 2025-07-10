@@ -1,5 +1,35 @@
-import React, { useState } from 'react';
-import { Button,Input } from '../../components';
+// src/components/uit/Alicuota.tsx
+import React, { useState, useEffect } from 'react';
+import {
+  Paper,
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  Chip,
+  useTheme,
+  alpha,
+  InputAdornment,
+  Tooltip,
+  Collapse,
+  Alert
+} from '@mui/material';
+import {
+  Edit as EditIcon,
+  Save as SaveIcon,
+  Cancel as CancelIcon,
+  Percent as PercentIcon,
+  TrendingUp as TrendingUpIcon,
+  AccountBalance as AccountBalanceIcon
+} from '@mui/icons-material';
 import { Alicuota } from '../../models/UIT';
 
 interface AlicuotaProps {
@@ -18,17 +48,27 @@ const AlicuotaComponent: React.FC<AlicuotaProps> = ({
   editable = false,
   loading = false
 }) => {
-  // Estado local para la edición de alícuotas
+  const theme = useTheme();
   const [editandoAlicuotas, setEditandoAlicuotas] = useState<Alicuota[]>(alicuotas);
   const [modoEdicion, setModoEdicion] = useState(false);
+  const [alicuotasModificadas, setAlicuotasModificadas] = useState(false);
+
+  // Actualizar cuando cambien las alícuotas externas
+  useEffect(() => {
+    if (!modoEdicion) {
+      setEditandoAlicuotas(alicuotas);
+    }
+  }, [alicuotas, modoEdicion]);
 
   // Manejar cambio en una alícuota
-  const handleAlicuotaChange = (id: number | undefined, tasa: number) => {
-    if (modoEdicion) {
+  const handleAlicuotaChange = (id: number | undefined, value: string) => {
+    if (modoEdicion && id !== undefined) {
+      const tasa = parseFloat(value) || 0;
       const nuevasAlicuotas = editandoAlicuotas.map(a => 
         a.id === id ? { ...a, tasa } : a
       );
       setEditandoAlicuotas(nuevasAlicuotas);
+      setAlicuotasModificadas(true);
     }
   };
 
@@ -36,6 +76,7 @@ const AlicuotaComponent: React.FC<AlicuotaProps> = ({
   const activarEdicion = () => {
     setEditandoAlicuotas([...alicuotas]);
     setModoEdicion(true);
+    setAlicuotasModificadas(false);
   };
 
   // Guardar cambios
@@ -44,96 +85,194 @@ const AlicuotaComponent: React.FC<AlicuotaProps> = ({
       onActualizarAlicuotas(editandoAlicuotas);
     }
     setModoEdicion(false);
+    setAlicuotasModificadas(false);
   };
 
   // Cancelar edición
   const cancelarEdicion = () => {
     setEditandoAlicuotas([...alicuotas]);
     setModoEdicion(false);
+    setAlicuotasModificadas(false);
+  };
+
+  // Obtener color según el valor de la tasa
+  const getTasaColor = (tasa: number) => {
+    if (tasa <= 0.2) return theme.palette.success.main;
+    if (tasa <= 0.6) return theme.palette.warning.main;
+    return theme.palette.error.main;
   };
 
   return (
-    <div className="bg-white rounded-md shadow-sm overflow-hidden">
-      <div className="px-6 py-4 bg-gray-50 border-b">
-        <h2 className="text-lg font-medium text-gray-800">Lista de rangos y tasas</h2>
-      </div>
-      
-      <div className="p-6">
-        <div className="space-y-4">
-          {/* Tabla de alícuotas */}
-          <div className="overflow-hidden">
-            <table className="min-w-full">
-              <thead>
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    RANGO
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    ALÍCUOTA
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {(modoEdicion ? editandoAlicuotas : alicuotas).map((alicuota) => (
-                  <tr key={alicuota.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {alicuota.descripcion}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {modoEdicion ? (
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={alicuota.tasa}
-                          onChange={(e) => handleAlicuotaChange(alicuota.id, parseFloat(e.target.value))}
-                          className="border rounded px-2 py-1 w-20 text-center"
-                        />
-                      ) : (
-                        <div className="bg-gray-200 px-4 py-2 rounded text-center">
-                          {alicuota.tasa.toFixed(2)}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+    <Paper 
+      elevation={1}
+      sx={{ 
+        overflow: 'hidden',
+        border: `1px solid ${theme.palette.divider}`,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column'
+      }}
+    >
+      <Box 
+        sx={{ 
+          px: 3, 
+          py: 2, 
+          bgcolor: alpha(theme.palette.primary.main, 0.04),
+          borderBottom: `1px solid ${theme.palette.divider}`
+        }}
+      >
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <TrendingUpIcon color="primary" fontSize="small" />
+            <Typography variant="h6" fontWeight={500}>
+              Lista de rangos y tasas
+            </Typography>
+          </Stack>
           
-          {/* Botones de acción */}
-          {editable && (
-            <div className="flex justify-center">
-              {modoEdicion ? (
-                <div className="flex space-x-2">
-                  <Button
-                    onClick={guardarCambios}
-                    disabled={loading}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    Guardar
-                  </Button>
-                  <Button
-                    onClick={cancelarEdicion}
-                    disabled={loading}
-                    className="bg-gray-600 hover:bg-gray-700"
-                  >
-                    Cancelar
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  onClick={activarEdicion}
-                  disabled={loading}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  Cambiar tasas
-                </Button>
-              )}
-            </div>
+          {editable && !modoEdicion && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<EditIcon />}
+              onClick={activarEdicion}
+              disabled={loading}
+            >
+              Cambiar tasas
+            </Button>
           )}
-        </div>
-      </div>
-    </div>
+        </Stack>
+      </Box>
+      
+      <Box sx={{ p: 3, flexGrow: 1, overflow: 'auto' }}>
+        {/* Mensaje informativo cuando está en modo edición */}
+        <Collapse in={modoEdicion}>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Modifique las tasas y haga clic en "Guardar" para aplicar los cambios
+          </Alert>
+        </Collapse>
+
+        {/* Tabla de alícuotas */}
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600, color: theme.palette.text.secondary }}>
+                  RANGO
+                </TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600, color: theme.palette.text.secondary }}>
+                  ALÍCUOTA
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(modoEdicion ? editandoAlicuotas : alicuotas).map((alicuota) => (
+                <TableRow 
+                  key={alicuota.id} 
+                  sx={{ 
+                    '&:hover': { 
+                      bgcolor: alpha(theme.palette.primary.main, 0.04) 
+                    },
+                    '&:last-child td': { 
+                      borderBottom: 0 
+                    }
+                  }}
+                >
+                  <TableCell>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <AccountBalanceIcon fontSize="small" color="action" />
+                      <Typography variant="body2">
+                        {alicuota.descripcion}
+                      </Typography>
+                    </Stack>
+                  </TableCell>
+                  <TableCell align="right">
+                    {modoEdicion ? (
+                      <TextField
+                        size="small"
+                        type="number"
+                        value={alicuota.tasa}
+                        onChange={(e) => handleAlicuotaChange(alicuota.id, e.target.value)}
+                        sx={{ width: 120 }}
+                        InputProps={{
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <PercentIcon fontSize="small" />
+                            </InputAdornment>
+                          ),
+                        }}
+                        inputProps={{
+                          step: 0.01,
+                          min: 0,
+                          max: 100,
+                          style: { textAlign: 'right' }
+                        }}
+                      />
+                    ) : (
+                      <Chip
+                        label={`${alicuota.tasa.toFixed(2)}%`}
+                        size="small"
+                        sx={{
+                          bgcolor: alpha(getTasaColor(alicuota.tasa), 0.1),
+                          color: getTasaColor(alicuota.tasa),
+                          fontWeight: 500,
+                          minWidth: 80
+                        }}
+                      />
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        {/* Botones de acción en modo edición */}
+        {modoEdicion && (
+          <Stack 
+            direction="row" 
+            spacing={2} 
+            justifyContent="flex-end" 
+            sx={{ mt: 3 }}
+          >
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<CancelIcon />}
+              onClick={cancelarEdicion}
+              disabled={loading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<SaveIcon />}
+              onClick={guardarCambios}
+              disabled={loading || !alicuotasModificadas}
+            >
+              Guardar cambios
+            </Button>
+          </Stack>
+        )}
+
+        {/* Información adicional */}
+        {!modoEdicion && (
+          <Box 
+            sx={{ 
+              mt: 3,
+              p: 2, 
+              bgcolor: alpha(theme.palette.info.main, 0.08),
+              borderRadius: 1,
+              border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
+            }}
+          >
+            <Typography variant="caption" color="text.secondary">
+              Las alícuotas se aplican de forma progresiva según los rangos de UIT establecidos
+            </Typography>
+          </Box>
+        )}
+      </Box>
+    </Paper>
   );
 };
 

@@ -1,10 +1,12 @@
+// src/hooks/useUIT.ts
 import { useState, useCallback, useEffect } from 'react';
-import { UIT, Alicuota, CalculoUIT } from '../models/UIT';
+import { UIT, Alicuota } from '../models/UIT';
+import { uitService } from '../services/uitService';
+import { NotificationService } from '../components/utils/Notification';
 
 /**
  * Hook personalizado para la gestión de UIT y cálculos de impuestos
- * 
- * Proporciona funcionalidades para obtener, listar y calcular impuestos basados en UIT
+ * Conectado con la API real
  */
 export const useUIT = () => {
   // Estados
@@ -21,161 +23,264 @@ export const useUIT = () => {
 
   // Cargar datos iniciales
   useEffect(() => {
-    cargarUIT();
-    cargarAlicuotas();
-    cargarAniosDisponibles();
+    cargarDatosIniciales();
   }, []);
 
-  // Cargar UIT (simulación de carga desde API)
-  const cargarUIT = useCallback(async () => {
+  // Cargar todos los datos iniciales
+  const cargarDatosIniciales = async () => {
     try {
       setLoading(true);
+      
+      // Cargar UITs, alícuotas y años disponibles en paralelo
+      const [uitsData, alicuotasData, aniosData] = await Promise.all([
+        cargarUIT(),
+        cargarAlicuotas(),
+        cargarAniosDisponibles()
+      ]);
+      
+    } catch (error) {
+      console.error('Error al cargar datos iniciales:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cargar UIT desde la API
+  const cargarUIT = useCallback(async () => {
+    try {
       setError(null);
       
-      // Simular carga de datos
-      setTimeout(() => {
-        const uitsData: UIT[] = [
-          { anio: 2025, uit: 5350, tasa: 0.2, rangoInicial: 0.00, rangoFinal: 80250, impuestoParcial: 0.00, impuestoAcumulado: 'ACTIVO' },
-          { anio: 2025, uit: 5350, tasa: 0.6, rangoInicial: 80251, rangoFinal: 321000, impuestoParcial: 0.00, impuestoAcumulado: 'ACTIVO' },
-          { anio: 2025, uit: 5350, tasa: 1.0, rangoInicial: 321001, rangoFinal: 1.0, impuestoParcial: 0.00, impuestoAcumulado: 'INACTIVO' },
-        ];
-        
-        setUits(uitsData);
-        setLoading(false);
-      }, 500);
+      const uitsData = await uitService.obtenerTodos();
+      setUits(uitsData);
+      
+      console.log(`✅ [useUIT] ${uitsData.length} UITs cargados`);
+      return uitsData;
       
     } catch (err: any) {
-      setError(err.message || 'Error al cargar UIT');
-      setLoading(false);
+      const mensaje = err.message || 'Error al cargar UITs';
+      setError(mensaje);
+      console.error('❌ [useUIT] Error:', err);
+      return [];
     }
   }, []);
 
-  // Cargar alícuotas
+  // Cargar alícuotas desde la API
   const cargarAlicuotas = useCallback(async () => {
     try {
-      setLoading(true);
       setError(null);
       
-      // Simular carga de datos
-      setTimeout(() => {
-        const alicuotasData: Alicuota[] = [
-          { id: 1, descripcion: 'Hasta 15 UIT :', tasa: 0.20, uitMinimo: 0, uitMaximo: 15 },
-          { id: 2, descripcion: 'Mas de 15 UIT hasta 60 UIT :', tasa: 0.60, uitMinimo: 15, uitMaximo: 60 },
-          { id: 3, descripcion: 'Mas de 60 UIT :', tasa: 1.00, uitMinimo: 60 }, // uitMaximo es undefined
-        ];
-        
-        setAlicuotas(alicuotasData);
-        setLoading(false);
-      }, 500);
+      const alicuotasData = await uitService.obtenerAlicuotas();
+      setAlicuotas(alicuotasData);
+      
+      console.log(`✅ [useUIT] ${alicuotasData.length} alícuotas cargadas`);
+      return alicuotasData;
       
     } catch (err: any) {
-      setError(err.message || 'Error al cargar alícuotas');
-      setLoading(false);
+      const mensaje = err.message || 'Error al cargar alícuotas';
+      setError(mensaje);
+      console.error('❌ [useUIT] Error:', err);
+      return [];
     }
   }, []);
 
   // Cargar años disponibles
   const cargarAniosDisponibles = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
+      const anios = await uitService.obtenerAniosDisponibles();
       
-      // Simular carga de datos
-      setTimeout(() => {
-        const anios = [
-          { value: '2023', label: '2023' },
-          { value: '2024', label: '2024' },
-          { value: '2025', label: '2025' },
-        ];
-        
-        setAniosDisponibles(anios);
-        setLoading(false);
-      }, 300);
+      // Generar lista de años desde 1991 hasta el año actual + 5
+      const currentYear = new Date().getFullYear();
+      const startYear = 1991;
+      const endYear = currentYear + 5;
       
-    } catch (err: any) {
-      setError(err.message || 'Error al cargar años disponibles');
-      setLoading(false);
+      const todosLosAnios = [];
+      for (let year = endYear; year >= startYear; year--) {
+        todosLosAnios.push({
+          value: year.toString(),
+          label: year.toString()
+        });
+      }
+      
+      setAniosDisponibles(todosLosAnios);
+      
+      // Si hay años con datos, seleccionar el más reciente
+      if (anios.length > 0) {
+        setAnioSeleccionado(anios[0]);
+      }
+      
+      return todosLosAnios;
+    } catch (err) {
+      console.error('❌ [useUIT] Error al cargar años:', err);
+      return [];
     }
   }, []);
 
   // Manejar cambio de año
-  const handleAnioChange = useCallback((anio: number | null) => {
+  const handleAnioChange = useCallback(async (anio: number | null) => {
     setAnioSeleccionado(anio);
+    setResultadoCalculo(null);
+    
+    if (anio) {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Cargar UITs del año seleccionado
+        const uitsAnio = await uitService.obtenerPorAnio(anio);
+        setUits(uitsAnio);
+        
+        console.log(`✅ [useUIT] ${uitsAnio.length} UITs cargados para el año ${anio}`);
+      } catch (err: any) {
+        const mensaje = err.message || `Error al cargar UITs del año ${anio}`;
+        setError(mensaje);
+        console.error('❌ [useUIT] Error:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
   }, []);
 
   // Manejar cambio de monto
   const handleMontoChange = useCallback((monto: number) => {
     setMontoCalculo(monto);
+    setResultadoCalculo(null);
   }, []);
 
-  // Calcular impuesto
-  const calcularImpuesto = useCallback(() => {
+  // Calcular impuesto basado en UIT
+  const calcularImpuesto = useCallback(async () => {
     if (!anioSeleccionado || montoCalculo <= 0) {
       setError('Debe seleccionar un año y un monto válido');
       return;
     }
-    
+
     try {
       setLoading(true);
       setError(null);
       
-      // Lógica para calcular el impuesto según las alícuotas
-      // En un caso real, podría hacerse mediante una llamada a la API
-      
-      // Simulación de cálculo
-      let resultado = 0;
-      
-      // Obtener valor de la UIT para el año seleccionado
-      const uitDelAnio = uits.find(u => u.anio === anioSeleccionado)?.uit || 5350;
-      
-      // Calcular el impuesto según los rangos
-      for (const alicuota of alicuotas) {
-        const minimo = (alicuota.uitMinimo || 0) * uitDelAnio;
-        const maximo = alicuota.uitMaximo !== undefined ? alicuota.uitMaximo * uitDelAnio : Infinity;
-        
-        if (montoCalculo > minimo) {
-          const montoEnRango = Math.min(montoCalculo, maximo) - minimo;
-          if (montoEnRango > 0) {
-            resultado += montoEnRango * (alicuota.tasa / 100);
-          }
-        }
-      }
-      
+      const resultado = await uitService.calcularImpuesto(anioSeleccionado, montoCalculo);
       setResultadoCalculo(resultado);
-      setLoading(false);
+      
+      console.log(`✅ [useUIT] Impuesto calculado: S/ ${resultado.toFixed(2)}`);
+      NotificationService.success(`Impuesto calculado: S/ ${resultado.toFixed(2)}`);
       
     } catch (err: any) {
-      setError(err.message || 'Error al calcular impuesto');
+      const mensaje = err.message || 'Error al calcular impuesto';
+      setError(mensaje);
+      NotificationService.error(mensaje);
+      console.error('❌ [useUIT] Error:', err);
+    } finally {
       setLoading(false);
     }
-  }, [anioSeleccionado, montoCalculo, alicuotas, uits]);
+  }, [anioSeleccionado, montoCalculo]);
 
-  // Actualizar alícuotas
+  // Actualizar alícuotas (por ahora es local, se puede implementar API si existe)
   const actualizarAlicuotas = useCallback(async (nuevasAlicuotas: Alicuota[]) => {
     try {
       setLoading(true);
       setError(null);
       
-      // En un caso real, esto sería una petición a la API
-      // await fetch('/api/alicuotas', {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(nuevasAlicuotas),
-      // });
+      // Si hay un endpoint para actualizar alícuotas, usarlo aquí
+      // Por ahora solo actualizamos localmente
+      setAlicuotas(nuevasAlicuotas);
       
-      // Simulación de actualización exitosa
-      setTimeout(() => {
-        setAlicuotas(nuevasAlicuotas);
-        setLoading(false);
-      }, 500);
+      NotificationService.success('Alícuotas actualizadas correctamente');
+      console.log('✅ [useUIT] Alícuotas actualizadas');
       
     } catch (err: any) {
-      setError(err.message || 'Error al actualizar alícuotas');
+      const mensaje = err.message || 'Error al actualizar alícuotas';
+      setError(mensaje);
+      NotificationService.error(mensaje);
+      console.error('❌ [useUIT] Error:', err);
+    } finally {
       setLoading(false);
     }
   }, []);
 
+  // Crear nuevo UIT
+  const crearUIT = useCallback(async (datos: {
+    anio: number;
+    valorUit: number;
+    alicuota: number;
+    rangoInicial: number;
+    rangoFinal: number;
+  }) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const nuevoUit = await uitService.crear(datos);
+      
+      // Recargar UITs
+      await cargarUIT();
+      
+      console.log('✅ [useUIT] UIT creado exitosamente');
+      return nuevoUit;
+      
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al crear UIT';
+      setError(mensaje);
+      console.error('❌ [useUIT] Error:', err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [cargarUIT]);
+
+  // Actualizar UIT existente
+  const actualizarUIT = useCallback(async (id: number, datos: Partial<{
+    anio: number;
+    valorUit: number;
+    alicuota: number;
+    rangoInicial: number;
+    rangoFinal: number;
+  }>) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const uitActualizado = await uitService.actualizar(id, datos);
+      
+      // Recargar UITs
+      await cargarUIT();
+      
+      console.log('✅ [useUIT] UIT actualizado exitosamente');
+      return uitActualizado;
+      
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al actualizar UIT';
+      setError(mensaje);
+      console.error('❌ [useUIT] Error:', err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [cargarUIT]);
+
+  // Eliminar UIT
+  const eliminarUIT = useCallback(async (id: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      await uitService.eliminar(id);
+      
+      // Recargar UITs
+      await cargarUIT();
+      
+      console.log('✅ [useUIT] UIT eliminado exitosamente');
+      
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al eliminar UIT';
+      setError(mensaje);
+      console.error('❌ [useUIT] Error:', err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [cargarUIT]);
+
   return {
+    // Estados
     uits,
     alicuotas,
     aniosDisponibles,
@@ -184,10 +289,20 @@ export const useUIT = () => {
     resultadoCalculo,
     loading,
     error,
+    
+    // Handlers principales
     handleAnioChange,
     handleMontoChange,
     calcularImpuesto,
-    actualizarAlicuotas
+    actualizarAlicuotas,
+    
+    // CRUD operations
+    crearUIT,
+    actualizarUIT,
+    eliminarUIT,
+    
+    // Refresh
+    recargar: cargarDatosIniciales
   };
 };
 

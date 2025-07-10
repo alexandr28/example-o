@@ -1,5 +1,8 @@
+// src/components/alcabala/AlcabalaForm.tsx
 import React from 'react';
-import {AlcabalaList,Alcabala} from '../../components';
+import { Grid, useTheme, useMediaQuery } from '@mui/material';
+import Alcabala from './Alcabala';
+import AlcabalaList from './AlcabalaList';
 import { PaginacionOptions } from '../../models/Alcabala';
 
 interface AlcabalaFormProps {
@@ -13,6 +16,8 @@ interface AlcabalaFormProps {
   onRegistrar: () => void;
   onCambiarPagina: (pagina: number) => void;
   loading?: boolean;
+  onEditar?: (alcabala: any) => void;
+  onEliminar?: (alcabala: any) => void;
 }
 
 /**
@@ -28,27 +33,38 @@ const AlcabalaForm: React.FC<AlcabalaFormProps> = ({
   onTasaChange,
   onRegistrar,
   onCambiarPagina,
-  loading = false
+  loading = false,
+  onEditar,
+  onEliminar
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <Alcabala 
-        aniosDisponibles={aniosDisponibles}
-        anioSeleccionado={anioSeleccionado}
-        tasa={tasa}
-        onAnioChange={onAnioChange}
-        onTasaChange={onTasaChange}
-        onRegistrar={onRegistrar}
-        loading={loading}
-      />
+    <Grid container spacing={3}>
+      <Grid item xs={12} md={6}>
+        <Alcabala 
+          aniosDisponibles={aniosDisponibles}
+          anioSeleccionado={anioSeleccionado}
+          tasa={tasa}
+          onAnioChange={onAnioChange}
+          onTasaChange={onTasaChange}
+          onRegistrar={onRegistrar}
+          loading={loading}
+        />
+      </Grid>
       
-      <AlcabalaList 
-        alcabalas={alcabalas}
-        paginacion={paginacion}
-        onCambiarPagina={onCambiarPagina}
-        loading={loading}
-      />
-    </div>
+      <Grid item xs={12} md={6}>
+        <AlcabalaList 
+          alcabalas={alcabalas}
+          paginacion={paginacion}
+          onCambiarPagina={onCambiarPagina}
+          loading={loading}
+          onEditar={onEditar}
+          onEliminar={onEliminar}
+        />
+      </Grid>
+    </Grid>
   );
 };
 

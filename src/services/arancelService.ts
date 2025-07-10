@@ -1,5 +1,5 @@
 // src/services/arancelService.ts
-import { API_CONFIG } from '../config/api.config';
+import { NotificationService } from '../components/utils/Notification';
 
 // Tipos basados en la respuesta de tu API
 export interface ArancelData {
@@ -9,7 +9,6 @@ export interface ArancelData {
   costo: number;
   codUsuario?: number;
   costoArancel?: number;
-  // Datos adicionales que vienen en la respuesta
   pagina?: number;
   limite?: number;
   totalPaginas?: number;
@@ -19,7 +18,7 @@ export interface ArancelData {
 export interface ArancelFormData {
   anio: number;
   codDireccion: number;
-  codUsuario: number;
+  codUsuario?: number;
 }
 
 export interface ArancelResponse {
@@ -32,20 +31,17 @@ export interface ArancelResponse {
   totalRegistros?: number;
 }
 
-export interface ArancelCreateResponse {
-  success: boolean;
-  message: string;
-  data: ArancelData;
-}
-
 /**
- * Servicio para gestión de aranceles - Sin autenticación para GET
+ * Servicio para gestión de aranceles - SIN autenticación Bearer
  */
 class ArancelService {
   private static instance: ArancelService;
   private readonly API_BASE_URL = 'http://192.168.20.160:8080/api/arancel';
 
-  private constructor() {}
+  private constructor() {
+    console.log('🔧 [ArancelService] Inicializado');
+    console.log('📡 [ArancelService] URL base:', this.API_BASE_URL);
+  }
 
   public static getInstance(): ArancelService {
     if (!ArancelService.instance) {
@@ -55,16 +51,111 @@ class ArancelService {
   }
 
   /**
-   * Realiza una petición GET sin autenticación
+   * Convierte parámetros a URLSearchParams para GET requests
    */
-  private async fetchGet(url: string): Promise<any> {
+  private createURLSearchParams(params: Record<string, any>): URLSearchParams {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        searchParams.append(key, value.toString());
+      }
+    });
+    return searchParams;
+  }
+
+  /**
+   * Convierte parámetros a FormData para POST/PUT requests
+   */
+  private createFormData(params: Record<string, any>): FormData {
+    const formData = new FormData();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, value.toString());
+      }
+    });
+    return formData;
+  }
+
+  /**
+   * Obtiene todos los aranceles (GET con parámetros form-data style)
+   */
+  async obtenerTodos(pagina: number = 1, limite: number = 100): Promise<ArancelResponse> {
     try {
-      console.log(`📡 GET: ${url}`);
+      console.log('📋 [ArancelService] Obteniendo todos los aranceles...');
+      
+      // Crear parámetros para la consulta
+      const params = this.createURLSearchParams({
+        pagina: pagina,
+        limite: limite,
+        codUsuario: 1 // Usuario por defecto
+      });
+
+      const url = `${this.API_BASE_URL}?${params}`;
+      console.log('🔗 [ArancelService] URL:', url);
       
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+
+      console.log('📥 [ArancelService] Respuesta status:', response.status);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ [ArancelService] Datos recibidos:', data);
+      
+      // Normalizar la respuesta
+      if (data.success && data.data) {
+        return {
+          success: true,
+          message: data.message || 'Aranceles obtenidos',
+          data: Array.isArray(data.data) ? data.data : [],
+          pagina: data.pagina || pagina,
+          limite: data.limite || limite,
+          totalPaginas: data.totalPaginas || 1,
+          totalRegistros: data.totalRegistros || 0
+        };
+      }
+      
+      // Si la respuesta viene en otro formato
+      return {
+        success: true,
+        message: 'Aranceles obtenidos',
+        data: Array.isArray(data) ? data : [],
+        pagina: pagina,
+        limite: limite,
+        totalPaginas: 1,
+        totalRegistros: 0
+      };
+    } catch (error: any) {
+      console.error('❌ [ArancelService] Error al obtener aranceles:', error);
+      NotificationService.error('Error al cargar aranceles');
+      throw new Error(error.message || 'Error al obtener aranceles');
+    }
+  }
+
+  /**
+   * Busca aranceles por año (GET con parámetros)
+   */
+  async buscarPorAnio(anio: number): Promise<ArancelData[]> {
+    try {
+      console.log(`🔍 [ArancelService] Buscando aranceles del año ${anio}...`);
+      
+      const params = this.createURLSearchParams({
+        anio: anio,
+        codUsuario: 1
+      });
+
+      const url = `${this.API_BASE_URL}?${params}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
           'Accept': 'application/json'
         }
       });
@@ -74,106 +165,94 @@ class ArancelService {
       }
 
       const data = await response.json();
-      console.log('✅ Respuesta recibida:', data);
-      return data;
-    } catch (error) {
-      console.error('❌ Error en petición GET:', error);
-      throw error;
+      
+      if (data.success && data.data) {
+        return Array.isArray(data.data) ? data.data : [data.data];
+      }
+      
+      return [];
+      
+    } catch (error: any) {
+      console.error(`❌ [ArancelService] Error al buscar aranceles del año ${anio}:`, error);
+      throw new Error(error.message || 'Error al buscar aranceles por año');
     }
   }
 
   /**
-   * Realiza una petición POST con autenticación (si es necesaria)
+   * Busca aranceles por dirección (GET con parámetros)
    */
-  private async fetchPost(url: string, body: any): Promise<any> {
+  async buscarPorDireccion(codDireccion: number): Promise<ArancelData[]> {
     try {
-      console.log(`📡 POST: ${url}`, body);
+      console.log(`🔍 [ArancelService] Buscando aranceles para dirección ${codDireccion}...`);
       
-      // Si necesitas token para POST, agrégalo aquí
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      };
+      const params = this.createURLSearchParams({
+        codDireccion: codDireccion,
+        codUsuario: 1
+      });
 
-      // Si tienes token, agrégalo
-      const token = localStorage.getItem('auth_token');
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
+      const url = `${this.API_BASE_URL}?${params}`;
+      
       const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body)
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('✅ Respuesta POST:', data);
-      return data;
-    } catch (error) {
-      console.error('❌ Error en petición POST:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Obtiene todos los aranceles (GET sin autenticación)
-   */
-  async obtenerTodos(pagina: number = 1, limite: number = 100): Promise<ArancelResponse> {
-    try {
-      const url = `${this.API_BASE_URL}?pagina=${pagina}&limite=${limite}`;
-      const response = await this.fetchGet(url);
       
-      // Normalizar la respuesta
-      if (response.success && response.data) {
-        return response;
+      if (data.success && data.data) {
+        return Array.isArray(data.data) ? data.data : [data.data];
       }
       
-      // Si la respuesta viene en otro formato
-      return {
-        success: true,
-        message: 'Aranceles obtenidos',
-        data: Array.isArray(response) ? response : [],
-        pagina: response.pagina || pagina,
-        limite: response.limite || limite,
-        totalPaginas: response.totalPaginas || 1,
-        totalRegistros: response.totalRegistros || 0
-      };
+      return [];
+      
     } catch (error: any) {
-      console.error('Error al obtener aranceles:', error);
-      throw new Error(error.message || 'Error al obtener aranceles');
+      console.error(`❌ [ArancelService] Error al buscar aranceles por dirección:`, error);
+      throw new Error(error.message || 'Error al buscar aranceles por dirección');
     }
   }
 
   /**
-   * Busca aranceles por año (GET sin autenticación)
+   * Busca aranceles con filtros específicos
    */
-  async buscarPorAnio(anio: number): Promise<ArancelData[]> {
+  async buscarConFiltros(filtros: { anio?: number; codDireccion?: number }): Promise<ArancelData[]> {
     try {
-      // Primero intentamos con un endpoint específico
-      try {
-        const url = `${this.API_BASE_URL}/anio/${anio}`;
-        const response = await this.fetchGet(url);
-        
-        if (response.success && response.data) {
-          return Array.isArray(response.data) ? response.data : [response.data];
+      console.log('🔍 [ArancelService] Buscando aranceles con filtros:', filtros);
+      
+      const params = this.createURLSearchParams({
+        ...filtros,
+        codUsuario: 1
+      });
+
+      const url = `${this.API_BASE_URL}?${params}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
         }
-      } catch (error) {
-        console.log('No existe endpoint específico para año, filtrando localmente');
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Si no existe endpoint específico, obtenemos todos y filtramos
-      const todosLosAranceles = await this.obtenerTodos(1, 1000);
-      return todosLosAranceles.data.filter(arancel => arancel.anio === anio);
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        return Array.isArray(data.data) ? data.data : [data.data];
+      }
+      
+      return [];
       
     } catch (error: any) {
-      console.error(`Error al buscar aranceles del año ${anio}:`, error);
-      throw new Error(error.message || 'Error al buscar aranceles por año');
+      console.error('❌ [ArancelService] Error al buscar aranceles con filtros:', error);
+      throw new Error(error.message || 'Error al buscar aranceles');
     }
   }
 
@@ -182,67 +261,16 @@ class ArancelService {
    */
   async obtenerPorId(id: number): Promise<ArancelData> {
     try {
+      console.log(`🔍 [ArancelService] Obteniendo arancel con ID ${id}...`);
+      
       const url = `${this.API_BASE_URL}/${id}`;
-      const response = await this.fetchGet(url);
-      
-      if (response.success && response.data) {
-        return response.data;
-      }
-      
-      throw new Error('Arancel no encontrado');
-    } catch (error: any) {
-      console.error(`Error al obtener arancel ${id}:`, error);
-      throw new Error(error.message || 'Error al obtener arancel');
-    }
-  }
-
-  /**
-   * Crea un nuevo arancel (POST - puede requerir autenticación)
-   */
-  async crear(datos: ArancelFormData): Promise<ArancelData> {
-    try {
-      const payload = {
-        anio: datos.anio,
-        codDireccion: datos.codDireccion,
-        codUsuario: datos.codUsuario || 1 // Usuario por defecto si no se proporciona
-      };
-
-      const response = await this.fetchPost(this.API_BASE_URL, payload);
-      
-      if (response.success && response.data) {
-        return response.data;
-      }
-      
-      throw new Error(response.message || 'Error al crear arancel');
-    } catch (error: any) {
-      console.error('Error al crear arancel:', error);
-      throw new Error(error.message || 'Error al crear arancel');
-    }
-  }
-
-  /**
-   * Actualiza un arancel (PUT - puede requerir autenticación)
-   */
-  async actualizar(id: number, datos: Partial<ArancelFormData>): Promise<ArancelData> {
-    try {
-      const url = `${this.API_BASE_URL}/${id}`;
-      
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      };
-
-      const token = localStorage.getItem('auth_token');
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
       const response = await fetch(url, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(datos)
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
       });
-
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -253,46 +281,134 @@ class ArancelService {
         return data.data;
       }
       
-      throw new Error(data.message || 'Error al actualizar arancel');
+      throw new Error('Arancel no encontrado');
     } catch (error: any) {
-      console.error(`Error al actualizar arancel ${id}:`, error);
-      throw new Error(error.message || 'Error al actualizar arancel');
+      console.error(`❌ [ArancelService] Error al obtener arancel ${id}:`, error);
+      throw new Error(error.message || 'Error al obtener arancel');
     }
   }
 
   /**
-   * Elimina un arancel (DELETE - puede requerir autenticación)
+   * Crea un nuevo arancel (POST con FormData)
    */
-  async eliminar(id: number): Promise<void> {
+  async crear(datos: ArancelFormData): Promise<ArancelData> {
     try {
-      const url = `${this.API_BASE_URL}/${id}`;
+      console.log('➕ [ArancelService] Creando nuevo arancel:', datos);
       
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      };
+      const formData = this.createFormData({
+        anio: datos.anio,
+        codDireccion: datos.codDireccion,
+        codUsuario: datos.codUsuario || 1
+      });
 
-      const token = localStorage.getItem('auth_token');
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      const response = await fetch(this.API_BASE_URL, {
+        method: 'POST',
+        body: formData
+      });
+      
+      console.log('📥 [ArancelService] Respuesta status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        console.log('✅ [ArancelService] Arancel creado exitosamente');
+        NotificationService.success('Arancel creado exitosamente');
+        return data.data;
+      }
+      
+      throw new Error(data.message || 'Error al crear arancel');
+    } catch (error: any) {
+      console.error('❌ [ArancelService] Error al crear arancel:', error);
+      NotificationService.error(error.message || 'Error al crear arancel');
+      throw new Error(error.message || 'Error al crear arancel');
+    }
+  }
+
+  /**
+   * Actualiza un arancel (PUT con FormData)
+   */
+  async actualizar(id: number, datos: Partial<ArancelFormData>): Promise<ArancelData> {
+    try {
+      console.log(`📝 [ArancelService] Actualizando arancel ${id}:`, datos);
+      
+      const formData = this.createFormData({
+        ...datos,
+        codUsuario: datos.codUsuario || 1
+      });
+
+      const url = `${this.API_BASE_URL}/${id}`;
       const response = await fetch(url, {
-        method: 'DELETE',
-        headers
+        method: 'PUT',
+        body: formData
       });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      console.log('✅ Arancel eliminado exitosamente');
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        console.log('✅ [ArancelService] Arancel actualizado exitosamente');
+        NotificationService.success('Arancel actualizado exitosamente');
+        return data.data;
+      }
+      
+      throw new Error(data.message || 'Error al actualizar arancel');
     } catch (error: any) {
-      console.error(`Error al eliminar arancel ${id}:`, error);
+      console.error(`❌ [ArancelService] Error al actualizar arancel ${id}:`, error);
+      NotificationService.error(error.message || 'Error al actualizar arancel');
+      throw new Error(error.message || 'Error al actualizar arancel');
+    }
+  }
+
+  /**
+   * Elimina un arancel
+   */
+  async eliminar(id: number): Promise<void> {
+    try {
+      console.log(`🗑️ [ArancelService] Eliminando arancel ${id}...`);
+      
+      const url = `${this.API_BASE_URL}/${id}`;
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      console.log('✅ [ArancelService] Arancel eliminado exitosamente');
+      NotificationService.success('Arancel eliminado exitosamente');
+    } catch (error: any) {
+      console.error(`❌ [ArancelService] Error al eliminar arancel ${id}:`, error);
+      NotificationService.error(error.message || 'Error al eliminar arancel');
       throw new Error(error.message || 'Error al eliminar arancel');
+    }
+  }
+
+  /**
+   * Verifica si existe un arancel para una dirección y año específicos
+   */
+  async existeArancel(codDireccion: number, anio: number): Promise<boolean> {
+    try {
+      const aranceles = await this.buscarConFiltros({ codDireccion, anio });
+      return aranceles.length > 0;
+    } catch (error) {
+      console.error('❌ [ArancelService] Error al verificar existencia de arancel:', error);
+      return false;
     }
   }
 }
 
-// Exportar instancia única
+// Exportar instancia singleton
 export const arancelService = ArancelService.getInstance();

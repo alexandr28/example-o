@@ -1,5 +1,24 @@
+// src/components/unitarios/ValorUnitarioForm.tsx
 import React from 'react';
-import { Input, Select } from '../';
+import {
+  Paper,
+  Box,
+  Typography,
+  TextField,
+  InputAdornment,
+  Stack,
+  useTheme,
+  alpha,
+  Divider
+} from '@mui/material';
+import {
+  AttachMoney as MoneyIcon,
+  Category as CategoryIcon,
+  CalendarToday as CalendarIcon,
+  Title as TitleIcon,
+  Layers as LayersIcon
+} from '@mui/icons-material';
+import SearchableSelect from '../ui/SearchableSelect';
 import { CategoriaValorUnitario, SubcategoriaValorUnitario, LetraValorUnitario } from '../../models';
 
 interface ValorUnitarioFormProps {
@@ -37,103 +56,240 @@ const ValorUnitarioForm: React.FC<ValorUnitarioFormProps> = ({
   onCostoChange,
   costoValue
 }) => {
-  // Manejar cambio en el año
-  const handleAñoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    onAñoChange(value ? parseInt(value) : null);
-  };
+  const theme = useTheme();
 
-  // Manejar cambio en la categoría
-  const handleCategoriaChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    onCategoriaChange(value ? value as CategoriaValorUnitario : null);
-  };
+  // Convertir las opciones al formato esperado por SearchableSelect
+  const añoOptions = años.map(año => ({
+    id: año.value,
+    value: parseInt(año.value),
+    label: año.label,
+    description: año.value === new Date().getFullYear().toString() ? 'Año actual' : undefined
+  }));
 
-  // Manejar cambio en la subcategoría
-  const handleSubcategoriaChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    onSubcategoriaChange(value ? value as SubcategoriaValorUnitario : null);
-  };
+  const categoriaOptions = categorias.map(cat => ({
+    id: cat.value,
+    value: cat.value,
+    label: cat.label,
+    description: getCategoriaDescription(cat.value)
+  }));
 
-  // Manejar cambio en la letra
-  const handleLetraChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    onLetraChange(value ? value as LetraValorUnitario : null);
-  };
+  const subcategoriaOptions = subcategoriasDisponibles.map(sub => ({
+    id: sub.value,
+    value: sub.value,
+    label: sub.label,
+    description: getSubcategoriaDescription(sub.value)
+  }));
 
-  // Manejar cambio en el costo
-  const handleCostoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onCostoChange(e.target.value);
-  };
+  const letraOptions = letras.map(letra => ({
+    id: letra.value,
+    value: letra.value,
+    label: letra.label,
+    description: getLetraDescription(letra.value)
+  }));
+
+  // Helpers para descripciones
+  function getCategoriaDescription(categoria: string): string {
+    switch (categoria) {
+      case 'Estructuras': return 'Componentes estructurales del inmueble';
+      case 'Acabados': return 'Elementos de terminación y acabado';
+      case 'Instalaciones Eléctricas y Sanitarias': return 'Sistemas eléctricos y sanitarios';
+      default: return '';
+    }
+  }
+
+  function getSubcategoriaDescription(subcategoria: string): string {
+    switch (subcategoria) {
+      case 'Muros y Columnas': return 'Elementos verticales estructurales';
+      case 'Techos': return 'Cubiertas y techumbres';
+      case 'Pisos': return 'Pavimentos y contrapisos';
+      case 'Puertas y Ventanas': return 'Aberturas y cerramientos';
+      case 'Revestimientos': return 'Acabados de superficies';
+      case 'Baños': return 'Aparatos y accesorios sanitarios';
+      case 'Instalaciones Eléctricas y Sanitarias': return 'Redes eléctricas y de agua';
+      default: return '';
+    }
+  }
+
+  function getLetraDescription(letra: string): string {
+    const descripciones: Record<string, string> = {
+      'A': 'Calidad muy alta - Lujo',
+      'B': 'Calidad alta - Superior',
+      'C': 'Calidad media alta',
+      'D': 'Calidad media',
+      'E': 'Calidad media baja',
+      'F': 'Calidad baja',
+      'G': 'Calidad muy baja',
+      'H': 'Calidad económica',
+      'I': 'Calidad muy económica'
+    };
+    return descripciones[letra] || `Clasificación ${letra}`;
+  }
 
   return (
-    <div className="bg-white rounded-md shadow-sm overflow-hidden w-3/4">
-      <div className="px-6 py-3 bg-gray-50 border-b">
-        <h2 className="text-lg font-medium text-gray-800">Valores Unitarios</h2>
-      </div>
+    <Paper 
+      elevation={1}
+      sx={{ 
+        overflow: 'hidden',
+        border: `1px solid ${theme.palette.divider}`,
+        backgroundColor: theme.palette.background.paper
+      }}
+    >
+      <Box 
+        sx={{ 
+          px: 3, 
+          py: 2, 
+          bgcolor: alpha(theme.palette.primary.main, 0.04),
+          borderBottom: `1px solid ${theme.palette.divider}`
+        }}
+      >
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <CategoryIcon color="primary" fontSize="small" />
+          <Typography variant="h6" fontWeight={500}>
+            Valores Unitarios
+          </Typography>
+        </Stack>
+      </Box>
       
-      <div className="p-4">
-        <div className="grid grid-cols-2 gap-3">
-          {/* Fila 1: Año y Categoría */}
-          <div>
-            <Select
-              label="Años"
-              options={años}
-              placeholder="Seleccione"
-              value={añoSeleccionado?.toString() || ''}
-              onChange={handleAñoChange}
-              disabled={loading}
-            />
-          </div>
+      <Box sx={{ p: 3 }}>
+        <Stack spacing={3}>
+          {/* Primera fila: Año y Categoría */}
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+            <Box sx={{ flex: 1 }}>
+              <SearchableSelect
+                label="Año"
+                options={añoOptions}
+                value={añoSeleccionado ? añoOptions.find(opt => opt.value === añoSeleccionado) || null : null}
+                onChange={(option) => onAñoChange(option ? option.value : null)}
+                placeholder="Seleccione el año"
+                disabled={loading}
+                required
+                renderOption={(props, option) => (
+                  <Box component="li" {...props}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <CalendarIcon fontSize="small" color="action" />
+                      <Box>
+                        <Typography variant="body2">{option.label}</Typography>
+                        {option.description && (
+                          <Typography variant="caption" color="text.secondary">
+                            {option.description}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Stack>
+                  </Box>
+                )}
+              />
+            </Box>
+            
+            <Box sx={{ flex: 1 }}>
+              <SearchableSelect
+                label="Categoría"
+                options={categoriaOptions}
+                value={categoriaSeleccionada ? categoriaOptions.find(opt => opt.value === categoriaSeleccionada) || null : null}
+                onChange={(option) => onCategoriaChange(option ? option.value as CategoriaValorUnitario : null)}
+                placeholder="Seleccione la categoría"
+                disabled={loading || !añoSeleccionado}
+                required
+                renderOption={(props, option) => (
+                  <Box component="li" {...props}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <LayersIcon fontSize="small" color="action" />
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2">{option.label}</Typography>
+                        {option.description && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            {option.description}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Stack>
+                  </Box>
+                )}
+              />
+            </Box>
+          </Stack>
           
-          <div>
-            <Select
-              label="Categorías"
-              options={categorias}
-              placeholder="Seleccione"
-              value={categoriaSeleccionada || ''}
-              onChange={handleCategoriaChange}
-              disabled={loading || !añoSeleccionado}
-            />
-          </div>
+          {/* Segunda fila: Subcategoría y Letra */}
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+            <Box sx={{ flex: 1 }}>
+              <SearchableSelect
+                label="Subcategoría"
+                options={subcategoriaOptions}
+                value={subcategoriaSeleccionada ? subcategoriaOptions.find(opt => opt.value === subcategoriaSeleccionada) || null : null}
+                onChange={(option) => onSubcategoriaChange(option ? option.value as SubcategoriaValorUnitario : null)}
+                placeholder="Seleccione la subcategoría"
+                disabled={loading || !categoriaSeleccionada}
+                required
+              />
+            </Box>
+            
+            <Box sx={{ flex: 1 }}>
+              <SearchableSelect
+                label="Letra (Calidad)"
+                options={letraOptions}
+                value={letraSeleccionada ? letraOptions.find(opt => opt.value === letraSeleccionada) || null : null}
+                onChange={(option) => onLetraChange(option ? option.value as LetraValorUnitario : null)}
+                placeholder="Seleccione la letra"
+                disabled={loading || !subcategoriaSeleccionada}
+                required
+                renderOption={(props, option) => (
+                  <Box component="li" {...props}>
+                    <Stack direction="row" alignItems="center" spacing={2}>
+                      <Box
+                        sx={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 1,
+                          bgcolor: alpha(theme.palette.primary.main, 0.1),
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 'bold',
+                          color: theme.palette.primary.main
+                        }}
+                      >
+                        {option.label}
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        {option.description}
+                      </Typography>
+                    </Stack>
+                  </Box>
+                )}
+              />
+            </Box>
+          </Stack>
           
-          {/* Fila 2: Subcategoría y Letra */}
-          <div>
-            <Select
-              label="Subcategorías"
-              options={subcategoriasDisponibles}
-              placeholder="Seleccione"
-              value={subcategoriaSeleccionada || ''}
-              onChange={handleSubcategoriaChange}
-              disabled={loading || !categoriaSeleccionada}
-            />
-          </div>
+          <Divider />
           
-          <div>
-            <Select
-              label="Letra"
-              options={letras}
-              placeholder="Seleccione"
-              value={letraSeleccionada || ''}
-              onChange={handleLetraChange}
-              disabled={loading || !subcategoriaSeleccionada}
-            />
-          </div>
-          
-          {/* Fila 3: Costo */}
-          <div className="col-span-2">
-            <Input
-              label="Costo"
+          {/* Tercera fila: Costo */}
+          <Box>
+            <TextField
+              fullWidth
+              label="Costo Unitario"
               type="number"
-              step="0.01"
               value={costoValue}
-              onChange={handleCostoChange}
+              onChange={(e) => onCostoChange(e.target.value)}
               disabled={loading || !letraSeleccionada}
+              required
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <MoneyIcon color="action" />
+                  </InputAdornment>
+                ),
+                endAdornment: <InputAdornment position="end">S/</InputAdornment>
+              }}
+              inputProps={{
+                step: 0.01,
+                min: 0
+              }}
+              helperText={letraSeleccionada ? "Ingrese el costo unitario para la configuración seleccionada" : "Seleccione todos los campos anteriores"}
             />
-          </div>
-        </div>
-      </div>
-    </div>
+          </Box>
+        </Stack>
+      </Box>
+    </Paper>
   );
 };
 

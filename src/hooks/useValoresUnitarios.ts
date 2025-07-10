@@ -1,3 +1,4 @@
+// src/hooks/useValoresUnitarios.ts
 import { useState, useCallback, useEffect } from 'react';
 import { 
   ValorUnitario, 
@@ -7,6 +8,8 @@ import {
   LetraValorUnitario,
   SUBCATEGORIAS_POR_CATEGORIA
 } from '../models';
+import { valorUnitarioService } from '../services';
+import { NotificationService } from '../components/utils/Notification';
 
 // Generar rangos de años
 const generarRangoAnos = (inicio: number, fin: number) => {
@@ -31,41 +34,13 @@ const letras = Object.values(LetraValorUnitario).map(letra => ({
   label: letra
 }));
 
-// Datos de ejemplo para pruebas
-const generateValoresUnitariosIniciales = (): ValorUnitario[] => {
-  const valoresUnitarios: ValorUnitario[] = [];
-  const año = 2025;
-  let id = 1;
-
-  // Para cada categoría y subcategoría, generar valores para cada letra
-  Object.entries(SUBCATEGORIAS_POR_CATEGORIA).forEach(([categoria, subcategorias]) => {
-    subcategorias.forEach(subcategoria => {
-      Object.values(LetraValorUnitario).forEach(letra => {
-        valoresUnitarios.push({
-          id: id++,
-          año,
-          categoria: categoria as CategoriaValorUnitario,
-          subcategoria,
-          letra,
-          costo: 0.00
-        });
-      });
-    });
-  });
-
-  return valoresUnitarios;
-};
-
-const valoresUnitariosIniciales = generateValoresUnitariosIniciales();
-
 /**
  * Hook personalizado para la gestión de valores unitarios
- * 
- * Proporciona funcionalidades para listar, crear, actualizar y eliminar valores unitarios
+ * Conectado con la API real
  */
 export const useValoresUnitarios = () => {
   // Estados
-  const [valoresUnitarios, setValoresUnitarios] = useState<ValorUnitario[]>(valoresUnitariosIniciales);
+  const [valoresUnitarios, setValoresUnitarios] = useState<ValorUnitario[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -86,28 +61,30 @@ export const useValoresUnitarios = () => {
         label: subcategoria
       }));
       setSubcategoriasDisponibles(subcategorias);
+      // Limpiar subcategoría seleccionada si no está en las nuevas opciones
+      if (subcategoriaSeleccionada && !subcategorias.some(s => s.value === subcategoriaSeleccionada)) {
+        setSubcategoriaSeleccionada(null);
+      }
     } else {
       setSubcategoriasDisponibles([]);
+      setSubcategoriaSeleccionada(null);
     }
-  }, [categoriaSeleccionada]);
+  }, [categoriaSeleccionada, subcategoriaSeleccionada]);
 
-  // Cargar valores unitarios (simula una petición a API)
+  // Cargar valores unitarios desde la API
   const cargarValoresUnitarios = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Aquí iría la petición a la API
-      // const response = await fetch('/api/valores-unitarios');
-      // const data = await response.json();
-      // setValoresUnitarios(data);
+      const valores = await valorUnitarioService.obtenerTodos();
+      setValoresUnitarios(valores);
       
-      // Simulamos un retardo
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setValoresUnitarios(valoresUnitariosIniciales);
-    } catch (err) {
-      setError('Error al cargar los valores unitarios');
-      console.error(err);
+      console.log(`✅ [useValoresUnitarios] ${valores.length} valores cargados`);
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al cargar los valores unitarios';
+      setError(mensaje);
+      console.error('❌ [useValoresUnitarios] Error:', err);
     } finally {
       setLoading(false);
     }
@@ -136,6 +113,10 @@ export const useValoresUnitarios = () => {
         throw new Error('Debe seleccionar una letra');
       }
       
+      if (data.costo <= 0) {
+        throw new Error('El costo debe ser mayor a 0');
+      }
+      
       // Verificar si ya existe un registro con los mismos criterios
       const existeRegistro = valoresUnitarios.some(
         vu => vu.año === data.año && 
@@ -148,32 +129,29 @@ export const useValoresUnitarios = () => {
         throw new Error('Ya existe un registro con los mismos criterios');
       }
       
-      // Aquí iría la petición a la API para crear
-      // const response = await fetch('/api/valores-unitarios', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(data),
-      // });
-      // const nuevoValorUnitario = await response.json();
-      
-      // Simulamos la creación con un ID nuevo
-      const nuevoValorUnitario: ValorUnitario = {
-        id: Math.max(0, ...valoresUnitarios.map(vu => vu.id)) + 1,
-        ...data
-      };
+      // Crear en la API
+      const nuevoValor = await valorUnitarioService.crear({
+        anio: data.año,
+        categoria: data.categoria,
+        subcategoria: data.subcategoria,
+        letra: data.letra,
+        costo: data.costo
+      });
       
       // Actualizar estado local
-      setValoresUnitarios(prev => [...prev, nuevoValorUnitario]);
+      setValoresUnitarios(prev => [...prev, nuevoValor]);
       
-      // Resetear selecciones
-      setAñoSeleccionado(null);
-      setCategoriaSeleccionada(null);
+      // Limpiar selecciones (manteniendo año y categoría)
       setSubcategoriaSeleccionada(null);
       setLetraSeleccionada(null);
       
+      console.log('✅ [useValoresUnitarios] Valor unitario registrado exitosamente');
+      
     } catch (err: any) {
-      setError(err.message || 'Error al registrar el valor unitario');
-      console.error(err);
+      const mensaje = err.message || 'Error al registrar el valor unitario';
+      setError(mensaje);
+      console.error('❌ [useValoresUnitarios] Error:', err);
+      throw err; // Re-lanzar para que la página pueda manejarlo
     } finally {
       setLoading(false);
     }
@@ -185,64 +163,94 @@ export const useValoresUnitarios = () => {
       setLoading(true);
       setError(null);
       
-      // Aquí iría la petición a la API para eliminar
-      // await fetch(`/api/valores-unitarios/${id}`, {
-      //   method: 'DELETE',
-      // });
+      // Eliminar en la API
+      await valorUnitarioService.eliminar(id);
       
       // Actualizar estado local
       setValoresUnitarios(prev => prev.filter(vu => vu.id !== id));
       
-    } catch (err) {
-      setError('Error al eliminar el valor unitario');
-      console.error(err);
+      console.log('✅ [useValoresUnitarios] Valor unitario eliminado');
+      
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al eliminar el valor unitario';
+      setError(mensaje);
+      console.error('❌ [useValoresUnitarios] Error:', err);
+      throw err;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Obtener valores unitarios por categoría
-  const obtenerValoresUnitariosPorCategoria = useCallback((año?: number) => {
-    // Filtrar por año si se proporciona
-    let filtrados = valoresUnitarios;
-    if (año) {
-      filtrados = filtrados.filter(vu => vu.año === año);
-    }
-    
-    // Agrupar por subcategoria y letra
-    const resultado: Record<string, Record<string, number>> = {};
-    
-    // Inicializar todas las subcategorías
-    const todasSubcategorias = [
-      SubcategoriaValorUnitario.MUROS_Y_COLUMNAS,
-      SubcategoriaValorUnitario.TECHOS,
-      SubcategoriaValorUnitario.PISOS,
-      SubcategoriaValorUnitario.PUERTAS_Y_VENTANAS,
-      SubcategoriaValorUnitario.REVESTIMIENTOS,
-      SubcategoriaValorUnitario.INSTALACIONES_ELECTRICAS_Y_SANITARIAS
-    ];
-    
-    // Inicializar la estructura del resultado
-    todasSubcategorias.forEach(subcategoria => {
-      resultado[subcategoria] = {};
+  // Eliminar todos los valores de un año
+  const eliminarValoresPorAnio = useCallback(async (anio: number) => {
+    try {
+      setLoading(true);
+      setError(null);
       
-      // Inicializar todas las letras para cada subcategoría
-      Object.values(LetraValorUnitario).forEach(letra => {
-        resultado[subcategoria][letra] = 0.00;
+      await valorUnitarioService.eliminarPorAnio(anio);
+      
+      // Actualizar estado local
+      setValoresUnitarios(prev => prev.filter(vu => vu.año !== anio));
+      
+      console.log(`✅ [useValoresUnitarios] Valores del año ${anio} eliminados`);
+      
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al eliminar valores por año';
+      setError(mensaje);
+      console.error('❌ [useValoresUnitarios] Error:', err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Obtener valores unitarios por categoría (para la tabla)
+  const obtenerValoresUnitariosPorCategoria = useCallback(async (año: number) => {
+    try {
+      setLoading(true);
+      const valores = await valorUnitarioService.obtenerValoresPorCategoria(año);
+      return valores;
+    } catch (err) {
+      console.error('❌ [useValoresUnitarios] Error al obtener valores por categoría:', err);
+      return {};
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Actualizar un valor unitario existente
+  const actualizarValorUnitario = useCallback(async (id: number, data: Partial<ValorUnitarioFormData>) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const valorActualizado = await valorUnitarioService.actualizar(id, {
+        anio: data.año,
+        categoria: data.categoria,
+        subcategoria: data.subcategoria,
+        letra: data.letra,
+        costo: data.costo
       });
-    });
-    
-    // Poblar con datos reales
-    filtrados.forEach(vu => {
-      if (resultado[vu.subcategoria]) {
-        resultado[vu.subcategoria][vu.letra] = vu.costo;
-      }
-    });
-    
-    return resultado;
-  }, [valoresUnitarios]);
+      
+      // Actualizar estado local
+      setValoresUnitarios(prev => 
+        prev.map(vu => vu.id === id ? valorActualizado : vu)
+      );
+      
+      console.log('✅ [useValoresUnitarios] Valor unitario actualizado');
+      
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al actualizar el valor unitario';
+      setError(mensaje);
+      console.error('❌ [useValoresUnitarios] Error:', err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   return {
+    // Estados
     valoresUnitarios,
     años,
     categorias,
@@ -254,10 +262,16 @@ export const useValoresUnitarios = () => {
     letraSeleccionada,
     loading,
     error,
+    
+    // Métodos
     cargarValoresUnitarios,
     registrarValorUnitario,
     eliminarValorUnitario,
+    eliminarValoresPorAnio,
+    actualizarValorUnitario,
     obtenerValoresUnitariosPorCategoria,
+    
+    // Setters
     setAñoSeleccionado,
     setCategoriaSeleccionada,
     setSubcategoriaSeleccionada,

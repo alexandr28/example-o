@@ -1,5 +1,24 @@
+// src/components/alcabala/Alcabala.tsx
 import React from 'react';
-import { Select, Input, Button } from '../../components';
+import {
+  Paper,
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Stack,
+  InputAdornment,
+  useTheme,
+  alpha,
+  CircularProgress
+} from '@mui/material';
+import {
+  CalendarToday as CalendarIcon,
+  Percent as PercentIcon,
+  Save as SaveIcon,
+  Receipt as ReceiptIcon
+} from '@mui/icons-material';
+import SearchableSelect from '../ui/SearchableSelect';
 
 interface AlcabalaProps {
   aniosDisponibles: { value: string, label: string }[];
@@ -12,7 +31,7 @@ interface AlcabalaProps {
 }
 
 /**
- * Componente para capturar los datos de Alcabala
+ * Componente para capturar los datos de Alcabala con Material-UI
  */
 const Alcabala: React.FC<AlcabalaProps> = ({
   aniosDisponibles,
@@ -23,63 +42,153 @@ const Alcabala: React.FC<AlcabalaProps> = ({
   onRegistrar,
   loading = false
 }) => {
-  // Manejar cambio de año
-  const handleAnioChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const anio = e.target.value ? parseInt(e.target.value) : null;
-    onAnioChange(anio);
-  };
+  const theme = useTheme();
+
+  // Convertir opciones de años al formato de SearchableSelect
+  const anioOptions = aniosDisponibles.map(anio => ({
+    id: anio.value,
+    value: parseInt(anio.value),
+    label: anio.label,
+    description: anio.value === new Date().getFullYear().toString() ? 'Año actual' : undefined
+  }));
 
   // Manejar cambio de tasa
   const handleTasaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const nuevaTasa = e.target.value ? parseFloat(e.target.value) : 0;
-    onTasaChange(nuevaTasa);
+    const value = e.target.value;
+    if (value === '' || /^\d*\.?\d{0,4}$/.test(value)) {
+      onTasaChange(parseFloat(value) || 0);
+    }
   };
 
   return (
-    <div className="bg-white rounded-md shadow-sm overflow-hidden">
-      <div className="px-6 py-4 bg-gray-50 border-b">
-        <h2 className="text-lg font-medium text-gray-800">Datos del alcabala</h2>
-      </div>
+    <Paper 
+      elevation={1}
+      sx={{ 
+        overflow: 'hidden',
+        border: `1px solid ${theme.palette.divider}`,
+        height: '100%'
+      }}
+    >
+      <Box 
+        sx={{ 
+          px: 3, 
+          py: 2, 
+          bgcolor: alpha(theme.palette.primary.main, 0.04),
+          borderBottom: `1px solid ${theme.palette.divider}`
+        }}
+      >
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <ReceiptIcon color="primary" fontSize="small" />
+          <Typography variant="h6" fontWeight={500}>
+            Datos del alcabala
+          </Typography>
+        </Stack>
+      </Box>
       
-      <div className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Campo Año */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Año</label>
-            <Select
-              options={aniosDisponibles}
-              value={anioSeleccionado?.toString() || ''}
-              onChange={handleAnioChange}
+      <Box sx={{ p: 3 }}>
+        <Stack spacing={3}>
+          {/* Campo Año con SearchableSelect */}
+          <Box>
+            <SearchableSelect
+              label="Año"
+              options={anioOptions}
+              value={anioSeleccionado ? anioOptions.find(opt => opt.value === anioSeleccionado) || null : null}
+              onChange={(option) => onAnioChange(option ? option.value : null)}
+              placeholder="Seleccione el año"
               disabled={loading}
-              placeholder="Seleccione"
+              required
+              renderOption={(props, option) => (
+                <Box component="li" {...props}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <CalendarIcon fontSize="small" color="action" />
+                    <Box>
+                      <Typography variant="body2">{option.label}</Typography>
+                      {option.description && (
+                        <Typography variant="caption" color="text.secondary">
+                          {option.description}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Stack>
+                </Box>
+              )}
             />
-          </div>
+          </Box>
           
           {/* Campo Tasa */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tasa</label>
-            <Input
+          <Box>
+            <TextField
+              fullWidth
+              label="Tasa"
               type="number"
-              step="0.01"
               value={tasa}
               onChange={handleTasaChange}
               disabled={loading}
+              required
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <PercentIcon color="action" />
+                  </InputAdornment>
+                ),
+                endAdornment: <InputAdornment position="end">%</InputAdornment>
+              }}
+              inputProps={{
+                step: 0.01,
+                min: 0,
+                max: 100
+              }}
+              helperText={anioSeleccionado ? `Tasa de alcabala para el año ${anioSeleccionado}` : "Seleccione primero el año"}
             />
-          </div>
-        </div>
-        
-        {/* Botón Registrar */}
-        <div className="mt-6 flex justify-center">
-          <Button
-            onClick={onRegistrar}
-            disabled={loading || !anioSeleccionado}
-            className="w-full md:w-1/2 bg-green-400 hover:bg-green-500"
-          >
-            Registrar
-          </Button>
-        </div>
-      </div>
-    </div>
+          </Box>
+          
+          {/* Información adicional */}
+          {anioSeleccionado && tasa > 0 && (
+            <Box 
+              sx={{ 
+                p: 2, 
+                bgcolor: alpha(theme.palette.info.main, 0.08),
+                borderRadius: 1,
+                border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
+              }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                Se aplicará una tasa del {tasa}% para las transferencias del año {anioSeleccionado}
+              </Typography>
+            </Box>
+          )}
+          
+          {/* Botón Registrar */}
+          <Box>
+            <Button
+              fullWidth
+              variant="contained"
+              size="large"
+              onClick={onRegistrar}
+              disabled={loading || !anioSeleccionado || tasa <= 0}
+              startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+              sx={{
+                py: 1.5,
+                bgcolor: theme.palette.success.main,
+                '&:hover': {
+                  bgcolor: theme.palette.success.dark,
+                },
+                '&:disabled': {
+                  bgcolor: theme.palette.action.disabledBackground,
+                },
+                fontWeight: 600,
+                boxShadow: theme.shadows[2],
+                '&:hover:not(:disabled)': {
+                  boxShadow: theme.shadows[4],
+                }
+              }}
+            >
+              {loading ? 'Registrando...' : 'Registrar'}
+            </Button>
+          </Box>
+        </Stack>
+      </Box>
+    </Paper>
   );
 };
 

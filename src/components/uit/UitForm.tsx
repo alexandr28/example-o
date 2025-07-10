@@ -1,4 +1,6 @@
+// src/components/uit/UitForm.tsx
 import React from 'react';
+import { Grid, useTheme, useMediaQuery } from '@mui/material';
 import UIT from './UIT';
 import AlicuotaComponent from './Alicuota';
 import { Alicuota } from '../../models/UIT';
@@ -31,25 +33,32 @@ const UitForm: React.FC<UitFormProps> = ({
   loading = false,
   editable = true
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <UIT 
-        aniosDisponibles={aniosDisponibles}
-        anioSeleccionado={anioSeleccionado}
-        montoCalculo={montoCalculo}
-        onAnioChange={onAnioChange}
-        onMontoChange={onMontoChange}
-        onCalcular={onCalcular}
-        loading={loading}
-      />
+    <Grid container spacing={3}>
+      <Grid item xs={12} md={6}>
+        <UIT 
+          aniosDisponibles={aniosDisponibles}
+          anioSeleccionado={anioSeleccionado}
+          montoCalculo={montoCalculo}
+          onAnioChange={onAnioChange}
+          onMontoChange={onMontoChange}
+          onCalcular={onCalcular}
+          loading={loading}
+        />
+      </Grid>
       
-      <AlicuotaComponent 
-        alicuotas={alicuotas}
-        onActualizarAlicuotas={onActualizarAlicuotas}
-        editable={editable}
-        loading={loading}
-      />
-    </div>
+      <Grid item xs={12} md={6}>
+        <AlicuotaComponent 
+          alicuotas={alicuotas}
+          onActualizarAlicuotas={onActualizarAlicuotas}
+          editable={editable}
+          loading={loading}
+        />
+      </Grid>
+    </Grid>
   );
 };
 
