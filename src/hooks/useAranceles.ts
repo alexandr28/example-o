@@ -1,265 +1,228 @@
 // src/hooks/useAranceles.ts
-import { useState, useCallback, useEffect } from 'react';
-import { arancelService } from '../services/arancelService';
-import { NotificationService } from '../components/utils/Notification';
+import { useCallback, useEffect, useState } from 'react';
+import { useCrudEntity } from './useCrudEntity';
+import { 
+  ArancelData, 
+  CreateArancelDTO, 
+  UpdateArancelDTO,
+  UNIDADES_MEDIDA,
+  CATEGORIAS_ARANCEL
+} from '../services/arancelService';
+import arancelService from '../services/arancelService';
 
-// Tipos
-export interface Arancel {
+// Extender el tipo ArancelData para incluir un codigo numérico opcional
+interface ArancelDataExtended extends ArancelData {
+  codigo: string;
   id: number;
-  anio: number;
-  direccionId: number;
-  monto: number;
-  estado?: boolean;
-}
-
-export interface ArancelFormData {
-  anio: number;
-  direccionId: number;
-  monto: number;
-}
-
-export interface ArancelDireccion {
-  id: number;
-  anio: number;
-  direccion: string;
-  sector: string;
-  barrio: string;
-  tipoVia: string;
-  nombreVia: string;
-  cuadra: number;
-  lado: string;
-  loteInicial: number;
-  loteFinal: number;
-  monto: number;
-  estado: boolean;
 }
 
 export const useAranceles = () => {
-  const [aranceles, setAranceles] = useState<Arancel[]>([]);
-  const [arancelesPorDireccion, setArancelesPorDireccion] = useState<ArancelDireccion[]>([]);
-  const [arancelSeleccionado, setArancelSeleccionado] = useState<Arancel | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Estados adicionales para estadísticas
+  const [estadisticas, setEstadisticas] = useState({
+    totalActivos: 0,
+    totalInactivos: 0,
+    porCategoria: {} as Record<string, number>,
+    costoPromedio: 0
+  });
 
-  // Cargar todos los aranceles
-  const cargarAranceles = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await arancelService.obtenerTodos();
-      
-      // Mapear los datos de la API al formato esperado
-      const arancelesMapeados = response.data.map(item => ({
-        id: item.codArancel || 0,
-        anio: item.anio,
-        direccionId: item.codDireccion,
-        monto: item.costo || item.costoArancel || 0,
-        estado: true
-      }));
-      
-      setAranceles(arancelesMapeados);
-      console.log(`✅ ${arancelesMapeados.length} aranceles cargados`);
-      
-    } catch (err: any) {
-      console.error('Error al cargar aranceles:', err);
-      setError(err.message || 'Error al cargar aranceles');
-      NotificationService.error('Error al cargar aranceles');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Buscar aranceles por año (para la lista)
-  const buscarArancelesPorDireccion = useCallback(async (anio: number) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const data = await arancelService.buscarPorAnio(anio);
-      
-      // Mapear los datos para la tabla (simulando datos de dirección)
-      const arancelesConDireccion: ArancelDireccion[] = data.map(arancel => ({
-        id: arancel.codArancel || 0,
-        anio: arancel.anio,
-        direccion: `Dirección ${arancel.codDireccion}`,
-        sector: 'Centro', // Estos datos deberían venir de la API
-        barrio: 'San Juan',
-        tipoVia: 'Calle',
-        nombreVia: 'Principal',
-        cuadra: 1,
-        lado: 'Derecho',
-        loteInicial: 1,
-        loteFinal: 10,
-        monto: arancel.costo || arancel.costoArancel || 0,
-        estado: true
-      }));
-      
-      setArancelesPorDireccion(arancelesConDireccion);
-      
-      if (arancelesConDireccion.length === 0) {
-        NotificationService.info(`No se encontraron aranceles para el año ${anio}`);
+  // Usar any para evitar conflictos de tipo, pero mantener la funcionalidad
+  const [state, actions] = useCrudEntity<any, CreateArancelDTO, UpdateArancelDTO>(
+    arancelService as any,
+    {
+      entityName: 'Arancel',
+      loadOnMount: true,
+      useCache: true,
+      searchDebounce: 300,
+      sortFunction: (a, b) => {
+        // Ordenar por categoría, luego por código
+        const catComparison = (a.categoria || '').localeCompare(b.categoria || '');
+        if (catComparison !== 0) return catComparison;
+        return a.codigo.localeCompare(b.codigo);
+      },
+      localFilter: (items, filter) => {
+        let filtered = items;
+        
+        if (filter.search) {
+          const searchLower = filter.search.toLowerCase();
+          filtered = filtered.filter((item: ArancelData) => 
+            item.codigo.toLowerCase().includes(searchLower) ||
+            item.descripcion.toLowerCase().includes(searchLower)
+          );
+        }
+        
+        if (filter.categoria) {
+          filtered = filtered.filter((item: ArancelData) => item.categoria === filter.categoria);
+        }
+        
+        if (filter.subcategoria) {
+          filtered = filtered.filter((item: ArancelData) => item.subcategoria === filter.subcategoria);
+        }
+        
+        if (filter.unidadMedida) {
+          filtered = filtered.filter((item: ArancelData) => item.unidadMedida === filter.unidadMedida);
+        }
+        
+        if (filter.estado) {
+          filtered = filtered.filter((item: ArancelData) => item.estado === filter.estado);
+        }
+        
+        if (filter.vigente !== undefined) {
+          const ahora = new Date().toISOString();
+          filtered = filtered.filter((item: ArancelData) => {
+            const vigenciaOk = (!item.vigenciaDesde || item.vigenciaDesde <= ahora) &&
+                             (!item.vigenciaHasta || item.vigenciaHasta >= ahora);
+            return filter.vigente ? vigenciaOk : !vigenciaOk;
+          });
+        }
+        
+        return filtered;
       }
-      
-    } catch (err: any) {
-      console.error('Error al buscar aranceles:', err);
-      setError(err.message || 'Error al buscar aranceles');
-      setArancelesPorDireccion([]);
-      NotificationService.error('Error al buscar aranceles');
-    } finally {
-      setLoading(false);
     }
-  }, []);
+  );
 
-  // Crear nuevo arancel
-  const crearArancel = useCallback(async (datos: ArancelFormData) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Preparar datos para la API
-      const datosAPI = {
-        anio: datos.anio,
-        codDireccion: datos.direccionId,
-        codUsuario: 1 // Usuario por defecto
-      };
-      
-      const nuevoArancel = await arancelService.crear(datosAPI);
-      
-      // Mapear y agregar a la lista
-      const arancelMapeado: Arancel = {
-        id: nuevoArancel.codArancel || 0,
-        anio: nuevoArancel.anio,
-        direccionId: nuevoArancel.codDireccion,
-        monto: nuevoArancel.costo || nuevoArancel.costoArancel || 0,
-        estado: true
-      };
-      
-      setAranceles(prev => [...prev, arancelMapeado]);
-      
-      NotificationService.success('Arancel creado exitosamente');
-      
-      // Recargar datos
-      await cargarAranceles();
-      
-      return arancelMapeado;
-      
-    } catch (err: any) {
-      console.error('Error al crear arancel:', err);
-      const mensaje = err.message || 'Error al crear arancel';
-      setError(mensaje);
-      NotificationService.error(mensaje);
-      throw err;
-    } finally {
-      setLoading(false);
+  // Tipar correctamente los datos
+  const aranceles: ArancelData[] = state.items;
+  const arancelSeleccionado: ArancelData | null = state.selectedItem;
+
+  // Calcular estadísticas cuando cambian los items
+  useEffect(() => {
+    const activos = aranceles.filter(item => item.estado === 'ACTIVO');
+    const inactivos = aranceles.filter(item => item.estado === 'INACTIVO');
+    
+    const porCategoria = aranceles.reduce((acc, item) => {
+      const cat = item.categoria || 'SIN CATEGORÍA';
+      acc[cat] = (acc[cat] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const costoTotal = aranceles.reduce((sum, item) => sum + item.costoUnitario, 0);
+    const costoPromedio = aranceles.length > 0 ? costoTotal / aranceles.length : 0;
+    
+    setEstadisticas({
+      totalActivos: activos.length,
+      totalInactivos: inactivos.length,
+      porCategoria,
+      costoPromedio
+    });
+  }, [aranceles]);
+
+  // Buscar por categoría
+  const buscarPorCategoria = useCallback((categoria: string) => {
+    actions.setFilters({ categoria });
+  }, [actions]);
+
+  // Buscar por unidad de medida
+  const buscarPorUnidadMedida = useCallback((unidadMedida: string) => {
+    actions.setFilters({ unidadMedida });
+  }, [actions]);
+
+  // Buscar solo vigentes
+  const buscarVigentes = useCallback(() => {
+    actions.setFilters({ vigente: true });
+  }, [actions]);
+
+  // Crear arancel con validaciones
+  const crearArancel = useCallback(async (data: CreateArancelDTO) => {
+    // Validar código único
+    const existe = aranceles.some(item => 
+      item.codigo === data.codigo && item.estado === 'ACTIVO'
+    );
+    
+    if (existe) {
+      throw new Error(`Ya existe un arancel activo con el código ${data.codigo}`);
     }
-  }, [cargarAranceles]);
+    
+    // Validar costo
+    if (data.costoUnitario < 0) {
+      throw new Error('El costo unitario no puede ser negativo');
+    }
+    
+    const result = await actions.createItem(data);
+    return result as ArancelData | null;
+  }, [actions, aranceles]);
 
   // Actualizar arancel
-  const actualizarArancel = useCallback(async (id: number, datos: Partial<ArancelFormData>) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const datosAPI: any = {};
-      if (datos.anio) datosAPI.anio = datos.anio;
-      if (datos.monto !== undefined) datosAPI.costo = datos.monto;
-      
-      const arancelActualizado = await arancelService.actualizar(id, datosAPI);
-      
-      // Mapear y actualizar en la lista
-      const arancelMapeado: Arancel = {
-        id: arancelActualizado.codArancel || id,
-        anio: arancelActualizado.anio,
-        direccionId: arancelActualizado.codDireccion,
-        monto: arancelActualizado.costo || arancelActualizado.costoArancel || 0,
-        estado: true
-      };
-      
-      setAranceles(prev => 
-        prev.map(a => a.id === id ? arancelMapeado : a)
-      );
-      
-      NotificationService.success('Arancel actualizado exitosamente');
-      
-      // Recargar datos
-      await cargarAranceles();
-      
-      return arancelMapeado;
-      
-    } catch (err: any) {
-      console.error('Error al actualizar arancel:', err);
-      const mensaje = err.message || 'Error al actualizar arancel';
-      setError(mensaje);
-      NotificationService.error(mensaje);
-      throw err;
-    } finally {
-      setLoading(false);
+  const actualizarArancel = useCallback(async (id: string | number, data: UpdateArancelDTO) => {
+    const result = await actions.updateItem(id, data);
+    return result as ArancelData | null;
+  }, [actions]);
+
+  // Duplicar arancel
+  const duplicarArancel = useCallback(async (id: number, nuevoCodigo: string) => {
+    const original = aranceles.find(item => item.id === id);
+    if (!original) {
+      throw new Error('Arancel no encontrado');
     }
-  }, [cargarAranceles]);
+    
+    const nuevoArancel: CreateArancelDTO = {
+      codigo: nuevoCodigo,
+      descripcion: `${original.descripcion} (COPIA)`,
+      unidadMedida: original.unidadMedida,
+      costoUnitario: original.costoUnitario,
+      categoria: original.categoria,
+      subcategoria: original.subcategoria,
+      vigenciaDesde: new Date().toISOString()
+    };
+    
+    return crearArancel(nuevoArancel);
+  }, [aranceles, crearArancel]);
 
-  // Eliminar arancel
-  const eliminarArancel = useCallback(async (id: number) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      await arancelService.eliminar(id);
-      
-      // Actualizar lista
-      setAranceles(prev => prev.filter(a => a.id !== id));
-      setArancelesPorDireccion(prev => prev.filter(a => a.id !== id));
-      
-      NotificationService.success('Arancel eliminado exitosamente');
-      
-    } catch (err: any) {
-      console.error('Error al eliminar arancel:', err);
-      const mensaje = err.message || 'Error al eliminar arancel';
-      setError(mensaje);
-      NotificationService.error(mensaje);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Seleccionar arancel
-  const seleccionarArancel = useCallback((arancel: Arancel | null) => {
-    setArancelSeleccionado(arancel);
-  }, []);
-
-  // Limpiar selección
-  const limpiarSeleccion = useCallback(() => {
-    setArancelSeleccionado(null);
-  }, []);
-
-  // Cargar datos iniciales
-  useEffect(() => {
-    cargarAranceles();
-  }, [cargarAranceles]);
+  // Seleccionar arancel tipado
+  const seleccionarArancel = useCallback((arancel: ArancelData | null) => {
+    actions.selectItem(arancel);
+  }, [actions]);
 
   return {
-    // Estados
+    // Estado
     aranceles,
-    arancelesPorDireccion,
     arancelSeleccionado,
-    loading,
-    error,
+    loading: state.loading,
+    error: state.error,
+    page: state.page,
+    pageSize: state.pageSize,
+    totalItems: state.totalItems,
+    totalPages: state.totalPages,
+    searchTerm: state.searchTerm,
+    isOffline: state.isOffline,
     
-    // Funciones principales
-    cargarAranceles,
-    buscarArancelesPorDireccion,
+    // Estados de operaciones
+    creating: state.creating,
+    updating: state.updating,
+    deleting: state.deleting,
     
-    // CRUD
+    // Datos adicionales
+    estadisticas,
+    unidadesMedida: Object.values(UNIDADES_MEDIDA),
+    categorias: Object.values(CATEGORIAS_ARANCEL),
+    
+    // Acciones CRUD
+    cargarAranceles: actions.loadItems,
     crearArancel,
     actualizarArancel,
-    eliminarArancel,
-    
-    // Selección
+    eliminarArancel: actions.deleteItem,
     seleccionarArancel,
-    limpiarSeleccion,
+    buscarAranceles: actions.search,
+    limpiarSeleccion: actions.clearSelection,
     
-    // Utils
-    refrescar: cargarAranceles
+    // Acciones específicas
+    duplicarArancel,
+    buscarPorCategoria,
+    buscarPorUnidadMedida,
+    buscarVigentes,
+    
+    // Filtros
+    setFiltros: actions.setFilters,
+    limpiarFiltros: actions.clearFilters,
+    
+    // Paginación
+    setPagina: actions.setPage,
+    setTamañoPagina: actions.setPageSize,
+    siguientePagina: actions.nextPage,
+    paginaAnterior: actions.previousPage,
+    
+    // Utilidades
+    refrescar: actions.refresh,
+    limpiarError: actions.clearError,
+    resetear: actions.reset
   };
 };
