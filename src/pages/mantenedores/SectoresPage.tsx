@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+// src/pages/mantenedores/SectoresPage.tsx - VERSIÓN CORREGIDA COMPLETA
+import React, { useState, useMemo, useEffect } from "react";
 import { MainLayout } from "../../layout";
 import { SectorList, SectorForm, Breadcrumb } from "../../components";
 import { BreadcrumbItem } from "../../components/utils/Breadcrumb";
@@ -48,24 +49,38 @@ const SectoresPage: React.FC = () => {
     }
   };
 
-  // Manejo de guardado
+  // IMPORTANTE: Esta es la función que debe pasarse como 'onGuardar' al formulario
   const handleGuardar = async (data: { nombre: string }) => {
     try {
-      await guardarSector(data);
-      // showMessage(
-      //   modoEdicion
-      //     ? "✅ Sector actualizado correctamente"
-      //     : "✅ Sector creado correctamente"
-      // );
+      console.log('📝 [SectoresPage] Llamando a guardarSector con:', data);
+      const resultado = await guardarSector(data);
+      
+      if (resultado) {
+        showMessage(
+          modoEdicion
+            ? "✅ Sector actualizado correctamente"
+            : "✅ Sector creado correctamente"
+        );
+      }
     } catch (error: unknown) {
+      console.error('❌ [SectoresPage] Error al guardar:', error);
       let errorMessage = "Error al guardar sector";
+      
       if (error instanceof Error) {
         errorMessage = error.message;
       } else if (typeof error === "string") {
         errorMessage = error;
       }
-      showMessage(errorMessage, 3000); // Cambiado "error" por 3000
+      
+      showMessage(`❌ ${errorMessage}`, 5000);
     }
+  };
+
+  // Función para limpiar el formulario
+  const handleNuevo = () => {
+    console.log('🆕 [SectoresPage] Limpiando selección');
+    limpiarSeleccion();
+    setModoEdicion(false);
   };
 
   // Forzar recarga
@@ -77,94 +92,82 @@ const SectoresPage: React.FC = () => {
       showMessage("✅ Datos recargados desde API");
     } catch (error: unknown) {
       let errorMessage = "❌ Error al forzar recarga";
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "message" in error &&
-        typeof (error as { message?: string }).message === "string"
-      ) {
-        errorMessage += `: ${(error as { message: string }).message}`;
+      if (error instanceof Error) {
+        errorMessage = `❌ ${error.message}`;
       }
-      showMessage(errorMessage);
+      showMessage(errorMessage, 5000);
     }
   };
 
+  // Debug: Verificar que las funciones existen
+  useEffect(() => {
+    console.log('🔍 [SectoresPage] Props del formulario:', {
+      handleGuardar: typeof handleGuardar,
+      handleNuevo: typeof handleNuevo,
+      handleEditar: typeof handleEditar,
+      guardarSector: typeof guardarSector
+    });
+  }, []);
 
   return (
-    <MainLayout title="Mantenimiento de Sectores">
-      {/* Contenedor principal con padding fijo de 10px */}
-      <div style={{ padding: 20, boxSizing: 'border-box' }}>
-        {/* Toast flotante en la parte inferior derecha */}
-        {successMessage && (
-          <div
-            style={{
-              position: "fixed",
-              bottom: 24,
-              right: 24,
-              zIndex: 9999,
-              minWidth: 280,
-              maxWidth: 400,
-              boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
-              pointerEvents: "auto",
-            }}
-            className={`border px-4 py-3 rounded ${
-              successMessage.includes("❌")
-                ? "bg-red-50 border-red-200 text-red-800"
-                : successMessage.includes("⚠️")
-                ? "bg-yellow-50 border-yellow-200 text-yellow-800"
-                : "bg-green-50 border-green-200 text-green-800"
-            }`}
-            role="alert"
-          >
-            <span className="block sm:inline">{successMessage}</span>
-          </div>
-        )}
-        <div className="space-y-0">
-          {/* Header con botones de acciones */}
-          <div className="flex justify-between items-center">
+    <MainLayout>
+      <div className="flex h-full flex-col">
+        {/* Header con breadcrumb */}
+        <div className="bg-white shadow-sm border-b">
+          <div className="px-6 py-4">
             <Breadcrumb items={breadcrumbItems} />
+            <h1 className="text-2xl font-semibold text-gray-900 mt-2">
+              Gestión de Sectores
+            </h1>
           </div>
+        </div>
 
-          {/* Alerta de modo offline */}
-          {isOfflineMode && (
-            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded relative">
-              <div className="flex justify-between items-center">
-                <div>
-                  <span className="font-medium">⚠️ Modo sin conexión:</span>
-                  <span className="ml-1">Trabajando con datos locales.</span>
-                </div>
+        {/* Mensajes de estado */}
+        {(error || successMessage || isOfflineMode) && (
+          <div className="px-6 pt-4">
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md flex items-center">
+                <span className="mr-2">❌</span>
+                {error}
+              </div>
+            )}
+            {successMessage && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-md">
+                {successMessage}
+              </div>
+            )}
+            {isOfflineMode && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-md flex justify-between items-center">
+                <span>🔌 Trabajando sin conexión. Los cambios se sincronizarán cuando se restablezca la conexión.</span>
                 <button
                   onClick={handleForceReload}
-                  className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300"
-                  disabled={loading}
+                  className="text-sm underline hover:text-yellow-800"
                 >
-                  Reconectar
+                  Forzar recarga
                 </button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        )}
 
-          {/* Mensajes de error */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
-              <span className="block sm:inline">{error}</span>
-            </div>
-          )}
-
-          {/* Layout en dos columnas: formulario a la izquierda, tabla a la derecha */}
-          <div className="flex flex-col md:flex-row gap-5">
-            <div className="w-full md:w-1/3">
+        {/* Contenido principal */}
+        <div className="flex-1 overflow-hidden">
+          <div className="h-full grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
+            {/* Formulario */}
+            <div className="lg:col-span-1">
               <SectorForm
                 sectorSeleccionado={sectorSeleccionado}
-                onGuardar={handleGuardar}
-                onNuevo={limpiarSeleccion}
+                onGuardar={handleGuardar}  {/* IMPORTANTE: Usar onGuardar, NO guardarSector */}
+                onNuevo={handleNuevo}
                 onEditar={handleEditar}
                 modoOffline={isOfflineMode}
                 loading={loading}
                 isEditMode={modoEdicion}
               />
             </div>
-            <div className="w-full md:w-2/3">
+
+            {/* Lista de sectores */}
+            <div className="lg:col-span-2">
               <SectorList
                 sectores={sectores}
                 onSelectSector={seleccionarSector}

@@ -1,180 +1,285 @@
-// src/hooks/useCalles.ts
-import { useCallback, useEffect, useState } from 'react';
-import { useCrudEntity } from './useCrudEntity';
-import { 
-  CalleData, 
-  CreateCalleDTO, 
-  UpdateCalleDTO,
-  TIPOS_VIA 
-} from '../services/calleApiService';
-import { SectorData } from '../services/sectorService';
-import { BarrioData } from '../services/barrioService';
-import calleService from '../services/calleApiService';
+// src/hooks/useSectores.ts
+import { useState, useCallback, useEffect } from 'react';
+import { Sector, SectorFormData } from '../models/Sector';
 import sectorService from '../services/sectorService';
-import barrioService from '../services/barrioService';
+import { NotificationService } from '../components/utils/Notification';
 
-export const useCalles = () => {
-  // Estados adicionales
-  const [sectores, setSectores] = useState<SectorData[]>([]);
-  const [barrios, setBarrios] = useState<BarrioData[]>([]);
-  const [barriosFiltrados, setBarriosFiltrados] = useState<BarrioData[]>([]);
-  const [loadingDependencias, setLoadingDependencias] = useState(false);
+// Tipos del servicio
+import type { SectorData, CreateSectorDTO } from '../services/sectorService';
 
-  // Hook genérico para CRUD
-  const [state, actions] = useCrudEntity<CalleData, CreateCalleDTO, UpdateCalleDTO>(
-    calleService,
-    {
-      entityName: 'Calle',
-      loadOnMount: true,
-      useCache: true,
-      searchDebounce: 300,
-      sortFunction: (a, b) => {
-        // Ordenar por nombre de vía y luego por nombre
-        const viaComparison = (a.nombreVia || '').localeCompare(b.nombreVia || '');
-        if (viaComparison !== 0) return viaComparison;
-        return a.nombre.localeCompare(b.nombre);
-      },
-      localFilter: (items, filter) => {
-        let filtered = items;
-        
-        if (filter.search) {
-          const searchLower = filter.search.toLowerCase();
-          filtered = filtered.filter(item => 
-            item.nombre.toLowerCase().includes(searchLower) ||
-            item.nombreVia?.toLowerCase().includes(searchLower) ||
-            item.nombreCompleto?.toLowerCase().includes(searchLower)
-          );
-        }
-        
-        if (filter.codigoVia) {
-          filtered = filtered.filter(item => item.codigoVia === filter.codigoVia);
-        }
-        
-        if (filter.codigoBarrio) {
-          filtered = filtered.filter(item => item.codigoBarrio === filter.codigoBarrio);
-        }
-        
-        if (filter.codigoSector) {
-          // Filtrar por sector a través de los barrios
-          const barriosDelSector = barrios
-            .filter(b => b.codigoSector === filter.codigoSector)
-            .map(b => b.codigo);
-          filtered = filtered.filter(item => 
-            barriosDelSector.includes(item.codigoBarrio)
-          );
-        }
-        
-        return filtered;
-      }
-    }
-  );
+/**
+ * Adaptador para convertir SectorData (servicio) a Sector (modelo)
+ */
+const adaptSectorDataToModel = (data: SectorData): Sector => {
+  return {
+    id: data.codigo,  // Mapear codigo a id
+    nombre: data.nombre,
+    descripcion: data.descripcion,
+    estado: data.estado || 'ACTIVO',
+    fechaRegistro: data.fechaRegistro,
+    fechaModificacion: data.fechaModificacion,
+    usuarioCreacion: data.codUsuario?.toString(),
+    usuarioModificacion: data.codUsuario?.toString()
+  };
+};
 
-  // Cargar dependencias (sectores y barrios)
-  const cargarDependencias = useCallback(async () => {
-    try {
-      setLoadingDependencias(true);
-      const [sectoresData, barriosData] = await Promise.all([
-        sectorService.getAll(),
-        barrioService.getAll()
-      ]);
-      setSectores(sectoresData);
-      setBarrios(barriosData);
-      setBarriosFiltrados(barriosData);
-    } catch (error) {
-      console.error('Error cargando dependencias:', error);
-    } finally {
-      setLoadingDependencias(false);
-    }
+/**
+ * Hook personalizado para gestión de sectores
+ */
+export const useSectores = () => {
+  // Estados principales
+  const [sectores, setSectores] = useState<Sector[]>([]);
+  const [sectorSeleccionado, setSectorSeleccionado] = useState<Sector | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [modoEdicion, setModoEdicion] = useState(false);
+  
+  // Estado para modo offline
+  const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+
+  // Verificar conexión
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOfflineMode(false);
+      NotificationService.info('Conexión restaurada');
+    };
+    
+    const handleOffline = () => {
+      setIsOfflineMode(true);
+      NotificationService.warning('Trabajando sin conexión');
+    };
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
-  // Filtrar barrios por sector
-  const filtrarBarriosPorSector = useCallback((codigoSector: number | null) => {
-    if (!codigoSector) {
-      setBarriosFiltrados(barrios);
-    } else {
-      const filtrados = barrios.filter(b => b.codigoSector === codigoSector);
-      setBarriosFiltrados(filtrados);
+  /**
+   * Cargar todos los sectores
+   */
+  const cargarSectores = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('📋 [useSectores] Cargando sectores...');
+      
+      // Obtener datos del servicio
+      const sectorData = await sectorService.getAll();
+      
+      // Convertir SectorData[] a Sector[]
+      const sectoresAdaptados = sectorData.map(adaptSectorDataToModel);
+      
+      setSectores(sectoresAdaptados);
+      setLastSyncTime(new Date());
+      
+      console.log(`✅ [useSectores] ${sectoresAdaptados.length} sectores cargados`);
+      
+    } catch (error: any) {
+      console.error('❌ [useSectores] Error al cargar sectores:', error);
+      
+      if (isOfflineMode) {
+        NotificationService.warning('Sin conexión. Mostrando datos en caché.');
+      } else {
+        setError(error.message || 'Error al cargar sectores');
+        NotificationService.error('Error al cargar sectores');
+      }
+      
+    } finally {
+      setLoading(false);
     }
-  }, [barrios]);
+  }, [isOfflineMode]);
 
-  // Cargar dependencias al montar
-  useEffect(() => {
-    cargarDependencias();
-  }, [cargarDependencias]);
+  /**
+   * Buscar sectores por término
+   */
+  const buscarSectores = useCallback(async (term: string) => {
+    try {
+      setSearchTerm(term);
+      
+      if (!term.trim()) {
+        await cargarSectores();
+        return;
+      }
+      
+      setLoading(true);
+      
+      // Usar búsqueda local por ahora
+      const todosSectores = await sectorService.getAll();
+      const filtrados = todosSectores.filter(sector => 
+        sector.nombre.toLowerCase().includes(term.toLowerCase())
+      );
+      
+      const sectoresAdaptados = filtrados.map(adaptSectorDataToModel);
+      setSectores(sectoresAdaptados);
+      
+    } catch (error: any) {
+      console.error('❌ [useSectores] Error en búsqueda:', error);
+      setError('Error al buscar sectores');
+    } finally {
+      setLoading(false);
+    }
+  }, [cargarSectores]);
 
-  // Buscar por tipo de vía
-  const buscarPorTipoVia = useCallback((codigoVia: number) => {
-    actions.setFilters({ codigoVia });
-  }, [actions]);
+  /**
+   * Seleccionar un sector para edición
+   */
+  const seleccionarSector = useCallback((sector: Sector) => {
+    setSectorSeleccionado(sector);
+    setModoEdicion(true);
+    console.log('📝 [useSectores] Sector seleccionado:', sector);
+  }, []);
 
-  // Buscar por barrio
-  const buscarPorBarrio = useCallback((codigoBarrio: number) => {
-    actions.setFilters({ codigoBarrio });
-  }, [actions]);
+  /**
+   * Limpiar selección
+   */
+  const limpiarSeleccion = useCallback(() => {
+    setSectorSeleccionado(null);
+    setModoEdicion(false);
+    setError(null);
+  }, []);
 
-  // Buscar por sector
-  const buscarPorSector = useCallback((codigoSector: number) => {
-    actions.setFilters({ codigoSector });
-    filtrarBarriosPorSector(codigoSector);
-  }, [actions, filtrarBarriosPorSector]);
+  /**
+   * Guardar sector (crear o actualizar)
+   */
+  const guardarSector = useCallback(async (data: SectorFormData): Promise<boolean> => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('💾 [useSectores] Guardando sector:', data);
+      
+      let resultado: SectorData;
+      
+      if (modoEdicion && sectorSeleccionado) {
+        // Actualizar
+        resultado = await sectorService.update(sectorSeleccionado.id, {
+          nombre: data.nombre.trim(),
+          descripcion: data.descripcion?.trim()
+        });
+        console.log('✅ [useSectores] Sector actualizado:', resultado);
+        NotificationService.success('Sector actualizado correctamente');
+        
+      } else {
+        // Crear nuevo
+        const createDto: CreateSectorDTO = {
+          nombre: data.nombre.trim(),
+          descripcion: data.descripcion?.trim() || '',
+          codUsuario: 1
+        };
+        resultado = await sectorService.create(createDto);
+        console.log('✅ [useSectores] Sector creado:', resultado);
+        NotificationService.success('Sector creado correctamente');
+      }
+      
+      // Recargar lista completa
+      await cargarSectores();
+      
+      // Limpiar selección después de guardar
+      limpiarSeleccion();
+      
+      return true;
+      
+    } catch (error: any) {
+      console.error('❌ [useSectores] Error al guardar:', error);
+      const mensaje = error.message || 'Error al guardar el sector';
+      setError(mensaje);
+      NotificationService.error(mensaje);
+      return false;
+      
+    } finally {
+      setLoading(false);
+    }
+  }, [modoEdicion, sectorSeleccionado, cargarSectores, limpiarSeleccion]);
 
-  // Crear calle con validación
-  const crearCalle = useCallback(async (data: CreateCalleDTO) => {
-    // Validar que el barrio existe
-    const barrioExiste = barrios.some(b => b.codigo === data.codigoBarrio);
-    if (!barrioExiste) {
-      throw new Error('El barrio seleccionado no existe');
+  /**
+   * Eliminar sector
+   */
+  const eliminarSector = useCallback(async (id: number): Promise<boolean> => {
+    try {
+      const confirmar = window.confirm('¿Está seguro de eliminar este sector?');
+      if (!confirmar) return false;
+      
+      setLoading(true);
+      
+      // Cambiar estado a INACTIVO en lugar de eliminar
+      await sectorService.update(id, { estado: 'INACTIVO' });
+      
+      NotificationService.success('Sector eliminado correctamente');
+      
+      // Recargar lista
+      await cargarSectores();
+      
+      // Limpiar selección si era el sector eliminado
+      if (sectorSeleccionado?.id === id) {
+        limpiarSeleccion();
+      }
+      
+      return true;
+      
+    } catch (error: any) {
+      console.error('❌ [useSectores] Error al eliminar:', error);
+      const mensaje = error.message || 'Error al eliminar el sector';
+      NotificationService.error(mensaje);
+      return false;
+      
+    } finally {
+      setLoading(false);
+    }
+  }, [sectorSeleccionado, cargarSectores, limpiarSeleccion]);
+
+  /**
+   * Sincronizar manualmente
+   */
+  const sincronizarManualmente = useCallback(async () => {
+    if (!navigator.onLine) {
+      NotificationService.warning('No hay conexión a internet');
+      return;
     }
     
-    return actions.createItem(data);
-  }, [actions, barrios]);
+    await cargarSectores();
+    NotificationService.success('Datos sincronizados');
+  }, [cargarSectores]);
 
-  // Obtener los tipos de vía disponibles
-  const tiposVia = Object.values(TIPOS_VIA);
+  /**
+   * Forzar modo online (para testing)
+   */
+  const forzarModoOnline = useCallback(async () => {
+    setIsOfflineMode(false);
+    await cargarSectores();
+  }, [cargarSectores]);
+
+  // Cargar sectores al montar
+  useEffect(() => {
+    cargarSectores();
+  }, [cargarSectores]);
 
   return {
-    // Estado
-    calles: state.items,
-    calleSeleccionada: state.selectedItem,
-    loading: state.loading,
-    error: state.error,
-    page: state.page,
-    pageSize: state.pageSize,
-    totalItems: state.totalItems,
-    totalPages: state.totalPages,
-    searchTerm: state.searchTerm,
-    isOffline: state.isOffline,
-    
-    // Dependencias
+    // Estados
     sectores,
-    barrios,
-    barriosFiltrados,
-    loadingDependencias,
-    tiposVia,
+    sectorSeleccionado,
+    modoEdicion,
+    loading,
+    error,
+    isOfflineMode,
+    searchTerm,
+    lastSyncTime,
     
-    // Acciones CRUD
-    cargarCalles: actions.loadItems,
-    crearCalle,
-    actualizarCalle: actions.updateItem,
-    eliminarCalle: actions.deleteItem,
-    seleccionarCalle: actions.selectItem,
-    buscarCalles: actions.search,
-    limpiarSeleccion: actions.clearSelection,
-    
-    // Paginación
-    setPagina: actions.setPage,
-    setTamañoPagina: actions.setPageSize,
-    siguientePagina: actions.nextPage,
-    paginaAnterior: actions.previousPage,
-    
-    // Acciones adicionales
-    buscarPorTipoVia,
-    buscarPorBarrio,
-    buscarPorSector,
-    filtrarBarriosPorSector,
-    cargarDependencias,
-    refrescar: actions.refresh,
-    limpiarError: actions.clearError,
-    resetear: actions.reset
+    // Funciones
+    cargarSectores,
+    buscarSectores,
+    seleccionarSector,
+    limpiarSeleccion,
+    guardarSector,
+    eliminarSector,
+    setModoEdicion,
+    sincronizarManualmente,
+    forzarModoOnline,
   };
 };

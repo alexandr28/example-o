@@ -1,6 +1,5 @@
-// src/services/BaseApiService.ts
-import { buildApiUrl, getApiHeaders, API_CONFIG } from '../config/api.unified.config';
-import { connectivityService } from './connectivityService';
+// src/services/BaseApiService.ts - VERSIÓN CON AUTENTICACIÓN CONFIGURABLE
+import { buildApiUrl, getApiHeaders, API_CONFIG, getAuthToken } from '../config/api.unified.config';
 import { NotificationService } from '../components/utils/Notification';
 
 /**
@@ -36,6 +35,17 @@ export interface QueryParams {
 }
 
 /**
+ * Configuración de autenticación por servicio
+ */
+export interface AuthConfig {
+  GET?: boolean;
+  POST?: boolean;
+  PUT?: boolean;
+  DELETE?: boolean;
+  PATCH?: boolean;
+}
+
+/**
  * Clase de error personalizada para API
  */
 export class ApiError extends Error {
@@ -55,26 +65,40 @@ export class ApiError extends Error {
 /**
  * Clase base abstracta para todos los servicios de API
  * Proporciona métodos CRUD estándar y manejo de errores
+ * ACTUALIZADO: Permite configurar qué métodos requieren autenticación
  */
 export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
   protected endpoint: string;
   protected normalizeOptions: NormalizeOptions<T>;
   protected cacheKey: string;
+  protected authConfig: AuthConfig;
   private cache: Map<string, { data: any; timestamp: number }> = new Map();
   private cacheDuration: number = 5 * 60 * 1000; // 5 minutos por defecto
   
   constructor(
     endpoint: string,
     normalizeOptions: NormalizeOptions<T>,
-    cacheKey: string
+    cacheKey: string,
+    authConfig?: AuthConfig
   ) {
     this.endpoint = endpoint;
     this.normalizeOptions = normalizeOptions;
     this.cacheKey = cacheKey;
     
+    // Configuración de autenticación por defecto
+    // Por defecto: GET no requiere auth, POST/PUT/DELETE/PATCH sí
+    this.authConfig = authConfig || {
+      GET: false,
+      POST: false,    // Cambiado a false para tu caso
+      PUT: false,     // Cambiado a false para tu caso
+      DELETE: false,  // Cambiado a false para tu caso
+      PATCH: false    // Cambiado a false para tu caso
+    };
+    
     console.log(`🔧 [${this.constructor.name}] Inicializado:`);
     console.log(`  - Endpoint: "${this.endpoint}"`);
     console.log(`  - Cache Key: "${this.cacheKey}"`);
+    console.log(`  - Auth Config:`, this.authConfig);
   }
 
   /**
@@ -90,6 +114,14 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
   public clearCache(): void {
     this.cache.clear();
     console.log(`🧹 [${this.constructor.name}] Cache limpiado`);
+  }
+
+  /**
+   * Actualizar configuración de autenticación
+   */
+  public setAuthConfig(config: AuthConfig): void {
+    this.authConfig = { ...this.authConfig, ...config };
+    console.log(`🔐 [${this.constructor.name}] Configuración de auth actualizada:`, this.authConfig);
   }
 
   /**
@@ -112,6 +144,22 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
   }
 
   /**
+   * Verificar si existe un token de autenticación
+   */
+  private hasAuthToken(): boolean {
+    const token = getAuthToken();
+    return !!token;
+  }
+
+  /**
+   * Determinar si un método requiere autenticación
+   */
+  private requiresAuth(method: string): boolean {
+    const methodUpper = method.toUpperCase() as keyof AuthConfig;
+    return this.authConfig[methodUpper] || false;
+  }
+
+  /**
    * Realiza una petición HTTP con reintentos y manejo de errores mejorado
    */
   protected async makeRequest<R = any>(
@@ -120,186 +168,166 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
     retries: number = API_CONFIG.retries
   ): Promise<R> {
     const url = buildApiUrl(this.endpoint + path);
-    
-    // Determinar si se requiere autenticación basado en el método HTTP
-    // GET no requiere auth, POST/PUT/DELETE/PATCH sí
     const method = (options.method || 'GET').toUpperCase();
-    const isAuthRequired = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method);
+    
+    // Determinar si este método específico requiere autenticación
+    const isAuthRequired = this.requiresAuth(method);
+    
+    // Verificar si hay token disponible cuando es requerido
+    if (isAuthRequired && !this.hasAuthToken()) {
+      console.warn(`⚠️ [${this.constructor.name}] No hay token de autenticación disponible para ${method} ${url}`);
+      // Opcional: puedes decidir si lanzar error o continuar sin auth
+      // throw new ApiError('Se requiere autenticación', 401);
+    }
+    
+    // Obtener headers base
+    const baseHeaders = getApiHeaders(isAuthRequired);
+    
+    // Combinar con headers personalizados si existen
+    const customHeaders = options.headers || {};
+    
+    // Crear Headers object para la petición
+    const headers = new Headers();
+    
+    // Agregar headers base
+    Object.entries(baseHeaders).forEach(([key, value]) => {
+      headers.append(key, value);
+    });
+    
+    // Agregar headers personalizados
+    if (customHeaders instanceof Headers) {
+      customHeaders.forEach((value, key) => {
+        headers.set(key, value);
+      });
+    } else if (Array.isArray(customHeaders)) {
+      customHeaders.forEach(([key, value]) => {
+        headers.set(key, value);
+      });
+    } else if (typeof customHeaders === 'object') {
+      Object.entries(customHeaders).forEach(([key, value]) => {
+        headers.set(key, value as string);
+      });
+    }
     
     const finalOptions: RequestInit = {
       ...options,
-      headers: {
-        ...getApiHeaders(isAuthRequired),
-        ...options.headers
-      },
+      headers,
       signal: options.signal || AbortSignal.timeout(API_CONFIG.timeout)
     };
 
     console.log(`🌐 [${this.constructor.name}] ${method} ${url}`);
-    console.log(`🔐 [${this.constructor.name}] Autenticación: ${isAuthRequired ? 'Requerida' : 'No requerida'}`);
-
-    let lastError: Error | null = null;
+    console.log(`🔐 [${this.constructor.name}] Autenticación: ${isAuthRequired ? 'INCLUIDA' : 'NO REQUERIDA'}`);
     
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        // Verificar conectividad antes de hacer la petición
-        if (!connectivityService.getStatus()) {
-          throw new ApiError('Sin conexión a Internet', 0);
-        }
+    // Verificar conectividad básica
+    if (!navigator.onLine) {
+      console.warn(`📵 [${this.constructor.name}] Sin conexión a internet`);
+      throw new ApiError('Sin conexión a internet', 0);
+    }
 
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
         const response = await fetch(url, finalOptions);
         
-        // Log de respuesta
+        // Log detallado de la respuesta
         console.log(`📡 [${this.constructor.name}] Respuesta:`, {
           status: response.status,
-          statusText: response.statusText
+          statusText: response.statusText,
+          ok: response.ok
         });
 
         // Manejar respuestas no exitosas
         if (!response.ok) {
-          const errorData = await this.parseErrorResponse(response);
-          throw new ApiError(
-            errorData.message || `Error HTTP ${response.status}`,
-            response.status,
-            errorData
-          );
+          // Extraer mensaje de error del body si es posible
+          let errorMessage = `Error ${response.status}: ${response.statusText}`;
+          let errorData: any = null;
+          
+          try {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              errorData = await response.json();
+              errorMessage = errorData.message || errorData.error || errorMessage;
+            }
+          } catch (e) {
+            console.warn('No se pudo parsear el error como JSON');
+          }
+
+          // Manejar errores específicos
+          if (response.status === 401) {
+            console.error(`🚫 [${this.constructor.name}] No autorizado`);
+            throw new ApiError('No autorizado. Por favor, inicie sesión.', 401, errorData);
+          }
+          
+          if (response.status === 403) {
+            throw new ApiError('No tiene permisos para realizar esta acción', 403, errorData);
+          }
+          
+          if (response.status === 404) {
+            throw new ApiError('Recurso no encontrado', 404, errorData);
+          }
+          
+          if (response.status === 422) {
+            throw new ApiError('Datos de entrada inválidos', 422, errorData);
+          }
+          
+          if (response.status >= 500) {
+            throw new ApiError('Error del servidor. Por favor, intente más tarde.', response.status, errorData);
+          }
+          
+          throw new ApiError(errorMessage, response.status, errorData);
         }
 
-        // Parsear respuesta exitosa
-        const data = await this.parseResponse(response);
-        
-        // Notificar éxito para operaciones de escritura
-        if (['POST', 'PUT', 'DELETE'].includes(options.method || '')) {
-          NotificationService.success(this.getSuccessMessage(options.method || 'POST'));
+        // Manejar respuesta vacía
+        if (response.status === 204 || response.headers.get('content-length') === '0') {
+          return {} as R;
         }
 
-        return data;
+        // Parsear respuesta JSON
+        const data = await response.json();
+        return data as R;
+
+      } catch (error: any) {
+        console.error(`❌ [${this.constructor.name}] Error en intento ${attempt + 1}:`, error);
         
-      } catch (error) {
-        lastError = error as Error;
-        
-        // Si es el último intento o un error no recuperable, lanzar
-        if (attempt === retries || !this.isRetryableError(error)) {
-          throw this.handleError(error);
+        // Si es el último intento, lanzar el error
+        if (attempt === retries) {
+          if (error instanceof ApiError) {
+            throw error;
+          }
+          
+          if (error.name === 'AbortError') {
+            throw new ApiError('La petición excedió el tiempo límite', 0);
+          }
+          
+          if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+            throw new ApiError('Error de conexión. Verifique su conexión a internet.', 0);
+          }
+          
+          throw new ApiError(error.message || 'Error desconocido', 0);
         }
         
-        // Esperar antes de reintentar (backoff exponencial)
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
-        console.log(`🔄 [${this.constructor.name}] Reintentando en ${delay}ms... (${attempt}/${retries})`);
+        // Esperar antes de reintentar
+        const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+        console.log(`⏳ Reintentando en ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
-
-    throw this.handleError(lastError!);
-  }
-
-  /**
-   * Determina si un error es recuperable
-   */
-  private isRetryableError(error: any): boolean {
-    if (error instanceof ApiError) {
-      // No reintentar errores de cliente (4xx) excepto 429 (Too Many Requests)
-      return error.statusCode === 429 || error.statusCode >= 500;
-    }
-    // Reintentar errores de red
-    return error.name === 'NetworkError' || error.name === 'TimeoutError';
-  }
-
-  /**
-   * Parsea la respuesta según el tipo de contenido
-   */
-  private async parseResponse(response: Response): Promise<any> {
-    const contentType = response.headers.get('content-type');
     
-    if (contentType?.includes('application/json')) {
-      return response.json();
-    } else if (contentType?.includes('text/')) {
-      return response.text();
-    } else if (response.status === 204) {
-      return null; // No content
-    }
-    
-    return response.blob();
+    throw new ApiError('Máximo de reintentos alcanzado', 0);
   }
 
   /**
-   * Parsea una respuesta de error
-   */
-  private async parseErrorResponse(response: Response): Promise<any> {
-    try {
-      const contentType = response.headers.get('content-type');
-      if (contentType?.includes('application/json')) {
-        return await response.json();
-      }
-      return { message: await response.text() };
-    } catch {
-      return { message: response.statusText };
-    }
-  }
-
-  /**
-   * Maneja errores y los convierte en un formato consistente
-   */
-  private handleError(error: any): Error {
-    console.error(`❌ [${this.constructor.name}] Error:`, error);
-
-    if (error instanceof ApiError) {
-      // Mostrar notificación de error
-      NotificationService.error(error.message);
-      return error;
-    }
-
-    if (error.name === 'AbortError') {
-      const message = 'La petición fue cancelada o excedió el tiempo límite';
-      NotificationService.error(message);
-      return new ApiError(message, 0);
-    }
-
-    const message = error.message || 'Error desconocido';
-    NotificationService.error(message);
-    return new ApiError(message, 0);
-  }
-
-  /**
-   * Obtiene mensaje de éxito según la operación
-   */
-  private getSuccessMessage(method: string): string {
-    const entity = this.cacheKey.replace('_', ' ');
-    switch (method) {
-      case 'POST':
-        return `${entity} creado exitosamente`;
-      case 'PUT':
-        return `${entity} actualizado exitosamente`;
-      case 'DELETE':
-        return `${entity} eliminado exitosamente`;
-      default:
-        return 'Operación exitosa';
-    }
-  }
-
-  /**
-   * Normaliza y valida una lista de items
+   * Normaliza los datos según las opciones de normalización
    */
   protected normalizeData(data: any[]): T[] {
     if (!Array.isArray(data)) {
-      console.warn(`⚠️ [${this.constructor.name}] Data no es un array, convirtiendo...`);
-      data = [data];
+      console.warn(`⚠️ [${this.constructor.name}] Se esperaba un array, se recibió:`, typeof data);
+      return [];
     }
 
     const normalized = data
       .map((item, index) => {
         try {
-          const normalizedItem = this.normalizeOptions.normalizeItem(item, index);
-          
-          // Validar si se proporciona función de validación
-          if (this.normalizeOptions.validateItem) {
-            if (!this.normalizeOptions.validateItem(normalizedItem, index)) {
-              console.warn(`⚠️ [${this.constructor.name}] Item ${index} no pasó la validación`);
-              return null;
-            }
-          }
-          
-          return normalizedItem;
+          return this.normalizeOptions.normalizeItem(item, index);
         } catch (error) {
           console.error(`❌ [${this.constructor.name}] Error normalizando item ${index}:`, error);
           return null;
@@ -307,32 +335,42 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
       })
       .filter((item): item is T => item !== null);
 
-    console.log(`✅ [${this.constructor.name}] ${normalized.length} items normalizados de ${data.length}`);
+    // Validar items si se proporciona validador
+    if (this.normalizeOptions.validateItem) {
+      const validItems = normalized.filter((item, index) => {
+        const isValid = this.normalizeOptions.validateItem!(item, index);
+        if (!isValid) {
+          console.warn(`⚠️ [${this.constructor.name}] Item ${index} no pasó la validación`);
+        }
+        return isValid;
+      });
+      
+      console.log(`✅ [${this.constructor.name}] ${validItems.length}/${normalized.length} items válidos`);
+      return validItems;
+    }
+
     return normalized;
   }
 
-  // ==================== MÉTODOS CRUD ====================
+  // ... resto de los métodos permanecen igual ...
 
-  /**
-   * Obtiene todos los registros
-   */
   public async getAll(params?: QueryParams, useCache: boolean = true): Promise<T[]> {
     const cacheKey = `${this.cacheKey}_all_${JSON.stringify(params || {})}`;
     
-    // Intentar obtener del cache
     if (useCache) {
       const cached = this.getCachedData(cacheKey);
-      if (cached) return cached;
+      if (cached) {
+        return cached;
+      }
     }
-
+    
     try {
       const queryString = params ? `?${new URLSearchParams(params as any).toString()}` : '';
-      const response = await this.makeRequest<ApiResponse<T[]>>(queryString);
+      const response = await this.makeRequest<any>(queryString);
       
       const data = Array.isArray(response) ? response : response.data || [];
       const normalized = this.normalizeData(data);
       
-      // Guardar en cache
       this.setCachedData(cacheKey, normalized);
       
       return normalized;
@@ -342,72 +380,31 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
     }
   }
 
-  /**
-   * Obtiene un registro por ID
-   */
-  public async getById(id: string | number, useCache: boolean = true): Promise<T | null> {
+  public async getById(id: string | number): Promise<T | null> {
     const cacheKey = `${this.cacheKey}_${id}`;
     
-    // Intentar obtener del cache
-    if (useCache) {
-      const cached = this.getCachedData(cacheKey);
-      if (cached) return cached;
+    const cached = this.getCachedData(cacheKey);
+    if (cached) {
+      return cached;
     }
-
-    try {
-      const response = await this.makeRequest<ApiResponse<T>>(`/${id}`);
-      const data = response.data || response;
-      
-      if (!data) return null;
-      
-      const normalized = this.normalizeData([data])[0] || null;
-      
-      // Guardar en cache
-      if (normalized) {
-        this.setCachedData(cacheKey, normalized);
-      }
-      
-      return normalized;
-    } catch (error) {
-      if ((error as ApiError).statusCode === 404) {
-        return null;
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Busca registros según criterios
-   */
-  public async search(criteria: any, useCache: boolean = true): Promise<T[]> {
-    const cacheKey = `${this.cacheKey}_search_${JSON.stringify(criteria)}`;
     
-    // Intentar obtener del cache
-    if (useCache) {
-      const cached = this.getCachedData(cacheKey);
-      if (cached) return cached;
-    }
-
     try {
-      const queryString = `?${new URLSearchParams(criteria).toString()}`;
-      const response = await this.makeRequest<ApiResponse<T[]>>(queryString);
+      const response = await this.makeRequest<any>(`/${id}`);
+      const data = response.data || response;
+      const normalized = this.normalizeData([data])[0];
       
-      const data = Array.isArray(response) ? response : response.data || [];
-      const normalized = this.normalizeData(data);
-      
-      // Guardar en cache
       this.setCachedData(cacheKey, normalized);
       
-      return normalized;
-    } catch (error) {
-      console.error(`❌ [${this.constructor.name}] Error en búsqueda:`, error);
+      return normalized || null;
+    } catch (error: any) {
+      if (error.statusCode === 404) {
+        return null;
+      }
+      console.error(`❌ [${this.constructor.name}] Error obteniendo por ID:`, error);
       throw error;
     }
   }
 
-  /**
-   * Crea un nuevo registro
-   */
   public async create(data: CreateDTO): Promise<T> {
     try {
       const response = await this.makeRequest<ApiResponse<T>>('', {
@@ -418,19 +415,24 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
       const created = response.data || response;
       const normalized = this.normalizeData([created])[0];
       
-      // Limpiar cache relacionado
       this.clearCache();
+      
+      // Notificar éxito
+      NotificationService.success(`${this.constructor.name.replace('Service', '')} creado exitosamente`);
       
       return normalized;
     } catch (error) {
       console.error(`❌ [${this.constructor.name}] Error creando:`, error);
+      
+      // Notificar error
+      if (error instanceof ApiError) {
+        NotificationService.error(error.message);
+      }
+      
       throw error;
     }
   }
 
-  /**
-   * Actualiza un registro existente
-   */
   public async update(id: string | number, data: UpdateDTO): Promise<T> {
     try {
       const response = await this.makeRequest<ApiResponse<T>>(`/${id}`, {
@@ -441,19 +443,68 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
       const updated = response.data || response;
       const normalized = this.normalizeData([updated])[0];
       
-      // Limpiar cache relacionado
       this.clearCache();
+      
+      NotificationService.success(`Actualizado exitosamente`);
       
       return normalized;
     } catch (error) {
       console.error(`❌ [${this.constructor.name}] Error actualizando:`, error);
+      
+      if (error instanceof ApiError) {
+        NotificationService.error(error.message);
+      }
+      
       throw error;
     }
   }
 
-  /**
-   * Actualización parcial
-   */
+  public async delete(id: string | number): Promise<void> {
+    try {
+      await this.makeRequest(`/${id}`, {
+        method: 'DELETE'
+      });
+      
+      this.clearCache();
+      
+      NotificationService.success(`Eliminado exitosamente`);
+    } catch (error) {
+      console.error(`❌ [${this.constructor.name}] Error eliminando:`, error);
+      
+      if (error instanceof ApiError) {
+        NotificationService.error(error.message);
+      }
+      
+      throw error;
+    }
+  }
+
+  // Otros métodos...
+  
+  public async search(params: any): Promise<T[]> {
+    const cacheKey = `${this.cacheKey}_search_${JSON.stringify(params)}`;
+    
+    const cached = this.getCachedData(cacheKey);
+    if (cached) {
+      return cached;
+    }
+    
+    try {
+      const queryString = `?${new URLSearchParams(params).toString()}`;
+      const response = await this.makeRequest<any>(queryString);
+      
+      const data = Array.isArray(response) ? response : response.data || [];
+      const normalized = this.normalizeData(data);
+      
+      this.setCachedData(cacheKey, normalized);
+      
+      return normalized;
+    } catch (error) {
+      console.error(`❌ [${this.constructor.name}] Error en búsqueda:`, error);
+      throw error;
+    }
+  }
+
   public async patch(id: string | number, data: Partial<UpdateDTO>): Promise<T> {
     try {
       const response = await this.makeRequest<ApiResponse<T>>(`/${id}`, {
@@ -464,7 +515,6 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
       const updated = response.data || response;
       const normalized = this.normalizeData([updated])[0];
       
-      // Limpiar cache relacionado
       this.clearCache();
       
       return normalized;
@@ -474,26 +524,6 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
     }
   }
 
-  /**
-   * Elimina un registro
-   */
-  public async delete(id: string | number): Promise<void> {
-    try {
-      await this.makeRequest(`/${id}`, {
-        method: 'DELETE'
-      });
-      
-      // Limpiar cache relacionado
-      this.clearCache();
-    } catch (error) {
-      console.error(`❌ [${this.constructor.name}] Error eliminando:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Elimina múltiples registros
-   */
   public async deleteMany(ids: (string | number)[]): Promise<void> {
     try {
       await this.makeRequest('/batch-delete', {
@@ -501,7 +531,6 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
         body: JSON.stringify({ ids })
       });
       
-      // Limpiar cache relacionado
       this.clearCache();
     } catch (error) {
       console.error(`❌ [${this.constructor.name}] Error eliminando múltiples:`, error);
@@ -509,9 +538,6 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
     }
   }
 
-  /**
-   * Obtiene registros paginados
-   */
   public async getPaginated(params: QueryParams): Promise<PaginatedResponse<T>> {
     try {
       const queryString = `?${new URLSearchParams(params as any).toString()}`;
@@ -529,9 +555,6 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
     }
   }
 
-  /**
-   * Verifica si un registro existe
-   */
   public async exists(id: string | number): Promise<boolean> {
     try {
       await this.makeRequest(`/${id}/exists`, {
@@ -546,9 +569,6 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
     }
   }
 
-  /**
-   * Ejecuta una acción personalizada en un registro
-   */
   public async executeAction(id: string | number, action: string, data?: any): Promise<any> {
     try {
       const response = await this.makeRequest(`/${id}/${action}`, {
@@ -556,7 +576,6 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
         body: data ? JSON.stringify(data) : undefined
       });
       
-      // Limpiar cache ya que una acción puede modificar datos
       this.clearCache();
       
       return response;
