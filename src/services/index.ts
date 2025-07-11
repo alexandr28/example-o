@@ -9,38 +9,64 @@ export type { NormalizeOptions } from './BaseApiService';
 
 // Servicios de utilidades
 export { connectivityService } from './connectivityService';
+export type { ApiStatus, ConnectivityConfig } from './connectivityService';
 
-// NOTA: Por ahora, importar los servicios directamente en los componentes
-// hasta resolver el problema de las rutas de importación
-
-// Los servicios están disponibles en:
-// - src/services/barrioService.ts
-// - src/services/sectorService.ts  
-// - src/services/calleApiService.ts
-
-// Temporalmente, en los hooks usar:
-// import barrioService from '../services/barrioService';
-// import sectorService from '../services/sectorService';
-// import calleService from '../services/calleApiService';
+// Servicios de entidades - IMPORTANTE: Sin extensiones .ts
 export { default as barrioService } from './barrioService';
 export { default as sectorService } from './sectorService'; 
 export { default as calleService } from './calleApiService';
-export {  personaService } from './personaService';
-export {  contribuyenteService } from './contribuyenteService';
-export {  contribuyenteListService } from './contribuyenteListService';
-export { DireccionService} from './direccionService';
+export { personaService } from './personaService';
+export { contribuyenteService } from './contribuyenteService';
+export { direccionService } from './direccionService';
 export { pisoService } from './pisoService';
 export { predioService } from './predioService';
 export { arancelService } from './arancelService';
-export { valorUnitarioService } from './valorUnitarioService.ts';
-//export { uitService } from './uitService';
-
-/*
-export { arancelService } from './arancelService';
 export { valorUnitarioService } from './valorUnitarioService';
 export { uitService } from './uitService';
-export { alcabalaService } from './alcabalaService';
-export { depreciacionService } from './depreciacionService';
-export { depreciacionService } from './depreciacionService';
+// export { alcabalaService } from './alcabalaService';
+// export { depreciacionService } from './depreciacionService';
 
-*/
+// Exportar tipos relacionados si existen
+export type { 
+  PersonaData, 
+  PersonaApiResponse, 
+  BusquedaPersonaParams 
+} from './personaService';
+
+export type {
+  ContribuyenteData,
+  CreateContribuyenteDTO,
+  UpdateContribuyenteDTO,
+  BusquedaContribuyenteParams,
+  TIPO_PERSONA,
+  TIPO_DOCUMENTO
+} from './contribuyenteService';
+
+export type {
+  ArancelData,
+  CreateArancelDTO,
+  UpdateArancelDTO,
+  UNIDADES_MEDIDA,
+  CATEGORIAS_ARANCEL
+} from './arancelService';
+
+export type {
+  DireccionData,
+  CreateDireccionDTO,
+  UpdateDireccionDTO
+} from './direccionService';
+
+export type {
+  UITData,
+  CreateUITDTO,
+  UpdateUITDTO
+} from './uitService';
+
+export type {
+  ValorUnitarioData,
+  CreateValorUnitarioDTO,
+  UpdateValorUnitarioDTO,
+  CategoriaValorUnitario,
+  SubcategoriaValorUnitario,
+  LetraValorUnitario
+} from './valorUnitarioService';

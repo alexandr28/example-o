@@ -17,9 +17,18 @@ export const API_ENDPOINTS = {
   SECTOR: `/api/sector`,
   VIA: `/api/via`,
   CALLE: `/api/calle`,
-  DIRECCION: [`api/direccion/listarDireccionPorTipoVia?parametrosBusqueda=a&codUsuario=1`, `api/direccion/listarDireccionPorNombreVia`],
+  direccion: {
+      base: '/api/direccion',
+      listarPorNombreVia: `api/direccion/listarDireccionPorNombreVia`,
+      listarPorTipoVia: `api/direccion/listarDireccionPorTipoVia?parametrosBusqueda=a&codUsuario=1`,
+    },
   CONTRIBUYENTE: `/api/contribuyente`,
-  PERSONA:[`/api/persona/listarPersonaPorTipoPersonaNombreRazon`,`/api/persona/listarPersonaPorTipoPersonaNombreRazonContribuyente`,`api/persona/listarPersonaPorTipoPersonaNombreVia`],
+ persona: {
+      base: '/api/persona',
+      listarPorTipoYNombre: '/api/persona/listarPersonaPorTipoPersonaNombreRazon',
+      listarPorContribuyente: '/api/persona/listarPersonaPorTipoPersonaNombreRazonContribuyente',
+      listarPorTipoVia: '/api/persona/listarPersonaPorTipoPersonaNombreVia'
+    },
    ARANCEL: `/api/arancel`,
   VALOR_UNITARIO: `/api/valoresunitarios`,
   UIT: `/api/uitEpa`,
@@ -27,7 +36,11 @@ export const API_ENDPOINTS = {
   DEPRECIACION: `/api/depreciacion`,
   PREDIO: `/api/predio`,
   PISO: `/api/piso`,
-  CONSTANTE: [`/api/constante/listarConstantePadre`,`/api/constante/listarConstanteHijo`],
+  constante: {
+      base: '/api/constante',
+      listarPadre: '/api/constante/listarConstantePadre',
+      listarHijo: '/api/constante/listarConstanteHijo'
+  },
 
   // Autenticación (referencia a AUTH_ENDPOINTS)
   AUTH: `/auth`,

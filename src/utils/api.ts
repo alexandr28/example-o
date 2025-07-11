@@ -1,35 +1,54 @@
 // src/utils/api.ts
 /**
  * Utilidades unificadas para llamadas a la API
- * Fusión de utils/api.ts y components/utils/apiRequest.ts
+ * Maneja autenticación basada en método HTTP:
+ * - GET: Sin autenticación
+ * - POST/PUT/DELETE/PATCH: Con Token Bearer
  */
 
-import { API_CONFIG } from '../config/api.config';
-import { type ApiResponse, type ApiErrorResponse } from '../types/apiTypes';
-
-// URL base del backend - Priorizar variable de entorno
-export const API_BASE_URL = import.meta.env.VITE_API_URL || API_CONFIG?.baseURL || 'http://192.168.20.160:8080';
-
-// Verificar configuración
-console.log('🔧 API Configuration:', {
-  ENV_URL: import.meta.env.VITE_API_URL,
-  CONFIG_URL: API_CONFIG?.baseURL,
-  FINAL_URL: API_BASE_URL
-});
+import { 
+  buildApiUrl, 
+  getApiHeaders, 
+  API_CONFIG, 
+  API_CONSTANTS,
+  getErrorMessage,
+  requiresAuth 
+} from '../config/api.unified.config';
 
 /**
- * Tipo para opciones adicionales en las peticiones
+ * Tipos para las respuestas de la API
  */
-export interface ApiRequestOptionsType {
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  errors?: Record<string, string[]>;
+}
+
+export interface ApiErrorResponse {
+  success: false;
+  message: string;
+  errors?: Record<string, string[]>;
+  statusCode?: number;
+}
+
+/**
+ * Opciones adicionales para las peticiones
+ */
+export interface ApiRequestOptions {
   headers?: HeadersInit;
   timeout?: number;
   signal?: AbortSignal;
+  params?: Record<string, any>;
+  // Permite forzar o evitar autenticación independientemente del método
+  forceAuth?: boolean;
+  skipAuth?: boolean;
 }
 
 /**
  * Clase personalizada para errores de API
  */
-export class ApiErrorClass extends Error {
+export class ApiError extends Error {
   public statusCode: number;
   public data: any;
   public errors?: Record<string, string[]>;
@@ -44,607 +63,297 @@ export class ApiErrorClass extends Error {
 }
 
 /**
- * Obtiene el token de autenticación (si existe)
+ * Manejador de errores centralizado
  */
-const getAuthToken = (): string | null => {
-  return localStorage.getItem('authToken') || localStorage.getItem('auth_token');
-};
-
-/**
- * Construye la URL completa para una petición
- */
-export const buildApiUrl = (endpoint: string): string => {
-  // Si el endpoint ya es una URL completa, devolverla tal cual
-  if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
-    return endpoint;
-  }
+const handleApiError = (error: any): never => {
+  console.error('❌ API Error:', error);
   
-  // Limpiar la URL base y el endpoint
-  const baseURL = API_BASE_URL.endsWith('/') 
-    ? API_BASE_URL.slice(0, -1) 
-    : API_BASE_URL;
-    
-  const cleanEndpoint = endpoint.startsWith('/') 
-    ? endpoint 
-    : `/${endpoint}`;
-    
-  const fullUrl = `${baseURL}${cleanEndpoint}`;
-  
-  console.log(`🌐 URL construida: ${fullUrl}`);
-  return fullUrl;
-};
-
-/**
- * Construye los headers para las peticiones
- */
-const buildHeaders = (customHeaders?: HeadersInit): HeadersInit => {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  };
-
-  // Agregar token de autenticación si existe
-  const token = getAuthToken();
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  // Combinar con headers personalizados
-  if (customHeaders) {
-    Object.assign(headers, customHeaders);
-  }
-
-  return headers;
-};
-
-/**
- * Maneja la respuesta de la API
- */
-const handleResponse = async <T>(response: Response): Promise<ApiResponse<T>> => {
-  const contentType = response.headers.get('content-type');
-  const isJson = contentType && contentType.includes('application/json');
-  
-  let data: any;
-  
-  try {
-    if (isJson) {
-      data = await response.json();
-    } else {
-      data = await response.text();
-    }
-  } catch (error) {
-    console.error('Error al parsear respuesta:', error);
-    data = null;
-  }
-
-  // Si la respuesta es exitosa (2xx)
-  if (response.ok) {
-    // Si la respuesta ya tiene el formato ApiResponse
-    if (data && typeof data === 'object' && 'success' in data) {
-      return data;
-    }
-    
-    // Si no, envolver en formato ApiResponse
-    return {
-      success: true,
-      data,
-      statusCode: response.status
-    };
-  }
-
-  // Si hay un error
-  const errorMessage = data?.message || data?.error || `Error ${response.status}: ${response.statusText}`;
-  
-  throw new ApiErrorClass(errorMessage, response.status, data);
-};
-
-/**
- * Realiza una petición con timeout
- */
-const fetchWithTimeout = async (
-  url: string,
-  options: RequestInit,
-  timeout: number = API_CONFIG?.timeout || 30000
-): Promise<Response> => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: options.signal || controller.signal,
-      // Importante para CORS
-      mode: 'cors',
-      credentials: 'include'
-    });
-    
-    clearTimeout(timeoutId);
-    return response;
-    
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    
-    if (error.name === 'AbortError') {
-      throw new ApiErrorClass('La petición excedió el tiempo de espera', 408);
-    }
-    
+  if (error instanceof ApiError) {
     throw error;
   }
-};
-
-/**
- * Función genérica para realizar peticiones (compatible con el estilo antiguo)
- */
-export const apiRequest = async (endpoint: string, options?: RequestInit): Promise<Response> => {
-  const url = buildApiUrl(endpoint);
   
-  console.log(`📡 API Request: ${options?.method || 'GET'} ${url}`);
-  
-  const defaultHeaders = buildHeaders(options?.headers);
-  
-  try {
-    const response = await fetchWithTimeout(url, {
-      ...options,
-      headers: defaultHeaders
-    });
-    
-    console.log(`📥 API Response: ${response.status} ${response.statusText}`);
-    
-    return response;
-  } catch (error) {
-    console.error(`❌ API Error:`, error);
-    throw error;
+  if (error.name === 'AbortError') {
+    throw new ApiError('La petición fue cancelada', 0);
   }
+  
+  if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+    throw new ApiError('Error de conexión. Verifique su internet.', 0);
+  }
+  
+  throw new ApiError(error.message || 'Error desconocido', 0);
 };
 
 /**
- * Función genérica mejorada para realizar peticiones tipadas
+ * Función principal para realizar peticiones HTTP
+ * Determina automáticamente si necesita autenticación basado en el método
  */
-const apiRequestTyped = async <T = any>(
-  method: string,
+export const apiRequest = async <T = any>(
   endpoint: string,
+  method: string = 'GET',
   data?: any,
-  options?: ApiRequestOptionsType
-): Promise<ApiResponse<T>> => {
-  const url = buildApiUrl(endpoint);
-  const headers = buildHeaders(options?.headers);
+  options: ApiRequestOptions = {}
+): Promise<T> => {
+  // Construir URL con parámetros
+  const url = buildApiUrl(endpoint, options.params);
   
-  const requestOptions: RequestInit = {
+  // Determinar si se requiere autenticación
+  let needsAuth = requiresAuth(method);
+  
+  // Permitir override de autenticación
+  if (options.forceAuth === true) needsAuth = true;
+  if (options.skipAuth === true) needsAuth = false;
+  
+  // Obtener headers con o sin autenticación
+  const headers = {
+    ...getApiHeaders(needsAuth),
+    ...options.headers
+  };
+  
+  // Configurar la petición
+  const config: RequestInit = {
     method,
     headers,
-    signal: options?.signal
+    signal: options.signal || AbortSignal.timeout(options.timeout || API_CONFIG.timeout)
   };
-
-  // Agregar body para métodos que lo requieren
+  
+  // Agregar body si existe
   if (data && ['POST', 'PUT', 'PATCH'].includes(method)) {
-    requestOptions.body = JSON.stringify(data);
+    config.body = JSON.stringify(data);
   }
-
-  console.log(`🌐 [API] ${method} ${url}`, data ? { data } : '');
-
+  
+  // Log de la petición
+  console.log(`🌐 API Request: ${method} ${url}`);
+  console.log(`🔐 Autenticación: ${needsAuth ? 'Incluida' : 'No incluida'}`);
+  if (data) console.log('📦 Datos:', data);
+  
   try {
-    const response = await fetchWithTimeout(
-      url,
-      requestOptions,
-      options?.timeout
-    );
+    const response = await fetch(url, config);
     
-    const result = await handleResponse<T>(response);
+    // Log de la respuesta
+    console.log(`📡 API Response: ${response.status} ${response.statusText}`);
     
-    console.log(`✅ [API] ${method} ${url} - Status: ${response.status}`);
-    
-    return result;
-    
-  } catch (error: any) {
-    console.error(`❌ [API] ${method} ${url} - Error:`, error);
-    
-    // Re-lanzar ApiError
-    if (error instanceof ApiErrorClass) {
-      throw error;
-    }
-    
-    // Manejar errores de red
-    if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      throw new ApiErrorClass(
-        'Error de conexión. Verifica tu conexión a internet.',
-        0
+    // Manejar respuestas no exitosas
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        message: getErrorMessage(response.status)
+      }));
+      
+      throw new ApiError(
+        errorData.message || getErrorMessage(response.status),
+        response.status,
+        errorData
       );
     }
     
-    // Otros errores
-    throw new ApiErrorClass(
-      error.message || 'Error desconocido',
-      0
-    );
-  }
-};
-
-/**
- * Helper para hacer peticiones GET (compatible con apiRequest.ts original)
- * Versión simple que devuelve los datos directamente
- */
-export const apiGetSimple = async (endpoint: string, headers?: HeadersInit): Promise<any> => {
-  const response = await apiRequest(endpoint, {
-    method: 'GET',
-    headers
-  });
-  
-  if (!response.ok) {
-    let errorMessage = `API Error ${response.status}`;
-    try {
-      const errorData = await response.json();
-      errorMessage = errorData.message || errorData.error || errorMessage;
-    } catch {
-      // Si no es JSON, intentar texto
-      try {
-        const errorText = await response.text();
-        if (errorText) errorMessage = errorText;
-      } catch {
-        // Usar mensaje por defecto
-      }
+    // Manejar respuesta vacía (204 No Content)
+    if (response.status === 204) {
+      return null as any;
     }
-    throw new Error(errorMessage);
-  }
-  
-  return response.json();
-};
-
-/**
- * Helper para hacer peticiones POST (compatible con apiRequest.ts original)
- * Versión simple que devuelve los datos directamente
- */
-export const apiPostSimple = async (endpoint: string, data: any, headers?: HeadersInit): Promise<any> => {
-  const response = await apiRequest(endpoint, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(data)
-  });
-  
-  if (!response.ok) {
-    let errorMessage = `API Error ${response.status}`;
-    try {
-      const errorData = await response.json();
-      errorMessage = errorData.message || errorData.error || errorMessage;
-    } catch {
-      try {
-        const errorText = await response.text();
-        if (errorText) errorMessage = errorText;
-      } catch {
-        // Usar mensaje por defecto
+    
+    // Parsear respuesta JSON
+    const responseData = await response.json();
+    
+    // Si la respuesta tiene estructura de ApiResponse
+    if ('success' in responseData && 'data' in responseData) {
+      if (!responseData.success) {
+        throw new ApiError(
+          responseData.message || 'Error en la operación',
+          response.status,
+          responseData
+        );
       }
+      return responseData.data;
     }
-    throw new Error(errorMessage);
+    
+    // Devolver datos directamente
+    return responseData;
+    
+  } catch (error) {
+    return handleApiError(error);
   }
-  
-  return response.json();
 };
 
 /**
- * Realiza una petición GET (versión mejorada con tipos)
+ * Métodos específicos para cada verbo HTTP
+ * GET no incluye autenticación por defecto
+ * POST, PUT, DELETE incluyen autenticación por defecto
+ */
+
+/**
+ * Realiza una petición GET (sin autenticación por defecto)
  */
 export const apiGet = async <T = any>(
   endpoint: string,
-  headers?: HeadersInit,
-  options?: ApiRequestOptionsType
-): Promise<ApiResponse<T>> => {
-  return apiRequestTyped<T>('GET', endpoint, undefined, { ...options, headers });
+  options: ApiRequestOptions = {}
+): Promise<T> => {
+  return apiRequest<T>(endpoint, 'GET', null, options);
 };
 
 /**
- * Realiza una petición POST (versión mejorada con tipos)
+ * Realiza una petición POST (con autenticación por defecto)
  */
 export const apiPost = async <T = any>(
   endpoint: string,
-  data?: any,
-  headers?: HeadersInit,
-  options?: ApiRequestOptionsType
-): Promise<ApiResponse<T>> => {
-  return apiRequestTyped<T>('POST', endpoint, data, { ...options, headers });
+  data: any,
+  options: ApiRequestOptions = {}
+): Promise<T> => {
+  return apiRequest<T>(endpoint, 'POST', data, options);
 };
 
 /**
- * Helper para hacer peticiones PUT (compatible con apiRequest.ts original)
- * Versión simple que devuelve los datos directamente
- */
-export const apiPutSimple = async (endpoint: string, data: any, headers?: HeadersInit): Promise<any> => {
-  const response = await apiRequest(endpoint, {
-    method: 'PUT',
-    headers,
-    body: JSON.stringify(data)
-  });
-  
-  if (!response.ok) {
-    let errorMessage = `API Error ${response.status}`;
-    try {
-      const errorData = await response.json();
-      errorMessage = errorData.message || errorData.error || errorMessage;
-    } catch {
-      try {
-        const errorText = await response.text();
-        if (errorText) errorMessage = errorText;
-      } catch {
-        // Usar mensaje por defecto
-      }
-    }
-    throw new Error(errorMessage);
-  }
-  
-  return response.json();
-};
-
-/**
- * Helper para hacer peticiones DELETE (compatible con apiRequest.ts original)
- * Versión simple que devuelve los datos directamente
- */
-export const apiDeleteSimple = async (endpoint: string, headers?: HeadersInit): Promise<any> => {
-  const response = await apiRequest(endpoint, {
-    method: 'DELETE',
-    headers
-  });
-  
-  if (!response.ok) {
-    let errorMessage = `API Error ${response.status}`;
-    try {
-      const errorData = await response.json();
-      errorMessage = errorData.message || errorData.error || errorMessage;
-    } catch {
-      try {
-        const errorText = await response.text();
-        if (errorText) errorMessage = errorText;
-      } catch {
-        // Usar mensaje por defecto
-      }
-    }
-    throw new Error(errorMessage);
-  }
-  
-  // Algunos endpoints DELETE no devuelven contenido
-  const text = await response.text();
-  return text ? JSON.parse(text) : { success: true };
-};
-
-/**
- * Helper para hacer peticiones PATCH (compatible con apiRequest.ts original)
- * Versión simple que devuelve los datos directamente
- */
-export const apiPatchSimple = async (endpoint: string, data: any, headers?: HeadersInit): Promise<any> => {
-  const response = await apiRequest(endpoint, {
-    method: 'PATCH',
-    headers,
-    body: JSON.stringify(data)
-  });
-  
-  if (!response.ok) {
-    let errorMessage = `API Error ${response.status}`;
-    try {
-      const errorData = await response.json();
-      errorMessage = errorData.message || errorData.error || errorMessage;
-    } catch {
-      try {
-        const errorText = await response.text();
-        if (errorText) errorMessage = errorText;
-      } catch {
-        // Usar mensaje por defecto
-      }
-    }
-    throw new Error(errorMessage);
-  }
-  
-  return response.json();
-};
-
-/**
- * Realiza una petición PUT
+ * Realiza una petición PUT (con autenticación por defecto)
  */
 export const apiPut = async <T = any>(
   endpoint: string,
-  data?: any,
-  headers?: HeadersInit,
-  options?: ApiRequestOptionsType
-): Promise<ApiResponse<T>> => {
-  return apiRequestTyped<T>('PUT', endpoint, data, { ...options, headers });
+  data: any,
+  options: ApiRequestOptions = {}
+): Promise<T> => {
+  return apiRequest<T>(endpoint, 'PUT', data, options);
 };
 
 /**
- * Realiza una petición PATCH
+ * Realiza una petición PATCH (con autenticación por defecto)
  */
 export const apiPatch = async <T = any>(
   endpoint: string,
-  data?: any,
-  headers?: HeadersInit,
-  options?: ApiRequestOptionsType
-): Promise<ApiResponse<T>> => {
-  return apiRequestTyped<T>('PATCH', endpoint, data, { ...options, headers });
+  data: any,
+  options: ApiRequestOptions = {}
+): Promise<T> => {
+  return apiRequest<T>(endpoint, 'PATCH', data, options);
 };
 
 /**
- * Realiza una petición DELETE
+ * Realiza una petición DELETE (con autenticación por defecto)
  */
 export const apiDelete = async <T = any>(
   endpoint: string,
-  headers?: HeadersInit,
-  options?: ApiRequestOptionsType
-): Promise<ApiResponse<T>> => {
-  return apiRequestTyped<T>('DELETE', endpoint, undefined, { ...options, headers });
+  options: ApiRequestOptions = {}
+): Promise<T> => {
+  return apiRequest<T>(endpoint, 'DELETE', null, options);
 };
 
 /**
- * Sube un archivo
+ * Utilidad para subir archivos (con autenticación por defecto)
  */
 export const apiUpload = async <T = any>(
   endpoint: string,
-  file: File,
-  additionalData?: Record<string, any>,
-  options?: ApiRequestOptionsType
-): Promise<ApiResponse<T>> => {
-  const url = buildApiUrl(endpoint);
-  const formData = new FormData();
+  formData: FormData,
+  options: ApiRequestOptions = {}
+): Promise<T> => {
+  // Para uploads, no establecer Content-Type (el browser lo hace automáticamente)
+  const uploadOptions = {
+    ...options,
+    headers: {
+      ...options.headers,
+      'Content-Type': undefined as any // Remover Content-Type para FormData
+    }
+  };
   
-  // Agregar archivo
-  formData.append('file', file);
-  
-  // Agregar datos adicionales si existen
-  if (additionalData) {
-    Object.entries(additionalData).forEach(([key, value]) => {
-      formData.append(key, value);
-    });
-  }
-  
-  // Headers especiales para multipart/form-data
-  const headers: Record<string, string> = {};
-  const token = getAuthToken();
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  
-  console.log(`📤 [API] Upload ${url}`, { fileName: file.name, fileSize: file.size });
-  
-  try {
-    const response = await fetchWithTimeout(
-      url,
-      {
-        method: 'POST',
-        headers,
-        body: formData,
-        signal: options?.signal
-      },
-      options?.timeout
-    );
-    
-    const result = await handleResponse<T>(response);
-    
-    console.log(`✅ [API] Upload ${url} - Status: ${response.status}`);
-    
-    return result;
-    
-  } catch (error: any) {
-    console.error(`❌ [API] Upload ${url} - Error:`, error);
-    throw error;
-  }
+  return apiRequest<T>(endpoint, 'POST', formData, uploadOptions);
 };
 
 /**
- * Descarga un archivo
+ * Utilidad para descargar archivos (sin autenticación por defecto)
  */
 export const apiDownload = async (
   endpoint: string,
-  fileName?: string,
-  options?: ApiRequestOptionsType
+  filename: string,
+  options: ApiRequestOptions = {}
 ): Promise<void> => {
-  const url = buildApiUrl(endpoint);
-  const headers = buildHeaders(options?.headers);
+  const url = buildApiUrl(endpoint, options.params);
+  const needsAuth = options.forceAuth === true; // Solo con forceAuth para downloads
   
-  console.log(`📥 [API] Download ${url}`);
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: getApiHeaders(needsAuth),
+    signal: options.signal
+  });
   
-  try {
-    const response = await fetchWithTimeout(
-      url,
-      {
-        method: 'GET',
-        headers,
-        signal: options?.signal
-      },
-      options?.timeout
+  if (!response.ok) {
+    throw new ApiError(
+      `Error al descargar archivo: ${response.statusText}`,
+      response.status
     );
+  }
+  
+  const blob = await response.blob();
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(downloadUrl);
+};
+
+/**
+ * Verificar si el backend está disponible
+ * Usa un endpoint GET que no requiere autenticación
+ */
+export const checkBackendHealth = async (): Promise<boolean> => {
+  try {
+    const response = await fetch(buildApiUrl('/api/sector'), {
+      method: 'HEAD',
+      headers: getApiHeaders(false) // Sin autenticación
+    });
     
-    if (!response.ok) {
-      throw new ApiErrorClass(
-        `Error al descargar archivo: ${response.statusText}`,
-        response.status
-      );
-    }
+    return response.ok || response.status === 401 || response.status === 403;
+  } catch (error) {
+    console.error('❌ Backend no disponible:', error);
+    return false;
+  }
+};
+
+/**
+ * Verificar si hay un token de autenticación válido
+ */
+export const hasAuthToken = (): boolean => {
+  const token = localStorage.getItem('auth_token') || localStorage.getItem('authToken');
+  return !!token;
+};
+
+/**
+ * Limpiar el token de autenticación
+ */
+export const clearAuthToken = (): void => {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('authToken');
+  console.log('🔓 Token de autenticación eliminado');
+};
+
+/**
+ * Establecer el token de autenticación
+ */
+export const setAuthToken = (token: string): void => {
+  localStorage.setItem('auth_token', token);
+  console.log('🔐 Token de autenticación guardado');
+};
+
+/**
+ * Interceptor para manejar tokens expirados
+ */
+export const setupAuthInterceptor = (onAuthError: () => void): void => {
+  // Guardar referencia a la función fetch original
+  const originalFetch = window.fetch;
+  
+  // Sobrescribir fetch
+  window.fetch = async (...args) => {
+    const response = await originalFetch(...args);
     
-    // Obtener el blob del archivo
-    const blob = await response.blob();
-    
-    // Obtener el nombre del archivo del header o usar el proporcionado
-    const contentDisposition = response.headers.get('content-disposition');
-    let finalFileName = fileName || 'download';
-    
-    if (contentDisposition) {
-      const fileNameMatch = contentDisposition.match(/filename="(.+)"/);
-      if (fileNameMatch) {
-        finalFileName = fileNameMatch[1];
+    // Si recibimos 401, el token puede estar expirado
+    if (response.status === 401) {
+      const url = args[0] as string;
+      // No disparar en la ruta de login
+      if (!url.includes('/auth/login')) {
+        console.warn('⚠️ Token expirado o inválido');
+        onAuthError();
       }
     }
     
-    // Crear un enlace temporal para descargar
-    const urlObject = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = urlObject;
-    link.download = finalFileName;
-    document.body.appendChild(link);
-    link.click();
-    
-    // Limpiar
-    setTimeout(() => {
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(urlObject);
-    }, 100);
-    
-    console.log(`✅ [API] Download ${url} - Archivo descargado: ${finalFileName}`);
-    
-  } catch (error: any) {
-    console.error(`❌ [API] Download ${url} - Error:`, error);
-    throw error;
-  }
-};
-
-/**
- * Hook para cancelar peticiones
- */
-export const useApiAbort = () => {
-  const controller = new AbortController();
-  
-  return {
-    signal: controller.signal,
-    abort: () => controller.abort()
+    return response;
   };
 };
 
-/**
- * Utilidad para manejar errores de API de forma consistente
- */
-export const handleApiError = (error: any): string => {
-  if (error instanceof ApiErrorClass) {
-    // Si hay errores de validación específicos
-    if (error.errors) {
-      const messages = Object.entries(error.errors)
-        .map(([field, errors]) => `${field}: ${errors.join(', ')}`)
-        .join('\n');
-      return messages;
-    }
-    
-    return error.message;
-  }
-  
-  if (error.message) {
-    return error.message;
-  }
-  
-  return 'Ha ocurrido un error inesperado';
-};
-
-/**
- * Para mantener compatibilidad, si el código usa apiGet/apiPost esperando
- * una respuesta simple (no ApiResponse), puede usar estas funciones
- */
-export const apiGetData = async (endpoint: string, headers?: HeadersInit): Promise<any> => {
-  const response = await apiGet(endpoint, headers);
-  return response.data;
-};
-
-export const apiPostData = async (endpoint: string, data: any, headers?: HeadersInit): Promise<any> => {
-  const response = await apiPost(endpoint, data, headers);
-  return response.data;
-};
-
-export const apiPutData = async (endpoint: string, data: any, headers?: HeadersInit): Promise<any> => {
-  const response = await apiPut(endpoint, data, headers);
-  return response.data;
-};
-
-export const apiDeleteData = async (endpoint: string, headers?: HeadersInit): Promise<any> => {
-  const response = await apiDelete(endpoint, headers);
-  return response.data;
-};
+// Re-exportar tipos y constantes útiles
+export { API_CONFIG, API_CONSTANTS, buildApiUrl, getApiHeaders };

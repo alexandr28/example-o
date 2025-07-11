@@ -1,3 +1,5 @@
+
+
 // Reexportamos todos los hooks desde este archivo
 export { useContribuyenteForm } from './useContribuyente';
 export { useCalles } from './useCalles';
@@ -11,3 +13,10 @@ export { useUIT } from './useUIT';
 export { useAlcabala } from './useAlcabala';
 export { useDepreciacion } from './useDepreciacion';
 export { useAuth } from './useAuth';
+
+// Hooks de conectividad
+export { 
+  useConnectivity, 
+  useApiConnectivity, 
+  useConnectivityNotifications 
+} from './useConnectivity';

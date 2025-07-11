@@ -1,374 +1,400 @@
-// src/services/barrioService.ts - VERSIÓN INDEPENDIENTE CON URL CORRECTA
-import { Barrio, BarrioFormData } from '../models/Barrio';
-import { NotificationService } from '../components/utils/Notification';
+// src/services/barrioService.ts
+import BaseApiService from './BaseApiService';
+import { API_CONFIG } from '../config/api.unified.config';
 
-class BarrioServiceClass {
-  // URL base - usar URL completa directamente
-  private readonly API_BASE = 'http://192.168.20.160:8080/api/barrio';
-  private readonly cacheKey = 'barrios_cache';
+/**
+ * Interfaces para Barrio
+ */
+export interface BarrioData {
+  codigo: number;
+  codigoSector: number;
+  nombre: string;
+  nombreSector?: string;
+  descripcion?: string;
+  estado?: string;
+  fechaRegistro?: string;
+  fechaModificacion?: string;
+  codUsuario?: number;
+}
 
-  constructor() {
-    console.log('🔧 [BarrioService] Inicializado');
-    console.log('📍 [BarrioService] Endpoint directo:', this.API_BASE);
-    console.log('🌐 [BarrioService] Conexión directa al backend (sin proxy)');
+export interface CreateBarrioDTO {
+  codigoSector: number;
+  nombre: string;
+  descripcion?: string;
+  codUsuario?: number;
+}
+
+export interface UpdateBarrioDTO extends Partial<CreateBarrioDTO> {
+  estado?: string;
+}
+
+export interface BusquedaBarrioParams {
+  nombre?: string;
+  codigoSector?: number;
+  estado?: string;
+  codUsuario?: number;
+}
+
+/**
+ * Servicio para gestión de barrios
+ * 
+ * Autenticación:
+ * - GET: No requiere token
+ * - POST/PUT/DELETE: Requieren token Bearer
+ */
+class BarrioService extends BaseApiService<BarrioData, CreateBarrioDTO, UpdateBarrioDTO> {
+  private static instance: BarrioService;
+  
+  private constructor() {
+    super(
+      '/api/barrio',
+      {
+        normalizeItem: (item: any) => ({
+          codigo: item.codBarrio || item.codigo || 0,
+          codigoSector: item.codSector || item.codigoSector || 0,
+          nombre: item.nombre || item.nombreBarrio || '',
+          nombreSector: item.nombreSector || '',
+          descripcion: item.descripcion || '',
+          estado: item.estado || 'ACTIVO',
+          fechaRegistro: item.fechaRegistro,
+          fechaModificacion: item.fechaModificacion,
+          codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario
+        }),
+        
+        validateItem: (item: BarrioData) => {
+          // Validar que tenga código, nombre y sector
+          return !!(item.codigo && item.nombre && item.codigoSector);
+        }
+      },
+      'barrio'
+    );
   }
-
+  
   /**
-   * Obtiene el token de autenticación
+   * Obtiene la instancia singleton del servicio
    */
-  private getAuthToken(): string | null {
-    const token = localStorage.getItem('auth_token');
-    console.log(`🔑 [BarrioService] Token:`, token ? 'Presente' : 'No encontrado');
-    return token;
+  static getInstance(): BarrioService {
+    if (!BarrioService.instance) {
+      BarrioService.instance = new BarrioService();
+    }
+    return BarrioService.instance;
   }
-
+  
   /**
-   * Normaliza un item de barrio
+   * Lista todos los barrios
+   * NO requiere autenticación (método GET)
    */
-  private normalizeItem(item: any, index: number): Barrio {
-    console.log(`🔍 [BarrioService] Normalizando item ${index}:`, item);
-    
-    if (!item || typeof item !== 'object') {
-      console.warn(`⚠️ [BarrioService] Item ${index} no es válido:`, item);
-      throw new Error(`Barrio en posición ${index} no es válido`);
-    }
-    
-    // Extraer campos con múltiples posibles nombres
-    const id = item.id || item.barrioId || item.barrio_id || item.codBarrio;
-    const nombre = item.nombre || item.nombreBarrio || item.barrio_nombre || '';
-    const sectorId = item.sectorId || item.sector_id || item.codSector || null;
-    const estado = item.estado !== undefined ? item.estado : 1;
-    
-    if (!id && id !== 0) {
-      console.error(`❌ [BarrioService] Barrio sin ID en posición ${index}:`, item);
-      throw new Error(`Barrio sin ID en posición ${index}`);
-    }
-    
-    const normalized: Barrio = {
-      id: Number(id),
-      nombre: String(nombre).trim(),
-      sectorId: sectorId ? Number(sectorId) : null,
-      estado: Number(estado)
-    };
-    
-    console.log(`✅ [BarrioService] Item normalizado:`, normalized);
-    return normalized;
-  }
-
-  /**
-   * Normaliza un array de barrios
-   */
-  private normalizeArray(data: any): Barrio[] {
-    console.log(`🔍 [BarrioService] Normalizando array:`, data);
-    
-    if (!data) {
-      console.warn(`⚠️ [BarrioService] Datos vacíos o nulos`);
-      return [];
-    }
-    
-    // Manejar diferentes formatos de respuesta
-    const array = Array.isArray(data) ? data : 
-                 (data.data ? data.data : 
-                 (data.content ? data.content :
-                 (data.result ? data.result : [])));
-    
-    if (!Array.isArray(array)) {
-      console.warn(`⚠️ [BarrioService] No se pudo extraer array de los datos`);
-      return [];
-    }
-    
-    const normalized = array.map((item, index) => {
-      try {
-        return this.normalizeItem(item, index);
-      } catch (error) {
-        console.error(`❌ [BarrioService] Error al normalizar item ${index}:`, error);
-        return null;
-      }
-    }).filter(item => item !== null) as Barrio[];
-    
-    console.log(`✅ [BarrioService] ${normalized.length} barrios normalizados`);
-    return normalized;
-  }
-
-  /**
-   * Guarda datos en caché
-   */
-  private saveToCache(data: Barrio[]): void {
+  async listarBarrios(incluirInactivos: boolean = false): Promise<BarrioData[]> {
     try {
-      localStorage.setItem(this.cacheKey, JSON.stringify(data));
-      localStorage.setItem(`${this.cacheKey}_timestamp`, new Date().toISOString());
-      console.log(`💾 [BarrioService] ${data.length} barrios guardados en caché`);
-    } catch (error) {
-      console.error(`❌ [BarrioService] Error al guardar en caché:`, error);
-    }
-  }
-
-  /**
-   * Carga datos del caché
-   */
-  private loadFromCache(): Barrio[] | null {
-    try {
-      const cached = localStorage.getItem(this.cacheKey);
-      if (cached) {
-        const data = JSON.parse(cached);
-        const timestamp = localStorage.getItem(`${this.cacheKey}_timestamp`);
-        console.log(`💾 [BarrioService] Datos cargados del caché (${timestamp})`);
-        return data;
-      }
-    } catch (error) {
-      console.error(`❌ [BarrioService] Error al cargar del caché:`, error);
-    }
-    return null;
-  }
-
-  /**
-   * Limpia el caché
-   */
-  private clearCache(): void {
-    try {
-      localStorage.removeItem(this.cacheKey);
-      localStorage.removeItem(`${this.cacheKey}_timestamp`);
-      console.log(`🧹 [BarrioService] Caché limpiado`);
-    } catch (error) {
-      console.error(`❌ [BarrioService] Error al limpiar caché:`, error);
-    }
-  }
-
-  /**
-   * Obtiene todos los barrios
-   */
-  async getAll(): Promise<Barrio[]> {
-    try {
-      console.log(`📡 [BarrioService] GET - Obteniendo todos los barrios`);
-      console.log(`📍 [BarrioService] URL: ${this.API_BASE}`);
+      console.log('🔍 [BarrioService] Listando barrios');
       
-      const response = await fetch(this.API_BASE, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        mode: 'cors',
-        credentials: 'include'
-      });
+      const barrios = await this.getAll();
       
-      console.log(`📊 [BarrioService] Respuesta: ${response.status} ${response.statusText}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      // Filtrar por estado si es necesario
+      if (!incluirInactivos) {
+        return barrios.filter(b => b.estado === 'ACTIVO');
       }
       
-      const data = await response.json();
-      const normalized = this.normalizeArray(data);
-      
-      // Guardar en caché
-      if (normalized.length > 0) {
-        this.saveToCache(normalized);
-      }
-      
-      return normalized;
+      return barrios;
       
     } catch (error: any) {
-      console.error(`❌ [BarrioService] Error en getAll:`, error);
-      
-      // Intentar usar caché como fallback
-      const cachedData = this.loadFromCache();
-      if (cachedData && cachedData.length > 0) {
-        console.log(`✅ [BarrioService] Usando ${cachedData.length} barrios del caché`);
-        NotificationService.warning('Sin conexión. Mostrando datos guardados.');
-        return cachedData;
-      }
-      
+      console.error('❌ [BarrioService] Error listando barrios:', error);
       throw error;
     }
   }
-
+  
+  /**
+   * Lista barrios por sector
+   * NO requiere autenticación (método GET)
+   */
+  async listarPorSector(codigoSector: number, incluirInactivos: boolean = false): Promise<BarrioData[]> {
+    try {
+      console.log('🔍 [BarrioService] Listando barrios del sector:', codigoSector);
+      
+      const barrios = await this.search({ 
+        codigoSector,
+        codUsuario: API_CONFIG.defaultParams.codUsuario
+      });
+      
+      if (!incluirInactivos) {
+        return barrios.filter(b => b.estado === 'ACTIVO');
+      }
+      
+      return barrios;
+      
+    } catch (error: any) {
+      console.error('❌ [BarrioService] Error listando barrios por sector:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Busca barrios por nombre
+   * NO requiere autenticación (método GET)
+   */
+  async buscarPorNombre(nombre: string, codigoSector?: number): Promise<BarrioData[]> {
+    try {
+      console.log('🔍 [BarrioService] Buscando barrios por nombre:', nombre);
+      
+      if (!nombre || nombre.trim().length < 2) {
+        return [];
+      }
+      
+      const params: BusquedaBarrioParams = {
+        nombre: nombre.trim(),
+        codUsuario: API_CONFIG.defaultParams.codUsuario
+      };
+      
+      if (codigoSector) {
+        params.codigoSector = codigoSector;
+      }
+      
+      return await this.search(params);
+      
+    } catch (error: any) {
+      console.error('❌ [BarrioService] Error buscando barrios:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Obtiene un barrio por su código
+   * NO requiere autenticación (método GET)
+   */
+  async obtenerPorCodigo(codigo: number): Promise<BarrioData | null> {
+    try {
+      console.log('🔍 [BarrioService] Obteniendo barrio por código:', codigo);
+      
+      return await this.getById(codigo);
+      
+    } catch (error: any) {
+      console.error('❌ [BarrioService] Error obteniendo barrio:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Verifica si un nombre de barrio ya existe en un sector
+   * NO requiere autenticación (método GET)
+   */
+  async verificarNombreExiste(
+    nombre: string, 
+    codigoSector: number, 
+    excluirCodigo?: number
+  ): Promise<boolean> {
+    try {
+      const barrios = await this.buscarPorNombre(nombre, codigoSector);
+      
+      if (excluirCodigo) {
+        return barrios.some(b => 
+          b.nombre.toLowerCase() === nombre.toLowerCase() && 
+          b.codigoSector === codigoSector &&
+          b.codigo !== excluirCodigo
+        );
+      }
+      
+      return barrios.some(b => 
+        b.nombre.toLowerCase() === nombre.toLowerCase() && 
+        b.codigoSector === codigoSector
+      );
+      
+    } catch (error: any) {
+      console.error('❌ [BarrioService] Error verificando nombre:', error);
+      return false;
+    }
+  }
+  
   /**
    * Crea un nuevo barrio
+   * REQUIERE autenticación (método POST)
    */
-  async create(data: BarrioFormData): Promise<Barrio> {
+  async crearBarrio(datos: CreateBarrioDTO): Promise<BarrioData> {
     try {
-      console.log(`📡 [BarrioService] POST - Creando barrio:`, data);
-      console.log(`📍 [BarrioService] URL: ${this.API_BASE}`);
+      console.log('➕ [BarrioService] Creando barrio:', datos);
       
       // Verificar token
-      const token = this.getAuthToken();
+      const token = localStorage.getItem('auth_token');
       if (!token) {
-        NotificationService.error('Debe iniciar sesión para crear barrios');
-        throw new Error('No hay token de autenticación');
+        throw new Error('Se requiere autenticación para crear barrios');
       }
       
-      // Preparar datos para la API
-      const requestData = {
-        nombreBarrio: data.nombre.trim(),
-        sectorId: data.sectorId,
-        estado: data.estado || 1
+      // Validar datos
+      if (!datos.nombre || datos.nombre.trim().length < 3) {
+        throw new Error('El nombre del barrio debe tener al menos 3 caracteres');
+      }
+      
+      if (!datos.codigoSector || datos.codigoSector <= 0) {
+        throw new Error('Debe seleccionar un sector válido');
+      }
+      
+      // Verificar si el nombre ya existe en el sector
+      const existe = await this.verificarNombreExiste(datos.nombre, datos.codigoSector);
+      if (existe) {
+        throw new Error('Ya existe un barrio con ese nombre en el sector seleccionado');
+      }
+      
+      const datosCompletos = {
+        ...datos,
+        nombre: datos.nombre.trim().toUpperCase(),
+        codUsuario: datos.codUsuario || API_CONFIG.defaultParams.codUsuario,
+        estado: 'ACTIVO',
+        fechaRegistro: new Date().toISOString()
       };
       
-      console.log(`📤 [BarrioService] Enviando:`, requestData);
-      
-      const response = await fetch(this.API_BASE, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        mode: 'cors',
-        credentials: 'include',
-        body: JSON.stringify(requestData)
-      });
-      
-      console.log(`📊 [BarrioService] Respuesta: ${response.status} ${response.statusText}`);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ [BarrioService] Error:`, errorText);
-        
-        if (response.status === 403) {
-          NotificationService.error('No tiene permisos para crear barrios');
-          throw new Error('Sin permisos para crear barrios');
-        } else if (response.status === 401) {
-          NotificationService.error('Sesión expirada');
-          throw new Error('Token inválido o expirado');
-        }
-        
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-      
-      const responseData = await response.json();
-      console.log(`✅ [BarrioService] Barrio creado:`, responseData);
-      
-      const barrioCreado = this.normalizeItem(responseData, 0);
-      
-      // Limpiar caché para forzar recarga
-      this.clearCache();
-      NotificationService.success('Barrio creado exitosamente');
-      
-      return barrioCreado;
+      return await this.create(datosCompletos);
       
     } catch (error: any) {
-      console.error(`❌ [BarrioService] Error al crear:`, error);
+      console.error('❌ [BarrioService] Error creando barrio:', error);
       throw error;
     }
   }
-
+  
   /**
-   * Actualiza un barrio
+   * Actualiza un barrio existente
+   * REQUIERE autenticación (método PUT)
    */
-  async update(id: number, data: BarrioFormData): Promise<Barrio> {
+  async actualizarBarrio(codigo: number, datos: UpdateBarrioDTO): Promise<BarrioData> {
     try {
-      console.log(`📡 [BarrioService] PUT - Actualizando barrio ${id}:`, data);
+      console.log('📝 [BarrioService] Actualizando barrio:', codigo, datos);
       
-      const token = this.getAuthToken();
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
       if (!token) {
-        NotificationService.error('Debe iniciar sesión para actualizar');
-        throw new Error('No hay token de autenticación');
+        throw new Error('Se requiere autenticación para actualizar barrios');
       }
       
-      const requestData = {
-        barrioId: id,
-        nombreBarrio: data.nombre.trim(),
-        sectorId: data.sectorId,
-        estado: data.estado || 1
+      // Obtener barrio actual para validaciones
+      const barrioActual = await this.getById(codigo);
+      if (!barrioActual) {
+        throw new Error('Barrio no encontrado');
+      }
+      
+      // Validar nombre si se está actualizando
+      if (datos.nombre) {
+        if (datos.nombre.trim().length < 3) {
+          throw new Error('El nombre del barrio debe tener al menos 3 caracteres');
+        }
+        
+        // Verificar si el nuevo nombre ya existe
+        const sectorId = datos.codigoSector || barrioActual.codigoSector;
+        const existe = await this.verificarNombreExiste(datos.nombre, sectorId, codigo);
+        if (existe) {
+          throw new Error('Ya existe otro barrio con ese nombre en el sector');
+        }
+      }
+      
+      const datosCompletos = {
+        ...datos,
+        nombre: datos.nombre ? datos.nombre.trim().toUpperCase() : undefined,
+        fechaModificacion: new Date().toISOString()
       };
       
-      const url = `${this.API_BASE}/${id}`;
-      console.log(`📍 [BarrioService] URL: ${url}`);
-      
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        mode: 'cors',
-        credentials: 'include',
-        body: JSON.stringify(requestData)
-      });
-      
-      if (!response.ok) {
-        if (response.status === 403) {
-          NotificationService.error('Sin permisos para actualizar');
-          throw new Error('Sin permisos');
-        } else if (response.status === 401) {
-          NotificationService.error('Sesión expirada');
-          throw new Error('Token inválido');
-        }
-        throw new Error(`Error ${response.status}`);
-      }
-      
-      const responseData = await response.json();
-      const barrioActualizado = this.normalizeItem(responseData, 0);
-      
-      this.clearCache();
-      NotificationService.success('Barrio actualizado');
-      
-      return barrioActualizado;
+      return await this.update(codigo, datosCompletos);
       
     } catch (error: any) {
-      console.error(`❌ [BarrioService] Error al actualizar:`, error);
+      console.error('❌ [BarrioService] Error actualizando barrio:', error);
       throw error;
     }
   }
-
+  
   /**
-   * Elimina un barrio
+   * Elimina un barrio (cambio de estado lógico)
+   * REQUIERE autenticación (método PUT)
    */
-  async delete(id: number): Promise<void> {
+  async eliminarBarrio(codigo: number): Promise<void> {
     try {
-      console.log(`📡 [BarrioService] DELETE - Eliminando barrio ${id}`);
+      console.log('🗑️ [BarrioService] Eliminando barrio:', codigo);
       
-      const token = this.getAuthToken();
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
       if (!token) {
-        NotificationService.error('Debe iniciar sesión');
-        throw new Error('No hay token');
+        throw new Error('Se requiere autenticación para eliminar barrios');
       }
       
-      const url = `${this.API_BASE}/${id}`;
-      const response = await fetch(url, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        mode: 'cors',
-        credentials: 'include'
+      // En lugar de eliminar físicamente, cambiar estado a INACTIVO
+      await this.update(codigo, {
+        estado: 'INACTIVO',
+        fechaModificacion: new Date().toISOString()
       });
       
-      if (!response.ok) {
-        if (response.status === 403) {
-          NotificationService.error('Sin permisos');
-          throw new Error('Sin permisos');
-        }
-        throw new Error(`Error ${response.status}`);
-      }
-      
-      this.clearCache();
-      NotificationService.success('Barrio eliminado');
+      console.log('✅ [BarrioService] Barrio marcado como inactivo');
       
     } catch (error: any) {
-      console.error(`❌ [BarrioService] Error al eliminar:`, error);
+      console.error('❌ [BarrioService] Error eliminando barrio:', error);
       throw error;
     }
   }
-
+  
   /**
-   * Obtiene barrios por sector
+   * Reactiva un barrio inactivo
+   * REQUIERE autenticación (método PUT)
    */
-  async getBySector(sectorId: number): Promise<Barrio[]> {
+  async reactivarBarrio(codigo: number): Promise<BarrioData> {
     try {
-      const allBarrios = await this.getAll();
-      return allBarrios.filter(barrio => barrio.sectorId === sectorId);
-    } catch (error) {
-      console.error(`❌ [BarrioService] Error:`, error);
+      console.log('♻️ [BarrioService] Reactivando barrio:', codigo);
+      
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Se requiere autenticación para reactivar barrios');
+      }
+      
+      return await this.update(codigo, {
+        estado: 'ACTIVO',
+        fechaModificacion: new Date().toISOString()
+      });
+      
+    } catch (error: any) {
+      console.error('❌ [BarrioService] Error reactivando barrio:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Obtiene estadísticas de barrios
+   * NO requiere autenticación (método GET)
+   */
+  async obtenerEstadisticas(codigoSector?: number): Promise<{
+    total: number;
+    activos: number;
+    inactivos: number;
+    porSector?: { [key: number]: number };
+  }> {
+    try {
+      let barrios: BarrioData[];
+      
+      if (codigoSector) {
+        barrios = await this.listarPorSector(codigoSector, true);
+      } else {
+        barrios = await this.getAll();
+      }
+      
+      const estadisticas: any = {
+        total: barrios.length,
+        activos: barrios.filter(b => b.estado === 'ACTIVO').length,
+        inactivos: barrios.filter(b => b.estado === 'INACTIVO').length
+      };
+      
+      // Si no se especifica sector, agrupar por sector
+      if (!codigoSector) {
+        estadisticas.porSector = barrios.reduce((acc, barrio) => {
+          acc[barrio.codigoSector] = (acc[barrio.codigoSector] || 0) + 1;
+          return acc;
+        }, {} as { [key: number]: number });
+      }
+      
+      return estadisticas;
+      
+    } catch (error: any) {
+      console.error('❌ [BarrioService] Error obteniendo estadísticas:', error);
       throw error;
     }
   }
 }
 
 // Exportar instancia singleton
-const barrioService = new BarrioServiceClass();
+const barrioService = BarrioService.getInstance();
 export default barrioService;
+
+// Exportar también la clase por si se necesita extender
+export { BarrioService };

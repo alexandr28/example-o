@@ -1,392 +1,462 @@
 // src/services/uitService.ts
-import { NotificationService } from '../components/utils/Notification';
-import { UIT, Alicuota } from '../models/UIT';
+import BaseApiService from './BaseApiService';
+import { API_CONFIG } from '../config/api.unified.config';
 
-// Tipos para la API
-interface UitApiResponse {
-  success: boolean;
-  message: string;
-  data: UitApiData[];
-  pagina?: number | null;
-  limite?: number | null;
-  totalPaginas?: number | null;
-  totalRegistros?: number | null;
+/**
+ * Interfaces para UIT (Unidad Impositiva Tributaria)
+ */
+export interface UITData {
+  id: number;
+  año: number;
+  valor: number;
+  resolucion?: string;
+  fechaPublicacion?: string;
+  fechaVigenciaDesde: string;
+  fechaVigenciaHasta?: string;
+  observaciones?: string;
+  estado?: string;
+  fechaRegistro?: string;
+  fechaModificacion?: string;
+  codUsuario?: number;
 }
 
-interface UitApiData {
-  codUit: number | null;
-  anio: number;
-  valor: number | null;
-  valorUit: number;
-  alicuota: number;
-  rangoInicial: number;
-  rangoFinal: number;
-  impuestoParcial: number;
-  impuestoAcumulado: number;
-  codEpa: number;
+export interface CreateUITDTO {
+  año: number;
+  valor: number;
+  resolucion?: string;
+  fechaPublicacion?: string;
+  fechaVigenciaDesde?: string;
+  observaciones?: string;
+  codUsuario?: number;
 }
 
-interface AlicuotaApiData {
-  codAlicuota?: number;
-  descripcion: string;
-  tasa: number;
-  uitMinimo?: number;
-  uitMaximo?: number;
+export interface UpdateUITDTO extends Partial<CreateUITDTO> {
+  fechaVigenciaHasta?: string;
+  estado?: string;
+}
+
+export interface BusquedaUITParams {
+  año?: number;
+  vigente?: boolean;
+  estado?: string;
+  codUsuario?: number;
 }
 
 /**
- * Servicio para gestión de UIT/EPA - SIN autenticación Bearer para GET
+ * Servicio para gestión de valores UIT
+ * 
+ * Autenticación:
+ * - GET: No requiere token
+ * - POST/PUT/DELETE: Requieren token Bearer
  */
-class UitService {
-  private static instance: UitService;
-  private readonly API_BASE_URL = 'http://192.168.20.160:8080/api/uitEpa';
-  private readonly API_ALICUOTA_URL = 'http://192.168.20.160:8080/api/alicuota';
-
+class UITService extends BaseApiService<UITData, CreateUITDTO, UpdateUITDTO> {
+  private static instance: UITService;
+  
   private constructor() {
-    console.log('🔧 [UitService] Inicializado');
-    console.log('📡 [UitService] URL base:', this.API_BASE_URL);
-  }
-
-  public static getInstance(): UitService {
-    if (!UitService.instance) {
-      UitService.instance = new UitService();
-    }
-    return UitService.instance;
-  }
-
-  /**
-   * Convierte los datos de la API al formato de la aplicación
-   */
-  private mapearDatosDesdeApi(apiData: UitApiData): UIT {
-    return {
-      id: apiData.codEpa, // Usar codEpa como ID ya que codUit viene null
-      anio: apiData.anio,
-      uit: apiData.valorUit,
-      tasa: apiData.alicuota,
-      rangoInicial: apiData.rangoInicial,
-      rangoFinal: apiData.rangoFinal,
-      impuestoParcial: apiData.impuestoParcial,
-      impuestoAcumulado: apiData.impuestoAcumulado.toString() // Convertir a string según el modelo
-    };
-  }
-
-  /**
-   * Obtiene todos los UITs (GET sin autenticación)
-   */
-  async obtenerTodos(): Promise<UIT[]> {
-    try {
-      console.log('📋 [UitService] Obteniendo todos los UITs...');
-      
-      const response = await fetch(this.API_BASE_URL, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-
-      console.log('📥 [UitService] Respuesta status:', response.status);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data: UitApiResponse = await response.json();
-      console.log('✅ [UitService] Datos recibidos:', data);
-      
-      if (data.success && Array.isArray(data.data)) {
-        return data.data.map(item => this.mapearDatosDesdeApi(item));
-      }
-      
-      return [];
-    } catch (error: any) {
-      console.error('❌ [UitService] Error al obtener UITs:', error);
-      NotificationService.error('Error al cargar UITs');
-      throw new Error(error.message || 'Error al obtener UITs');
-    }
-  }
-
-  /**
-   * Obtiene UITs por año (GET con parámetros)
-   */
-  async obtenerPorAnio(anio: number): Promise<UIT[]> {
-    try {
-      console.log(`🔍 [UitService] Obteniendo UITs del año ${anio}...`);
-      
-      const params = new URLSearchParams({
-        anio: anio.toString()
-      });
-
-      const url = `${this.API_BASE_URL}?${params}`;
-      console.log('🔗 [UitService] URL:', url);
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data: UitApiResponse = await response.json();
-      
-      if (data.success && Array.isArray(data.data)) {
-        const uits = data.data
-          .filter(item => item.anio === anio)
-          .map(item => this.mapearDatosDesdeApi(item));
+    super(
+      '/api/uitEpa',
+      {
+        normalizeItem: (item: any) => ({
+          id: item.codUitEpa || item.id || 0,
+          año: item.anio || item.año || new Date().getFullYear(),
+          valor: parseFloat(item.valor || '0'),
+          resolucion: item.resolucion || '',
+          fechaPublicacion: item.fechaPublicacion,
+          fechaVigenciaDesde: item.fechaVigenciaDesde || 
+            `${item.anio || new Date().getFullYear()}-01-01`,
+          fechaVigenciaHasta: item.fechaVigenciaHasta,
+          observaciones: item.observaciones || '',
+          estado: item.estado || 'ACTIVO',
+          fechaRegistro: item.fechaRegistro,
+          fechaModificacion: item.fechaModificacion,
+          codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario
+        }),
         
-        console.log(`✅ [UitService] ${uits.length} UITs encontrados para el año ${anio}`);
-        return uits;
+        validateItem: (item: UITData) => {
+          // Validar que tenga los campos requeridos
+          return !!(
+            item.id && 
+            item.año > 1990 && 
+            item.año <= 2100 && 
+            item.valor > 0
+          );
+        }
+      },
+      'uit'
+    );
+  }
+  
+  /**
+   * Obtiene la instancia singleton del servicio
+   */
+  static getInstance(): UITService {
+    if (!UITService.instance) {
+      UITService.instance = new UITService();
+    }
+    return UITService.instance;
+  }
+  
+  /**
+   * Lista todos los valores UIT
+   * NO requiere autenticación (método GET)
+   */
+  async listarUITs(incluirInactivos: boolean = false): Promise<UITData[]> {
+    try {
+      console.log('🔍 [UITService] Listando valores UIT');
+      
+      const uits = await this.getAll();
+      
+      // Filtrar por estado si es necesario
+      if (!incluirInactivos) {
+        return uits.filter(u => u.estado === 'ACTIVO');
       }
       
-      return [];
+      // Ordenar por año descendente
+      return uits.sort((a, b) => b.año - a.año);
+      
     } catch (error: any) {
-      console.error(`❌ [UitService] Error al obtener UITs del año ${anio}:`, error);
-      throw new Error(error.message || 'Error al obtener UITs por año');
+      console.error('❌ [UITService] Error listando UITs:', error);
+      throw error;
     }
   }
-
+  
   /**
-   * Calcula el impuesto basado en UIT
+   * Obtiene el valor UIT para un año específico
+   * NO requiere autenticación (método GET)
    */
-  async calcularImpuesto(anio: number, monto: number): Promise<number> {
+  async obtenerPorAño(año: number): Promise<UITData | null> {
     try {
-      console.log(`💰 [UitService] Calculando impuesto para año ${anio}, monto: ${monto}`);
+      console.log('🔍 [UITService] Obteniendo UIT del año:', año);
       
-      // Obtener los UITs del año
-      const uits = await this.obtenerPorAnio(anio);
+      const uits = await this.search({ año });
       
-      if (uits.length === 0) {
-        throw new Error(`No se encontraron UITs para el año ${anio}`);
-      }
-
-      let impuestoTotal = 0;
-      let montoRestante = monto;
-
-      // Ordenar UITs por rango inicial
-      const uitsSorted = [...uits].sort((a, b) => a.rangoInicial - b.rangoInicial);
-
-      // Calcular impuesto por cada tramo
-      for (const uit of uitsSorted) {
-        if (montoRestante <= 0) break;
-
-        let montoEnTramo = 0;
+      // Buscar el más reciente para ese año
+      const uitDelAño = uits
+        .filter(u => u.año === año)
+        .sort((a, b) => {
+          // Ordenar por fecha de vigencia descendente
+          const fechaA = new Date(a.fechaVigenciaDesde).getTime();
+          const fechaB = new Date(b.fechaVigenciaDesde).getTime();
+          return fechaB - fechaA;
+        })[0];
+      
+      return uitDelAño || null;
+      
+    } catch (error: any) {
+      console.error('❌ [UITService] Error obteniendo UIT por año:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Obtiene el valor UIT vigente a una fecha específica
+   * NO requiere autenticación (método GET)
+   */
+  async obtenerVigente(fecha: Date = new Date()): Promise<UITData | null> {
+    try {
+      console.log('🔍 [UITService] Obteniendo UIT vigente a:', fecha);
+      
+      const uits = await this.listarUITs();
+      const fechaTime = fecha.getTime();
+      
+      // Buscar UIT vigente a la fecha
+      const uitVigente = uits.find(uit => {
+        const vigenciaDesde = new Date(uit.fechaVigenciaDesde).getTime();
+        const vigenciaHasta = uit.fechaVigenciaHasta ? 
+          new Date(uit.fechaVigenciaHasta).getTime() : 
+          Infinity;
         
-        if (uit.rangoFinal === 0) {
-          // Último tramo sin límite
-          montoEnTramo = montoRestante;
-        } else {
-          // Calcular monto en este tramo
-          const inicioTramo = uit.rangoInicial;
-          const finTramo = uit.rangoFinal;
-          
-          if (monto > inicioTramo) {
-            const montoMaximoEnTramo = finTramo - inicioTramo;
-            montoEnTramo = Math.min(montoRestante, montoMaximoEnTramo);
-          }
-        }
-
-        // Calcular impuesto para este tramo
-        const impuestoTramo = montoEnTramo * uit.tasa;
-        impuestoTotal += impuestoTramo;
-        montoRestante -= montoEnTramo;
-
-        console.log(`📊 Tramo: ${uit.rangoInicial}-${uit.rangoFinal || '∞'}, Tasa: ${uit.tasa * 100}%, Impuesto: ${impuestoTramo}`);
-      }
-
-      console.log(`✅ [UitService] Impuesto total calculado: ${impuestoTotal}`);
-      return impuestoTotal;
-      
-    } catch (error: any) {
-      console.error('❌ [UitService] Error al calcular impuesto:', error);
-      throw new Error(error.message || 'Error al calcular impuesto');
-    }
-  }
-
-  /**
-   * Obtiene las alícuotas (tasas) disponibles
-   */
-  async obtenerAlicuotas(): Promise<Alicuota[]> {
-    try {
-      console.log('📋 [UitService] Obteniendo alícuotas...');
-      
-      // Por ahora, retornamos alícuotas estáticas basadas en los datos
-      // Si hay un endpoint específico para alícuotas, se puede usar aquí
-      const alicuotas: Alicuota[] = [
-        {
-          id: 1,
-          descripcion: 'Hasta 15 UIT',
-          tasa: 0.2,
-          uitMinimo: 0,
-          uitMaximo: 15
-        },
-        {
-          id: 2,
-          descripcion: 'Más de 15 UIT hasta 60 UIT',
-          tasa: 0.6,
-          uitMinimo: 15,
-          uitMaximo: 60
-        },
-        {
-          id: 3,
-          descripcion: 'Más de 60 UIT',
-          tasa: 1.0,
-          uitMinimo: 60,
-          uitMaximo: undefined
-        }
-      ];
-
-      return alicuotas;
-    } catch (error: any) {
-      console.error('❌ [UitService] Error al obtener alícuotas:', error);
-      throw new Error(error.message || 'Error al obtener alícuotas');
-    }
-  }
-
-  /**
-   * Crea un nuevo UIT (POST con FormData)
-   */
-  async crear(datos: {
-    anio: number;
-    valorUit: number;
-    alicuota: number;
-    rangoInicial: number;
-    rangoFinal: number;
-  }): Promise<UIT> {
-    try {
-      console.log('➕ [UitService] Creando nuevo UIT:', datos);
-      
-      const formData = new FormData();
-      formData.append('anio', datos.anio.toString());
-      formData.append('valorUit', datos.valorUit.toString());
-      formData.append('alicuota', datos.alicuota.toString());
-      formData.append('rangoInicial', datos.rangoInicial.toString());
-      formData.append('rangoFinal', datos.rangoFinal.toString());
-
-      const response = await fetch(this.API_BASE_URL, {
-        method: 'POST',
-        body: formData
+        return fechaTime >= vigenciaDesde && fechaTime < vigenciaHasta;
       });
       
-      console.log('📥 [UitService] Respuesta status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Error response:', errorText);
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.data) {
-        console.log('✅ [UitService] UIT creado exitosamente');
-        NotificationService.success('UIT creado exitosamente');
-        
-        const nuevoUit = Array.isArray(data.data) ? data.data[0] : data.data;
-        return this.mapearDatosDesdeApi(nuevoUit);
+      if (!uitVigente) {
+        // Si no hay vigente, buscar por año
+        return await this.obtenerPorAño(fecha.getFullYear());
       }
       
-      throw new Error(data.message || 'Error al crear UIT');
+      return uitVigente;
+      
     } catch (error: any) {
-      console.error('❌ [UitService] Error al crear UIT:', error);
-      NotificationService.error(error.message || 'Error al crear UIT');
-      throw new Error(error.message || 'Error al crear UIT');
+      console.error('❌ [UITService] Error obteniendo UIT vigente:', error);
+      throw error;
     }
   }
-
+  
   /**
-   * Actualiza un UIT (PUT con FormData)
+   * Obtiene el historial de valores UIT
+   * NO requiere autenticación (método GET)
    */
-  async actualizar(id: number, datos: Partial<{
-    anio: number;
-    valorUit: number;
-    alicuota: number;
-    rangoInicial: number;
-    rangoFinal: number;
-  }>): Promise<UIT> {
+  async obtenerHistorial(
+    añoInicio?: number, 
+    añoFin?: number
+  ): Promise<UITData[]> {
     try {
-      console.log(`📝 [UitService] Actualizando UIT ${id}:`, datos);
+      console.log('🔍 [UITService] Obteniendo historial de UITs');
       
-      const formData = new FormData();
-      if (datos.anio !== undefined) formData.append('anio', datos.anio.toString());
-      if (datos.valorUit !== undefined) formData.append('valorUit', datos.valorUit.toString());
-      if (datos.alicuota !== undefined) formData.append('alicuota', datos.alicuota.toString());
-      if (datos.rangoInicial !== undefined) formData.append('rangoInicial', datos.rangoInicial.toString());
-      if (datos.rangoFinal !== undefined) formData.append('rangoFinal', datos.rangoFinal.toString());
-
-      const url = `${this.API_BASE_URL}/${id}`;
-      const response = await fetch(url, {
-        method: 'PUT',
-        body: formData
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      let uits = await this.listarUITs();
+      
+      // Filtrar por rango de años si se especifica
+      if (añoInicio) {
+        uits = uits.filter(u => u.año >= añoInicio);
       }
-
-      const data = await response.json();
-      
-      if (data.success && data.data) {
-        console.log('✅ [UitService] UIT actualizado exitosamente');
-        NotificationService.success('UIT actualizado exitosamente');
-        
-        const uitActualizado = Array.isArray(data.data) ? data.data[0] : data.data;
-        return this.mapearDatosDesdeApi(uitActualizado);
+      if (añoFin) {
+        uits = uits.filter(u => u.año <= añoFin);
       }
       
-      throw new Error(data.message || 'Error al actualizar UIT');
+      // Ordenar por año descendente
+      return uits.sort((a, b) => b.año - a.año);
+      
     } catch (error: any) {
-      console.error(`❌ [UitService] Error al actualizar UIT ${id}:`, error);
-      NotificationService.error(error.message || 'Error al actualizar UIT');
-      throw new Error(error.message || 'Error al actualizar UIT');
+      console.error('❌ [UITService] Error obteniendo historial:', error);
+      throw error;
     }
   }
-
+  
   /**
-   * Elimina un UIT
+   * Verifica si ya existe un valor UIT para un año
+   * NO requiere autenticación (método GET)
    */
-  async eliminar(id: number): Promise<void> {
+  async verificarAñoExiste(año: number, excluirId?: number): Promise<boolean> {
     try {
-      console.log(`🗑️ [UitService] Eliminando UIT ${id}...`);
+      const uits = await this.search({ año });
       
-      const url = `${this.API_BASE_URL}/${id}`;
-      const response = await fetch(url, {
-        method: 'DELETE',
-        headers: {
-          'Accept': 'application/json'
+      if (excluirId) {
+        return uits.some(u => u.año === año && u.id !== excluirId);
+      }
+      
+      return uits.some(u => u.año === año);
+      
+    } catch (error: any) {
+      console.error('❌ [UITService] Error verificando año:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Crea un nuevo valor UIT
+   * REQUIERE autenticación (método POST)
+   */
+  async crearUIT(datos: CreateUITDTO): Promise<UITData> {
+    try {
+      console.log('➕ [UITService] Creando valor UIT:', datos);
+      
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Se requiere autenticación para crear valores UIT');
+      }
+      
+      // Validar datos
+      if (!datos.año || datos.año < 1990 || datos.año > 2100) {
+        throw new Error('El año debe estar entre 1990 y 2100');
+      }
+      
+      if (!datos.valor || datos.valor <= 0) {
+        throw new Error('El valor UIT debe ser mayor a 0');
+      }
+      
+      // Verificar si ya existe para ese año
+      const existe = await this.verificarAñoExiste(datos.año);
+      if (existe) {
+        throw new Error(`Ya existe un valor UIT para el año ${datos.año}`);
+      }
+      
+      // Cerrar vigencia del anterior si existe
+      const anteriorAño = datos.año - 1;
+      const uitAnterior = await this.obtenerPorAño(anteriorAño);
+      if (uitAnterior && !uitAnterior.fechaVigenciaHasta) {
+        await this.update(uitAnterior.id, {
+          fechaVigenciaHasta: `${anteriorAño}-12-31`,
+          fechaModificacion: new Date().toISOString()
+        });
+      }
+      
+      const datosCompletos = {
+        ...datos,
+        fechaVigenciaDesde: datos.fechaVigenciaDesde || `${datos.año}-01-01`,
+        codUsuario: datos.codUsuario || API_CONFIG.defaultParams.codUsuario,
+        estado: 'ACTIVO',
+        fechaRegistro: new Date().toISOString()
+      };
+      
+      return await this.create(datosCompletos);
+      
+    } catch (error: any) {
+      console.error('❌ [UITService] Error creando UIT:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Actualiza un valor UIT existente
+   * REQUIERE autenticación (método PUT)
+   */
+  async actualizarUIT(id: number, datos: UpdateUITDTO): Promise<UITData> {
+    try {
+      console.log('📝 [UITService] Actualizando UIT:', id, datos);
+      
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Se requiere autenticación para actualizar valores UIT');
+      }
+      
+      // Obtener UIT actual
+      const uitActual = await this.getById(id);
+      if (!uitActual) {
+        throw new Error('Valor UIT no encontrado');
+      }
+      
+      // Validaciones
+      if (datos.año) {
+        if (datos.año < 1990 || datos.año > 2100) {
+          throw new Error('El año debe estar entre 1990 y 2100');
         }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        
+        // Verificar si el nuevo año ya existe
+        const existe = await this.verificarAñoExiste(datos.año, id);
+        if (existe) {
+          throw new Error(`Ya existe otro valor UIT para el año ${datos.año}`);
+        }
       }
-
-      console.log('✅ [UitService] UIT eliminado exitosamente');
-      NotificationService.success('UIT eliminado exitosamente');
+      
+      if (datos.valor !== undefined && datos.valor <= 0) {
+        throw new Error('El valor UIT debe ser mayor a 0');
+      }
+      
+      const datosCompletos = {
+        ...datos,
+        fechaModificacion: new Date().toISOString()
+      };
+      
+      return await this.update(id, datosCompletos);
+      
     } catch (error: any) {
-      console.error(`❌ [UitService] Error al eliminar UIT ${id}:`, error);
-      NotificationService.error(error.message || 'Error al eliminar UIT');
-      throw new Error(error.message || 'Error al eliminar UIT');
+      console.error('❌ [UITService] Error actualizando UIT:', error);
+      throw error;
     }
   }
-
+  
   /**
-   * Obtiene los años disponibles con UITs
+   * Elimina un valor UIT (cambio de estado lógico)
+   * REQUIERE autenticación (método PUT)
    */
-  async obtenerAniosDisponibles(): Promise<number[]> {
+  async eliminarUIT(id: number): Promise<void> {
     try {
-      const uits = await this.obtenerTodos();
-      const aniosUnicos = [...new Set(uits.map(uit => uit.anio))].sort((a, b) => b - a);
-      console.log(`✅ [UitService] Años disponibles: ${aniosUnicos.join(', ')}`);
-      return aniosUnicos;
+      console.log('🗑️ [UITService] Eliminando UIT:', id);
+      
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Se requiere autenticación para eliminar valores UIT');
+      }
+      
+      // En lugar de eliminar físicamente, cambiar estado a INACTIVO
+      await this.update(id, {
+        estado: 'INACTIVO',
+        fechaVigenciaHasta: new Date().toISOString(),
+        fechaModificacion: new Date().toISOString()
+      });
+      
+      console.log('✅ [UITService] UIT marcado como inactivo');
+      
     } catch (error: any) {
-      console.error('❌ [UitService] Error al obtener años disponibles:', error);
-      return [];
+      console.error('❌ [UITService] Error eliminando UIT:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Calcula un monto en base a UITs
+   * NO requiere autenticación (cálculo local)
+   */
+  async calcularMontoUIT(
+    cantidadUITs: number, 
+    año?: number
+  ): Promise<{ valor: number; uitUsado: UITData }> {
+    try {
+      let uit: UITData | null;
+      
+      if (año) {
+        uit = await this.obtenerPorAño(año);
+      } else {
+        uit = await this.obtenerVigente();
+      }
+      
+      if (!uit) {
+        throw new Error('No se encontró valor UIT para el cálculo');
+      }
+      
+      const valor = cantidadUITs * uit.valor;
+      
+      console.log(`💰 [UITService] ${cantidadUITs} UITs = S/. ${valor.toFixed(2)}`);
+      
+      return { valor, uitUsado: uit };
+      
+    } catch (error: any) {
+      console.error('❌ [UITService] Error calculando monto:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Obtiene estadísticas de valores UIT
+   * NO requiere autenticación (método GET)
+   */
+  async obtenerEstadisticas(): Promise<{
+    total: number;
+    activos: number;
+    inactivos: number;
+    uitActual: UITData | null;
+    promedioUltimos5Años: number;
+    incrementoAnual: number;
+  }> {
+    try {
+      const uits = await this.getAll();
+      const uitActual = await this.obtenerVigente();
+      const añoActual = new Date().getFullYear();
+      
+      // UITs de los últimos 5 años
+      const ultimos5Años = uits
+        .filter(u => u.año >= añoActual - 5 && u.año < añoActual)
+        .sort((a, b) => b.año - a.año);
+      
+      // Calcular promedio
+      const promedioUltimos5Años = ultimos5Años.length > 0
+        ? ultimos5Años.reduce((sum, u) => sum + u.valor, 0) / ultimos5Años.length
+        : 0;
+      
+      // Calcular incremento anual promedio
+      let incrementoAnual = 0;
+      if (ultimos5Años.length > 1) {
+        const incrementos = [];
+        for (let i = 0; i < ultimos5Años.length - 1; i++) {
+          const actual = ultimos5Años[i];
+          const anterior = ultimos5Años[i + 1];
+          const incremento = ((actual.valor - anterior.valor) / anterior.valor) * 100;
+          incrementos.push(incremento);
+        }
+        incrementoAnual = incrementos.reduce((sum, inc) => sum + inc, 0) / incrementos.length;
+      }
+      
+      return {
+        total: uits.length,
+        activos: uits.filter(u => u.estado === 'ACTIVO').length,
+        inactivos: uits.filter(u => u.estado === 'INACTIVO').length,
+        uitActual,
+        promedioUltimos5Años,
+        incrementoAnual
+      };
+      
+    } catch (error: any) {
+      console.error('❌ [UITService] Error obteniendo estadísticas:', error);
+      throw error;
     }
   }
 }
 
 // Exportar instancia singleton
-export const uitService = UitService.getInstance();
+export const uitService = UITService.getInstance();
+
+// Exportar también la clase por si se necesita extender
+export default UITService;

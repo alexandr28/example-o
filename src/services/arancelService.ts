@@ -1,414 +1,526 @@
 // src/services/arancelService.ts
-import { NotificationService } from '../components/utils/Notification';
-
-// Tipos basados en la respuesta de tu API
-export interface ArancelData {
-  codArancel?: number;
-  anio: number;
-  codDireccion: number;
-  costo: number;
-  codUsuario?: number;
-  costoArancel?: number;
-  pagina?: number;
-  limite?: number;
-  totalPaginas?: number;
-  totalRegistros?: number;
-}
-
-export interface ArancelFormData {
-  anio: number;
-  codDireccion: number;
-  codUsuario?: number;
-}
-
-export interface ArancelResponse {
-  success: boolean;
-  message: string;
-  data: ArancelData[];
-  pagina?: number;
-  limite?: number;
-  totalPaginas?: number;
-  totalRegistros?: number;
-}
+import BaseApiService from './BaseApiService';
+import { API_CONFIG } from '../config/api.unified.config';
 
 /**
- * Servicio para gestión de aranceles - SIN autenticación Bearer
+ * Interfaces para Arancel
  */
-class ArancelService {
+export interface ArancelData {
+  id: number;
+  codigo: string;
+  descripcion: string;
+  unidadMedida: string;
+  costoUnitario: number;
+  categoria?: string;
+  subcategoria?: string;
+  estado?: string;
+  vigenciaDesde?: string;
+  vigenciaHasta?: string;
+  fechaRegistro?: string;
+  fechaModificacion?: string;
+  codUsuario?: number;
+}
+
+export interface CreateArancelDTO {
+  codigo: string;
+  descripcion: string;
+  unidadMedida: string;
+  costoUnitario: number;
+  categoria?: string;
+  subcategoria?: string;
+  vigenciaDesde?: string;
+  vigenciaHasta?: string;
+  codUsuario?: number;
+}
+
+export interface UpdateArancelDTO extends Partial<CreateArancelDTO> {
+  estado?: string;
+}
+
+export interface BusquedaArancelParams {
+  codigo?: string;
+  descripcion?: string;
+  categoria?: string;
+  subcategoria?: string;
+  estado?: string;
+  vigente?: boolean;
+  codUsuario?: number;
+}
+
+// Unidades de medida comunes
+export const UNIDADES_MEDIDA = {
+  METRO_CUADRADO: 'M2',
+  METRO_LINEAL: 'ML',
+  UNIDAD: 'UND',
+  GLOBAL: 'GLB',
+  METRO_CUBICO: 'M3',
+  KILOGRAMO: 'KG',
+  LITRO: 'LT',
+  HORA: 'HR'
+} as const;
+
+// Categorías de aranceles
+export const CATEGORIAS_ARANCEL = {
+  CONSTRUCCION: 'CONSTRUCCION',
+  INSTALACIONES: 'INSTALACIONES',
+  ACABADOS: 'ACABADOS',
+  SERVICIOS: 'SERVICIOS',
+  OTROS: 'OTROS'
+} as const;
+
+/**
+ * Servicio para gestión de aranceles
+ * 
+ * Autenticación:
+ * - GET: No requiere token
+ * - POST/PUT/DELETE: Requieren token Bearer
+ */
+class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, UpdateArancelDTO> {
   private static instance: ArancelService;
-  private readonly API_BASE_URL = 'http://192.168.20.160:8080/api/arancel';
-
+  
   private constructor() {
-    console.log('🔧 [ArancelService] Inicializado');
-    console.log('📡 [ArancelService] URL base:', this.API_BASE_URL);
+    super(
+      '/api/arancel',
+      {
+        normalizeItem: (item: any) => ({
+          id: item.idArancel || item.id || 0,
+          codigo: item.codigo || item.codigoArancel || '',
+          descripcion: item.descripcion || '',
+          unidadMedida: item.unidadMedida || UNIDADES_MEDIDA.UNIDAD,
+          costoUnitario: parseFloat(item.costoUnitario || '0'),
+          categoria: item.categoria || CATEGORIAS_ARANCEL.OTROS,
+          subcategoria: item.subcategoria || '',
+          estado: item.estado || 'ACTIVO',
+          vigenciaDesde: item.vigenciaDesde || new Date().toISOString(),
+          vigenciaHasta: item.vigenciaHasta,
+          fechaRegistro: item.fechaRegistro,
+          fechaModificacion: item.fechaModificacion,
+          codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario
+        }),
+        
+        validateItem: (item: ArancelData) => {
+          // Validar que tenga los campos requeridos
+          return !!(
+            item.id && 
+            item.codigo && 
+            item.descripcion && 
+            item.unidadMedida && 
+            item.costoUnitario >= 0
+          );
+        }
+      },
+      'arancel'
+    );
   }
-
-  public static getInstance(): ArancelService {
+  
+  /**
+   * Obtiene la instancia singleton del servicio
+   */
+  static getInstance(): ArancelService {
     if (!ArancelService.instance) {
       ArancelService.instance = new ArancelService();
     }
     return ArancelService.instance;
   }
-
+  
   /**
-   * Convierte parámetros a URLSearchParams para GET requests
+   * Lista todos los aranceles
+   * NO requiere autenticación (método GET)
    */
-  private createURLSearchParams(params: Record<string, any>): URLSearchParams {
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        searchParams.append(key, value.toString());
-      }
-    });
-    return searchParams;
-  }
-
-  /**
-   * Convierte parámetros a FormData para POST/PUT requests
-   */
-  private createFormData(params: Record<string, any>): FormData {
-    const formData = new FormData();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        formData.append(key, value.toString());
-      }
-    });
-    return formData;
-  }
-
-  /**
-   * Obtiene todos los aranceles (GET con parámetros form-data style)
-   */
-  async obtenerTodos(pagina: number = 1, limite: number = 100): Promise<ArancelResponse> {
+  async listarAranceles(incluirInactivos: boolean = false): Promise<ArancelData[]> {
     try {
-      console.log('📋 [ArancelService] Obteniendo todos los aranceles...');
+      console.log('🔍 [ArancelService] Listando aranceles');
       
-      // Crear parámetros para la consulta
-      const params = this.createURLSearchParams({
-        pagina: pagina,
-        limite: limite,
-        codUsuario: 1 // Usuario por defecto
-      });
-
-      const url = `${this.API_BASE_URL}?${params}`;
-      console.log('🔗 [ArancelService] URL:', url);
+      const aranceles = await this.getAll();
       
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-
-      console.log('📥 [ArancelService] Respuesta status:', response.status);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('✅ [ArancelService] Datos recibidos:', data);
-      
-      // Normalizar la respuesta
-      if (data.success && data.data) {
-        return {
-          success: true,
-          message: data.message || 'Aranceles obtenidos',
-          data: Array.isArray(data.data) ? data.data : [],
-          pagina: data.pagina || pagina,
-          limite: data.limite || limite,
-          totalPaginas: data.totalPaginas || 1,
-          totalRegistros: data.totalRegistros || 0
-        };
+      // Filtrar por estado si es necesario
+      if (!incluirInactivos) {
+        return aranceles.filter(a => a.estado === 'ACTIVO');
       }
       
-      // Si la respuesta viene en otro formato
-      return {
-        success: true,
-        message: 'Aranceles obtenidos',
-        data: Array.isArray(data) ? data : [],
-        pagina: pagina,
-        limite: limite,
-        totalPaginas: 1,
-        totalRegistros: 0
+      return aranceles;
+      
+    } catch (error: any) {
+      console.error('❌ [ArancelService] Error listando aranceles:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Lista aranceles vigentes a una fecha específica
+   * NO requiere autenticación (método GET)
+   */
+  async listarVigentes(fecha: Date = new Date()): Promise<ArancelData[]> {
+    try {
+      console.log('🔍 [ArancelService] Listando aranceles vigentes a:', fecha);
+      
+      const aranceles = await this.listarAranceles();
+      const fechaStr = fecha.toISOString();
+      
+      return aranceles.filter(arancel => {
+        const vigenciaDesde = new Date(arancel.vigenciaDesde || '').getTime();
+        const vigenciaHasta = arancel.vigenciaHasta ? 
+          new Date(arancel.vigenciaHasta).getTime() : 
+          Infinity;
+        const fechaActual = fecha.getTime();
+        
+        return fechaActual >= vigenciaDesde && fechaActual <= vigenciaHasta;
+      });
+      
+    } catch (error: any) {
+      console.error('❌ [ArancelService] Error listando aranceles vigentes:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Busca aranceles por diferentes criterios
+   * NO requiere autenticación (método GET)
+   */
+  async buscarAranceles(criterios: BusquedaArancelParams): Promise<ArancelData[]> {
+    try {
+      console.log('🔍 [ArancelService] Buscando aranceles:', criterios);
+      
+      const params = {
+        ...criterios,
+        codUsuario: criterios.codUsuario || API_CONFIG.defaultParams.codUsuario
       };
-    } catch (error: any) {
-      console.error('❌ [ArancelService] Error al obtener aranceles:', error);
-      NotificationService.error('Error al cargar aranceles');
-      throw new Error(error.message || 'Error al obtener aranceles');
-    }
-  }
-
-  /**
-   * Busca aranceles por año (GET con parámetros)
-   */
-  async buscarPorAnio(anio: number): Promise<ArancelData[]> {
-    try {
-      console.log(`🔍 [ArancelService] Buscando aranceles del año ${anio}...`);
       
-      const params = this.createURLSearchParams({
-        anio: anio,
-        codUsuario: 1
-      });
-
-      const url = `${this.API_BASE_URL}?${params}`;
+      let aranceles = await this.search(params);
       
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.data) {
-        return Array.isArray(data.data) ? data.data : [data.data];
+      // Filtrar por vigencia si se especifica
+      if (criterios.vigente !== undefined) {
+        const ahora = new Date();
+        aranceles = aranceles.filter(arancel => {
+          const esVigente = this.esVigente(arancel, ahora);
+          return criterios.vigente ? esVigente : !esVigente;
+        });
       }
       
-      return [];
+      return aranceles;
       
     } catch (error: any) {
-      console.error(`❌ [ArancelService] Error al buscar aranceles del año ${anio}:`, error);
-      throw new Error(error.message || 'Error al buscar aranceles por año');
+      console.error('❌ [ArancelService] Error buscando aranceles:', error);
+      throw error;
     }
   }
-
+  
   /**
-   * Busca aranceles por dirección (GET con parámetros)
+   * Obtiene un arancel por su código
+   * NO requiere autenticación (método GET)
    */
-  async buscarPorDireccion(codDireccion: number): Promise<ArancelData[]> {
+  async obtenerPorCodigo(codigo: string): Promise<ArancelData | null> {
     try {
-      console.log(`🔍 [ArancelService] Buscando aranceles para dirección ${codDireccion}...`);
+      console.log('🔍 [ArancelService] Obteniendo arancel por código:', codigo);
       
-      const params = this.createURLSearchParams({
-        codDireccion: codDireccion,
-        codUsuario: 1
-      });
-
-      const url = `${this.API_BASE_URL}?${params}`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.data) {
-        return Array.isArray(data.data) ? data.data : [data.data];
-      }
-      
-      return [];
+      const aranceles = await this.search({ codigo });
+      return aranceles.length > 0 ? aranceles[0] : null;
       
     } catch (error: any) {
-      console.error(`❌ [ArancelService] Error al buscar aranceles por dirección:`, error);
-      throw new Error(error.message || 'Error al buscar aranceles por dirección');
+      console.error('❌ [ArancelService] Error obteniendo arancel:', error);
+      throw error;
     }
   }
-
+  
   /**
-   * Busca aranceles con filtros específicos
+   * Lista aranceles por categoría
+   * NO requiere autenticación (método GET)
    */
-  async buscarConFiltros(filtros: { anio?: number; codDireccion?: number }): Promise<ArancelData[]> {
+  async listarPorCategoria(
+    categoria: string, 
+    subcategoria?: string
+  ): Promise<ArancelData[]> {
     try {
-      console.log('🔍 [ArancelService] Buscando aranceles con filtros:', filtros);
+      console.log('🔍 [ArancelService] Listando aranceles por categoría:', categoria, subcategoria);
       
-      const params = this.createURLSearchParams({
-        ...filtros,
-        codUsuario: 1
-      });
-
-      const url = `${this.API_BASE_URL}?${params}`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.data) {
-        return Array.isArray(data.data) ? data.data : [data.data];
+      const params: BusquedaArancelParams = { categoria };
+      if (subcategoria) {
+        params.subcategoria = subcategoria;
       }
       
-      return [];
+      return await this.buscarAranceles(params);
       
     } catch (error: any) {
-      console.error('❌ [ArancelService] Error al buscar aranceles con filtros:', error);
-      throw new Error(error.message || 'Error al buscar aranceles');
+      console.error('❌ [ArancelService] Error listando por categoría:', error);
+      throw error;
     }
   }
-
+  
   /**
-   * Obtiene un arancel por ID
+   * Verifica si un arancel es vigente a una fecha
    */
-  async obtenerPorId(id: number): Promise<ArancelData> {
+  private esVigente(arancel: ArancelData, fecha: Date = new Date()): boolean {
+    const vigenciaDesde = new Date(arancel.vigenciaDesde || '').getTime();
+    const vigenciaHasta = arancel.vigenciaHasta ? 
+      new Date(arancel.vigenciaHasta).getTime() : 
+      Infinity;
+    const fechaActual = fecha.getTime();
+    
+    return fechaActual >= vigenciaDesde && fechaActual <= vigenciaHasta;
+  }
+  
+  /**
+   * Verifica si un código de arancel ya existe
+   * NO requiere autenticación (método GET)
+   */
+  async verificarCodigoExiste(codigo: string, excluirId?: number): Promise<boolean> {
     try {
-      console.log(`🔍 [ArancelService] Obteniendo arancel con ID ${id}...`);
+      const aranceles = await this.search({ codigo });
       
-      const url = `${this.API_BASE_URL}/${id}`;
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.data) {
-        return data.data;
+      if (excluirId) {
+        return aranceles.some(a => 
+          a.codigo.toLowerCase() === codigo.toLowerCase() && 
+          a.id !== excluirId
+        );
       }
       
-      throw new Error('Arancel no encontrado');
+      return aranceles.some(a => a.codigo.toLowerCase() === codigo.toLowerCase());
+      
     } catch (error: any) {
-      console.error(`❌ [ArancelService] Error al obtener arancel ${id}:`, error);
-      throw new Error(error.message || 'Error al obtener arancel');
-    }
-  }
-
-  /**
-   * Crea un nuevo arancel (POST con FormData)
-   */
-  async crear(datos: ArancelFormData): Promise<ArancelData> {
-    try {
-      console.log('➕ [ArancelService] Creando nuevo arancel:', datos);
-      
-      const formData = this.createFormData({
-        anio: datos.anio,
-        codDireccion: datos.codDireccion,
-        codUsuario: datos.codUsuario || 1
-      });
-
-      const response = await fetch(this.API_BASE_URL, {
-        method: 'POST',
-        body: formData
-      });
-      
-      console.log('📥 [ArancelService] Respuesta status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Error response:', errorText);
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.data) {
-        console.log('✅ [ArancelService] Arancel creado exitosamente');
-        NotificationService.success('Arancel creado exitosamente');
-        return data.data;
-      }
-      
-      throw new Error(data.message || 'Error al crear arancel');
-    } catch (error: any) {
-      console.error('❌ [ArancelService] Error al crear arancel:', error);
-      NotificationService.error(error.message || 'Error al crear arancel');
-      throw new Error(error.message || 'Error al crear arancel');
-    }
-  }
-
-  /**
-   * Actualiza un arancel (PUT con FormData)
-   */
-  async actualizar(id: number, datos: Partial<ArancelFormData>): Promise<ArancelData> {
-    try {
-      console.log(`📝 [ArancelService] Actualizando arancel ${id}:`, datos);
-      
-      const formData = this.createFormData({
-        ...datos,
-        codUsuario: datos.codUsuario || 1
-      });
-
-      const url = `${this.API_BASE_URL}/${id}`;
-      const response = await fetch(url, {
-        method: 'PUT',
-        body: formData
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.data) {
-        console.log('✅ [ArancelService] Arancel actualizado exitosamente');
-        NotificationService.success('Arancel actualizado exitosamente');
-        return data.data;
-      }
-      
-      throw new Error(data.message || 'Error al actualizar arancel');
-    } catch (error: any) {
-      console.error(`❌ [ArancelService] Error al actualizar arancel ${id}:`, error);
-      NotificationService.error(error.message || 'Error al actualizar arancel');
-      throw new Error(error.message || 'Error al actualizar arancel');
-    }
-  }
-
-  /**
-   * Elimina un arancel
-   */
-  async eliminar(id: number): Promise<void> {
-    try {
-      console.log(`🗑️ [ArancelService] Eliminando arancel ${id}...`);
-      
-      const url = `${this.API_BASE_URL}/${id}`;
-      const response = await fetch(url, {
-        method: 'DELETE',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      console.log('✅ [ArancelService] Arancel eliminado exitosamente');
-      NotificationService.success('Arancel eliminado exitosamente');
-    } catch (error: any) {
-      console.error(`❌ [ArancelService] Error al eliminar arancel ${id}:`, error);
-      NotificationService.error(error.message || 'Error al eliminar arancel');
-      throw new Error(error.message || 'Error al eliminar arancel');
-    }
-  }
-
-  /**
-   * Verifica si existe un arancel para una dirección y año específicos
-   */
-  async existeArancel(codDireccion: number, anio: number): Promise<boolean> {
-    try {
-      const aranceles = await this.buscarConFiltros({ codDireccion, anio });
-      return aranceles.length > 0;
-    } catch (error) {
-      console.error('❌ [ArancelService] Error al verificar existencia de arancel:', error);
+      console.error('❌ [ArancelService] Error verificando código:', error);
       return false;
+    }
+  }
+  
+  /**
+   * Crea un nuevo arancel
+   * REQUIERE autenticación (método POST)
+   */
+  async crearArancel(datos: CreateArancelDTO): Promise<ArancelData> {
+    try {
+      console.log('➕ [ArancelService] Creando arancel:', datos);
+      
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Se requiere autenticación para crear aranceles');
+      }
+      
+      // Validar datos
+      if (!datos.codigo || datos.codigo.trim().length < 2) {
+        throw new Error('El código del arancel debe tener al menos 2 caracteres');
+      }
+      
+      if (!datos.descripcion || datos.descripcion.trim().length < 5) {
+        throw new Error('La descripción debe tener al menos 5 caracteres');
+      }
+      
+      if (datos.costoUnitario < 0) {
+        throw new Error('El costo unitario no puede ser negativo');
+      }
+      
+      // Verificar si el código ya existe
+      const existe = await this.verificarCodigoExiste(datos.codigo);
+      if (existe) {
+        throw new Error('Ya existe un arancel con ese código');
+      }
+      
+      const datosCompletos = {
+        ...datos,
+        codigo: datos.codigo.trim().toUpperCase(),
+        descripcion: datos.descripcion.trim(),
+        codUsuario: datos.codUsuario || API_CONFIG.defaultParams.codUsuario,
+        estado: 'ACTIVO',
+        vigenciaDesde: datos.vigenciaDesde || new Date().toISOString(),
+        fechaRegistro: new Date().toISOString()
+      };
+      
+      return await this.create(datosCompletos);
+      
+    } catch (error: any) {
+      console.error('❌ [ArancelService] Error creando arancel:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Actualiza un arancel existente
+   * REQUIERE autenticación (método PUT)
+   */
+  async actualizarArancel(id: number, datos: UpdateArancelDTO): Promise<ArancelData> {
+    try {
+      console.log('📝 [ArancelService] Actualizando arancel:', id, datos);
+      
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Se requiere autenticación para actualizar aranceles');
+      }
+      
+      // Validaciones
+      if (datos.codigo) {
+        if (datos.codigo.trim().length < 2) {
+          throw new Error('El código del arancel debe tener al menos 2 caracteres');
+        }
+        
+        // Verificar si el nuevo código ya existe
+        const existe = await this.verificarCodigoExiste(datos.codigo, id);
+        if (existe) {
+          throw new Error('Ya existe otro arancel con ese código');
+        }
+      }
+      
+      if (datos.descripcion && datos.descripcion.trim().length < 5) {
+        throw new Error('La descripción debe tener al menos 5 caracteres');
+      }
+      
+      if (datos.costoUnitario !== undefined && datos.costoUnitario < 0) {
+        throw new Error('El costo unitario no puede ser negativo');
+      }
+      
+      const datosCompletos = {
+        ...datos,
+        codigo: datos.codigo ? datos.codigo.trim().toUpperCase() : undefined,
+        descripcion: datos.descripcion ? datos.descripcion.trim() : undefined,
+        fechaModificacion: new Date().toISOString()
+      };
+      
+      return await this.update(id, datosCompletos);
+      
+    } catch (error: any) {
+      console.error('❌ [ArancelService] Error actualizando arancel:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Elimina un arancel (cambio de estado lógico)
+   * REQUIERE autenticación (método PUT)
+   */
+  async eliminarArancel(id: number): Promise<void> {
+    try {
+      console.log('🗑️ [ArancelService] Eliminando arancel:', id);
+      
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Se requiere autenticación para eliminar aranceles');
+      }
+      
+      // En lugar de eliminar físicamente, cambiar estado a INACTIVO
+      await this.update(id, {
+        estado: 'INACTIVO',
+        vigenciaHasta: new Date().toISOString(),
+        fechaModificacion: new Date().toISOString()
+      });
+      
+      console.log('✅ [ArancelService] Arancel marcado como inactivo');
+      
+    } catch (error: any) {
+      console.error('❌ [ArancelService] Error eliminando arancel:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Reactiva un arancel inactivo
+   * REQUIERE autenticación (método PUT)
+   */
+  async reactivarArancel(id: number): Promise<ArancelData> {
+    try {
+      console.log('♻️ [ArancelService] Reactivando arancel:', id);
+      
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Se requiere autenticación para reactivar aranceles');
+      }
+      
+      return await this.update(id, {
+        estado: 'ACTIVO',
+        vigenciaDesde: new Date().toISOString(),
+        vigenciaHasta: undefined,
+        fechaModificacion: new Date().toISOString()
+      });
+      
+    } catch (error: any) {
+      console.error('❌ [ArancelService] Error reactivando arancel:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Duplica un arancel existente con nuevo código
+   * REQUIERE autenticación (método POST)
+   */
+  async duplicarArancel(id: number, nuevoCodigo: string): Promise<ArancelData> {
+    try {
+      console.log('📋 [ArancelService] Duplicando arancel:', id, 'con código:', nuevoCodigo);
+      
+      // Obtener arancel original
+      const original = await this.getById(id);
+      if (!original) {
+        throw new Error('Arancel original no encontrado');
+      }
+      
+      // Crear copia con nuevo código
+      const nuevoArancel: CreateArancelDTO = {
+        codigo: nuevoCodigo,
+        descripcion: `${original.descripcion} (COPIA)`,
+        unidadMedida: original.unidadMedida,
+        costoUnitario: original.costoUnitario,
+        categoria: original.categoria,
+        subcategoria: original.subcategoria,
+        vigenciaDesde: new Date().toISOString()
+      };
+      
+      return await this.crearArancel(nuevoArancel);
+      
+    } catch (error: any) {
+      console.error('❌ [ArancelService] Error duplicando arancel:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Obtiene estadísticas de aranceles
+   * NO requiere autenticación (método GET)
+   */
+  async obtenerEstadisticas(): Promise<{
+    total: number;
+    activos: number;
+    inactivos: number;
+    vigentes: number;
+    porCategoria: { [key: string]: number };
+    costoPromedio: number;
+  }> {
+    try {
+      const aranceles = await this.getAll();
+      const ahora = new Date();
+      
+      const estadisticas = {
+        total: aranceles.length,
+        activos: aranceles.filter(a => a.estado === 'ACTIVO').length,
+        inactivos: aranceles.filter(a => a.estado === 'INACTIVO').length,
+        vigentes: aranceles.filter(a => this.esVigente(a, ahora)).length,
+        porCategoria: {} as { [key: string]: number },
+        costoPromedio: 0
+      };
+      
+      // Agrupar por categoría
+      aranceles.forEach(arancel => {
+        const categoria = arancel.categoria || 'SIN CATEGORIA';
+        estadisticas.porCategoria[categoria] = 
+          (estadisticas.porCategoria[categoria] || 0) + 1;
+      });
+      
+      // Calcular costo promedio
+      if (aranceles.length > 0) {
+        const sumaCostos = aranceles.reduce((sum, a) => sum + a.costoUnitario, 0);
+        estadisticas.costoPromedio = sumaCostos / aranceles.length;
+      }
+      
+      return estadisticas;
+      
+    } catch (error: any) {
+      console.error('❌ [ArancelService] Error obteniendo estadísticas:', error);
+      throw error;
     }
   }
 }
 
 // Exportar instancia singleton
 export const arancelService = ArancelService.getInstance();
+
+// Exportar también la clase por si se necesita extender
+export default ArancelService;

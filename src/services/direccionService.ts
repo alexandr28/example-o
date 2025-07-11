@@ -1,330 +1,551 @@
-// src/services/direccionService.ts - VERSIÓN CORREGIDA
-import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api';
-import { API_CONFIG } from '../config/api.config';
+// src/services/direccionService.ts
+import BaseApiService from './BaseApiService';
+import { getEndpoint, API_CONFIG } from '../config/api.unified.config';
+import { apiGet } from '../utils/api';
 
-// Tipos de la API
+/**
+ * Interfaces para Dirección
+ */
 export interface DireccionData {
-  codDireccion?: number;
-  codSector: number;
+  codigo: number;
+  codigoSector: number;
+  codigoBarrio: number;
+  codigoCalle: number;
+  codigoVia: number;
   nombreSector?: string;
-  codBarrio: number;
   nombreBarrio?: string;
-  codTipoVia: number;
+  nombreCalle?: string;
   tipoVia?: string;
-  nombreVia: string;
-  cuadra: number;
-  lado: string;
-  loteInicial: number;
-  loteFinal: number;
-  estado?: number;
+  numeroMunicipal?: string;
+  lote?: string;
+  manzana?: string;
+  sublote?: string;
+  referencia?: string;
+  direccionCompleta: string;
+  estado?: string;
   fechaRegistro?: string;
-  usuarioRegistro?: string;
+  fechaModificacion?: string;
+  codUsuario?: number;
 }
 
-// Tipo para el frontend (lo que espera el hook)
-export interface Direccion {
-  id: number;
-  codigo: string;
-  sector: string;
-  barrio: string;
-  tipoVia: string;
-  nombreVia: string;
-  cuadra: number;
-  lotes: string;
-  lado: string;
-  estado: number;
-  // Datos adicionales para edición
-  codSector?: number;
-  codBarrio?: number;
-  codTipoVia?: number;
-  loteInicial?: number;
-  loteFinal?: number;
+export interface CreateDireccionDTO {
+  codigoSector: number;
+  codigoBarrio: number;
+  codigoCalle: number;
+  codigoVia: number;
+  numeroMunicipal?: string;
+  lote?: string;
+  manzana?: string;
+  sublote?: string;
+  referencia?: string;
+  codUsuario?: number;
 }
 
-export interface DireccionFormData {
-  sector: string;
-  barrio: string;
-  calleMz: string;
-  cuadra: string;
-  lado: string;
-  loteInicial: number;
-  loteFinal: number;
+export interface UpdateDireccionDTO extends Partial<CreateDireccionDTO> {
+  estado?: string;
+}
+
+export interface BusquedaDireccionParams {
+  codigoSector?: number;
+  codigoBarrio?: number;
+  codigoCalle?: number;
+  codigoVia?: number;
+  numeroMunicipal?: string;
+  estado?: string;
+  parametrosBusqueda?: string;
+  codUsuario?: number;
 }
 
 /**
  * Servicio para gestión de direcciones
+ * 
+ * Autenticación:
+ * - GET: No requiere token
+ * - POST/PUT/DELETE: Requieren token Bearer
  */
-class DireccionServiceClass {
-  private static instance: DireccionServiceClass;
-  private readonly API_ENDPOINT = `${API_CONFIG.baseURL}/api/direccion`;
-
-  private constructor() {}
-
+export class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO, UpdateDireccionDTO> {
+  private static instance: DireccionService;
+  
+  private constructor() {
+    super(
+      getEndpoint('direccion', 'base'),
+      {
+        normalizeItem: (item: any) => ({
+          codigo: item.codDireccion || item.codigo || 0,
+          codigoSector: item.codSector || 0,
+          codigoBarrio: item.codBarrio || 0,
+          codigoCalle: item.codCalle || 0,
+          codigoVia: item.codVia || item.codTipoVia || 0,
+          nombreSector: item.nombreSector || '',
+          nombreBarrio: item.nombreBarrio || '',
+          nombreCalle: item.nombreCalle || '',
+          tipoVia: item.tipoVia || item.nombreVia || '',
+          numeroMunicipal: item.numeroMunicipal || item.numMunicipal || '',
+          lote: item.lote || '',
+          manzana: item.manzana || item.mz || '',
+          sublote: item.sublote || '',
+          referencia: item.referencia || '',
+          direccionCompleta: item.direccionCompleta || 
+            DireccionService.construirDireccionCompleta(item),
+          estado: item.estado || 'ACTIVO',
+          fechaRegistro: item.fechaRegistro,
+          fechaModificacion: item.fechaModificacion,
+          codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario
+        }),
+        
+        validateItem: (item: DireccionData) => {
+          // Validar que tenga los campos mínimos
+          return !!(
+            item.codigo && 
+            item.codigoSector && 
+            item.codigoBarrio && 
+            item.codigoCalle
+          );
+        }
+      },
+      'direccion'
+    );
+  }
+  
   /**
-   * Obtiene la instancia única del servicio
+   * Obtiene la instancia singleton del servicio
    */
-  public static getInstance(): DireccionServiceClass {
-    if (!DireccionServiceClass.instance) {
-      DireccionServiceClass.instance = new DireccionServiceClass();
+  static getInstance(): DireccionService {
+    if (!DireccionService.instance) {
+      DireccionService.instance = new DireccionService();
     }
-    return DireccionServiceClass.instance;
+    return DireccionService.instance;
   }
-
+  
   /**
-   * Obtiene los headers para las peticiones
+   * Construye la dirección completa a partir de sus componentes
    */
-  private getHeaders(): HeadersInit {
-    return {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    };
+  private static construirDireccionCompleta(item: any): string {
+    const partes = [];
+    
+    // Sector
+    if (item.nombreSector) {
+      partes.push(`Sector ${item.nombreSector}`);
+    }
+    
+    // Barrio
+    if (item.nombreBarrio) {
+      partes.push(`Barrio ${item.nombreBarrio}`);
+    }
+    
+    // Tipo de vía y calle
+    if (item.tipoVia || item.nombreVia) {
+      partes.push(item.tipoVia || item.nombreVia);
+    }
+    if (item.nombreCalle) {
+      partes.push(item.nombreCalle);
+    }
+    
+    // Número municipal
+    if (item.numeroMunicipal || item.numMunicipal) {
+      partes.push(`N° ${item.numeroMunicipal || item.numMunicipal}`);
+    }
+    
+    // Lote y manzana
+    if (item.lote) {
+      partes.push(`Lote ${item.lote}`);
+    }
+    if (item.manzana || item.mz) {
+      partes.push(`Mz ${item.manzana || item.mz}`);
+    }
+    
+    // Sublote
+    if (item.sublote) {
+      partes.push(`Sublote ${item.sublote}`);
+    }
+    
+    return partes.join(' ').trim();
   }
-
+  
   /**
-   * Mapea los datos de la API al formato esperado por el frontend
-   * IMPORTANTE: Este método convierte DireccionData a Direccion
+   * Lista todas las direcciones
+   * NO requiere autenticación (método GET)
    */
-  private mapearDireccion(direccion: DireccionData): Direccion {
-    return {
-      id: direccion.codDireccion || 0,
-      codigo: direccion.codDireccion?.toString() || '',
-      sector: direccion.nombreSector || '',
-      barrio: direccion.nombreBarrio || '',
-      tipoVia: direccion.tipoVia || '',
-      nombreVia: direccion.nombreVia || '',
-      cuadra: direccion.cuadra || 0,
-      lotes: `${direccion.loteInicial} - ${direccion.loteFinal}`,
-      lado: direccion.lado,
-      estado: direccion.estado || 1,
-      // Datos adicionales para edición
-      codSector: direccion.codSector,
-      codBarrio: direccion.codBarrio,
-      codTipoVia: direccion.codTipoVia,
-      loteInicial: direccion.loteInicial,
-      loteFinal: direccion.loteFinal
-    };
-  }
-
-  /**
-   * Obtiene todas las direcciones
-   * @returns Promise<Direccion[]> - Array de direcciones mapeadas
-   */
-  async obtenerTodas(): Promise<Direccion[]> {
+  async listarDirecciones(incluirInactivos: boolean = false): Promise<DireccionData[]> {
     try {
-      console.log('📡 [DireccionService] Obteniendo todas las direcciones');
+      console.log('🔍 [DireccionService] Listando direcciones');
       
-      const response = await apiGet(this.API_ENDPOINT, this.getHeaders());
+      const direcciones = await this.getAll();
       
-      if (response.success && response.data) {
-        const direcciones = Array.isArray(response.data) ? 
-          response.data : [response.data];
-        
-        // IMPORTANTE: Mapear cada dirección al formato correcto
-        const direccionesMapeadas = direcciones.map(dir => this.mapearDireccion(dir));
-        
-        console.log(`✅ [DireccionService] ${direccionesMapeadas.length} direcciones obtenidas`);
-        return direccionesMapeadas;
+      if (!incluirInactivos) {
+        return direcciones.filter(d => d.estado === 'ACTIVO');
+      }
+      
+      return direcciones;
+      
+    } catch (error: any) {
+      console.error('❌ [DireccionService] Error listando direcciones:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Lista direcciones por tipo de vía
+   * NO requiere autenticación (método GET)
+   */
+  async listarPorTipoVia(
+    codigoVia?: number, 
+    parametrosBusqueda: string = 'a'
+  ): Promise<DireccionData[]> {
+    try {
+      console.log('🔍 [DireccionService] Listando direcciones por tipo de vía');
+      
+      const endpoint = getEndpoint('direccion', 'listarPorTipoVia');
+      const params: any = {
+        parametrosBusqueda,
+        codUsuario: API_CONFIG.defaultParams.codUsuario
+      };
+      
+      if (codigoVia) {
+        params.codTipoVia = codigoVia;
+      }
+      
+      const response = await apiGet<DireccionData[]>(endpoint, { params });
+      
+      if (Array.isArray(response)) {
+        return this.normalizeData(response);
       }
       
       return [];
+      
     } catch (error: any) {
-      console.error('❌ [DireccionService] Error al obtener direcciones:', error);
-      throw new Error(error.message || 'Error al obtener direcciones');
+      console.error('❌ [DireccionService] Error listando por tipo de vía:', error);
+      throw error;
     }
   }
-
+  
   /**
-   * Busca direcciones con filtros
-   * @returns Promise<Direccion[]> - Array de direcciones mapeadas
+   * Lista direcciones por nombre de vía
+   * NO requiere autenticación (método GET)
    */
-  async buscar(filtros: any): Promise<Direccion[]> {
+  async listarPorNombreVia(nombreVia: string): Promise<DireccionData[]> {
     try {
-      console.log('🔍 [DireccionService] Buscando direcciones con filtros:', filtros);
+      console.log('🔍 [DireccionService] Listando direcciones por nombre de vía:', nombreVia);
       
-      const params = new URLSearchParams();
+      const endpoint = getEndpoint('direccion', 'listarPorNombreVia');
+      const params = {
+        nombreVia: nombreVia.trim(),
+        codUsuario: API_CONFIG.defaultParams.codUsuario
+      };
       
-      if (filtros.sector) params.append('sector', filtros.sector);
-      if (filtros.barrio) params.append('barrio', filtros.barrio);
-      if (filtros.nombreVia) params.append('nombreVia', filtros.nombreVia);
-      if (filtros.busqueda) params.append('q', filtros.busqueda);
+      const response = await apiGet<DireccionData[]>(endpoint, { params });
       
-      const endpoint = params.toString() ? `${this.API_ENDPOINT}?${params}` : this.API_ENDPOINT;
-      const response = await apiGet(endpoint, this.getHeaders());
-      
-      if (response.success && response.data) {
-        const direcciones = Array.isArray(response.data) ? response.data : [response.data];
-        // IMPORTANTE: Mapear cada dirección
-        const direccionesMapeadas = direcciones.map(dir => this.mapearDireccion(dir));
-        
-        console.log(`✅ [DireccionService] ${direccionesMapeadas.length} direcciones encontradas`);
-        return direccionesMapeadas;
+      if (Array.isArray(response)) {
+        return this.normalizeData(response);
       }
       
       return [];
+      
     } catch (error: any) {
-      console.error('❌ [DireccionService] Error en búsqueda:', error);
-      throw new Error(error.message || 'Error al buscar direcciones');
+      console.error('❌ [DireccionService] Error listando por nombre de vía:', error);
+      throw error;
     }
   }
-
+  
   /**
-   * Busca direcciones por nombre de vía (usando endpoint específico si existe)
-   * @returns Promise<Direccion[]> - Array de direcciones mapeadas
+   * Busca direcciones por diferentes criterios
+   * NO requiere autenticación (método GET)
    */
-  async buscarPorNombreVia(nombreVia: string): Promise<Direccion[]> {
+  async buscarDirecciones(criterios: BusquedaDireccionParams): Promise<DireccionData[]> {
     try {
-      if (!nombreVia || nombreVia.trim().length < 2) {
-        return [];
-      }
-
-      const endpoint = `${API_CONFIG.baseURL}${API_CONFIG.endpoints.direcciones.listarPorNombreVia}`;
-      console.log(`📡 [DireccionService] Buscando por nombre de vía: ${nombreVia}`);
+      console.log('🔍 [DireccionService] Buscando direcciones:', criterios);
       
-      const url = `${endpoint}?nombreVia=${encodeURIComponent(nombreVia.trim())}`;
-      const response = await apiGet(url, this.getHeaders());
+      const params = {
+        ...criterios,
+        codUsuario: criterios.codUsuario || API_CONFIG.defaultParams.codUsuario
+      };
       
-      if (response.success && response.data) {
-        const direcciones = Array.isArray(response.data) ? 
-          response.data : [response.data];
-        return direcciones.map(dir => this.mapearDireccion(dir));
-      }
+      return await this.search(params);
       
-      return [];
     } catch (error: any) {
-      console.error('❌ [DireccionService] Error al buscar por nombre de vía:', error);
-      // Si falla el endpoint específico, usar el método buscar genérico
-      return this.buscar({ nombreVia });
+      console.error('❌ [DireccionService] Error buscando direcciones:', error);
+      throw error;
     }
   }
-
+  
+  /**
+   * Busca una dirección específica por componentes
+   * NO requiere autenticación (método GET)
+   */
+  async buscarDireccionExacta(
+    codigoSector: number,
+    codigoBarrio: number,
+    codigoCalle: number,
+    numeroMunicipal?: string,
+    lote?: string,
+    manzana?: string
+  ): Promise<DireccionData | null> {
+    try {
+      const criterios: BusquedaDireccionParams = {
+        codigoSector,
+        codigoBarrio,
+        codigoCalle
+      };
+      
+      if (numeroMunicipal) criterios.numeroMunicipal = numeroMunicipal;
+      
+      const direcciones = await this.buscarDirecciones(criterios);
+      
+      // Filtrar por coincidencia exacta
+      const direccionExacta = direcciones.find(d => {
+        const coincideLote = !lote || d.lote === lote;
+        const coincideManzana = !manzana || d.manzana === manzana;
+        return coincideLote && coincideManzana;
+      });
+      
+      return direccionExacta || null;
+      
+    } catch (error: any) {
+      console.error('❌ [DireccionService] Error buscando dirección exacta:', error);
+      throw error;
+    }
+  }
+  
   /**
    * Obtiene una dirección por su código
-   * @returns Promise<Direccion> - Dirección mapeada
+   * NO requiere autenticación (método GET)
    */
-  async obtenerPorCodigo(codigo: number): Promise<Direccion> {
+  async obtenerPorCodigo(codigo: number): Promise<DireccionData | null> {
     try {
-      const endpoint = `${API_CONFIG.baseURL}${API_CONFIG.endpoints.direcciones.obtenerPorCodigo}/${codigo}`;
-      console.log(`📡 [DireccionService] Obteniendo dirección con código: ${codigo}`);
+      console.log('🔍 [DireccionService] Obteniendo dirección por código:', codigo);
       
-      const response = await apiGet(endpoint, this.getHeaders());
+      return await this.getById(codigo);
       
-      if (response.success && response.data) {
-        return this.mapearDireccion(response.data);
-      }
-      
-      throw new Error('Dirección no encontrada');
     } catch (error: any) {
-      console.error(`❌ [DireccionService] Error al obtener dirección ${codigo}:`, error);
-      throw new Error(error.message || 'Error al obtener dirección');
+      console.error('❌ [DireccionService] Error obteniendo dirección:', error);
+      throw error;
     }
   }
-
+  
+  /**
+   * Verifica si una dirección ya existe
+   * NO requiere autenticación (método GET)
+   */
+  async verificarDireccionExiste(
+    codigoSector: number,
+    codigoBarrio: number,
+    codigoCalle: number,
+    numeroMunicipal?: string,
+    lote?: string,
+    manzana?: string,
+    excluirCodigo?: number
+  ): Promise<boolean> {
+    try {
+      const direccionExistente = await this.buscarDireccionExacta(
+        codigoSector,
+        codigoBarrio,
+        codigoCalle,
+        numeroMunicipal,
+        lote,
+        manzana
+      );
+      
+      if (direccionExistente && excluirCodigo) {
+        return direccionExistente.codigo !== excluirCodigo;
+      }
+      
+      return !!direccionExistente;
+      
+    } catch (error: any) {
+      console.error('❌ [DireccionService] Error verificando dirección:', error);
+      return false;
+    }
+  }
+  
   /**
    * Crea una nueva dirección
-   * @returns Promise<Direccion> - Dirección creada y mapeada
+   * REQUIERE autenticación (método POST)
    */
-  async crear(datos: DireccionFormData): Promise<Direccion> {
+  async crearDireccion(datos: CreateDireccionDTO): Promise<DireccionData> {
     try {
-      console.log('📡 [DireccionService] Creando nueva dirección:', datos);
+      console.log('➕ [DireccionService] Creando dirección:', datos);
       
-      // Mapear datos del formulario al formato de la API
-      const payload = {
-        codSector: parseInt(datos.sector),
-        codBarrio: parseInt(datos.barrio),
-        codTipoVia: this.obtenerCodigoTipoVia(datos.calleMz),
-        nombreVia: this.obtenerNombreVia(datos.calleMz),
-        cuadra: parseInt(datos.cuadra),
-        lado: datos.lado,
-        loteInicial: datos.loteInicial,
-        loteFinal: datos.loteFinal,
-        estado: 1
-      };
-      
-      const response = await apiPost(this.API_ENDPOINT, payload, this.getHeaders());
-      
-      if (response.success && response.data) {
-        // IMPORTANTE: Mapear la respuesta
-        return this.mapearDireccion(response.data);
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Se requiere autenticación para crear direcciones');
       }
       
-      throw new Error(response.message || 'Error al crear dirección');
+      // Validar datos básicos
+      if (!datos.codigoSector || !datos.codigoBarrio || !datos.codigoCalle) {
+        throw new Error('Debe especificar sector, barrio y calle');
+      }
+      
+      // Verificar si la dirección ya existe
+      const existe = await this.verificarDireccionExiste(
+        datos.codigoSector,
+        datos.codigoBarrio,
+        datos.codigoCalle,
+        datos.numeroMunicipal,
+        datos.lote,
+        datos.manzana
+      );
+      
+      if (existe) {
+        throw new Error('Ya existe una dirección con esos datos');
+      }
+      
+      const datosCompletos = {
+        ...datos,
+        codUsuario: datos.codUsuario || API_CONFIG.defaultParams.codUsuario,
+        estado: 'ACTIVO',
+        fechaRegistro: new Date().toISOString()
+      };
+      
+      return await this.create(datosCompletos);
+      
     } catch (error: any) {
-      console.error('❌ [DireccionService] Error al crear dirección:', error);
-      throw new Error(error.message || 'Error al crear dirección');
+      console.error('❌ [DireccionService] Error creando dirección:', error);
+      throw error;
     }
   }
-
+  
   /**
    * Actualiza una dirección existente
-   * @returns Promise<Direccion> - Dirección actualizada y mapeada
+   * REQUIERE autenticación (método PUT)
    */
-  async actualizar(codigo: number, datos: DireccionFormData): Promise<Direccion> {
+  async actualizarDireccion(codigo: number, datos: UpdateDireccionDTO): Promise<DireccionData> {
     try {
-      console.log(`📡 [DireccionService] Actualizando dirección ${codigo}:`, datos);
+      console.log('📝 [DireccionService] Actualizando dirección:', codigo, datos);
       
-      const payload = {
-        codDireccion: codigo,
-        codSector: parseInt(datos.sector),
-        codBarrio: parseInt(datos.barrio),
-        codTipoVia: this.obtenerCodigoTipoVia(datos.calleMz),
-        nombreVia: this.obtenerNombreVia(datos.calleMz),
-        cuadra: parseInt(datos.cuadra),
-        lado: datos.lado,
-        loteInicial: datos.loteInicial,
-        loteFinal: datos.loteFinal,
-        estado: 1
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Se requiere autenticación para actualizar direcciones');
+      }
+      
+      // Obtener dirección actual
+      const direccionActual = await this.getById(codigo);
+      if (!direccionActual) {
+        throw new Error('Dirección no encontrada');
+      }
+      
+      // Si se están cambiando los componentes principales, verificar duplicados
+      if (datos.codigoSector || datos.codigoBarrio || datos.codigoCalle || 
+          datos.numeroMunicipal || datos.lote || datos.manzana) {
+        
+        const existe = await this.verificarDireccionExiste(
+          datos.codigoSector || direccionActual.codigoSector,
+          datos.codigoBarrio || direccionActual.codigoBarrio,
+          datos.codigoCalle || direccionActual.codigoCalle,
+          datos.numeroMunicipal || direccionActual.numeroMunicipal,
+          datos.lote || direccionActual.lote,
+          datos.manzana || direccionActual.manzana,
+          codigo
+        );
+        
+        if (existe) {
+          throw new Error('Ya existe otra dirección con esos datos');
+        }
+      }
+      
+      const datosCompletos = {
+        ...datos,
+        fechaModificacion: new Date().toISOString()
       };
       
-      const endpoint = `${this.API_ENDPOINT}/${codigo}`;
-      const response = await apiPut(endpoint, payload, this.getHeaders());
+      return await this.update(codigo, datosCompletos);
       
-      if (response.success && response.data) {
-        // IMPORTANTE: Mapear la respuesta
-        return this.mapearDireccion(response.data);
-      }
-      
-      throw new Error(response.message || 'Error al actualizar dirección');
     } catch (error: any) {
-      console.error(`❌ [DireccionService] Error al actualizar dirección ${codigo}:`, error);
-      throw new Error(error.message || 'Error al actualizar dirección');
+      console.error('❌ [DireccionService] Error actualizando dirección:', error);
+      throw error;
     }
   }
-
+  
   /**
-   * Elimina una dirección
+   * Elimina una dirección (cambio de estado lógico)
+   * REQUIERE autenticación (método PUT)
    */
-  async eliminar(codigo: number): Promise<void> {
+  async eliminarDireccion(codigo: number): Promise<void> {
     try {
-      console.log(`📡 [DireccionService] Eliminando dirección ${codigo}`);
+      console.log('🗑️ [DireccionService] Eliminando dirección:', codigo);
       
-      const endpoint = `${this.API_ENDPOINT}/${codigo}`;
-      const response = await apiDelete(endpoint, this.getHeaders());
-      
-      if (!response.success) {
-        throw new Error(response.message || 'Error al eliminar dirección');
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Se requiere autenticación para eliminar direcciones');
       }
+      
+      // En lugar de eliminar físicamente, cambiar estado a INACTIVO
+      await this.update(codigo, {
+        estado: 'INACTIVO',
+        fechaModificacion: new Date().toISOString()
+      });
+      
+      console.log('✅ [DireccionService] Dirección marcada como inactiva');
+      
     } catch (error: any) {
-      console.error(`❌ [DireccionService] Error al eliminar dirección ${codigo}:`, error);
-      throw new Error(error.message || 'Error al eliminar dirección');
+      console.error('❌ [DireccionService] Error eliminando dirección:', error);
+      throw error;
     }
   }
-
+  
   /**
-   * Métodos auxiliares para parsear el campo calleMz
+   * Formatea una dirección para mostrar
    */
-  private obtenerCodigoTipoVia(calleMz: string): number {
-    // Parsear formato "id:nombre"
-    const partes = calleMz.split(':');
-    return partes.length > 0 ? parseInt(partes[0]) : 1;
+  formatearDireccion(direccion: DireccionData): string {
+    if (direccion.direccionCompleta) {
+      return direccion.direccionCompleta;
+    }
+    
+    return DireccionService.construirDireccionCompleta(direccion);
   }
-
-  private obtenerNombreVia(calleMz: string): string {
-    // Parsear formato "id:nombre"
-    const partes = calleMz.split(':');
-    return partes.length > 1 ? partes[1].trim() : calleMz;
+  
+  /**
+   * Obtiene estadísticas de direcciones
+   * NO requiere autenticación (método GET)
+   */
+  async obtenerEstadisticas(codigoSector?: number): Promise<{
+    total: number;
+    activas: number;
+    inactivas: number;
+    porBarrio: { [key: number]: number };
+    porTipoVia: { [key: number]: number };
+  }> {
+    try {
+      let direcciones: DireccionData[];
+      
+      if (codigoSector) {
+        direcciones = await this.buscarDirecciones({ codigoSector });
+      } else {
+        direcciones = await this.getAll();
+      }
+      
+      const estadisticas = {
+        total: direcciones.length,
+        activas: direcciones.filter(d => d.estado === 'ACTIVO').length,
+        inactivas: direcciones.filter(d => d.estado === 'INACTIVO').length,
+        porBarrio: {} as { [key: number]: number },
+        porTipoVia: {} as { [key: number]: number }
+      };
+      
+      // Agrupar por barrio y tipo de vía
+      direcciones.forEach(direccion => {
+        // Por barrio
+        estadisticas.porBarrio[direccion.codigoBarrio] = 
+          (estadisticas.porBarrio[direccion.codigoBarrio] || 0) + 1;
+        
+        // Por tipo de vía
+        estadisticas.porTipoVia[direccion.codigoVia] = 
+          (estadisticas.porTipoVia[direccion.codigoVia] || 0) + 1;
+      });
+      
+      return estadisticas;
+      
+    } catch (error: any) {
+      console.error('❌ [DireccionService] Error obteniendo estadísticas:', error);
+      throw error;
+    }
   }
 }
 
-// Exportar instancia única
-export const DireccionService = DireccionServiceClass.getInstance();
-export const direccionService = DireccionService; // Alias para compatibilidad
+// Exportar instancia singleton
+export const direccionService = DireccionService.getInstance();
+
+// También exportar la clase para extensión si es necesario
+export default DireccionService;

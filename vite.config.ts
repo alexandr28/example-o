@@ -1,93 +1,76 @@
 // vite.config.ts
-import { defineConfig, loadEnv } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
-  const API_BASE_URL = env.VITE_API_URL || 'http://192.168.20.160:8080';
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
   
-  console.log('🔧 Configurando Vite con API_BASE_URL:', API_BASE_URL);
+  // Resolver alias para importaciones
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      '@/components': path.resolve(__dirname, './src/components'),
+      '@/hooks': path.resolve(__dirname, './src/hooks'),
+      '@/services': path.resolve(__dirname, './src/services'),
+      '@/utils': path.resolve(__dirname, './src/utils'),
+      '@/config': path.resolve(__dirname, './src/config'),
+      '@/types': path.resolve(__dirname, './src/types'),
+    }
+  },
   
-  return {
-    plugins: [react()],
+  // Configuración del servidor de desarrollo
+  server: {
+    port: 3000,
+    host: true, // Permite acceso desde la red local
     
-    resolve: {
-      alias: {
-        '@': path.resolve(__dirname, 'src')
-      }
-    },
-    
-    server: {
-      port: 3000,
-      host: true,
-      strictPort: true,
-      hmr: { 
-        overlay: true,
-        clientPort: 3000,
+    // Configuración del proxy para evitar CORS
+    proxy: {
+      // Proxy para todas las rutas /api/*
+      '/api': {
+        target: 'http://192.168.20.160:8080',
+        changeOrigin: true,
+        secure: false,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('❌ Proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('➡️ Proxying:', req.method, req.url, '→', proxyReq.path);
+          });
+          proxy.on('proxyRes', (proxyRes, req, _res) => {
+            console.log('⬅️ Proxy response:', proxyRes.statusCode, 'for', req.url);
+          });
+        }
       },
       
-      proxy: {
-        // Proxy para autenticación
-        '/auth': {
-          target: API_BASE_URL,
-          changeOrigin: true,
-          secure: false,
-          ws: false,
-          configure: (proxy, _options) => {
-            proxy.on('proxyReq', (proxyReq, req, _res) => {
-              console.log(`🔐 AUTH PROXY: ${req.method} ${req.url} -> ${API_BASE_URL}${req.url}`);
-            });
-          }
-        },
-        
-        // Proxy para todas las APIs
-        '/api': {
-          target: API_BASE_URL,
-          changeOrigin: true,
-          secure: false,
-          ws: false,
-          configure: (proxy, _options) => {
-            proxy.on('proxyReq', (proxyReq, req, _res) => {
-              console.log(`📤 API PROXY: ${req.method} ${req.url} -> ${API_BASE_URL}${req.url}`);
-            });
-            
-            proxy.on('proxyRes', (proxyRes, req, _res) => {
-              console.log(`📥 API PROXY RESPONSE: ${proxyRes.statusCode} for ${req.url}`);
-            });
-            
-            proxy.on('error', (err, req, res) => {
-              console.error(`❌ API PROXY ERROR for ${req.url}:`, err.message);
-              
-              if (!res.headersSent) {
-                res.writeHead(500, {
-                  'Content-Type': 'application/json',
-                  'Access-Control-Allow-Origin': '*'
-                });
-                res.end(JSON.stringify({
-                  error: 'Proxy Error',
-                  message: `No se pudo conectar con ${API_BASE_URL}${req.url}`,
-                  details: err.message
-                }));
-              }
-            });
-          }
+      // Proxy para rutas de autenticación /auth/*
+      '/auth': {
+        target: 'http://192.168.20.160:8080',
+        changeOrigin: true,
+        secure: false
+      }
+    }
+  },
+  
+  // Configuración de build
+  build: {
+    outDir: 'dist',
+    sourcemap: true,
+    // Manejar chunks grandes
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          ui: ['@mui/material', '@emotion/react', '@emotion/styled'],
         }
       }
-    },
-    
-    build: {
-      outDir: 'dist',
-      sourcemap: mode !== 'production',
-      minify: mode === 'production'
-    },
-    
-    optimizeDeps: {
-      include: [
-        'react', 
-        'react-dom', 
-        'react-router-dom'
-      ]
     }
-  };
-});
+  },
+  
+  // Variables de entorno
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
+  }
+})

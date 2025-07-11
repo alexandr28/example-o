@@ -1,7 +1,7 @@
 // src/hooks/useContribuyentes.ts
 import { useState, useCallback, useEffect } from 'react';
 import { NotificationService } from '../components/utils/Notification';
-import { API_CONFIG, buildApiUrl } from '../config/api.config';
+import { API_CONFIG, buildApiUrl } from '../config/api.unified.config';
 import { contribuyenteService } from '../services/contribuyenteService';
 
 /**

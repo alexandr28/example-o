@@ -1,378 +1,327 @@
-// src/services/sectorService.ts - VERSIÓN CORREGIDA CON CAMPOS CORRECTOS
-import { BaseApiService } from "./BaseApiService";
-import { Sector, SectorFormData } from "../models/Sector";
-import { API_CONFIG } from "../config/api.config";
+// src/services/sectorService.ts
+import BaseApiService from './BaseApiService';
+import { API_CONFIG } from '../config/api.unified.config';
 
-class SectorService extends BaseApiService<
-  Sector,
-  SectorFormData,
-  SectorFormData
-> {
-  constructor() {
-    const baseUrl = import.meta.env.DEV ? "" : API_CONFIG.baseURL;
+/**
+ * Interfaces para Sector
+ */
+export interface SectorData {
+  codigo: number;
+  nombre: string;
+  descripcion?: string;
+  estado?: string;
+  fechaRegistro?: string;
+  fechaModificacion?: string;
+  codUsuario?: number;
+}
 
+export interface CreateSectorDTO {
+  nombre: string;
+  descripcion?: string;
+  codUsuario?: number;
+}
+
+export interface UpdateSectorDTO extends Partial<CreateSectorDTO> {
+  estado?: string;
+}
+
+export interface BusquedaSectorParams {
+  nombre?: string;
+  estado?: string;
+  codUsuario?: number;
+}
+
+/**
+ * Servicio para gestión de sectores
+ * 
+ * Autenticación:
+ * - GET: No requiere token
+ * - POST/PUT/DELETE: Requieren token Bearer
+ */
+class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSectorDTO> {
+  private static instance: SectorService;
+  
+  private constructor() {
     super(
-      baseUrl,
-      API_CONFIG.endpoints.sectores, // '/api/sector'
+      '/api/sector',
       {
-        normalizeItem: (item: any, index: number): Sector => {
-          console.log(`🔍 [SectorService] Normalizando item ${index}:`, item);
-
-          if (!item || typeof item !== "object") {
-            console.warn(
-              `⚠️ [SectorService] Item ${index} no es válido:`,
-              item
-            );
-            throw new Error(`Sector en posición ${index} no es válido`);
-          }
-
-          // LA API DEVUELVE: { codSector: number, nombreSector: string }
-          const id = item.codSector;
-          const nombre = item.nombreSector || "";
-
-          if (!id && id !== 0) {
-            console.error(
-              `❌ [SectorService] Sector sin ID en posición ${index}:`,
-              item
-            );
-            throw new Error(`Sector sin codSector en posición ${index}`);
-          }
-
-          const normalizedSector: Sector = {
-            id: Number(id),
-            nombre: String(nombre).trim()
-          };
-
-          console.log(
-            `✅ [SectorService] Sector normalizado:`,
-            normalizedSector
-          );
-          return normalizedSector;
-        },
-
-        validateItem: (item: Sector, index: number): boolean => {
-          const isValid =
-            item &&
-            item.id !== undefined &&
-            item.id !== null &&
-            !isNaN(Number(item.id)) &&
-            item.nombre &&
-            item.nombre.trim().length > 0;
-
-          if (!isValid) {
-            console.warn(
-              `⚠️ [SectorService] Sector ${index} no pasó validación:`,
-              item
-            );
-          }
-
-          return isValid;
-        },
+        normalizeItem: (item: any) => ({
+          codigo: item.codSector || item.codigo || 0,
+          nombre: item.nombre || item.nombreSector || '',
+          descripcion: item.descripcion || '',
+          estado: item.estado || 'ACTIVO',
+          fechaRegistro: item.fechaRegistro,
+          fechaModificacion: item.fechaModificacion,
+          codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario
+        }),
+        
+        validateItem: (item: SectorData) => {
+          // Validar que tenga código y nombre
+          return !!(item.codigo && item.nombre);
+        }
       },
-      "sectores_cache"
+      'sector'
     );
   }
-
+  
   /**
-   * Override para manejar la respuesta específica de la API
+   * Obtiene la instancia singleton del servicio
    */
-  async getAll(): Promise<Sector[]> {
+  static getInstance(): SectorService {
+    if (!SectorService.instance) {
+      SectorService.instance = new SectorService();
+    }
+    return SectorService.instance;
+  }
+  
+  /**
+   * Lista todos los sectores
+   * NO requiere autenticación (método GET)
+   */
+  async listarSectores(incluirInactivos: boolean = false): Promise<SectorData[]> {
     try {
-      console.log(
-        `📡 [SectorService] GET - Obteniendo sectores desde: ${this.url}`
-      );
-
-      // Intentar cargar desde caché primero
-      const cachedData = this.loadFromCache();
-      if (cachedData && cachedData.length > 0) {
-        console.log(
-          `💾 [SectorService] Usando ${cachedData.length} sectores del caché`
-        );
-        // Actualizar en background
-        this.updateInBackground();
-        return cachedData;
+      console.log('🔍 [SectorService] Listando sectores');
+      
+      const sectores = await this.getAll();
+      
+      // Filtrar por estado si es necesario
+      if (!incluirInactivos) {
+        return sectores.filter(s => s.estado === 'ACTIVO');
       }
-
-      const response = await fetch(this.url, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        mode: "cors",
-        credentials: "same-origin",
-      });
-
-      console.log(
-        `📊 [SectorService] Respuesta: ${response.status} ${response.statusText}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log(`📦 [SectorService] Datos recibidos:`, data);
-
-      // La API devuelve directamente un array
-      if (!Array.isArray(data)) {
-        console.error(`❌ [SectorService] La respuesta no es un array:`, data);
-        throw new Error("La respuesta no es un array de sectores");
-      }
-
-      // Normalizar los datos
-      const normalized = this.normalizeArray(data);
-
-      // Guardar en caché
-      if (normalized.length > 0) {
-        this.saveToCache(normalized);
-        console.log(
-          `💾 [SectorService] ${normalized.length} sectores guardados en caché`
-        );
-      }
-
-      return normalized;
+      
+      return sectores;
+      
     } catch (error: any) {
-      console.error(`❌ [SectorService] Error en getAll:`, error);
-
-      // Intentar usar caché como fallback
-      const cachedData = this.loadFromCache();
-      if (cachedData && cachedData.length > 0) {
-        console.log(
-          `✅ [SectorService] Recuperados ${cachedData.length} sectores del caché`
-        );
-        return cachedData;
-      }
-
-      // Si no hay caché y hay error de red, usar datos de ejemplo
-      if (
-        error.message.includes("Failed to fetch") ||
-        error.message.includes("network")
-      ) {
-        console.log(`📋 [SectorService] Sin conexión, usando datos de ejemplo`);
-        return this.getDefaultSectors();
-      }
-
+      console.error('❌ [SectorService] Error listando sectores:', error);
       throw error;
     }
   }
-
+  
   /**
-   * Override create para enviar los datos en el formato que espera la API
+   * Busca sectores por nombre
+   * NO requiere autenticación (método GET)
    */
-  async create(data: SectorFormData): Promise<Sector> {
+  async buscarPorNombre(nombre: string): Promise<SectorData[]> {
     try {
-      console.log(`📡 [SectorService] POST - Creando sector:`, data);
-
-      // Transformar al formato que espera la API
-      const apiData = {
-        nombreSector: data.nombre
-      };
-
-      console.log(`📤 [SectorService] Enviando a la API:`, apiData);
-
-      const response = await this.makeRequest(this.url, {
-        method: "POST",
-        body: JSON.stringify(apiData),
-      });
-
-      console.log(`📥 [SectorService] Respuesta de creación:`, response);
-
-      // Manejar diferentes formatos de respuesta
-      let sectorCreado: Sector;
-
-      // Si la respuesta es directamente el sector creado
-      if (response && typeof response === "object") {
-        // Caso 1: La respuesta tiene el formato esperado con codSector
-        if (response.codSector !== undefined && response.codSector !== null) {
-          sectorCreado = {
-            id: Number(response.codSector),
-            nombre: response.nombreSector || data.nombre
-          };
-        }
-        // Caso 2: La respuesta tiene id en lugar de codSector
-        else if (response.id !== undefined && response.id !== null) {
-          sectorCreado = {
-            id: Number(response.id),
-            nombre: response.nombre || response.nombreSector || data.nombre
-          };
-        }
-        // Caso 3: La respuesta es un mensaje de éxito sin el objeto
-        else if (response.message || response.success) {
-          console.log(
-            `⚠️ [SectorService] La API no devolvió el sector creado, recargando lista`
-          );
-          // Limpiar caché y recargar para obtener el nuevo sector
-          this.clearCache();
-          // Crear un sector temporal con ID provisional
-          sectorCreado = {
-            id: Date.now(), // ID temporal
-            nombre: data.nombre
-          };
-        }
-        // Caso 4: Respuesta inesperada
-        else {
-          console.error(`❌ [SectorService] Respuesta inesperada:`, response);
-          throw new Error("La API devolvió una respuesta inesperada");
-        }
-      } else {
-        throw new Error("Respuesta inválida del servidor");
+      console.log('🔍 [SectorService] Buscando sectores por nombre:', nombre);
+      
+      if (!nombre || nombre.trim().length < 2) {
+        return [];
       }
-
-      // Limpiar caché para forzar recarga
-      this.clearCache();
-
-      console.log(`✅ [SectorService] Sector creado:`, sectorCreado);
-      return sectorCreado;
+      
+      return await this.search({ 
+        nombre: nombre.trim(),
+        codUsuario: API_CONFIG.defaultParams.codUsuario
+      });
+      
     } catch (error: any) {
-      console.error(`❌ [SectorService] Error al crear:`, error);
-
-      // Si el error es porque no puede normalizar, intentar crear un sector temporal
-      if (error.message && error.message.includes("Sector sin codSector")) {
-        console.log(`⚠️ [SectorService] Creando sector temporal`);
-        const sectorTemporal: Sector = {
-          id: Date.now(),
-          nombre: data.nombre
-        };
-
-        // Limpiar caché para forzar recarga
-        this.clearCache();
-
-        return sectorTemporal;
+      console.error('❌ [SectorService] Error buscando sectores:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Obtiene un sector por su código
+   * NO requiere autenticación (método GET)
+   */
+  async obtenerPorCodigo(codigo: number): Promise<SectorData | null> {
+    try {
+      console.log('🔍 [SectorService] Obteniendo sector por código:', codigo);
+      
+      return await this.getById(codigo);
+      
+    } catch (error: any) {
+      console.error('❌ [SectorService] Error obteniendo sector:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Verifica si un nombre de sector ya existe
+   * NO requiere autenticación (método GET)
+   */
+  async verificarNombreExiste(nombre: string, excluirCodigo?: number): Promise<boolean> {
+    try {
+      const sectores = await this.buscarPorNombre(nombre);
+      
+      if (excluirCodigo) {
+        return sectores.some(s => 
+          s.nombre.toLowerCase() === nombre.toLowerCase() && 
+          s.codigo !== excluirCodigo
+        );
       }
-
-      throw error;
+      
+      return sectores.some(s => s.nombre.toLowerCase() === nombre.toLowerCase());
+      
+    } catch (error: any) {
+      console.error('❌ [SectorService] Error verificando nombre:', error);
+      return false;
     }
   }
-
+  
   /**
-   * Override update para enviar los datos en el formato correcto
+   * Crea un nuevo sector
+   * REQUIERE autenticación (método POST)
    */
-  async update(id: number, data: SectorFormData): Promise<Sector> {
+  async crearSector(datos: CreateSectorDTO): Promise<SectorData> {
     try {
-      console.log(`📡 [SectorService] PUT - Actualizando sector ${id}:`, data);
-
-      // Transformar al formato que espera la API
-      const apiData = {
-        codSector: id,
-        nombreSector: data.nombre
+      console.log('➕ [SectorService] Creando sector:', datos);
+      
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Se requiere autenticación para crear sectores');
+      }
+      
+      // Validar datos
+      if (!datos.nombre || datos.nombre.trim().length < 3) {
+        throw new Error('El nombre del sector debe tener al menos 3 caracteres');
+      }
+      
+      // Verificar si el nombre ya existe
+      const existe = await this.verificarNombreExiste(datos.nombre);
+      if (existe) {
+        throw new Error('Ya existe un sector con ese nombre');
+      }
+      
+      const datosCompletos = {
+        ...datos,
+        nombre: datos.nombre.trim().toUpperCase(),
+        codUsuario: datos.codUsuario || API_CONFIG.defaultParams.codUsuario,
+        estado: 'ACTIVO',
+        fechaRegistro: new Date().toISOString()
       };
-
-      const response = await this.makeRequest(`${this.url}/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(apiData),
-      });
-
-      const normalized = this.normalizeOptions.normalizeItem(response, 0);
-
-      // Limpiar caché para forzar recarga
-      this.clearCache();
-
-      console.log(`✅ [SectorService] Sector actualizado:`, normalized);
-      return normalized;
-    } catch (error) {
-      console.error(`❌ [SectorService] Error al actualizar:`, error);
+      
+      return await this.create(datosCompletos);
+      
+    } catch (error: any) {
+      console.error('❌ [SectorService] Error creando sector:', error);
       throw error;
     }
   }
-
+  
   /**
-   * Actualiza los datos en background sin bloquear la UI
+   * Actualiza un sector existente
+   * REQUIERE autenticación (método PUT)
    */
-  private async updateInBackground(): Promise<void> {
+  async actualizarSector(codigo: number, datos: UpdateSectorDTO): Promise<SectorData> {
     try {
-      console.log(`🔄 [SectorService] Actualizando datos en background...`);
-      const response = await fetch(this.url, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          const normalized = this.normalizeArray(data);
-          if (normalized.length > 0) {
-            this.saveToCache(normalized);
-            console.log(`✅ [SectorService] Caché actualizado en background`);
-          }
+      console.log('📝 [SectorService] Actualizando sector:', codigo, datos);
+      
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Se requiere autenticación para actualizar sectores');
+      }
+      
+      // Validar nombre si se está actualizando
+      if (datos.nombre) {
+        if (datos.nombre.trim().length < 3) {
+          throw new Error('El nombre del sector debe tener al menos 3 caracteres');
+        }
+        
+        // Verificar si el nuevo nombre ya existe
+        const existe = await this.verificarNombreExiste(datos.nombre, codigo);
+        if (existe) {
+          throw new Error('Ya existe otro sector con ese nombre');
         }
       }
-    } catch (error) {
-      console.log(
-        `⚠️ [SectorService] No se pudo actualizar en background:`,
-        error
-      );
-    }
-  }
-
-  /**
-   * Carga datos desde el caché local
-   */
-  private loadFromCache(): Sector[] | null {
-    try {
-      const cached = localStorage.getItem(this.cacheKey);
-      if (!cached) return null;
-
-      const parsedCache = JSON.parse(cached);
-
-      if (!parsedCache.data || !Array.isArray(parsedCache.data)) {
-        return null;
-      }
-
-      // Verificar antigüedad (24 horas)
-      const cacheAge = Date.now() - (parsedCache.timestamp || 0);
-      const maxAge = 24 * 60 * 60 * 1000;
-
-      // Retornar los datos aunque estén viejos (se actualizarán en background)
-      return parsedCache.data;
-    } catch (error) {
-      console.error(`❌ [SectorService] Error al leer caché:`, error);
-      return null;
-    }
-  }
-
-  /**
-   * Guarda datos en el caché local
-   */
-  private saveToCache(data: Sector[]): void {
-    try {
-      const cacheData = {
-        data,
-        timestamp: Date.now(),
-        count: data.length,
+      
+      const datosCompletos = {
+        ...datos,
+        nombre: datos.nombre ? datos.nombre.trim().toUpperCase() : undefined,
+        fechaModificacion: new Date().toISOString()
       };
-
-      localStorage.setItem(this.cacheKey, JSON.stringify(cacheData));
-    } catch (error) {
-      console.error(`❌ [SectorService] Error al guardar caché:`, error);
+      
+      return await this.update(codigo, datosCompletos);
+      
+    } catch (error: any) {
+      console.error('❌ [SectorService] Error actualizando sector:', error);
+      throw error;
     }
   }
-
+  
   /**
-   * Retorna sectores por defecto para desarrollo/demo
+   * Elimina un sector (cambio de estado lógico)
+   * REQUIERE autenticación (método PUT)
    */
-  private getDefaultSectors(): Sector[] {
-    return [
-      { id: 1, nombre: "CENTRO" },
-      { id: 2, nombre: "NORTE" },
-      { id: 3, nombre: "SUR" },
-      { id: 4, nombre: "ESTE" },
-      { id: 5, nombre: "OESTE" },
-    ];
+  async eliminarSector(codigo: number): Promise<void> {
+    try {
+      console.log('🗑️ [SectorService] Eliminando sector:', codigo);
+      
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Se requiere autenticación para eliminar sectores');
+      }
+      
+      // En lugar de eliminar físicamente, cambiar estado a INACTIVO
+      await this.update(codigo, {
+        estado: 'INACTIVO',
+        fechaModificacion: new Date().toISOString()
+      });
+      
+      console.log('✅ [SectorService] Sector marcado como inactivo');
+      
+    } catch (error: any) {
+      console.error('❌ [SectorService] Error eliminando sector:', error);
+      throw error;
+    }
   }
-
+  
   /**
-   * Limpia el caché
+   * Reactiva un sector inactivo
+   * REQUIERE autenticación (método PUT)
    */
-  clearCache(): void {
-    localStorage.removeItem(this.cacheKey);
-    console.log(`🧹 [SectorService] Caché limpiado`);
+  async reactivarSector(codigo: number): Promise<SectorData> {
+    try {
+      console.log('♻️ [SectorService] Reactivando sector:', codigo);
+      
+      // Verificar token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Se requiere autenticación para reactivar sectores');
+      }
+      
+      return await this.update(codigo, {
+        estado: 'ACTIVO',
+        fechaModificacion: new Date().toISOString()
+      });
+      
+    } catch (error: any) {
+      console.error('❌ [SectorService] Error reactivando sector:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Obtiene estadísticas de sectores
+   * NO requiere autenticación (método GET)
+   */
+  async obtenerEstadisticas(): Promise<{
+    total: number;
+    activos: number;
+    inactivos: number;
+  }> {
+    try {
+      const sectores = await this.getAll();
+      
+      return {
+        total: sectores.length,
+        activos: sectores.filter(s => s.estado === 'ACTIVO').length,
+        inactivos: sectores.filter(s => s.estado === 'INACTIVO').length
+      };
+      
+    } catch (error: any) {
+      console.error('❌ [SectorService] Error obteniendo estadísticas:', error);
+      throw error;
+    }
   }
 }
 
-// Exportar instancia única
-const sectorService = new SectorService();
+// Exportar instancia singleton
+const sectorService = SectorService.getInstance();
 export default sectorService;
+
+// Exportar también la clase por si se necesita extender
+export { SectorService };
