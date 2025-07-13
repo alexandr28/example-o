@@ -1,112 +1,310 @@
-// src/hooks/usePredioAPI.ts
-import { useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { predioService, PredioData } from '../services/predioService';
+// src/hooks/usePredios.ts
+import { useState, useEffect, useCallback } from 'react';
+import { predioService } from '../services/predioService';
+import { 
+  Predio, 
+  FiltroPredio,
+  PredioFormData 
+} from '../models/Predio';
 import { NotificationService } from '../components/utils/Notification';
 
-/**
- * Formatea la fecha al formato esperado por la API
- */
-const formatearFecha = (fecha: any): string => {
-  if (!fecha) return '';
+interface UsePrediosReturn {
+  // Estado
+  predios: Predio[];
+  predioSeleccionado: Predio | null;
+  loading: boolean;
+  error: string | null;
   
-  if (fecha instanceof Date) {
-    return fecha.toISOString().split('T')[0];
-  }
+  // Estadísticas
+  estadisticas: {
+    total: number;
+    porEstado: Record<string, number>;
+    porCondicion: Record<string, number>;
+    areaTerrenoTotal: number;
+    areaConstruidaTotal: number;
+  } | null;
   
-  if (typeof fecha === 'string') {
-    const date = new Date(fecha);
-    if (!isNaN(date.getTime())) {
-      return date.toISOString().split('T')[0];
-    }
-  }
-  
-  return '';
-};
+  // Acciones
+  cargarPredios: () => Promise<void>;
+  buscarPredios: (filtros: FiltroPredio) => Promise<void>;
+  obtenerPredioPorCodigo: (codigoPredio: string) => Promise<void>;
+  obtenerPrediosPorContribuyente: (codContribuyente: number) => Promise<void>;
+  seleccionarPredio: (predio: Predio | null) => void;
+  crearPredio: (datos: PredioFormData) => Promise<Predio | null>;
+  actualizarPredio: (codigoPredio: string, datos: PredioFormData) => Promise<Predio | null>;
+  eliminarPredio: (codigoPredio: string) => Promise<boolean>;
+  limpiarSeleccion: () => void;
+  cargarEstadisticas: () => Promise<void>;
+}
 
 /**
- * Hook para integrar el PredioForm con la API
+ * Hook personalizado para gestión de predios
  */
-export const usePredioAPI = (codPersona?: number) => {
-  const navigate = useNavigate();
-  
+export const usePredios = (): UsePrediosReturn => {
+  const [predios, setPredios] = useState<Predio[]>([]);
+  const [predioSeleccionado, setPredioSeleccionado] = useState<Predio | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [estadisticas, setEstadisticas] = useState<UsePrediosReturn['estadisticas']>(null);
+
   /**
-   * Guarda un predio usando la API
+   * Cargar todos los predios
    */
-  const guardarPredio = useCallback(async (formData: any) => {
+  const cargarPredios = useCallback(async () => {
     try {
-      console.log('🚀 [usePredioAPI] Procesando datos del formulario:', formData);
+      setLoading(true);
+      setError(null);
       
-      // Validar que tengamos un contribuyente seleccionado
-      if (!codPersona) {
-        NotificationService.error('Debe seleccionar un contribuyente primero');
-        return;
-      }
+      const prediosData = await predioService.obtenerPredios();
+      setPredios(prediosData);
       
-      // Validar datos mínimos
-      if (!formData.direccion?.id && !formData.direccion?.codDireccion) {
-        throw new Error('Debe seleccionar una dirección');
-      }
-      
-      // Preparar datos para la API
-      const predioData: PredioData = {
-        codPersona: codPersona,
-        anioAdquisicion: formData.anioAdquisicion,
-        fechaAdquisicion: formatearFecha(formData.fechaAdquisicion),
-        condicionPropiedad: formData.condicionPropiedad,
-        codDireccion: formData.direccion.id || formData.direccion.codDireccion,
-        nFinca: formData.nFinca || null,
-        otroNumero: formData.otroNumero || null,
-        arancel: parseFloat(formData.arancel) || 0,
-        tipoPredio: formData.tipoPredio,
-        conductor: formData.conductor,
-        usoPredio: formData.usoPredio,
-        areaTerreno: parseFloat(formData.areaTerreno) || 0,
-        numeroPisos: parseInt(formData.numeroPisos) || 0,
-        numeroCondominos: parseInt(formData.numeroCondominos) || 1,
-        rutaFotografiaPredio: formData.rutaFotografiaPredio || null,
-        rutaPlanoPredio: formData.rutaPlanoPredio || null,
-        estado: true,
-        codUsuario: 1
-      };
-      
-      console.log('📤 [usePredioAPI] Enviando a API:', predioData);
-      
-      const predioCreado = await predioService.crear(predioData);
-      
-      console.log('✅ [usePredioAPI] Predio creado:', predioCreado);
-      
-      NotificationService.success('Predio registrado correctamente');
-      
-      // Navegar a la lista después de 2 segundos
-      setTimeout(() => {
-        navigate('/predio/consulta');
-      }, 2000);
-      
-      return predioCreado;
-      
-    } catch (error: any) {
-      console.error('❌ [usePredioAPI] Error al guardar:', error);
-      NotificationService.error(error.message || 'Error al registrar predio');
-      throw error;
-    }
-  }, [codPersona, navigate]);
-  
-  /**
-   * Busca predios de un contribuyente
-   */
-  const buscarPredios = useCallback(async (codPersona: number) => {
-    try {
-      const predios = await predioService.buscarPorContribuyente(codPersona);
-      return predios;
-    } catch (error) {
-      console.error('❌ [usePredioAPI] Error al buscar predios:', error);
-      return [];
+      NotificationService.success(`${prediosData.length} predios cargados`);
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al cargar predios';
+      setError(mensaje);
+      NotificationService.error(mensaje);
+    } finally {
+      setLoading(false);
     }
   }, []);
-  
+
+  /**
+   * Buscar predios con filtros
+   */
+  const buscarPredios = useCallback(async (filtros: FiltroPredio) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Convertir filtros al formato de la API
+      const parametros = {
+        codigoPredio: filtros.codigoPredio,
+        codContribuyente: filtros.contribuyenteId,
+        anio: filtros.fechaDesde ? new Date(filtros.fechaDesde).getFullYear() : undefined,
+        estadoPredio: filtros.tipoPredio,
+        condicionPropiedad: filtros.usoPredio
+      };
+      
+      const prediosData = await predioService.buscarPredios(parametros);
+      setPredios(prediosData);
+      
+      NotificationService.info(`${prediosData.length} predios encontrados`);
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al buscar predios';
+      setError(mensaje);
+      NotificationService.error(mensaje);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Obtener predio por código
+   */
+  const obtenerPredioPorCodigo = useCallback(async (codigoPredio: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const predio = await predioService.obtenerPredioPorCodigo(codigoPredio);
+      
+      if (predio) {
+        setPredioSeleccionado(predio);
+        NotificationService.success('Predio encontrado');
+      } else {
+        NotificationService.warning('No se encontró el predio');
+      }
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al obtener predio';
+      setError(mensaje);
+      NotificationService.error(mensaje);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Obtener predios por contribuyente
+   */
+  const obtenerPrediosPorContribuyente = useCallback(async (codContribuyente: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const prediosData = await predioService.obtenerPrediosPorContribuyente(codContribuyente);
+      setPredios(prediosData);
+      
+      NotificationService.info(`${prediosData.length} predios del contribuyente`);
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al obtener predios del contribuyente';
+      setError(mensaje);
+      NotificationService.error(mensaje);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Seleccionar un predio
+   */
+  const seleccionarPredio = useCallback((predio: Predio | null) => {
+    setPredioSeleccionado(predio);
+  }, []);
+
+  /**
+   * Crear nuevo predio
+   */
+  const crearPredio = useCallback(async (datos: PredioFormData): Promise<Predio | null> => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Preparar datos para la API
+      const datosApi = {
+        anio: datos.anio || new Date().getFullYear(),
+        numeroFinca: datos.numeroFinca,
+        otroNumero: datos.otroNumero,
+        areaTerreno: datos.areaTerreno,
+        fechaAdquisicion: datos.fechaAdquisicion?.toString() || null,
+        condicionPropiedad: datos.condicionPropiedad,
+        conductor: datos.conductor,
+        estadoPredio: datos.estadoPredio,
+        numeroPisos: datos.numeroPisos,
+        totalAreaConstruccion: datos.totalAreaConstruccion,
+        valorTerreno: datos.valorTerreno,
+        valorTotalConstruccion: datos.valorTotalConstruccion,
+        autoavaluo: datos.autoavaluo,
+        codDireccion: datos.direccionId
+      };
+      
+      const nuevoPredio = await predioService.crearPredio(datosApi);
+      
+      // Actualizar lista
+      await cargarPredios();
+      
+      NotificationService.success('Predio creado exitosamente');
+      return nuevoPredio;
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al crear predio';
+      setError(mensaje);
+      NotificationService.error(mensaje);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [cargarPredios]);
+
+  /**
+   * Actualizar predio existente
+   */
+  const actualizarPredio = useCallback(async (
+    codigoPredio: string, 
+    datos: PredioFormData
+  ): Promise<Predio | null> => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Preparar datos para la API
+      const datosApi = {
+        numeroFinca: datos.numeroFinca,
+        otroNumero: datos.otroNumero,
+        areaTerreno: datos.areaTerreno,
+        fechaAdquisicion: datos.fechaAdquisicion?.toString() || null,
+        condicionPropiedad: datos.condicionPropiedad,
+        conductor: datos.conductor,
+        estadoPredio: datos.estadoPredio,
+        numeroPisos: datos.numeroPisos,
+        totalAreaConstruccion: datos.totalAreaConstruccion,
+        valorTerreno: datos.valorTerreno,
+        valorTotalConstruccion: datos.valorTotalConstruccion,
+        autoavaluo: datos.autoavaluo
+      };
+      
+      const predioActualizado = await predioService.actualizarPredio(codigoPredio, datosApi);
+      
+      // Actualizar lista
+      await cargarPredios();
+      
+      NotificationService.success('Predio actualizado exitosamente');
+      return predioActualizado;
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al actualizar predio';
+      setError(mensaje);
+      NotificationService.error(mensaje);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [cargarPredios]);
+
+  /**
+   * Eliminar predio (cambio de estado)
+   */
+  const eliminarPredio = useCallback(async (codigoPredio: string): Promise<boolean> => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      await predioService.eliminarPredio(codigoPredio);
+      
+      // Actualizar lista
+      await cargarPredios();
+      
+      NotificationService.success('Predio eliminado exitosamente');
+      return true;
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al eliminar predio';
+      setError(mensaje);
+      NotificationService.error(mensaje);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [cargarPredios]);
+
+  /**
+   * Limpiar selección
+   */
+  const limpiarSeleccion = useCallback(() => {
+    setPredioSeleccionado(null);
+  }, []);
+
+  /**
+   * Cargar estadísticas
+   */
+  const cargarEstadisticas = useCallback(async () => {
+    try {
+      const stats = await predioService.obtenerEstadisticas();
+      setEstadisticas(stats);
+    } catch (err: any) {
+      console.error('Error al cargar estadísticas:', err);
+    }
+  }, []);
+
+  // Cargar predios al montar el componente
+  useEffect(() => {
+    cargarPredios();
+  }, [cargarPredios]);
+
   return {
-    guardarPredio,
-    buscarPredios
+    // Estado
+    predios,
+    predioSeleccionado,
+    loading,
+    error,
+    estadisticas,
+    
+    // Acciones
+    cargarPredios,
+    buscarPredios,
+    obtenerPredioPorCodigo,
+    obtenerPrediosPorContribuyente,
+    seleccionarPredio,
+    crearPredio,
+    actualizarPredio,
+    eliminarPredio,
+    limpiarSeleccion,
+    cargarEstadisticas
   };
 };

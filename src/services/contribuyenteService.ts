@@ -1,7 +1,7 @@
 // src/services/contribuyenteService.ts
 import BaseApiService from './BaseApiService';
-import { getEndpoint, API_CONFIG } from '../config/api.unified.config';
-import { apiGet } from '../utils/api';
+import { API_CONFIG } from '../config/api.unified.config';
+
 import { personaService } from './personaService';
 
 /**

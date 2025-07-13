@@ -1,4 +1,4 @@
-// src/components/barrio/BarrioListMUI.tsx
+// src/components/barrio/BarrioList.tsx - VERSIÓN COMPLETA CORREGIDA
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Paper,
@@ -35,11 +35,11 @@ import {
   CloudOff as CloudOffIcon,
   Clear as ClearIcon
 } from '@mui/icons-material';
-import { Barrio } from '../../models/Barrio';
+import { BarrioData } from '../../services/barrioService';
 
 interface BarrioListProps {
-  barrios: Barrio[];
-  onSelectBarrio: (barrio: Barrio) => void;
+  barrios: BarrioData[];
+  onSelectBarrio: (barrio: BarrioData) => void;
   isOfflineMode?: boolean;
   onEliminar?: (id: number) => void;
   loading?: boolean;
@@ -51,7 +51,7 @@ interface BarrioListProps {
 type Order = 'asc' | 'desc';
 
 interface HeadCell {
-  id: keyof Barrio | 'sector' | 'acciones';
+  id: keyof BarrioData | 'sector' | 'acciones';
   label: string;
   align?: 'left' | 'center' | 'right';
   sortable?: boolean;
@@ -82,6 +82,20 @@ const BarrioListMUI: React.FC<BarrioListProps> = ({
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
+   // LOGS DE DEBUG
+  useEffect(() => {
+    console.log('🔍 [BarrioList] Props recibidas:', {
+      barrios,
+      cantidadBarrios: barrios?.length,
+      loading,
+      searchTerm
+    });
+    
+    if (barrios && barrios.length > 0) {
+      console.log('📋 [BarrioList] Primer barrio:', barrios[0]);
+    }
+  }, [barrios, loading]);
+  
   useEffect(() => {
     setLocalSearchTerm(searchTerm);
   }, [searchTerm]);
@@ -93,16 +107,14 @@ const BarrioListMUI: React.FC<BarrioListProps> = ({
     setOrderBy(property);
   };
 
-  // Manejo de búsqueda
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Manejo de búsqueda local
+  const handleLocalSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setLocalSearchTerm(value);
+    setPage(0);
+    
     if (onSearch) {
-      // Debounce la búsqueda
-      const timeoutId = setTimeout(() => {
-        onSearch(value);
-      }, 300);
-      return () => clearTimeout(timeoutId);
+      onSearch(value);
     }
   };
 
@@ -125,121 +137,123 @@ const BarrioListMUI: React.FC<BarrioListProps> = ({
     setPage(0);
   };
 
-  // Selección de barrio
-  const handleSelectBarrio = (barrio: Barrio) => {
-    setSelectedId(barrio.id);
+  // Seleccionar barrio
+  const handleSelectBarrio = (barrio: BarrioData) => {
+    setSelectedId(barrio.codigo);
     onSelectBarrio(barrio);
   };
 
-  // Ordenar y filtrar datos
+  // Filtrado y ordenamiento
   const sortedAndFilteredBarrios = useMemo(() => {
-    let filteredData = [...barrios];
+    let filtered = [...barrios];
 
-    // Aplicar filtro de búsqueda local si no hay función de búsqueda externa
-    if (!onSearch && localSearchTerm) {
-      filteredData = filteredData.filter(barrio =>
-        barrio.nombre?.toLowerCase().includes(localSearchTerm.toLowerCase())
+    // Filtrado local
+    if (localSearchTerm) {
+      const searchLower = localSearchTerm.toLowerCase();
+      filtered = filtered.filter(barrio => 
+        barrio.nombre.toLowerCase().includes(searchLower) ||
+        (obtenerNombreSector && obtenerNombreSector(barrio.codigoSector).toLowerCase().includes(searchLower))
       );
     }
 
-    // Ordenar
-    filteredData.sort((a, b) => {
-      let aValue: any = a[orderBy as keyof Barrio];
-      let bValue: any = b[orderBy as keyof Barrio];
-
-      // Para el caso especial de sector
-      if (orderBy === 'sector' && obtenerNombreSector) {
-        aValue = obtenerNombreSector(a.sectorId);
-        bValue = obtenerNombreSector(b.sectorId);
+    // Ordenamiento
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      
+      switch (orderBy) {
+        case 'nombre':
+          comparison = a.nombre.localeCompare(b.nombre);
+          break;
+        case 'sector':
+          const sectorA = obtenerNombreSector ? obtenerNombreSector(a.codigoSector) : '';
+          const sectorB = obtenerNombreSector ? obtenerNombreSector(b.codigoSector) : '';
+          comparison = sectorA.localeCompare(sectorB);
+          break;
+        case 'estado':
+          comparison = (a.estado === b.estado) ? 0 : (a.estado === 'ACTIVO' ? -1 : 1);
+          break;
       }
-
-      if (aValue === null || aValue === undefined) return 1;
-      if (bValue === null || bValue === undefined) return -1;
-
-      if (typeof aValue === 'string') {
-        aValue = aValue.toLowerCase();
-        bValue = bValue?.toLowerCase() || '';
-      }
-
-      if (order === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
+      
+      return order === 'desc' ? -comparison : comparison;
     });
 
-    return filteredData;
-  }, [barrios, order, orderBy, localSearchTerm, onSearch, obtenerNombreSector]);
+    return filtered;
+  }, [barrios, localSearchTerm, orderBy, order, obtenerNombreSector]);
 
-  // Calcular datos paginados
-  const paginatedBarrios = sortedAndFilteredBarrios.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
+  // Paginación
+  const paginatedBarrios = useMemo(() => {
+    const startIndex = page * rowsPerPage;
+    return sortedAndFilteredBarrios.slice(startIndex, startIndex + rowsPerPage);
+  }, [sortedAndFilteredBarrios, page, rowsPerPage]);
+
+  // Renderizado de skeleton
+  const renderSkeleton = () => (
+    <>
+      {[...Array(5)].map((_, index) => (
+        <TableRow key={index}>
+          <TableCell><Skeleton variant="text" /></TableCell>
+          <TableCell><Skeleton variant="text" /></TableCell>
+          <TableCell align="center"><Skeleton variant="rounded" width={80} height={24} /></TableCell>
+          <TableCell align="center"><Skeleton variant="circular" width={32} height={32} /></TableCell>
+        </TableRow>
+      ))}
+    </>
   );
 
-  // Skeleton rows para loading
-  const renderSkeletonRows = () => {
-    return Array.from({ length: 5 }).map((_, index) => (
-      <TableRow key={`skeleton-${index}`}>
-        <TableCell><Skeleton /></TableCell>
-        <TableCell><Skeleton /></TableCell>
-        <TableCell align="center"><Skeleton width={80} /></TableCell>
-        <TableCell align="center"><Skeleton width={40} /></TableCell>
-      </TableRow>
-    ));
-  };
-
   return (
-    <Paper sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
+    <Paper elevation={2} sx={{ width: '100%', overflow: 'hidden' }}>
+      {/* Header con búsqueda */}
       <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-        <Stack spacing={2}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <HomeIcon color="primary" />
-              <Typography variant="h6">
-                Lista de Barrios
-              </Typography>
-              <Chip
-                label={sortedAndFilteredBarrios.length}
-                size="small"
-                color="primary"
-                variant="outlined"
-              />
-            </Box>
-          </Box>
-
-          {/* Barra de búsqueda */}
+        <Stack direction="row" spacing={2} alignItems="center">
           <TextField
             fullWidth
-            variant="outlined"
             size="small"
             placeholder="Buscar por nombre de barrio..."
             value={localSearchTerm}
-            onChange={handleSearchChange}
+            onChange={handleLocalSearch}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon />
+                  <SearchIcon fontSize="small" />
                 </InputAdornment>
               ),
               endAdornment: localSearchTerm && (
                 <InputAdornment position="end">
-                  <IconButton
-                    size="small"
-                    onClick={handleClearSearch}
-                  >
-                    <ClearIcon />
+                  <IconButton size="small" onClick={handleClearSearch}>
+                    <ClearIcon fontSize="small" />
                   </IconButton>
                 </InputAdornment>
               )
             }}
           />
+          
+          {isOfflineMode && (
+            <Chip
+              icon={<CloudOffIcon />}
+              label="Offline"
+              color="warning"
+              size="small"
+              variant="outlined"
+            />
+          )}
         </Stack>
       </Box>
 
+      {/* Mensaje cuando no hay datos */}
+      <Collapse in={!loading && barrios.length === 0}>
+        <Alert 
+          severity="info" 
+          sx={{ m: 2 }}
+          icon={<HomeIcon />}
+        >
+          <Typography variant="body2">
+            No hay barrios registrados
+          </Typography>
+        </Alert>
+      </Collapse>
+
       {/* Tabla */}
-      <TableContainer sx={{ flexGrow: 1 }}>
+      <TableContainer sx={{ maxHeight: 440 }}>
         <Table stickyHeader size="small">
           <TableHead>
             <TableRow>
@@ -247,12 +261,7 @@ const BarrioListMUI: React.FC<BarrioListProps> = ({
                 <TableCell
                   key={headCell.id}
                   align={headCell.align || 'left'}
-                  sx={{ 
-                    fontWeight: 600,
-                    bgcolor: 'background.paper',
-                    borderBottom: 2,
-                    borderColor: 'divider'
-                  }}
+                  sortDirection={orderBy === headCell.id ? order : false}
                 >
                   {headCell.sortable ? (
                     <TableSortLabel
@@ -271,57 +280,63 @@ const BarrioListMUI: React.FC<BarrioListProps> = ({
           </TableHead>
           <TableBody>
             {loading ? (
-              renderSkeletonRows()
+              renderSkeleton()
             ) : paginatedBarrios.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
-                  <Alert severity="info" sx={{ display: 'inline-flex' }}>
+                <TableCell colSpan={4} align="center">
+                  <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
                     {localSearchTerm 
-                      ? `No se encontraron barrios con "${localSearchTerm}"`
-                      : 'No hay barrios registrados'}
-                  </Alert>
+                      ? `No se encontraron barrios que coincidan con "${localSearchTerm}"`
+                      : 'No hay barrios para mostrar'}
+                  </Typography>
                 </TableCell>
               </TableRow>
             ) : (
-              paginatedBarrios.map((barrio) => (
-                <Fade in={true} key={barrio.id}>
+              paginatedBarrios.map((barrio, index) => (
+                <Fade
+                  key={barrio.codigo}
+                  in={true}
+                  timeout={300 + index * 50}
+                >
                   <TableRow
                     hover
                     onClick={() => handleSelectBarrio(barrio)}
-                    selected={selectedId === barrio.id}
-                    sx={{ 
+                    selected={selectedId === barrio.codigo}
+                    sx={{
                       cursor: 'pointer',
+                      '&:hover': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.05)
+                      },
                       '&.Mui-selected': {
-                        bgcolor: alpha(theme.palette.primary.main, 0.08)
+                        backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                        '&:hover': {
+                          backgroundColor: alpha(theme.palette.primary.main, 0.12)
+                        }
                       }
                     }}
                   >
                     <TableCell>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {barrio.nombre || barrio.nombreBarrio || 'Sin nombre'}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <HomeIcon fontSize="small" color="action" />
+                        <Typography variant="body2" fontWeight={500}>
+                          {barrio.nombre}
                         </Typography>
-                        {process.env.NODE_ENV === 'development' && (
-                          <Typography variant="caption" color="text.secondary">
-                            ID: {barrio.id} | Código: {barrio.codBarrio || 'N/A'}
-                          </Typography>
-                        )}
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <LocationCityIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <LocationCityIcon fontSize="small" color="action" />
                         <Typography variant="body2" color="text.secondary">
-                          {obtenerNombreSector ? obtenerNombreSector(barrio.sectorId) : `Sector ${barrio.sectorId}`}
+                          {obtenerNombreSector ? obtenerNombreSector(barrio.codigoSector) : `Sector ${barrio.codigoSector}`}
                         </Typography>
                       </Box>
                     </TableCell>
                     <TableCell align="center">
                       <Chip
-                        icon={barrio.estado === false ? <CancelIcon /> : <CheckCircleIcon />}
-                        label={barrio.estado === false ? 'Inactivo' : 'Activo'}
+                        icon={barrio.estado === 'INACTIVO' ? <CancelIcon /> : <CheckCircleIcon />}
+                        label={barrio.estado === 'INACTIVO' ? 'Inactivo' : 'Activo'}
                         size="small"
-                        color={barrio.estado === false ? 'error' : 'success'}
+                        color={barrio.estado === 'INACTIVO' ? 'error' : 'success'}
                         variant="outlined"
                       />
                     </TableCell>
@@ -333,7 +348,7 @@ const BarrioListMUI: React.FC<BarrioListProps> = ({
                             color="error"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onEliminar(barrio.id);
+                              onEliminar(barrio.codigo);
                             }}
                           >
                             <DeleteIcon fontSize="small" />

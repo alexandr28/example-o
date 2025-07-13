@@ -5,8 +5,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { es } from 'date-fns/locale';
 
-// Componentes de debug
-import SimpleDebug from '../components/debug/SimpleDebud';
+
 
 // Páginas
 import { 
@@ -25,7 +24,9 @@ import {
   NuevoPredio,
   ConsultaPredioPage,
   RegistroPisoPage,
-  ConsultaPisosPage
+  ConsultaPisosPage,
+  AsignacionPredioPage,
+  ConsultaAsignacionPage
 } from '../pages';
 
 // Providers y contextos
@@ -98,6 +99,18 @@ const AppRouter: React.FC = () => {
                       <ConsultaPredioPage />
                     </ProtectedRoute>
                   } />
+                  <Route path="/predio/asignacion/nuevo" element={
+                    <ProtectedRoute>
+                      <AsignacionPredioPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/predio/asignacion/consulta" element={
+                    <ProtectedRoute>
+                      <ConsultaAsignacionPage />
+                    </ProtectedRoute>
+                  } />
+
+                  {/* Rutas de pisos */}
                   <Route path="/predio/pisos/registro" element={
                     <ProtectedRoute>
                       <RegistroPisoPage />

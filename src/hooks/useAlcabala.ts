@@ -1,244 +1,152 @@
 // src/hooks/useAlcabala.ts
-import { useCallback, useEffect, useState } from 'react';
-import { useCrudEntity } from './useCrudEntity';
-import BaseApiService from '../services/BaseApiService';
-import { API_CONFIG } from '../config/api.unified.config';
+import { useState, useEffect, useCallback } from 'react';
+import { alcabalaService } from '../services/alcabalaService';
+import { NotificationService } from '../components/utils/Notification';
 
-// Interfaces para Alcabala (sin export para evitar conflictos)
-interface AlcabalaData {
+// Tipos
+interface Alcabala {
   id: number;
-  año: number;
+  anio: number;
   tasa: number;
-  baseImponible?: number;
-  descripcion?: string;
-  estado?: string;
+  estado: string;
   fechaRegistro?: string;
   fechaModificacion?: string;
-  codUsuario?: number;
 }
 
-interface CreateAlcabalaDTO {
-  año: number;
-  tasa: number;
-  baseImponible?: number;
-  descripcion?: string;
-  codUsuario?: number;
+interface PaginacionData {
+  paginaActual: number;
+  totalPaginas: number;
+  totalRegistros: number;
+  registrosPorPagina: number;
 }
 
-interface UpdateAlcabalaDTO extends Partial<CreateAlcabalaDTO> {
-  estado?: string;
-}
-
-// Servicio de Alcabala
-class AlcabalaService extends BaseApiService<AlcabalaData, CreateAlcabalaDTO, UpdateAlcabalaDTO> {
-  private static instance: AlcabalaService;
-  
-  private constructor() {
-    super(
-      '/api/alcabala',
-      {
-        normalizeItem: (item: any) => ({
-          id: item.idAlcabala || item.id || 0,
-          año: item.año || item.anio || new Date().getFullYear(),
-          tasa: parseFloat(item.tasa || '0'),
-          baseImponible: item.baseImponible ? parseFloat(item.baseImponible) : undefined,
-          descripcion: item.descripcion || '',
-          estado: item.estado || 'ACTIVO',
-          fechaRegistro: item.fechaRegistro,
-          fechaModificacion: item.fechaModificacion,
-          codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario
-        }),
-        
-        validateItem: (item: AlcabalaData) => {
-          return !!item.año && item.tasa >= 0;
-        }
-      },
-      'alcabala_cache' // Agregar el cacheKey como tercer parámetro
-    );
-  }
-  
-  static getInstance(): AlcabalaService {
-    if (!AlcabalaService.instance) {
-      AlcabalaService.instance = new AlcabalaService();
-    }
-    return AlcabalaService.instance;
-  }
-  
-  // Métodos específicos de Alcabala
-  async obtenerPorAño(año: number): Promise<AlcabalaData | null> {
-    try {
-      const items = await this.search({ año, estado: 'ACTIVO' });
-      return items[0] || null;
-    } catch (error) {
-      console.error(`Error obteniendo alcabala del año ${año}:`, error);
-      return null;
-    }
-  }
-  
-  async verificarExiste(año: number): Promise<boolean> {
-    try {
-      const item = await this.obtenerPorAño(año);
-      return !!item;
-    } catch (error) {
-      return false;
-    }
-  }
-}
-
-// Instancia del servicio
-const alcabalaService = AlcabalaService.getInstance();
-
-// Hook de Alcabala
+/**
+ * Hook personalizado para gestión de Alcabala
+ */
 export const useAlcabala = () => {
-  // Estados adicionales para el año actual
-  const [añoActual] = useState(new Date().getFullYear());
-  const [añosDisponibles, setAñosDisponibles] = useState<number[]>([]);
+  // Estados
+  const [alcabalas, setAlcabalas] = useState<Alcabala[]>([]);
+  const [anioSeleccionado, setAnioSeleccionado] = useState<number | null>(null);
+  const [tasaAlcabala, setTasaAlcabala] = useState<number>(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [paginacion, setPaginacion] = useState<PaginacionData>({
+    paginaActual: 1,
+    totalPaginas: 1,
+    totalRegistros: 0,
+    registrosPorPagina: 10
+  });
 
-  const [state, actions] = useCrudEntity<AlcabalaData, CreateAlcabalaDTO, UpdateAlcabalaDTO>(
-    alcabalaService,
-    {
-      entityName: 'Alcabala',
-      loadOnMount: true,
-      useCache: true,
-      searchDebounce: 300,
-      sortFunction: (a, b) => b.año - a.año, // Ordenar por año descendente
-      localFilter: (items, filter) => {
-        let filtered = items;
-        
-        if (filter.año) {
-          filtered = filtered.filter(item => item.año === filter.año);
-        }
-        
-        if (filter.estado) {
-          filtered = filtered.filter(item => item.estado === filter.estado);
-        }
-        
-        if (filter.search) {
-          const searchLower = filter.search.toLowerCase();
-          filtered = filtered.filter(item => 
-            item.descripcion?.toLowerCase().includes(searchLower) ||
-            item.año.toString().includes(searchLower)
-          );
-        }
-        
-        return filtered;
-      }
+  // Generar años disponibles (últimos 10 años)
+  const currentYear = new Date().getFullYear();
+  const aniosDisponibles = Array.from({ length: 10 }, (_, i) => ({
+    value: currentYear - i,
+    label: (currentYear - i).toString()
+  }));
+
+  // Cargar alcabalas
+  const cargarAlcabalas = useCallback(async (pagina = 1) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const data = await alcabalaService.obtenerAlcabalas();
+      
+      // Paginar localmente
+      const inicio = (pagina - 1) * paginacion.registrosPorPagina;
+      const fin = inicio + paginacion.registrosPorPagina;
+      const paginados = data.slice(inicio, fin);
+      
+      setAlcabalas(paginados);
+      setPaginacion({
+        paginaActual: pagina,
+        totalPaginas: Math.ceil(data.length / paginacion.registrosPorPagina),
+        totalRegistros: data.length,
+        registrosPorPagina: paginacion.registrosPorPagina
+      });
+      
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al cargar alcabalas';
+      setError(mensaje);
+      NotificationService.error(mensaje);
+    } finally {
+      setLoading(false);
     }
-  );
+  }, [paginacion.registrosPorPagina]);
 
-  // Calcular años disponibles basado en los datos
+  // Cargar al montar
   useEffect(() => {
-    const años = [...new Set(state.items.map(item => item.año))].sort((a, b) => b - a);
-    
-    // Agregar años futuros si no existen
-    const currentYear = new Date().getFullYear();
-    for (let i = 0; i < 5; i++) {
-      const year = currentYear + i;
-      if (!años.includes(year)) {
-        años.push(year);
-      }
+    cargarAlcabalas();
+  }, [cargarAlcabalas]);
+
+  // Handlers
+  const handleAnioChange = useCallback((anio: number | null) => {
+    setAnioSeleccionado(anio);
+    // Buscar si ya existe una tasa para ese año
+    const alcabalaExistente = alcabalas.find(a => a.anio === anio);
+    if (alcabalaExistente) {
+      setTasaAlcabala(alcabalaExistente.tasa);
+      NotificationService.warning(`Ya existe una alcabala para el año ${anio} con tasa ${alcabalaExistente.tasa}%`);
+    } else {
+      setTasaAlcabala(0);
     }
-    
-    setAñosDisponibles(años.sort((a, b) => b - a));
-  }, [state.items]);
+  }, [alcabalas]);
 
-  // Buscar por año
-  const buscarPorAño = useCallback((año: number) => {
-    actions.setFilters({ año });
-  }, [actions]);
+  const handleTasaChange = useCallback((tasa: number) => {
+    setTasaAlcabala(tasa);
+  }, []);
 
-  // Obtener alcabala del año actual
-  const obtenerAlcabalaActual = useCallback(() => {
-    return state.items.find(item => item.año === añoActual && item.estado === 'ACTIVO');
-  }, [state.items, añoActual]);
-
-  // Crear alcabala con validaciones
-  const crearAlcabala = useCallback(async (data: CreateAlcabalaDTO) => {
-    // Validar que no exista alcabala para ese año
-    const existe = state.items.some(item => 
-      item.año === data.año && item.estado === 'ACTIVO'
-    );
-    
-    if (existe) {
-      throw new Error(`Ya existe una alcabala activa para el año ${data.año}`);
+  const registrarAlcabala = useCallback(async () => {
+    if (!anioSeleccionado || tasaAlcabala <= 0) {
+      NotificationService.error('Debe seleccionar un año y especificar una tasa válida');
+      return;
     }
-    
-    // Validar tasa
-    if (data.tasa < 0 || data.tasa > 100) {
-      throw new Error('La tasa debe estar entre 0 y 100');
-    }
-    
-    return actions.createItem(data);
-  }, [actions, state.items]);
 
-  // Actualizar alcabala con validaciones
-  const actualizarAlcabala = useCallback(async (id: string | number, data: UpdateAlcabalaDTO) => {
-    // Si se está actualizando la tasa, validar
-    if (data.tasa !== undefined && (data.tasa < 0 || data.tasa > 100)) {
-      throw new Error('La tasa debe estar entre 0 y 100');
+    try {
+      setLoading(true);
+      
+      await alcabalaService.crearAlcabala({
+        anio: anioSeleccionado,
+        tasa: tasaAlcabala
+      });
+      
+      // Recargar lista
+      await cargarAlcabalas(paginacion.paginaActual);
+      
+      // Limpiar formulario
+      setAnioSeleccionado(null);
+      setTasaAlcabala(0);
+      
+      NotificationService.success('Alcabala registrada exitosamente');
+      
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al registrar alcabala';
+      setError(mensaje);
+      NotificationService.error(mensaje);
+    } finally {
+      setLoading(false);
     }
-    
-    return actions.updateItem(id, data);
-  }, [actions]);
+  }, [anioSeleccionado, tasaAlcabala, cargarAlcabalas, paginacion.paginaActual]);
 
-  // Desactivar alcabala (cambio de estado)
-  const desactivarAlcabala = useCallback(async (id: number) => {
-    return actions.updateItem(id, { estado: 'INACTIVO' });
-  }, [actions]);
+  const cambiarPagina = useCallback((nuevaPagina: number) => {
+    cargarAlcabalas(nuevaPagina);
+  }, [cargarAlcabalas]);
 
   return {
-    // Estado
-    alcabalas: state.items,
-    alcabalaSeleccionada: state.selectedItem,
-    loading: state.loading,
-    error: state.error,
-    page: state.page,
-    pageSize: state.pageSize,
-    totalItems: state.totalItems,
-    totalPages: state.totalPages,
-    searchTerm: state.searchTerm,
-    isOffline: state.isOffline,
+    // Estados
+    alcabalas,
+    aniosDisponibles,
+    anioSeleccionado,
+    tasaAlcabala,
+    paginacion,
+    loading,
+    error,
     
-    // Estados de operaciones
-    creating: state.creating,
-    updating: state.updating,
-    deleting: state.deleting,
-    
-    // Datos adicionales
-    añoActual,
-    añosDisponibles,
-    alcabalaActual: obtenerAlcabalaActual(),
-    
-    // Acciones CRUD
-    cargarAlcabalas: actions.loadItems,
-    crearAlcabala,
-    actualizarAlcabala,
-    eliminarAlcabala: actions.deleteItem,
-    desactivarAlcabala,
-    seleccionarAlcabala: actions.selectItem,
-    buscarAlcabalas: actions.search,
-    limpiarSeleccion: actions.clearSelection,
-    
-    // Búsquedas específicas
-    buscarPorAño,
-    obtenerAlcabalaActual,
-    
-    // Filtros
-    setFiltros: actions.setFilters,
-    limpiarFiltros: actions.clearFilters,
-    
-    // Paginación
-    setPagina: actions.setPage,
-    setTamañoPagina: actions.setPageSize,
-    siguientePagina: actions.nextPage,
-    paginaAnterior: actions.previousPage,
-    
-    // Utilidades
-    refrescar: actions.refresh,
-    limpiarError: actions.clearError,
-    resetear: actions.reset
+    // Handlers
+    handleAnioChange,
+    handleTasaChange,
+    registrarAlcabala,
+    cambiarPagina,
+    cargarAlcabalas
   };
 };
-
-// Exportar tipos si otros componentes los necesitan
-export type { AlcabalaData, CreateAlcabalaDTO, UpdateAlcabalaDTO };

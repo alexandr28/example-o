@@ -1,119 +1,63 @@
 // src/services/predioService.ts
 import BaseApiService from './BaseApiService';
 import { API_CONFIG } from '../config/api.unified.config';
-import { pisoService } from './pisoService';
-import { direccionService } from './direccionService';
+import { 
+  Predio, 
+  PredioApiResponse, 
+  mapPredioApiToModel,
+  CondicionPropiedad,
+  ConductorPredio,
+  EstadoPredio
+} from '../models/Predio';
 
 /**
- * Interfaces para Predio
+ * Interfaces para el servicio de Predio
  */
-export interface PredioData {
-  id: number;
-  codigoContribuyente: number;
-  codigoDireccion: number;
-  codigoCatastral?: string;
-  numeroFicha?: string;
-  tipoPropiedad?: string;
-  usoPropiedad?: string;
-  clasificacionPredio?: string;
-  estadoPredio?: string;
-  areaTerreno: number;
-  areaConstruida?: number;
-  valorTerreno?: number;
-  valorConstruccion?: number;
-  valorTotal?: number;
-  porcentajePropiedad?: number;
-  fechaAdquisicion?: string;
-  condicionPropiedad?: string;
-  observaciones?: string;
-  direccionCompleta?: string;
-  nombreContribuyente?: string;
-  estado?: string;
-  fechaRegistro?: string;
-  fechaModificacion?: string;
-  codUsuario?: number;
-}
-
 export interface CreatePredioDTO {
-  codigoContribuyente: number;
-  codigoDireccion: number;
-  codigoCatastral?: string;
-  numeroFicha?: string;
-  tipoPropiedad?: string;
-  usoPropiedad?: string;
-  clasificacionPredio?: string;
-  estadoPredio?: string;
+  codContribuyente?: number;
+  codDireccion?: number;
+  codPredio?: string;
+  numeroFinca?: string;
+  otroNumero?: string;
   areaTerreno: number;
-  porcentajePropiedad?: number;
-  fechaAdquisicion?: string;
+  fechaAdquisicion?: string | null;
   condicionPropiedad?: string;
-  observaciones?: string;
+  conductor?: string;
+  estadoPredio?: string;
+  numeroPisos?: number;
+  totalAreaConstruccion?: number;
+  valorTerreno?: number;
+  valorTotalConstruccion?: number;
+  autoavaluo?: number;
   codUsuario?: number;
+  anio?: number;
 }
 
 export interface UpdatePredioDTO extends Partial<CreatePredioDTO> {
-  valorTerreno?: number;
-  valorConstruccion?: number;
   estado?: string;
 }
 
 export interface BusquedaPredioParams {
-  codigoContribuyente?: number;
-  codigoCatastral?: string;
-  numeroFicha?: string;
-  tipoPropiedad?: string;
-  usoPropiedad?: string;
+  codigoPredio?: string;
+  codContribuyente?: number;
+  anio?: number;
   estadoPredio?: string;
-  estado?: string;
+  condicionPropiedad?: string;
   codUsuario?: number;
 }
 
-// Tipos de propiedad
-export const TIPO_PROPIEDAD = {
-  CASA_HABITACION: 'CASA_HABITACION',
-  DEPARTAMENTO: 'DEPARTAMENTO',
-  LOCAL_COMERCIAL: 'LOCAL_COMERCIAL',
-  LOCAL_INDUSTRIAL: 'LOCAL_INDUSTRIAL',
-  TERRENO: 'TERRENO',
-  OTROS: 'OTROS'
-} as const;
-
-// Usos de propiedad
-export const USO_PROPIEDAD = {
-  VIVIENDA: 'VIVIENDA',
-  COMERCIO: 'COMERCIO',
-  INDUSTRIA: 'INDUSTRIA',
-  EDUCACION: 'EDUCACION',
-  SALUD: 'SALUD',
-  CULTO: 'CULTO',
-  RECREACION: 'RECREACION',
-  OTROS: 'OTROS'
-} as const;
-
-// Clasificación de predio
-export const CLASIFICACION_PREDIO = {
-  URBANO: 'URBANO',
-  RUSTICO: 'RUSTICO',
-  ERIAZO: 'ERIAZO'
-} as const;
-
-// Estado del predio
-export const ESTADO_PREDIO = {
-  REGISTRADO: 'REGISTRADO',
-  EN_PROCESO: 'EN_PROCESO',
-  OBSERVADO: 'OBSERVADO',
-  ANULADO: 'ANULADO'
-} as const;
-
-// Condición de propiedad
-export const CONDICION_PROPIEDAD = {
-  PROPIETARIO_UNICO: 'PROPIETARIO_UNICO',
-  SUCESION: 'SUCESION',
-  COPROPIETARIO: 'COPROPIETARIO',
-  POSEEDOR: 'POSEEDOR',
-  LITIGIO: 'LITIGIO',
-  OTROS: 'OTROS'
-} as const;
+/**
+ * Respuesta de la API
+ */
+interface PredioApiListResponse {
+  success: boolean;
+  message: string;
+  data: PredioApiResponse[];
+  pagina?: number | null;
+  limite?: number | null;
+  totalPaginas?: number | null;
+  totalRegistros?: number | null;
+}
 
 /**
  * Servicio para gestión de predios
@@ -122,59 +66,53 @@ export const CONDICION_PROPIEDAD = {
  * - GET: No requiere token
  * - POST/PUT/DELETE: Requieren token Bearer
  */
-class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePredioDTO> {
+class PredioService extends BaseApiService<Predio, CreatePredioDTO, UpdatePredioDTO> {
   private static instance: PredioService;
   
   private constructor() {
     super(
-      '/api/predio',
+      API_CONFIG.endpoints.predio,
       {
-        normalizeItem: (item: any) => ({
-          id: item.codPredio || item.id || 0,
-          codigoContribuyente: item.codContribuyente || 0,
-          codigoDireccion: item.codDireccion || 0,
-          codigoCatastral: item.codigoCatastral || '',
-          numeroFicha: item.numeroFicha || '',
-          tipoPropiedad: item.tipoPropiedad || TIPO_PROPIEDAD.CASA_HABITACION,
-          usoPropiedad: item.usoPropiedad || USO_PROPIEDAD.VIVIENDA,
-          clasificacionPredio: item.clasificacionPredio || CLASIFICACION_PREDIO.URBANO,
-          estadoPredio: item.estadoPredio || ESTADO_PREDIO.REGISTRADO,
-          areaTerreno: parseFloat(item.areaTerreno || '0'),
-          areaConstruida: parseFloat(item.areaConstruida || '0'),
-          valorTerreno: parseFloat(item.valorTerreno || '0'),
-          valorConstruccion: parseFloat(item.valorConstruccion || '0'),
-          valorTotal: parseFloat(item.valorTotal || '0') || 
-            (parseFloat(item.valorTerreno || '0') + parseFloat(item.valorConstruccion || '0')),
-          porcentajePropiedad: parseFloat(item.porcentajePropiedad || '100'),
-          fechaAdquisicion: item.fechaAdquisicion,
-          condicionPropiedad: item.condicionPropiedad || CONDICION_PROPIEDAD.PROPIETARIO_UNICO,
-          observaciones: item.observaciones || '',
-          direccionCompleta: item.direccionCompleta || '',
-          nombreContribuyente: item.nombreContribuyente || '',
-          estado: item.estado || 'ACTIVO',
-          fechaRegistro: item.fechaRegistro,
-          fechaModificacion: item.fechaModificacion,
-          codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario
-        }),
+        normalizeItem: (item: any): Predio => {
+          // Si el item ya es un PredioApiResponse, mapearlo
+          if (item.codPredio !== undefined) {
+            return mapPredioApiToModel(item as PredioApiResponse);
+          }
+          
+          // Si no, intentar normalizar manualmente
+          return {
+            id: item.id || 0,
+            codigoPredio: item.codigoPredio || item.codPredio?.trim() || '',
+            anio: item.anio,
+            fechaAdquisicion: item.fechaAdquisicion,
+            condicionPropiedad: item.condicionPropiedad || CondicionPropiedad.PROPIETARIO_UNICO,
+            direccion: item.direccion || '',
+            direccionId: item.direccionId || item.codDireccion,
+            numeroFinca: item.numeroFinca,
+            otroNumero: item.otroNumero,
+            conductor: item.conductor || ConductorPredio.PRIVADO,
+            estadoPredio: item.estadoPredio || EstadoPredio.TERMINADO,
+            areaTerreno: parseFloat(item.areaTerreno?.toString() || '0'),
+            numeroPisos: item.numeroPisos,
+            totalAreaConstruccion: item.totalAreaConstruccion,
+            valorTotalConstruccion: item.valorTotalConstruccion,
+            valorTerreno: item.valorTerreno,
+            autoavaluo: item.autoavaluo,
+            numeroCondominos: item.numeroCondominos,
+            estado: item.estado || 'ACTIVO',
+            codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario
+          };
+        },
         
-        validateItem: (item: PredioData) => {
+        validateItem: (item: Predio) => {
           // Validar que tenga los campos requeridos
-          return !!(
-            item.id && 
-            item.codigoContribuyente && 
-            item.codigoDireccion && 
-            item.areaTerreno > 0
-          );
+          return !!(item.codigoPredio && item.areaTerreno >= 0);
         }
-      },
-      'predio'
+      }
     );
   }
   
-  /**
-   * Obtiene la instancia singleton del servicio
-   */
-  static getInstance(): PredioService {
+  public static getInstance(): PredioService {
     if (!PredioService.instance) {
       PredioService.instance = new PredioService();
     }
@@ -182,70 +120,69 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
   }
   
   /**
-   * Lista todos los predios
+   * Obtiene todos los predios
    * NO requiere autenticación (método GET)
    */
-  async listarPredios(incluirInactivos: boolean = false): Promise<PredioData[]> {
+  async obtenerPredios(): Promise<Predio[]> {
     try {
-      console.log('🔍 [PredioService] Listando predios');
+      console.log('📋 [PredioService] Obteniendo todos los predios');
       
-      const predios = await this.getAll();
-      
-      if (!incluirInactivos) {
-        return predios.filter(p => p.estado === 'ACTIVO');
-      }
-      
-      return predios;
-      
-    } catch (error: any) {
-      console.error('❌ [PredioService] Error listando predios:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Lista predios por contribuyente
-   * NO requiere autenticación (método GET)
-   */
-  async listarPorContribuyente(
-    codigoContribuyente: number, 
-    incluirInactivos: boolean = false
-  ): Promise<PredioData[]> {
-    try {
-      console.log('🔍 [PredioService] Listando predios del contribuyente:', codigoContribuyente);
-      
-      const predios = await this.search({ 
-        codigoContribuyente,
-        codUsuario: API_CONFIG.defaultParams.codUsuario
+      const response = await this.makeRequest<PredioApiListResponse>('', {
+        method: 'GET'
       });
       
-      if (!incluirInactivos) {
-        return predios.filter(p => p.estado === 'ACTIVO');
+      // La respuesta viene en el formato { success, message, data }
+      if (response.success && response.data) {
+        const predios = response.data.map(item => mapPredioApiToModel(item));
+        console.log(`✅ [PredioService] ${predios.length} predios obtenidos`);
+        return predios;
       }
       
-      return predios;
-      
+      return [];
     } catch (error: any) {
-      console.error('❌ [PredioService] Error listando predios por contribuyente:', error);
+      console.error('❌ [PredioService] Error obteniendo predios:', error);
       throw error;
     }
   }
   
   /**
-   * Busca predios por criterios
+   * Busca predios con filtros
    * NO requiere autenticación (método GET)
    */
-  async buscarPredios(criterios: BusquedaPredioParams): Promise<PredioData[]> {
+  async buscarPredios(params: BusquedaPredioParams): Promise<Predio[]> {
     try {
-      console.log('🔍 [PredioService] Buscando predios:', criterios);
+      console.log('🔍 [PredioService] Buscando predios con parámetros:', params);
       
-      const params = {
-        ...criterios,
-        codUsuario: criterios.codUsuario || API_CONFIG.defaultParams.codUsuario
-      };
+      const queryParams = new URLSearchParams();
       
-      return await this.search(params);
+      if (params.codigoPredio) {
+        queryParams.append('codigoPredio', params.codigoPredio);
+      }
+      if (params.codContribuyente) {
+        queryParams.append('codContribuyente', params.codContribuyente.toString());
+      }
+      if (params.anio) {
+        queryParams.append('anio', params.anio.toString());
+      }
+      if (params.estadoPredio) {
+        queryParams.append('estadoPredio', params.estadoPredio);
+      }
+      if (params.condicionPropiedad) {
+        queryParams.append('condicionPropiedad', params.condicionPropiedad);
+      }
       
+      const response = await this.makeRequest<PredioApiListResponse>(
+        `?${queryParams.toString()}`,
+        { method: 'GET' }
+      );
+      
+      if (response.success && response.data) {
+        const predios = response.data.map(item => mapPredioApiToModel(item));
+        console.log(`✅ [PredioService] ${predios.length} predios encontrados`);
+        return predios;
+      }
+      
+      return [];
     } catch (error: any) {
       console.error('❌ [PredioService] Error buscando predios:', error);
       throw error;
@@ -253,16 +190,25 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
   }
   
   /**
-   * Obtiene un predio por código catastral
+   * Obtiene un predio por su código
    * NO requiere autenticación (método GET)
    */
-  async obtenerPorCodigoCatastral(codigoCatastral: string): Promise<PredioData | null> {
+  async obtenerPredioPorCodigo(codigoPredio: string): Promise<Predio | null> {
     try {
-      console.log('🔍 [PredioService] Obteniendo predio por código catastral:', codigoCatastral);
+      console.log('🔍 [PredioService] Obteniendo predio:', codigoPredio);
       
-      const predios = await this.search({ codigoCatastral });
-      return predios.length > 0 ? predios[0] : null;
+      const response = await this.makeRequest<PredioApiListResponse>(
+        `?codigoPredio=${codigoPredio}`,
+        { method: 'GET' }
+      );
       
+      if (response.success && response.data && response.data.length > 0) {
+        const predio = mapPredioApiToModel(response.data[0]);
+        console.log('✅ [PredioService] Predio encontrado:', predio);
+        return predio;
+      }
+      
+      return null;
     } catch (error: any) {
       console.error('❌ [PredioService] Error obteniendo predio:', error);
       throw error;
@@ -270,117 +216,12 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
   }
   
   /**
-   * Obtiene un predio con sus pisos
-   * NO requiere autenticación (método GET)
-   */
-  async obtenerPredioCompleto(id: number): Promise<{
-    predio: PredioData;
-    pisos: any[];
-    direccion: any;
-  } | null> {
-    try {
-      console.log('🔍 [PredioService] Obteniendo predio completo:', id);
-      
-      const predio = await this.getById(id);
-      if (!predio) {
-        return null;
-      }
-      
-      // Obtener pisos del predio
-      const pisos = await pisoService.listarPorPredio(id);
-      
-      // Obtener dirección completa
-      const direccion = await direccionService.obtenerPorCodigo(predio.codigoDireccion);
-      
-      return {
-        predio,
-        pisos,
-        direccion
-      };
-      
-    } catch (error: any) {
-      console.error('❌ [PredioService] Error obteniendo predio completo:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Calcula y actualiza valores del predio
-   * NO requiere autenticación para cálculo, sí para actualización
-   */
-  async calcularValores(id: number): Promise<{
-    areaTotal: number;
-    valorTerreno: number;
-    valorConstruccion: number;
-    valorTotal: number;
-  }> {
-    try {
-      console.log('💰 [PredioService] Calculando valores del predio:', id);
-      
-      const predio = await this.getById(id);
-      if (!predio) {
-        throw new Error('Predio no encontrado');
-      }
-      
-      // Obtener área construida total de los pisos
-      const areaConstruidaTotal = await pisoService.calcularAreaTotalPredio(id);
-      
-      // Aquí deberías implementar la lógica real de cálculo
-      // Por ahora usamos valores de ejemplo
-      const valorPorM2Terreno = 500; // S/. por m2
-      const valorPorM2Construccion = 800; // S/. por m2
-      
-      const valores = {
-        areaTotal: areaConstruidaTotal,
-        valorTerreno: predio.areaTerreno * valorPorM2Terreno,
-        valorConstruccion: areaConstruidaTotal * valorPorM2Construccion,
-        valorTotal: 0
-      };
-      
-      valores.valorTotal = valores.valorTerreno + valores.valorConstruccion;
-      
-      console.log('💰 [PredioService] Valores calculados:', valores);
-      
-      return valores;
-      
-    } catch (error: any) {
-      console.error('❌ [PredioService] Error calculando valores:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Verifica si un código catastral ya existe
-   * NO requiere autenticación (método GET)
-   */
-  async verificarCodigoCatastralExiste(
-    codigoCatastral: string, 
-    excluirId?: number
-  ): Promise<boolean> {
-    try {
-      if (!codigoCatastral) return false;
-      
-      const predios = await this.search({ codigoCatastral });
-      
-      if (excluirId) {
-        return predios.some(p => p.id !== excluirId);
-      }
-      
-      return predios.length > 0;
-      
-    } catch (error: any) {
-      console.error('❌ [PredioService] Error verificando código catastral:', error);
-      return false;
-    }
-  }
-  
-  /**
    * Crea un nuevo predio
    * REQUIERE autenticación (método POST)
    */
-  async crearPredio(datos: CreatePredioDTO): Promise<PredioData> {
+  async crearPredio(datos: CreatePredioDTO): Promise<Predio> {
     try {
-      console.log('➕ [PredioService] Creando predio:', datos);
+      console.log('➕ [PredioService] Creando nuevo predio:', datos);
       
       // Verificar token
       const token = localStorage.getItem('auth_token');
@@ -388,47 +229,19 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
         throw new Error('Se requiere autenticación para crear predios');
       }
       
-      // Validar datos básicos
-      if (!datos.codigoContribuyente || datos.codigoContribuyente <= 0) {
-        throw new Error('Debe especificar un contribuyente válido');
-      }
-      
-      if (!datos.codigoDireccion || datos.codigoDireccion <= 0) {
-        throw new Error('Debe especificar una dirección válida');
-      }
-      
-      if (!datos.areaTerreno || datos.areaTerreno <= 0) {
-        throw new Error('El área del terreno debe ser mayor a 0');
-      }
-      
-      // Verificar código catastral único
-      if (datos.codigoCatastral) {
-        const existe = await this.verificarCodigoCatastralExiste(datos.codigoCatastral);
-        if (existe) {
-          throw new Error('Ya existe un predio con ese código catastral');
-        }
-      }
-      
-      // Validar porcentaje de propiedad
-      if (datos.porcentajePropiedad !== undefined && 
-          (datos.porcentajePropiedad <= 0 || datos.porcentajePropiedad > 100)) {
-        throw new Error('El porcentaje de propiedad debe estar entre 0 y 100');
-      }
-      
-      const datosCompletos = {
+      // Preparar datos con valores por defecto
+      const datosCompletos: CreatePredioDTO = {
         ...datos,
-        porcentajePropiedad: datos.porcentajePropiedad || 100,
-        estadoPredio: datos.estadoPredio || ESTADO_PREDIO.REGISTRADO,
-        tipoPropiedad: datos.tipoPropiedad || TIPO_PROPIEDAD.CASA_HABITACION,
-        usoPropiedad: datos.usoPropiedad || USO_PROPIEDAD.VIVIENDA,
-        clasificacionPredio: datos.clasificacionPredio || CLASIFICACION_PREDIO.URBANO,
-        condicionPropiedad: datos.condicionPropiedad || CONDICION_PROPIEDAD.PROPIETARIO_UNICO,
-        codUsuario: datos.codUsuario || API_CONFIG.defaultParams.codUsuario,
-        estado: 'ACTIVO',
-        fechaRegistro: new Date().toISOString()
+        anio: datos.anio || new Date().getFullYear(),
+        estadoPredio: datos.estadoPredio || EstadoPredio.TERMINADO,
+        condicionPropiedad: datos.condicionPropiedad || CondicionPropiedad.PROPIETARIO_UNICO,
+        conductor: datos.conductor || ConductorPredio.PRIVADO,
+        codUsuario: datos.codUsuario || API_CONFIG.defaultParams.codUsuario
       };
       
-      return await this.create(datosCompletos);
+      const response = await this.create(datosCompletos);
+      console.log('✅ [PredioService] Predio creado exitosamente');
+      return response;
       
     } catch (error: any) {
       console.error('❌ [PredioService] Error creando predio:', error);
@@ -440,9 +253,9 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
    * Actualiza un predio existente
    * REQUIERE autenticación (método PUT)
    */
-  async actualizarPredio(id: number, datos: UpdatePredioDTO): Promise<PredioData> {
+  async actualizarPredio(codigoPredio: string, datos: UpdatePredioDTO): Promise<Predio> {
     try {
-      console.log('📝 [PredioService] Actualizando predio:', id, datos);
+      console.log('📝 [PredioService] Actualizando predio:', codigoPredio, datos);
       
       // Verificar token
       const token = localStorage.getItem('auth_token');
@@ -450,44 +263,10 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
         throw new Error('Se requiere autenticación para actualizar predios');
       }
       
-      // Obtener predio actual
-      const predioActual = await this.getById(id);
-      if (!predioActual) {
-        throw new Error('Predio no encontrado');
-      }
-      
-      // Validaciones
-      if (datos.areaTerreno !== undefined && datos.areaTerreno <= 0) {
-        throw new Error('El área del terreno debe ser mayor a 0');
-      }
-      
-      if (datos.codigoCatastral && datos.codigoCatastral !== predioActual.codigoCatastral) {
-        const existe = await this.verificarCodigoCatastralExiste(datos.codigoCatastral, id);
-        if (existe) {
-          throw new Error('Ya existe otro predio con ese código catastral');
-        }
-      }
-      
-      if (datos.porcentajePropiedad !== undefined && 
-          (datos.porcentajePropiedad <= 0 || datos.porcentajePropiedad > 100)) {
-        throw new Error('El porcentaje de propiedad debe estar entre 0 y 100');
-      }
-      
-      // Calcular valor total si se actualizan valores
-      let valorTotal = predioActual.valorTotal;
-      if (datos.valorTerreno !== undefined || datos.valorConstruccion !== undefined) {
-        const valorTerreno = datos.valorTerreno ?? predioActual.valorTerreno;
-        const valorConstruccion = datos.valorConstruccion ?? predioActual.valorConstruccion;
-        valorTotal = valorTerreno + valorConstruccion;
-      }
-      
-      const datosCompletos = {
-        ...datos,
-        valorTotal,
-        fechaModificacion: new Date().toISOString()
-      };
-      
-      return await this.update(id, datosCompletos);
+      // El ID para la actualización podría ser el código del predio
+      const response = await this.update(codigoPredio, datos);
+      console.log('✅ [PredioService] Predio actualizado exitosamente');
+      return response;
       
     } catch (error: any) {
       console.error('❌ [PredioService] Error actualizando predio:', error);
@@ -496,35 +275,12 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
   }
   
   /**
-   * Actualiza valores calculados del predio
-   * REQUIERE autenticación (método PUT)
-   */
-  async actualizarValoresCalculados(id: number): Promise<PredioData> {
-    try {
-      console.log('💰 [PredioService] Actualizando valores calculados del predio:', id);
-      
-      // Calcular nuevos valores
-      const valores = await this.calcularValores(id);
-      
-      // Actualizar predio con los nuevos valores
-      return await this.actualizarPredio(id, {
-        valorTerreno: valores.valorTerreno,
-        valorConstruccion: valores.valorConstruccion
-      });
-      
-    } catch (error: any) {
-      console.error('❌ [PredioService] Error actualizando valores:', error);
-      throw error;
-    }
-  }
-  
-  /**
    * Elimina un predio (cambio de estado lógico)
-   * REQUIERE autenticación (método PUT)
+   * REQUIERE autenticación (método PUT o DELETE)
    */
-  async eliminarPredio(id: number): Promise<void> {
+  async eliminarPredio(codigoPredio: string): Promise<void> {
     try {
-      console.log('🗑️ [PredioService] Eliminando predio:', id);
+      console.log('🗑️ [PredioService] Eliminando predio:', codigoPredio);
       
       // Verificar token
       const token = localStorage.getItem('auth_token');
@@ -532,17 +288,9 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
         throw new Error('Se requiere autenticación para eliminar predios');
       }
       
-      // Verificar si tiene pisos activos
-      const pisos = await pisoService.listarPorPredio(id);
-      if (pisos.length > 0) {
-        throw new Error('No se puede eliminar un predio con pisos registrados');
-      }
-      
-      // En lugar de eliminar físicamente, cambiar estado a INACTIVO
-      await this.update(id, {
-        estado: 'INACTIVO',
-        estadoPredio: ESTADO_PREDIO.ANULADO,
-        fechaModificacion: new Date().toISOString()
+      // Cambiar estado a INACTIVO en lugar de eliminar físicamente
+      await this.update(codigoPredio, {
+        estado: 'INACTIVO'
       });
       
       console.log('✅ [PredioService] Predio marcado como inactivo');
@@ -554,32 +302,17 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
   }
   
   /**
-   * Transfiere un predio a otro contribuyente
-   * REQUIERE autenticación (método PUT)
+   * Obtiene predios por contribuyente
+   * NO requiere autenticación (método GET)
    */
-  async transferirPredio(
-    id: number, 
-    nuevoContribuyente: number, 
-    fechaTransferencia?: string
-  ): Promise<PredioData> {
+  async obtenerPrediosPorContribuyente(codContribuyente: number): Promise<Predio[]> {
     try {
-      console.log('🔄 [PredioService] Transfiriendo predio:', 
-        { id, nuevoContribuyente, fechaTransferencia });
+      console.log('🔍 [PredioService] Obteniendo predios del contribuyente:', codContribuyente);
       
-      // Verificar token
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        throw new Error('Se requiere autenticación para transferir predios');
-      }
-      
-      return await this.actualizarPredio(id, {
-        codigoContribuyente: nuevoContribuyente,
-        fechaAdquisicion: fechaTransferencia || new Date().toISOString(),
-        observaciones: `Transferido el ${new Date().toLocaleDateString()}`
-      });
+      return await this.buscarPredios({ codContribuyente });
       
     } catch (error: any) {
-      console.error('❌ [PredioService] Error transfiriendo predio:', error);
+      console.error('❌ [PredioService] Error obteniendo predios por contribuyente:', error);
       throw error;
     }
   }
@@ -588,66 +321,37 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
    * Obtiene estadísticas de predios
    * NO requiere autenticación (método GET)
    */
-  async obtenerEstadisticas(codigoContribuyente?: number): Promise<{
+  async obtenerEstadisticas(): Promise<{
     total: number;
-    activos: number;
-    inactivos: number;
+    porEstado: Record<string, number>;
+    porCondicion: Record<string, number>;
     areaTerrenoTotal: number;
     areaConstruidaTotal: number;
-    valorTerrenoTotal: number;
-    valorConstruccionTotal: number;
-    valorTotal: number;
-    porTipoPropiedad: { [key: string]: number };
-    porUsoPropiedad: { [key: string]: number };
-    porEstadoPredio: { [key: string]: number };
   }> {
     try {
-      let predios: PredioData[];
-      
-      if (codigoContribuyente) {
-        predios = await this.listarPorContribuyente(codigoContribuyente, true);
-      } else {
-        predios = await this.getAll();
-      }
+      const predios = await this.obtenerPredios();
       
       const estadisticas = {
         total: predios.length,
-        activos: predios.filter(p => p.estado === 'ACTIVO').length,
-        inactivos: predios.filter(p => p.estado === 'INACTIVO').length,
+        porEstado: {} as Record<string, number>,
+        porCondicion: {} as Record<string, number>,
         areaTerrenoTotal: 0,
-        areaConstruidaTotal: 0,
-        valorTerrenoTotal: 0,
-        valorConstruccionTotal: 0,
-        valorTotal: 0,
-        porTipoPropiedad: {} as { [key: string]: number },
-        porUsoPropiedad: {} as { [key: string]: number },
-        porEstadoPredio: {} as { [key: string]: number }
+        areaConstruidaTotal: 0
       };
       
-      // Calcular totales y agrupar
-      for (const predio of predios) {
-        // Totales
-        estadisticas.areaTerrenoTotal += predio.areaTerreno;
-        estadisticas.areaConstruidaTotal += predio.areaConstruida || 0;
-        estadisticas.valorTerrenoTotal += predio.valorTerreno || 0;
-        estadisticas.valorConstruccionTotal += predio.valorConstruccion || 0;
-        estadisticas.valorTotal += predio.valorTotal || 0;
+      predios.forEach(predio => {
+        // Por estado
+        const estado = predio.estadoPredio || 'SIN_ESTADO';
+        estadisticas.porEstado[estado] = (estadisticas.porEstado[estado] || 0) + 1;
         
-        // Por tipo de propiedad
-        const tipo = predio.tipoPropiedad || 'SIN TIPO';
-        estadisticas.porTipoPropiedad[tipo] = 
-          (estadisticas.porTipoPropiedad[tipo] || 0) + 1;
+        // Por condición
+        const condicion = predio.condicionPropiedad || 'SIN_CONDICION';
+        estadisticas.porCondicion[condicion] = (estadisticas.porCondicion[condicion] || 0) + 1;
         
-        // Por uso de propiedad
-        const uso = predio.usoPropiedad || 'SIN USO';
-        estadisticas.porUsoPropiedad[uso] = 
-          (estadisticas.porUsoPropiedad[uso] || 0) + 1;
-        
-        // Por estado del predio
-        const estado = predio.estadoPredio || 'SIN ESTADO';
-        estadisticas.porEstadoPredio[estado] = 
-          (estadisticas.porEstadoPredio[estado] || 0) + 1;
-      }
+        // Áreas
+        estadisticas.areaTerrenoTotal += predio.areaTerreno || 0;
+        estadisticas.areaConstruidaTotal += predio.totalAreaConstruccion || 0;
+      });
       
       return estadisticas;
       
@@ -658,8 +362,5 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
   }
 }
 
-// Exportar instancia singleton
+// Exportar instancia única del servicio
 export const predioService = PredioService.getInstance();
-
-// Exportar también la clase por si se necesita extender
-export default PredioService;

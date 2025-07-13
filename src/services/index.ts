@@ -15,9 +15,10 @@ export type { ApiStatus, ConnectivityConfig } from './connectivityService';
 export { default as barrioService } from './barrioService';
 export { default as sectorService } from './sectorService'; 
 export { default as calleService } from './calleApiService';
+export { default as tipoViaService } from './viaService';
+export { default as direccionService, DireccionService } from './direccionService'; // EXPORTAR AMBOS
 export { personaService } from './personaService';
 export { contribuyenteService } from './contribuyenteService';
-export { direccionService } from './direccionService';
 export { pisoService } from './pisoService';
 export { predioService } from './predioService';
 export { arancelService } from './arancelService';
@@ -53,7 +54,8 @@ export type {
 export type {
   DireccionData,
   CreateDireccionDTO,
-  UpdateDireccionDTO
+  UpdateDireccionDTO,
+  BusquedaDireccionParams
 } from './direccionService';
 
 export type {
@@ -70,3 +72,31 @@ export type {
   SubcategoriaValorUnitario,
   LetraValorUnitario
 } from './valorUnitarioService';
+
+// Nuevos tipos exportados
+export type {
+  BarrioData,
+  CreateBarrioDTO,
+  UpdateBarrioDTO,
+  BusquedaBarrioParams
+} from './barrioService';
+
+export type {
+  SectorData,
+  CreateSectorDTO,
+  UpdateSectorDTO,
+  BusquedaSectorParams
+} from './sectorService';
+
+export type {
+  CalleData,
+  CreateCalleDTO,
+  UpdateCalleDTO,
+  BusquedaCalleParams
+} from './calleApiService';
+
+export type {
+  TipoViaData,
+  CreateTipoViaDTO,
+  UpdateTipoViaDTO
+} from './viaService';

@@ -1,86 +1,128 @@
-// src/components/direcciones/DireccionListMUI.tsx
+// src/components/direcciones/DireccionList.tsx
 import React, { useState, useMemo } from 'react';
 import {
+  Box,
   Paper,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
-  TableRow,
   TablePagination,
+  TableRow,
+  TableSortLabel,
   IconButton,
   Chip,
-  Box,
-  Typography,
   TextField,
   InputAdornment,
-  Tooltip,
-  TableSortLabel,
-  Skeleton,
   Stack,
-  Button,
-  useTheme,
-  alpha
+  Typography,
+  Tooltip,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  CircularProgress,
+  Alert
 } from '@mui/material';
 import {
   Search as SearchIcon,
-  LocationOn as LocationIcon,
   Visibility as VisibilityIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  MoreVert as MoreVertIcon,
+  LocationOn as LocationIcon,
   FilterList as FilterIcon,
-  Business as BusinessIcon,
-  Home as HomeIcon
+  CheckCircle as ActiveIcon,
+  Cancel as InactiveIcon
 } from '@mui/icons-material';
+import { DireccionData } from '../../services/direccionService';
 
-interface DireccionListMUIProps {
-  direcciones: any[];
-  direccionSeleccionada: any | null;
-  onSelectDireccion: (direccion: any) => void;
+interface DireccionListProps {
+  direcciones: DireccionData[];
+  direccionSeleccionada?: DireccionData | null;
+  onSelectDireccion: (direccion: DireccionData) => void;
+  onEditDireccion?: (direccion: DireccionData) => void;
+  onDeleteDireccion?: (id: number) => void;
   loading?: boolean;
+  onSearch?: (searchTerm: string) => void;
+  searchTerm?: string;
 }
 
 type Order = 'asc' | 'desc';
 
-const DireccionListMUI: React.FC<DireccionListMUIProps> = ({
-  direcciones,
+interface HeadCell {
+  id: keyof DireccionData | 'actions';
+  label: string;
+  numeric: boolean;
+  width?: string;
+}
+
+const headCells: HeadCell[] = [
+  { id: 'codigo', label: 'Código', numeric: true, width: '8%' },
+  { id: 'nombreSector', label: 'Sector', numeric: false, width: '15%' },
+  { id: 'nombreBarrio', label: 'Barrio', numeric: false, width: '15%' },
+  { id: 'nombreCalle', label: 'Calle/Mz', numeric: false, width: '20%' },
+  { id: 'cuadra', label: 'Cuadra', numeric: false, width: '8%' },
+  { id: 'lado', label: 'Lado', numeric: false, width: '10%' },
+  { id: 'loteInicial', label: 'Lote Inicial', numeric: true, width: '8%' },
+  { id: 'loteFinal', label: 'Lote Final', numeric: true, width: '8%' },
+  { id: 'estado', label: 'Estado', numeric: false, width: '8%' },
+  { id: 'actions', label: 'Acciones', numeric: false, width: '10%' }
+];
+
+const DireccionListMUI: React.FC<DireccionListProps> = ({
+  direcciones = [],
   direccionSeleccionada,
   onSelectDireccion,
-  loading = false
+  onEditDireccion,
+  onDeleteDireccion,
+  loading = false,
+  onSearch,
+  searchTerm = ''
 }) => {
-  const theme = useTheme();
+  const [order, setOrder] = useState<Order>('asc');
+  const [orderBy, setOrderBy] = useState<keyof DireccionData>('codigo');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [order, setOrder] = useState<Order>('asc');
-  const [orderBy, setOrderBy] = useState<string>('nombreVia');
+  const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [selectedDireccion, setSelectedDireccion] = useState<DireccionData | null>(null);
 
   // Filtrar direcciones localmente
   const filteredDirecciones = useMemo(() => {
-    return direcciones.filter(dir => {
-      const search = searchTerm.toLowerCase();
-      return (
-        dir.nombreSector?.toLowerCase().includes(search) ||
-        dir.nombreBarrio?.toLowerCase().includes(search) ||
-        dir.nombreVia?.toLowerCase().includes(search) ||
-        dir.nombreTipoVia?.toLowerCase().includes(search) ||
-        dir.cuadra?.toString().includes(search)
-      );
-    });
-  }, [direcciones, searchTerm]);
+    if (!localSearchTerm) return direcciones;
+    
+    const searchLower = localSearchTerm.toLowerCase();
+    return direcciones.filter(direccion => 
+      direccion.direccionCompleta?.toLowerCase().includes(searchLower) ||
+      direccion.nombreSector?.toLowerCase().includes(searchLower) ||
+      direccion.nombreBarrio?.toLowerCase().includes(searchLower) ||
+      direccion.nombreCalle?.toLowerCase().includes(searchLower) ||
+      direccion.codigo.toString().includes(searchLower)
+    );
+  }, [direcciones, localSearchTerm]);
 
   // Ordenar direcciones
   const sortedDirecciones = useMemo(() => {
-    const comparator = (a: any, b: any) => {
-      let aValue = a[orderBy] || '';
-      let bValue = b[orderBy] || '';
+    const comparator = (a: DireccionData, b: DireccionData) => {
+      const aValue = a[orderBy];
+      const bValue = b[orderBy];
       
-      if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-      if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+      if (!aValue && !bValue) return 0;
+      if (!aValue) return order === 'asc' ? 1 : -1;
+      if (!bValue) return order === 'asc' ? -1 : 1;
       
-      if (order === 'desc') {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return order === 'asc' 
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
       }
-      return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      
+      if (order === 'asc') {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      }
+      return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
     };
     
     return [...filteredDirecciones].sort(comparator);
@@ -92,7 +134,7 @@ const DireccionListMUI: React.FC<DireccionListMUIProps> = ({
     page * rowsPerPage + rowsPerPage
   );
 
-  const handleRequestSort = (property: string) => {
+  const handleRequestSort = (property: keyof DireccionData) => {
     const isAsc = orderBy === property && order === 'asc';
     setOrder(isAsc ? 'desc' : 'asc');
     setOrderBy(property);
@@ -107,33 +149,80 @@ const DireccionListMUI: React.FC<DireccionListMUIProps> = ({
     setPage(0);
   };
 
-  // Columnas de la tabla
-  const columns = [
-    { id: 'codDireccion', label: 'Código', width: '10%' },
-    { id: 'nombreSector', label: 'Sector', width: '15%' },
-    { id: 'nombreBarrio', label: 'Barrio', width: '15%' },
-    { id: 'nombreTipoVia', label: 'Tipo Vía', width: '12%' },
-    { id: 'nombreVia', label: 'Nombre Vía', width: '20%' },
-    { id: 'cuadra', label: 'Cuadra', width: '10%', align: 'center' as const },
-    { id: 'lotes', label: 'Lotes', width: '10%', align: 'center' as const },
-    { id: 'actions', label: 'Acciones', width: '8%', align: 'center' as const }
-  ];
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setLocalSearchTerm(value);
+    
+    if (onSearch) {
+      // Debounce search
+      const timeoutId = setTimeout(() => {
+        onSearch(value);
+      }, 300);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  };
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, direccion: DireccionData) => {
+    setAnchorEl(event.currentTarget);
+    setSelectedDireccion(direccion);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    setSelectedDireccion(null);
+  };
+
+  const handleView = () => {
+    if (selectedDireccion) {
+      onSelectDireccion(selectedDireccion);
+    }
+    handleMenuClose();
+  };
+
+  const handleEdit = () => {
+    if (selectedDireccion && onEditDireccion) {
+      onEditDireccion(selectedDireccion);
+    }
+    handleMenuClose();
+  };
+
+  const handleDelete = () => {
+    if (selectedDireccion && onDeleteDireccion) {
+      onDeleteDireccion(selectedDireccion.codigo);
+    }
+    handleMenuClose();
+  };
+
+  const getLadoChip = (lado: string) => {
+    const ladoMap: Record<string, { label: string; color: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' }> = {
+      'Ninguno': { label: 'Ninguno', color: 'default' },
+      'Izquierdo': { label: 'Izq.', color: 'primary' },
+      'Derecho': { label: 'Der.', color: 'secondary' },
+      'Par': { label: 'Par', color: 'info' },
+      'Impar': { label: 'Impar', color: 'warning' }
+    };
+    
+    const config = ladoMap[lado] || { label: lado, color: 'default' };
+    return <Chip label={config.label} size="small" color={config.color} />;
+  };
 
   return (
     <Paper elevation={3}>
-      {/* Header */}
+      {/* Header con búsqueda */}
       <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6" component="h3">
+          <Typography variant="h6" component="h3" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <LocationIcon color="primary" />
             Lista de Direcciones
+            <Chip label={filteredDirecciones.length} size="small" color="primary" />
           </Typography>
           
-          {/* Búsqueda local */}
           <TextField
             size="small"
-            placeholder="Filtrar resultados..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar por dirección..."
+            value={localSearchTerm}
+            onChange={handleSearchChange}
             sx={{ width: 300 }}
             InputProps={{
               startAdornment: (
@@ -151,142 +240,111 @@ const DireccionListMUI: React.FC<DireccionListMUIProps> = ({
         <Table stickyHeader size="medium">
           <TableHead>
             <TableRow>
-              {columns.map((column) => (
+              {headCells.map((headCell) => (
                 <TableCell
-                  key={column.id}
-                  align={column.align}
-                  style={{ width: column.width }}
+                  key={headCell.id}
+                  align={headCell.numeric ? 'right' : 'left'}
+                  style={{ width: headCell.width }}
                   sx={{ 
                     bgcolor: 'grey.100',
                     fontWeight: 'bold'
                   }}
                 >
-                  {column.id !== 'actions' && column.id !== 'lotes' ? (
+                  {headCell.id !== 'actions' ? (
                     <TableSortLabel
-                      active={orderBy === column.id}
-                      direction={orderBy === column.id ? order : 'asc'}
-                      onClick={() => handleRequestSort(column.id)}
+                      active={orderBy === headCell.id}
+                      direction={orderBy === headCell.id ? order : 'asc'}
+                      onClick={() => handleRequestSort(headCell.id as keyof DireccionData)}
                     >
-                      {column.label}
+                      {headCell.label}
                     </TableSortLabel>
                   ) : (
-                    column.label
+                    headCell.label
                   )}
                 </TableCell>
               ))}
             </TableRow>
           </TableHead>
-          
           <TableBody>
             {loading ? (
-              // Skeletons de carga
-              [...Array(5)].map((_, index) => (
-                <TableRow key={`skeleton-${index}`}>
-                  {columns.map((column) => (
-                    <TableCell key={column.id} align={column.align}>
-                      <Skeleton variant="text" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : paginatedDirecciones.length === 0 ? (
-              // Estado vacío
               <TableRow>
-                <TableCell colSpan={columns.length} align="center">
-                  <Box sx={{ py: 8 }}>
-                    <LocationIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-                    <Typography variant="h6" color="text.secondary">
-                      No se encontraron direcciones
-                    </Typography>
+                <TableCell colSpan={headCells.length} align="center" sx={{ py: 3 }}>
+                  <CircularProgress />
+                  <Typography variant="body2" sx={{ mt: 2 }}>
+                    Cargando direcciones...
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : paginatedDirecciones.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={headCells.length} align="center" sx={{ py: 3 }}>
+                  <LocationIcon sx={{ fontSize: 48, color: 'grey.400' }} />
+                  <Typography variant="body1" color="text.secondary">
+                    No hay direcciones registradas
+                  </Typography>
+                  {localSearchTerm && (
                     <Typography variant="body2" color="text.secondary">
-                      {searchTerm ? 'Intente con otros términos de búsqueda' : 'No hay direcciones registradas'}
+                      No se encontraron resultados para "{localSearchTerm}"
                     </Typography>
-                  </Box>
+                  )}
                 </TableCell>
               </TableRow>
             ) : (
-              // Filas de datos
               paginatedDirecciones.map((direccion) => {
-                const isSelected = direccionSeleccionada?.codDireccion === direccion.codDireccion;
+                const isSelected = direccionSeleccionada?.codigo === direccion.codigo;
                 
                 return (
                   <TableRow
-                    key={direccion.codDireccion}
+                    key={direccion.codigo}
                     hover
                     selected={isSelected}
-                    sx={{
+                    sx={{ 
                       cursor: 'pointer',
-                      bgcolor: isSelected ? alpha(theme.palette.primary.main, 0.08) : 'inherit',
-                      '&:hover': {
-                        bgcolor: isSelected 
-                          ? alpha(theme.palette.primary.main, 0.12) 
-                          : alpha(theme.palette.action.hover, 0.04)
-                      }
+                      bgcolor: isSelected ? 'action.selected' : 'inherit'
                     }}
+                    onClick={() => onSelectDireccion(direccion)}
                   >
-                    <TableCell>
-                      <Typography variant="body2" fontWeight={isSelected ? 'bold' : 'normal'}>
-                        {direccion.codDireccion}
-                      </Typography>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Stack direction="row" alignItems="center" spacing={0.5}>
-                        <BusinessIcon fontSize="small" color="action" />
-                        <Typography variant="body2">
-                          {direccion.nombreSector}
-                        </Typography>
-                      </Stack>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Stack direction="row" alignItems="center" spacing={0.5}>
-                        <HomeIcon fontSize="small" color="action" />
-                        <Typography variant="body2">
-                          {direccion.nombreBarrio}
-                        </Typography>
-                      </Stack>
-                    </TableCell>
-                    
+                    <TableCell align="right">{direccion.codigo}</TableCell>
+                    <TableCell>{direccion.nombreSector || '-'}</TableCell>
+                    <TableCell>{direccion.nombreBarrio || '-'}</TableCell>
+                    <TableCell>{direccion.nombreCalle || '-'}</TableCell>
+                    <TableCell>{direccion.cuadra || '-'}</TableCell>
+                    <TableCell>{getLadoChip(direccion.lado || 'Ninguno')}</TableCell>
+                    <TableCell align="right">{direccion.loteInicial || 0}</TableCell>
+                    <TableCell align="right">{direccion.loteFinal || 0}</TableCell>
                     <TableCell>
                       <Chip
-                        label={direccion.nombreTipoVia}
+                        icon={direccion.estado === 'ACTIVO' ? <ActiveIcon /> : <InactiveIcon />}
+                        label={direccion.estado}
                         size="small"
-                        variant="outlined"
-                        color="primary"
+                        color={direccion.estado === 'ACTIVO' ? 'success' : 'error'}
                       />
                     </TableCell>
-                    
                     <TableCell>
-                      <Typography variant="body2" fontWeight="medium">
-                        {direccion.nombreVia}
-                      </Typography>
-                    </TableCell>
-                    
-                    <TableCell align="center">
-                      <Chip
-                        label={direccion.cuadra}
-                        size="small"
-                        color="secondary"
-                      />
-                    </TableCell>
-                    
-                    <TableCell align="center">
-                      <Typography variant="body2">
-                        {direccion.loteInicial} - {direccion.loteFinal}
-                      </Typography>
-                    </TableCell>
-                    
-                    <TableCell align="center">
-                      <Tooltip title={isSelected ? "Dirección seleccionada" : "Seleccionar dirección"}>
+                      <Stack direction="row" spacing={1}>
+                        <Tooltip title="Ver detalles">
+                          <IconButton
+                            size="small"
+                            color={isSelected ? "primary" : "default"}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectDireccion(direccion);
+                            }}
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        
                         <IconButton
                           size="small"
-                          color={isSelected ? "primary" : "default"}
-                          onClick={() => onSelectDireccion(direccion)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMenuOpen(e, direccion);
+                          }}
                         >
-                          {isSelected ? <LocationIcon /> : <VisibilityIcon />}
+                          <MoreVertIcon fontSize="small" />
                         </IconButton>
-                      </Tooltip>
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 );
@@ -311,16 +369,48 @@ const DireccionListMUI: React.FC<DireccionListMUIProps> = ({
         }
       />
 
-      {/* Resumen */}
+      {/* Menú contextual */}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+      >
+        <MenuItem onClick={handleView}>
+          <ListItemIcon>
+            <VisibilityIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Ver detalles</ListItemText>
+        </MenuItem>
+        
+        {onEditDireccion && (
+          <MenuItem onClick={handleEdit}>
+            <ListItemIcon>
+              <EditIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Editar</ListItemText>
+          </MenuItem>
+        )}
+        
+        {onDeleteDireccion && (
+          <MenuItem onClick={handleDelete}>
+            <ListItemIcon>
+              <DeleteIcon fontSize="small" color="error" />
+            </ListItemIcon>
+            <ListItemText>Eliminar</ListItemText>
+          </MenuItem>
+        )}
+      </Menu>
+
+      {/* Resumen en el footer */}
       <Box sx={{ p: 2, bgcolor: 'grey.50', borderTop: 1, borderColor: 'divider' }}>
-        <Stack direction="row" spacing={2}>
+        <Stack direction="row" spacing={2} alignItems="center">
           <Chip
             icon={<LocationIcon />}
             label={`Total: ${direcciones.length} direcciones`}
             size="small"
             color="primary"
           />
-          {searchTerm && (
+          {localSearchTerm && (
             <Chip
               icon={<FilterIcon />}
               label={`Filtradas: ${filteredDirecciones.length}`}
@@ -328,6 +418,12 @@ const DireccionListMUI: React.FC<DireccionListMUIProps> = ({
               color="secondary"
             />
           )}
+          <Chip
+            icon={<ActiveIcon />}
+            label={`Activas: ${direcciones.filter(d => d.estado === 'ACTIVO').length}`}
+            size="small"
+            color="success"
+          />
         </Stack>
       </Box>
     </Paper>

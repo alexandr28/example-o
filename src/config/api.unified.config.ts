@@ -1,19 +1,17 @@
-// src/config/api.unified.config.ts - ESTRUCTURA CORREGIDA
+// src/config/api.unified.config.ts - VERSIÓN COMPLETA CORREGIDA
 
 // ========================================
 // IMPORTACIONES Y CONFIGURACIÓN INICIAL
 // ========================================
 
 // Detectar si estamos en desarrollo
-const isDevelopment = import.meta.env.DEV;
+//const isDevelopment = import.meta.env.DEV;
 
-// URL base - usar rutas relativas en desarrollo para evitar CORS
-export const API_BASE_URL = isDevelopment 
-  ? '' // Vacío para usar el proxy de Vite
-  : (import.meta.env.VITE_API_URL || 'http://192.168.20.160:8080');
+// IMPORTANTE: Usar siempre la URL completa del backend
+export const API_BASE_URL = 'http://192.168.20.160:8080';
 
 // ========================================
-// TIPOS E INTERFACES (deben ir antes de usarlos)
+// TIPOS E INTERFACES
 // ========================================
 
 type SimpleEndpoint = string;
@@ -48,7 +46,7 @@ interface EndpointsConfig {
 }
 
 // ========================================
-// CONFIGURACIÓN PRINCIPAL (exportada)
+// CONFIGURACIÓN PRINCIPAL - DEBE ESTAR EXPORTADA
 // ========================================
 
 export const API_CONFIG = {
@@ -70,7 +68,7 @@ export const API_CONFIG = {
     },
     barrio: '/api/barrio',
     sector: '/api/sector',
-    via: '/api/via',
+    via: '/api/via/listarVia',
     calle: '/api/calle',
     direccion: {
       base: '/api/direccion',
@@ -111,7 +109,7 @@ export const API_CONFIG = {
 };
 
 // ========================================
-// CONSTANTES ADICIONALES (exportadas)
+// CONSTANTES ADICIONALES
 // ========================================
 
 export const API_CONSTANTS = {
@@ -151,30 +149,25 @@ export const API_CONSTANTS = {
 };
 
 // ========================================
-// FUNCIONES PRINCIPALES (exportadas directamente)
+// FUNCIONES PRINCIPALES
 // ========================================
 
 /**
  * Función unificada para construir URLs
+ * SIEMPRE usa la URL completa
  */
 export const buildApiUrl = (endpoint: string, params?: Record<string, any>): string => {
+  // Si ya es una URL completa, devolverla tal cual
   if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
     return endpoint;
   }
   
-  if (isDevelopment) {
-    let url = endpoint;
-    if (params && Object.keys(params).length > 0) {
-      const queryString = new URLSearchParams(params).toString();
-      url += `?${queryString}`;
-    }
-    return url;
-  }
-  
+  // SIEMPRE construir la URL completa con el host
   const baseURL = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   let url = `${baseURL}${cleanEndpoint}`;
   
+  // Agregar parámetros si existen
   if (params && Object.keys(params).length > 0) {
     const queryString = new URLSearchParams(params).toString();
     url += `?${queryString}`;
@@ -206,110 +199,84 @@ export const getApiHeaders = (includeAuth: boolean = false): Record<string, stri
 };
 
 /**
+ * Helper para obtener el token de autenticación
+ */
+export const getAuthToken = (): string | null => {
+  const token = 
+    localStorage.getItem('auth_token') || 
+    localStorage.getItem('authToken') ||
+    sessionStorage.getItem('auth_token') ||
+    sessionStorage.getItem('authToken');
+  
+  return token;
+};
+
+/**
  * Helper para obtener endpoint
  */
 export function getEndpoint<K extends keyof EndpointsConfig>(
   module: K,
   subEndpoint?: string
 ): string {
-  const moduleEndpoint = API_CONFIG.endpoints[module];
+  const endpoint = API_CONFIG.endpoints[module];
   
-  if (!moduleEndpoint) {
-    return '';
+  if (typeof endpoint === 'string') {
+    return endpoint;
   }
   
-  if (typeof moduleEndpoint === 'string') {
-    return moduleEndpoint;
+  if (typeof endpoint === 'object' && endpoint !== null) {
+    if (subEndpoint && subEndpoint in endpoint) {
+      return endpoint[subEndpoint];
+    }
+    return endpoint.base || '';
   }
   
-  if (module === 'auth' && subEndpoint) {
-    const authEndpoint = moduleEndpoint as AuthEndpoint;
-    return authEndpoint[subEndpoint as keyof AuthEndpoint] || '';
-  }
-  
-  const complexEndpoint = moduleEndpoint as ComplexEndpoint;
-  if (subEndpoint) {
-    return complexEndpoint[subEndpoint] || complexEndpoint.base || '';
-  }
-  
-  return complexEndpoint.base || '';
+  throw new Error(`Endpoint no encontrado: ${String(module)}`);
 }
 
 /**
- * Helpers de autenticación
- */
-export const getAuthToken = (): string | null => {
-  return localStorage.getItem('auth_token') || 
-         localStorage.getItem('authToken') ||
-         sessionStorage.getItem('auth_token') ||
-         sessionStorage.getItem('authToken');
-};
-
-export const setAuthToken = (token: string): void => {
-  localStorage.setItem('auth_token', token);
-  sessionStorage.setItem('auth_token', token);
-  console.log('🔐 Token de autenticación guardado');
-};
-
-export const clearAuthToken = (): void => {
-  localStorage.removeItem('auth_token');
-  localStorage.removeItem('authToken');
-  sessionStorage.removeItem('auth_token');
-  sessionStorage.removeItem('authToken');
-  console.log('🔓 Token de autenticación eliminado');
-};
-
-export const requiresAuth = (method: string): boolean => {
-  return true; // Todos los métodos requieren autenticación
-};
-
-/**
- * Helper para obtener mensaje de error
- */
-export const getErrorMessage = (statusCode: number): string => {
-  switch (statusCode) {
-    case 401:
-      return API_CONSTANTS.ERROR_MESSAGES.UNAUTHORIZED;
-    case 403:
-      return API_CONSTANTS.ERROR_MESSAGES.FORBIDDEN;
-    case 404:
-      return API_CONSTANTS.ERROR_MESSAGES.NOT_FOUND;
-    case 408:
-      return API_CONSTANTS.ERROR_MESSAGES.TIMEOUT;
-    case 500:
-    case 502:
-    case 503:
-      return API_CONSTANTS.ERROR_MESSAGES.SERVER_ERROR;
-    default:
-      return API_CONSTANTS.ERROR_MESSAGES.UNKNOWN;
-  }
-};
-
-/**
- * Helper para obtener endpoints de health check
+ * Función para obtener los endpoints de health check
  */
 export const getHealthCheckEndpoints = (): string[] => {
   return [
     API_CONFIG.endpoints.sector,
     API_CONFIG.endpoints.barrio,
-    API_CONFIG.endpoints.via,
-    API_CONFIG.endpoints.calle,
     API_CONFIG.endpoints.contribuyente,
-    API_CONFIG.endpoints.arancel,
-    API_CONFIG.endpoints.valorUnitario,
-    API_CONFIG.endpoints.uit,
-    API_CONFIG.endpoints.alcabala,
-    API_CONFIG.endpoints.depreciacion,
-    API_CONFIG.endpoints.predio,
-    API_CONFIG.endpoints.piso
+    API_CONFIG.endpoints.predio
   ];
 };
 
-// ========================================
-// EXPORTACIÓN DE TIPOS
-// ========================================
+/**
+ * Función para obtener mensaje de error basado en el código de estado
+ */
+export const getErrorMessage = (statusCode: number): string => {
+  const messages = API_CONSTANTS.ERROR_MESSAGES;
+  
+  switch (statusCode) {
+    case 400:
+      return 'Solicitud incorrecta. Verifique los datos enviados.';
+    case 401:
+      return messages.UNAUTHORIZED;
+    case 403:
+      return messages.FORBIDDEN;
+    case 404:
+      return messages.NOT_FOUND;
+    case 408:
+      return messages.TIMEOUT;
+    case 500:
+    case 502:
+    case 503:
+      return messages.SERVER_ERROR;
+    default:
+      return messages.UNKNOWN;
+  }
+};
 
-export type ApiEndpoint = keyof EndpointsConfig;
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD';
-export type AuthEndpointKey = keyof AuthEndpoint;
-export type { EndpointsConfig, SimpleEndpoint, ComplexEndpoint, AuthEndpoint };
+/**
+ * Función para determinar si un método requiere autenticación
+ */
+export const requiresAuth = (method: string): boolean => {
+  // Por defecto, GET no requiere auth, otros métodos sí
+  const methodUpper = method.toUpperCase();
+  return methodUpper !== 'GET';
+};

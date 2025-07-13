@@ -18,6 +18,7 @@ export enum TipoPredio {
  * Enumeración para la condición de propiedad
  */
 export enum CondicionPropiedad {
+  PROPIETARIO_UNICO = 'PROPIETARIO UNICO',
   PROPIETARIO = 'PROPIETARIO',
   POSEEDOR = 'POSEEDOR',
   ARRENDATARIO = 'ARRENDATARIO',
@@ -29,6 +30,7 @@ export enum CondicionPropiedad {
  * Enumeración para el conductor del predio
  */
 export enum ConductorPredio {
+  PRIVADO = 'PRIVADO',
   PROPIETARIO = 'PROPIETARIO',
   INQUILINO = 'INQUILINO',
   FAMILIAR = 'FAMILIAR',
@@ -49,71 +51,109 @@ export enum UsoPredio {
 }
 
 /**
- * Interfaz para la entidad Predio
+ * Enumeración para el estado del predio
+ */
+export enum EstadoPredio {
+  TERMINADO = 'TERMINADO',
+  EN_CONSTRUCCION = 'EN_CONSTRUCCION',
+  EN_PROCESO = 'EN_PROCESO',
+  REGISTRADO = 'REGISTRADO',
+  OBSERVADO = 'OBSERVADO',
+  ANULADO = 'ANULADO'
+}
+
+/**
+ * Interfaz para la respuesta de la API de Predio
+ */
+export interface PredioApiResponse {
+  anio: number | null;
+  codPredio: string;
+  numeroFinca: string | null;
+  otroNumero: string | null;
+  codClasificacion: number | null;
+  estPredio: string | null;
+  codTipoPredio: number | null;
+  codCondicionPropiedad: number | null;
+  codDireccion: number | null;
+  codUsoPredio: number | null;
+  fechaAdquisicion: string | null;
+  numeroCondominos: number | null;
+  codListaConductor: number | null;
+  codUbicacionAreaVerde: number | null;
+  areaTerreno: number;
+  numeroPisos: number | null;
+  totalAreaConstruccion: number | null;
+  valorTotalConstruccion: number | null;
+  valorTerreno: number | null;
+  autoavaluo: number | null;
+  codEstado: number | null;
+  codUsuario: number | null;
+  direccion: string;
+  conductor: string;
+  estadoPredio: string;
+  condicionPropiedad: string;
+}
+
+/**
+ * Interfaz para la entidad Predio (modelo interno)
  */
 export interface Predio {
   id?: number;
   codigoPredio: string;
   
   // Relación con contribuyente
-  contribuyenteId: number;
+  contribuyenteId?: number;
   contribuyente?: Contribuyente;
   
   // Datos de adquisición
-  anioAdquisicion: number;
-  fechaAdquisicion: Date | string;
+  anio?: number | null;
+  fechaAdquisicion?: Date | string | null;
   condicionPropiedad: CondicionPropiedad | string;
   
   // Ubicación
-  direccionId: number;
+  direccionId?: number | null;
   direccion?: Direccion | string; // Puede ser objeto Direccion o string de dirección completa
-  nFinca?: string;
-  numeroFinca?: string; // Alias del API
-  otroNumero?: string;
+  numeroFinca?: string | null;
+  otroNumero?: string | null;
   
   // Características del predio
-  tipoPredio: TipoPredio | string;
+  tipoPredio?: TipoPredio | string | null;
   conductor: ConductorPredio | string;
-  usoPredio: UsoPredio | string;
-  estadoPredio?: string; // Nuevo campo del API
+  usoPredio?: UsoPredio | string | null;
+  estadoPredio?: EstadoPredio | string;
   
   // Medidas y valores
   areaTerreno: number;
-  valorArancel: number;
-  valorTerreno: number;
-  valorConstruccion: number;
-  otrasInstalaciones: number;
-  autoavalo: number;
-  totalAreaConstruccion?: number; // Nuevo campo del API
+  valorTerreno?: number | null;
+  valorConstruccion?: number | null;
+  valorTotal?: number | null;
+  totalAreaConstruccion?: number | null;
+  valorTotalConstruccion?: number | null;
+  autoavaluo?: number | null;
   
   // Datos adicionales
-  numeroPisos?: number;
-  numeroCondominos?: number;
+  numeroPisos?: number | null;
+  numeroCondominos?: number | null;
   
-  // Imágenes
-  rutaFotografiaPredio?: string;
-  rutaPlanoPredio?: string;
+  // Códigos de la API
+  codPredio?: string;
+  codClasificacion?: number | null;
+  estPredio?: string | null;
+  codTipoPredio?: number | null;
+  codCondicionPropiedad?: number | null;
+  codDireccion?: number | null;
+  codUsoPredio?: number | null;
+  codListaConductor?: number | null;
+  codUbicacionAreaVerde?: number | null;
+  codEstado?: number | null;
+  codUsuario?: number | null;
   
   // Auditoría
-  estado?: boolean;
+  estado?: string | boolean;
   fechaCreacion?: Date;
   fechaModificacion?: Date;
   usuarioCreacion?: string;
   usuarioModificacion?: string;
-  
-  // Campos adicionales del API
-  anio?: number;
-  codClasificacion?: number;
-  estPredio?: string;
-  codTipoPredio?: number;
-  codCondicionPropiedad?: number;
-  codDireccion?: number;
-  codUsoPredio?: number;
-  codListaConductor?: number;
-  codUbicacionAreaVerde?: number;
-  valorTotalConstruccion?: number;
-  codEstado?: number;
-  codUsuario?: number;
 }
 
 /**
@@ -121,29 +161,30 @@ export interface Predio {
  */
 export interface PredioFormData {
   // Datos básicos
-  anioAdquisicion: number;
-  fechaAdquisicion: Date | string;
-  condicionPropiedad: CondicionPropiedad;
+  anio?: number;
+  fechaAdquisicion?: Date | string | null;
+  condicionPropiedad: string;
   
   // Ubicación
-  direccionId: number;
-  nFinca?: string;
+  direccionId?: number;
+  direccion?: string;
+  numeroFinca?: string;
   otroNumero?: string;
   
   // Características
-  tipoPredio: TipoPredio;
-  conductor: ConductorPredio;
-  usoPredio: UsoPredio;
+  tipoPredio?: string;
+  conductor: string;
+  usoPredio?: string;
+  estadoPredio?: string;
   
   // Valores
   areaTerreno: number;
-  valorArancel: number;
+  valorTerreno?: number;
+  totalAreaConstruccion?: number;
+  valorTotalConstruccion?: number;
+  autoavaluo?: number;
   numeroPisos?: number;
   numeroCondominos?: number;
-  
-  // Imágenes
-  rutaFotografiaPredio?: string;
-  rutaPlanoPredio?: string;
 }
 
 /**
@@ -152,9 +193,49 @@ export interface PredioFormData {
 export interface FiltroPredio {
   codigoPredio?: string;
   contribuyenteId?: number;
-  tipoPredio?: TipoPredio;
-  usoPredio?: UsoPredio;
+  tipoPredio?: TipoPredio | string;
+  usoPredio?: UsoPredio | string;
   direccionId?: number;
   fechaDesde?: Date;
   fechaHasta?: Date;
+  anio?: number;
 }
+
+/**
+ * Función para mapear la respuesta de la API al modelo interno
+ */
+export const mapPredioApiToModel = (apiData: PredioApiResponse): Predio => {
+  return {
+    codigoPredio: apiData.codPredio?.trim() || '',
+    anio: apiData.anio,
+    fechaAdquisicion: apiData.fechaAdquisicion,
+    condicionPropiedad: apiData.condicionPropiedad || CondicionPropiedad.PROPIETARIO_UNICO,
+    direccion: apiData.direccion,
+    direccionId: apiData.codDireccion,
+    numeroFinca: apiData.numeroFinca,
+    otroNumero: apiData.otroNumero,
+    conductor: apiData.conductor || ConductorPredio.PRIVADO,
+    estadoPredio: apiData.estadoPredio || EstadoPredio.TERMINADO,
+    areaTerreno: apiData.areaTerreno || 0,
+    numeroPisos: apiData.numeroPisos,
+    totalAreaConstruccion: apiData.totalAreaConstruccion,
+    valorTotalConstruccion: apiData.valorTotalConstruccion,
+    valorTerreno: apiData.valorTerreno,
+    autoavaluo: apiData.autoavaluo,
+    
+    // Códigos originales de la API
+    codPredio: apiData.codPredio,
+    codClasificacion: apiData.codClasificacion,
+    estPredio: apiData.estPredio,
+    codTipoPredio: apiData.codTipoPredio,
+    codCondicionPropiedad: apiData.codCondicionPropiedad,
+    codDireccion: apiData.codDireccion,
+    codUsoPredio: apiData.codUsoPredio,
+    codListaConductor: apiData.codListaConductor,
+    codUbicacionAreaVerde: apiData.codUbicacionAreaVerde,
+    codEstado: apiData.codEstado,
+    codUsuario: apiData.codUsuario,
+    
+    numeroCondominos: apiData.numeroCondominos,
+  };
+};

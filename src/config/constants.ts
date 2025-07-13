@@ -15,8 +15,12 @@ export const API_ENDPOINTS = {
   // Mantenedores (sin autenticación)
   BARRIO: `/api/barrio`,
   SECTOR: `/api/sector`,
-  VIA: `/api/via`,
-  CALLE: `/api/calle`,
+  VIA:{
+    base: '/api/via',
+    listarVia: `/api/via/listarVia`,
+  },
+ 
+
   direccion: {
       base: '/api/direccion',
       listarPorNombreVia: `api/direccion/listarDireccionPorNombreVia`,

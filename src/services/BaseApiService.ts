@@ -217,6 +217,12 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
 
     console.log(`🌐 [${this.constructor.name}] ${method} ${url}`);
     console.log(`🔐 [${this.constructor.name}] Autenticación: ${isAuthRequired ? 'INCLUIDA' : 'NO REQUERIDA'}`);
+    // Agregar este log detallado de headers
+  console.log('📋 Headers enviados:', {
+  method: method,
+  headers: Object.fromEntries(headers.entries()),
+  body: options.body ? JSON.parse(options.body as string) : undefined
+});
     
     // Verificar conectividad básica
     if (!navigator.onLine) {
@@ -407,9 +413,12 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
 
   public async create(data: CreateDTO): Promise<T> {
     try {
+      console.log('➕ [BaseApiService] Creando con datos:', data);
+      console.log('🔧 Auth config para POST:', this.authConfig.POST);
       const response = await this.makeRequest<ApiResponse<T>>('', {
         method: 'POST',
         body: JSON.stringify(data)
+        
       });
       
       const created = response.data || response;

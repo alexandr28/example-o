@@ -1,4 +1,4 @@
-// src/components/barrio/BarrioFormMUI.tsx
+// src/components/barrio/BarrioForm.tsx - VERSIÓN CORREGIDA
 import React, { FC, useEffect, useState } from 'react';
 import {
   Paper,
@@ -26,39 +26,35 @@ import {
   LocationCity as LocationCityIcon,
   Home as HomeIcon
 } from '@mui/icons-material';
-import { BarrioFormData } from '../../models/Barrio';
-import { Sector } from '../../models/Sector';
+import { BarrioData } from '../../services/barrioService';
+import { SectorData } from '../../services/sectorService';
 
 interface BarrioFormProps {
-  barrioSeleccionado?: BarrioFormData | null;
-  sectores: Sector[];
-  onSubmit: (data: BarrioFormData) => void;
+  barrio?: BarrioData | null;
+  sectores: SectorData[];
+  onSubmit: (data: any) => void;
   onNuevo: () => void;
   onEditar: () => void;
   loading?: boolean;
-  loadingSectores?: boolean;
   isEditMode?: boolean;
-  isOfflineMode?: boolean;
 }
 
 const BarrioFormMUI: FC<BarrioFormProps> = ({
-  barrioSeleccionado,
+  barrio,
   sectores,
   onSubmit,
   onNuevo,
   onEditar,
   loading = false,
-  loadingSectores = false,
-  isEditMode = false,
-  isOfflineMode = false
+  isEditMode = false
 }) => {
   const theme = useTheme();
   
   // Estados del formulario
-  const [formData, setFormData] = useState<BarrioFormData>({
+  const [formData, setFormData] = useState({
     nombre: '',
-    sectorId: null,
-    estado: 1
+    sectorId: 0,
+    descripcion: ''
   });
   
   const [errors, setErrors] = useState<{
@@ -66,25 +62,25 @@ const BarrioFormMUI: FC<BarrioFormProps> = ({
     sectorId?: string;
   }>({});
 
-  // Inicializar con datos si es edición
+  // Inicializar con datos si existe barrio seleccionado
   useEffect(() => {
-    if (barrioSeleccionado && isEditMode) {
+    if (barrio && isEditMode) {
       setFormData({
-        nombre: barrioSeleccionado.nombre || '',
-        sectorId: barrioSeleccionado.sectorId || null,
-        estado: barrioSeleccionado.estado !== undefined ? barrioSeleccionado.estado : 1
+        nombre: barrio.nombre || '',
+        sectorId: barrio.codigoSector || 0,
+        descripcion: barrio.descripcion || ''
       });
       setErrors({});
-    } else {
-      // Limpiar formulario
+    } else if (!isEditMode) {
+      // Limpiar formulario si no es modo edición
       setFormData({
         nombre: '',
-        sectorId: null,
-        estado: 1
+        sectorId: 0,
+        descripcion: ''
       });
       setErrors({});
     }
-  }, [barrioSeleccionado, isEditMode]);
+  }, [barrio, isEditMode]);
 
   // Manejar cambios en los inputs
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,10 +100,10 @@ const BarrioFormMUI: FC<BarrioFormProps> = ({
   };
 
   // Manejar cambio en el autocomplete de sector
-  const handleSectorChange = (value: Sector | null) => {
+  const handleSectorChange = (value: SectorData | null) => {
     setFormData(prev => ({
       ...prev,
-      sectorId: value ? value.id : null
+      sectorId: value ? value.codigo : 0
     }));
     
     // Limpiar error si había
@@ -125,9 +121,11 @@ const BarrioFormMUI: FC<BarrioFormProps> = ({
     
     if (!formData.nombre.trim()) {
       newErrors.nombre = 'El nombre del barrio es requerido';
+    } else if (formData.nombre.trim().length < 3) {
+      newErrors.nombre = 'El nombre debe tener al menos 3 caracteres';
     }
     
-    if (!formData.sectorId) {
+    if (!formData.sectorId || formData.sectorId === 0) {
       newErrors.sectorId = 'Debe seleccionar un sector';
     }
     
@@ -148,10 +146,10 @@ const BarrioFormMUI: FC<BarrioFormProps> = ({
   };
 
   // Obtener el sector seleccionado
-  const sectorSeleccionado = sectores.find(s => s.id === formData.sectorId);
+  const sectorSeleccionado = sectores.find(s => s.codigo === formData.sectorId);
 
-  // Determinar si el formulario está deshabilitado
-  const isDisabled = loading || (sectores.length === 0 && !loadingSectores);
+  // Determinar si el formulario está válido
+  const isFormValid = formData.nombre.trim().length > 0 && formData.sectorId > 0;
 
   return (
     <Paper
@@ -171,17 +169,17 @@ const BarrioFormMUI: FC<BarrioFormProps> = ({
           </Typography>
         </Box>
         
-        {/* Chips de estado */}
-        <Stack direction="row" spacing={1}>
-          {barrioSeleccionado && !isEditMode && (
+        {/* Info del barrio seleccionado */}
+        {barrio && !isEditMode && (
+          <Stack direction="row" spacing={1}>
             <Chip
-              label={`Seleccionado: ${barrioSeleccionado.nombre}`}
+              label={`Seleccionado: ${barrio.nombre}`}
               size="small"
               color="info"
               onDelete={onNuevo}
             />
-          )}
-        </Stack>
+          </Stack>
+        )}
       </Box>
 
       <Divider sx={{ mb: 3 }} />
@@ -189,95 +187,55 @@ const BarrioFormMUI: FC<BarrioFormProps> = ({
       {/* Formulario */}
       <form onSubmit={handleSubmit}>
         <Stack spacing={3}>
-          {/* Autocomplete de Sector */}
+          {/* Selector de Sector */}
           <Autocomplete
-            id="sector"
             options={sectores}
             getOptionLabel={(option) => option.nombre || ''}
             value={sectorSeleccionado || null}
             onChange={(event, newValue) => handleSectorChange(newValue)}
-            disabled={isDisabled || loadingSectores}
-            loading={loadingSectores}
+            disabled={loading}
             renderInput={(params) => (
               <TextField
                 {...params}
                 label="Sector *"
                 error={!!errors.sectorId}
-                helperText={errors.sectorId || (sectores.length === 0 && !loadingSectores ? "No hay sectores disponibles" : "")}
+                helperText={errors.sectorId}
                 InputProps={{
                   ...params.InputProps,
                   startAdornment: (
                     <>
-                      <LocationCityIcon 
-                        sx={{ 
-                          color: 'action.disabled', 
-                          mr: 1,
-                          ml: 1
-                        }} 
-                      />
+                      <LocationCityIcon sx={{ color: 'action.disabled', mr: 1 }} />
                       {params.InputProps.startAdornment}
                     </>
-                  ),
+                  )
                 }}
               />
             )}
-            renderOption={(props, option) => (
-              <Box component="li" {...props}>
-                <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
-                  <Typography>{option.nombre}</Typography>
-                  {option.estado === false && (
-                    <Chip
-                      label="Inactivo"
-                      size="small"
-                      color="error"
-                      sx={{ ml: 1 }}
-                    />
-                  )}
-                </Box>
-              </Box>
-            )}
-            isOptionEqualToValue={(option, value) => option.id === value?.id}
-            noOptionsText="No se encontraron sectores"
-            placeholder="Buscar sector..."
           />
 
-          {/* Mostrar información del sector seleccionado */}
+          {/* Mostrar sector seleccionado */}
           {sectorSeleccionado && (
-            <Alert 
-              severity="info" 
-              icon={<LocationCityIcon />}
-              sx={{ 
-                bgcolor: alpha(theme.palette.info.main, 0.05),
-                border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
-              }}
-            >
+            <Alert severity="info" icon={<LocationCityIcon />}>
               <Typography variant="body2">
-                <strong>Sector seleccionado:</strong> {sectorSeleccionado.nombre}
+                Sector seleccionado: <strong>{sectorSeleccionado.nombre}</strong>
               </Typography>
             </Alert>
           )}
 
-          {/* Campo Nombre */}
+          {/* Campo de nombre */}
           <TextField
-            fullWidth
-            id="nombre"
             name="nombre"
-            label="Nombre del Barrio"
+            label="Nombre del Barrio *"
+            fullWidth
             value={formData.nombre}
             onChange={handleInputChange}
             error={!!errors.nombre}
             helperText={errors.nombre}
-            disabled={isDisabled}
-            required
+            disabled={loading}
             placeholder="Ingrese el nombre del barrio"
             InputProps={{
               startAdornment: (
-                <HomeIcon 
-                  sx={{ 
-                    color: 'action.disabled', 
-                    mr: 1
-                  }} 
-                />
+                <HomeIcon sx={{ color: 'action.disabled', mr: 1 }} />
               )
             }}
           />
@@ -286,9 +244,9 @@ const BarrioFormMUI: FC<BarrioFormProps> = ({
           {process.env.NODE_ENV === 'development' && (
             <Alert severity="info" sx={{ mt: 1 }}>
               <Typography variant="caption">
-                Debug: Sector ID: {formData.sectorId || 'null'} | 
-                Estado: {formData.estado} | 
-                Modo: {isEditMode ? 'Edición' : 'Nuevo'}
+                Debug: Sector ID: {formData.sectorId} | 
+                Estado: {isEditMode ? 'Edición' : 'Nuevo'} |
+                Modo: Nuevo
               </Typography>
             </Alert>
           )}
@@ -310,7 +268,7 @@ const BarrioFormMUI: FC<BarrioFormProps> = ({
             <Button
               variant="outlined"
               onClick={onEditar}
-              disabled={loading || !barrioSeleccionado || isEditMode}
+              disabled={loading || !barrio || isEditMode}
               startIcon={<EditIcon />}
               fullWidth
             >
@@ -321,7 +279,7 @@ const BarrioFormMUI: FC<BarrioFormProps> = ({
             <Button
               type="submit"
               variant="contained"
-              disabled={isDisabled || !formData.nombre || !formData.sectorId}
+              disabled={loading || !isFormValid}
               startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
               fullWidth
               sx={{
@@ -338,7 +296,7 @@ const BarrioFormMUI: FC<BarrioFormProps> = ({
       </form>
 
       {/* Loading overlay */}
-      {loadingSectores && (
+      {loading && (
         <Box
           sx={{
             position: 'absolute',

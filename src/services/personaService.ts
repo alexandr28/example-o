@@ -279,11 +279,6 @@ class PersonaService extends BaseApiService<PersonaData, CreatePersonaDTO, Updat
     try {
       console.log('➕ [PersonaService] Creando nueva persona:', datos);
       
-      // Verificar token antes de crear
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        throw new Error('Se requiere autenticación para crear personas');
-      }
       
       const datosCompletos = {
         ...datos,

@@ -1,5 +1,5 @@
 // src/components/predio/ConsultaPredios.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -9,141 +9,95 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TextField,
-  Button,
-  IconButton,
-  Typography,
-  Stack,
-  Chip,
   TablePagination,
-  Collapse,
-  InputAdornment,
+  TextField,
+  IconButton,
+  Stack,
+  Typography,
+  Chip,
+  Tooltip,
+  Button,
+  CircularProgress,
   Grid,
   Card,
   CardContent,
-  Tooltip,
-  LinearProgress,
-  Alert,
-  FormControl,
+  InputAdornment,
   useTheme,
   alpha
 } from '@mui/material';
 import {
   Search as SearchIcon,
-  FilterList as FilterIcon,
+  Refresh as RefreshIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  Visibility as VisibilityIcon,
+  Add as AddIcon,
   Clear as ClearIcon,
-  Refresh as RefreshIcon,
+  FilterList as FilterIcon,
   Home as HomeIcon,
-  LocationOn as LocationIcon,
-  CalendarMonth as CalendarIcon
+  Terrain as TerrainIcon,
+  AttachMoney as MoneyIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import SearchableSelect from '../ui/SearchableSelect';
-import { predioService } from '../../services/predioService';
+import { usePredios } from '../../hooks/usePredioAPI';
 import { Predio } from '../../models/Predio';
 import { NotificationService } from '../utils/Notification';
+import { formatCurrency } from '../../utils/formatters';
 
-interface Filtros {
-  codPredio: string;
-  anio: number;
-  direccion: string;
-}
-
+/**
+ * Componente de consulta de predios con Material-UI
+ */
 const ConsultaPredios: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  
-  // Estados
-  const [searchTerm, setSearchTerm] = useState('');
-  const [predios, setPredios] = useState<Predio[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [showFilters, setShowFilters] = useState(true);
+  const { 
+    predios, 
+    loading, 
+    cargarPredios, 
+    buscarPredios,
+    eliminarPredio,
+    estadisticas,
+    cargarEstadisticas
+  } = usePredios();
+
+  // Estados locales
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [filtros, setFiltros] = useState<Filtros>({
-    codPredio: '',
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filtros, setFiltros] = useState({
+    codigoPredio: '',
     anio: new Date().getFullYear(),
-    direccion: ''
+    estadoPredio: '',
+    condicionPropiedad: ''
   });
 
-  // Generar opciones de años
-  const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: 10 }, (_, i) => ({
-    id: currentYear - i,
-    value: currentYear - i,
-    label: (currentYear - i).toString()
-  }));
-
-  // Cargar datos iniciales
+  // Cargar datos al montar
   useEffect(() => {
-    cargarPredios();
-  }, []);
-
-  // Función para cargar predios
-  const cargarPredios = useCallback(async () => {
-    setLoading(true);
-    try {
-      let prediosData: Predio[] = [];
-      
-      if (filtros.codPredio || filtros.anio || filtros.direccion) {
-        prediosData = await predioService.buscarPredios(
-          filtros.codPredio || undefined,
-          filtros.anio || undefined,
-          filtros.direccion ? parseInt(filtros.direccion) : undefined
-        );
-      } else {
-        prediosData = await predioService.getAll();
-      }
-      
-      setPredios(prediosData);
-      setPage(0);
-    } catch (error) {
-      console.error('Error al cargar predios:', error);
-      NotificationService.error('Error al cargar los predios');
-    } finally {
-      setLoading(false);
-    }
-  }, [filtros]);
-
-  // Función de búsqueda local
-  const handleSearch = (value: string) => {
-    setSearchTerm(value);
-    setPage(0);
-  };
-
-  // Aplicar filtros
-  const aplicarFiltros = () => {
-    cargarPredios();
-  };
-
-  // Limpiar filtros
-  const limpiarFiltros = () => {
-    setFiltros({
-      codPredio: '',
-      anio: new Date().getFullYear(),
-      direccion: ''
-    });
-    setSearchTerm('');
-    cargarPredios();
-  };
+    cargarEstadisticas();
+  }, [cargarEstadisticas]);
 
   // Filtrar predios localmente
-  const filteredPredios = predios.filter(predio => 
-    predio.codigoPredio.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    predio.tipoPredio?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    predio.direccion?.toString().toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPredios = useMemo(() => {
+    if (!searchTerm) return predios;
+    
+    const term = searchTerm.toLowerCase();
+    return predios.filter(predio => 
+      predio.codigoPredio?.toLowerCase().includes(term) ||
+      predio.direccion?.toString().toLowerCase().includes(term) ||
+      predio.conductor?.toLowerCase().includes(term) ||
+      predio.numeroFinca?.toLowerCase().includes(term)
+    );
+  }, [predios, searchTerm]);
 
-  // Calcular paginación
-  const paginatedPredios = filteredPredios.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
+  // Paginar predios
+  const paginatedPredios = useMemo(() => {
+    const start = page * rowsPerPage;
+    const end = start + rowsPerPage;
+    return filteredPredios.slice(start, end);
+  }, [filteredPredios, page, rowsPerPage]);
 
   // Handlers
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (_: unknown, newPage: number) => {
     setPage(newPage);
   };
 
@@ -153,216 +107,266 @@ const ConsultaPredios: React.FC = () => {
   };
 
   const handleEdit = (predio: Predio) => {
-    navigate(`/predio/editar/${predio.id}`);
+    navigate(`/predio/editar/${predio.codigoPredio}`);
   };
 
-  const handleDelete = async (predio: Predio) => {
-    if (window.confirm(`¿Está seguro de eliminar el predio ${predio.codigoPredio}?`)) {
-      try {
-        setLoading(true);
-        await predioService.delete(predio.id!);
-        NotificationService.success('Predio eliminado correctamente');
-        await cargarPredios();
-      } catch (error) {
-        console.error('Error al eliminar predio:', error);
-        NotificationService.error('Error al eliminar el predio');
-      } finally {
-        setLoading(false);
+  const handleDelete = async (codigoPredio: string) => {
+    if (window.confirm(`¿Está seguro de eliminar el predio ${codigoPredio}?`)) {
+      const result = await eliminarPredio(codigoPredio);
+      if (result) {
+        NotificationService.success('Predio eliminado exitosamente');
       }
     }
   };
 
-  // Formatear moneda
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-PE', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(value);
+  const handleView = (predio: Predio) => {
+    navigate(`/predio/detalle/${predio.codigoPredio}`);
+  };
+
+  const handleBuscar = () => {
+    buscarPredios(filtros);
+  };
+
+  const handleLimpiarFiltros = () => {
+    setFiltros({
+      codigoPredio: '',
+      anio: new Date().getFullYear(),
+      estadoPredio: '',
+      condicionPropiedad: ''
+    });
+    setSearchTerm('');
+    cargarPredios();
+  };
+
+  const getEstadoChip = (estado?: string) => {
+    const estadoUpper = estado?.toUpperCase();
+    switch (estadoUpper) {
+      case 'TERMINADO':
+        return <Chip label="Terminado" color="success" size="small" />;
+      case 'EN_CONSTRUCCION':
+        return <Chip label="En Construcción" color="warning" size="small" />;
+      case 'EN_PROCESO':
+        return <Chip label="En Proceso" color="info" size="small" />;
+      case 'REGISTRADO':
+        return <Chip label="Registrado" color="primary" size="small" />;
+      case 'OBSERVADO':
+        return <Chip label="Observado" color="error" size="small" />;
+      default:
+        return <Chip label={estado || 'Sin Estado'} size="small" />;
+    }
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Header */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Características del predio
-        </Typography>
-      </Box>
+    <Box>
+      {/* Tarjetas de estadísticas */}
+      {estadisticas && (
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card>
+              <CardContent>
+                <Stack spacing={1}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Typography color="text.secondary" variant="body2">
+                      Total Predios
+                    </Typography>
+                    <HomeIcon color="primary" />
+                  </Stack>
+                  <Typography variant="h4" fontWeight={600}>
+                    {estadisticas.total}
+                  </Typography>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={3}>
+            <Card>
+              <CardContent>
+                <Stack spacing={1}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Typography color="text.secondary" variant="body2">
+                      Área Total
+                    </Typography>
+                    <TerrainIcon color="success" />
+                  </Stack>
+                  <Typography variant="h5" fontWeight={600}>
+                    {estadisticas.areaTerrenoTotal.toFixed(2)} m²
+                  </Typography>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
 
-      {/* Sección de filtros */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6" fontWeight={500}>
-              Filtros de búsqueda
-            </Typography>
-            <IconButton
-              onClick={() => setShowFilters(!showFilters)}
-              color="primary"
-              sx={{
-                bgcolor: alpha(theme.palette.primary.main, 0.1),
-                '&:hover': {
-                  bgcolor: alpha(theme.palette.primary.main, 0.2)
+          <Grid item xs={12} sm={6} md={3}>
+            <Card>
+              <CardContent>
+                <Stack spacing={1}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Typography color="text.secondary" variant="body2">
+                      Área Construida
+                    </Typography>
+                    <HomeIcon color="warning" />
+                  </Stack>
+                  <Typography variant="h5" fontWeight={600}>
+                    {estadisticas.areaConstruidaTotal.toFixed(2)} m²
+                  </Typography>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={3}>
+            <Card>
+              <CardContent>
+                <Stack spacing={1}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Typography color="text.secondary" variant="body2">
+                      Estados
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" spacing={0.5}>
+                    {Object.entries(estadisticas.porEstado).slice(0, 3).map(([estado, count]) => (
+                      <Chip 
+                        key={estado}
+                        label={`${estado}: ${count}`} 
+                        size="small" 
+                        variant="outlined"
+                      />
+                    ))}
+                  </Stack>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
+
+      {/* Barra de búsqueda y filtros */}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} md={4}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Buscar por código, dirección, conductor..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+                endAdornment: searchTerm && (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearchTerm('')}>
+                      <ClearIcon />
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }}
+            />
+          </Grid>
+          
+          <Grid item xs={12} md={2}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Código Predio"
+              value={filtros.codigoPredio}
+              onChange={(e) => setFiltros({ ...filtros, codigoPredio: e.target.value })}
+            />
+          </Grid>
+          
+          <Grid item xs={12} md={2}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Año"
+              type="number"
+              value={filtros.anio}
+              onChange={(e) => setFiltros({ ...filtros, anio: parseInt(e.target.value) })}
+              InputProps={{
+                inputProps: { 
+                  min: 1900, 
+                  max: new Date().getFullYear() 
                 }
               }}
-            >
-              <FilterIcon />
-            </IconButton>
-          </Stack>
-
-          <Collapse in={showFilters}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={3}>
-                <TextField
-                  fullWidth
-                  label="Código Predio"
-                  value={filtros.codPredio}
-                  onChange={(e) => setFiltros({ ...filtros, codPredio: e.target.value })}
-                  placeholder="Ej: 20241"
-                  variant="outlined"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <HomeIcon fontSize="small" color="action" />
-                      </InputAdornment>
-                    )
-                  }}
-                />
-              </Grid>
-
-              <Grid item xs={12} md={3}>
-                <FormControl fullWidth>
-                  <SearchableSelect
-                    label="Año"
-                    options={yearOptions}
-                    value={yearOptions.find(opt => opt.value === filtros.anio) || null}
-                    onChange={(option) => setFiltros({ ...filtros, anio: option?.value || new Date().getFullYear() })}
-                    placeholder="Seleccione año"
-                    fullWidth
-                    size="medium"
-                  />
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={12} md={3}>
-                <TextField
-                  fullWidth
-                  label="ID de dirección"
-                  value={filtros.direccion}
-                  onChange={(e) => setFiltros({ ...filtros, direccion: e.target.value })}
-                  placeholder="ID de dirección"
-                  variant="outlined"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <LocationIcon fontSize="small" color="action" />
-                      </InputAdornment>
-                    )
-                  }}
-                />
-              </Grid>
-
-              <Grid item xs={12} md={3}>
-                <Box sx={{ display: 'flex', gap: 1, alignItems: 'stretch' }}>
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    onClick={aplicarFiltros}
-                    startIcon={<SearchIcon />}
-                    disabled={loading}
-                    sx={{ 
-                      py: 1.5,
-                      textTransform: 'none',
-                      fontWeight: 500
-                    }}
-                  >
-                    Aplicar
-                  </Button>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    onClick={limpiarFiltros}
-                    startIcon={<ClearIcon />}
-                    disabled={loading}
-                    sx={{ 
-                      py: 1.5,
-                      textTransform: 'none',
-                      fontWeight: 500
-                    }}
-                  >
-                    Limpiar
-                  </Button>
-                </Box>
-              </Grid>
-            </Grid>
-
-            {/* Búsqueda rápida */}
-            <Box sx={{ mt: 3 }}>
-              <TextField
-                fullWidth
-                placeholder="Buscar en los resultados..."
-                value={searchTerm}
-                onChange={(e) => handleSearch(e.target.value)}
+            />
+          </Grid>
+          
+          <Grid item xs={12} md={4}>
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="contained"
+                startIcon={<FilterIcon />}
+                onClick={handleBuscar}
+                disabled={loading}
+              >
+                Buscar
+              </Button>
+              <Button
                 variant="outlined"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  )
-                }}
-              />
-            </Box>
-          </Collapse>
-        </CardContent>
-      </Card>
+                onClick={handleLimpiarFiltros}
+                disabled={loading}
+              >
+                Limpiar
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={cargarPredios}
+                disabled={loading}
+              >
+                Actualizar
+              </Button>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<AddIcon />}
+                onClick={() => navigate('/predio/nuevo')}
+              >
+                Nuevo
+              </Button>
+            </Stack>
+          </Grid>
+        </Grid>
+      </Paper>
 
-      {/* Tabla de resultados */}
-      <Paper elevation={1}>
-        {loading && <LinearProgress />}
-        
-        <TableContainer>
-          <Table>
+      {/* Tabla de predios */}
+      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+        <TableContainer sx={{ maxHeight: 600 }}>
+          <Table stickyHeader size="small">
             <TableHead>
-              <TableRow sx={{ bgcolor: 'grey.50' }}>
+              <TableRow>
                 <TableCell>
                   <Typography variant="caption" fontWeight={600}>
-                    CÓDIGO PREDIO
+                    CÓDIGO
                   </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="caption" fontWeight={600}>
-                    TIPO PREDIO
+                    DIRECCIÓN
                   </Typography>
                 </TableCell>
-                <TableCell align="center">
+                <TableCell>
                   <Typography variant="caption" fontWeight={600}>
-                    ÁREA DEL TERRENO
+                    CONDUCTOR
                   </Typography>
                 </TableCell>
-                <TableCell align="center">
+                <TableCell>
                   <Typography variant="caption" fontWeight={600}>
-                    VALOR ARANCEL
+                    CONDICIÓN
                   </Typography>
                 </TableCell>
-                <TableCell align="center">
+                <TableCell align="right">
                   <Typography variant="caption" fontWeight={600}>
-                    VALOR TERRENO
+                    ÁREA (m²)
                   </Typography>
                 </TableCell>
-                <TableCell align="center">
+                <TableCell>
                   <Typography variant="caption" fontWeight={600}>
-                    VALOR DE CONSTRUCCIÓN
-                  </Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="caption" fontWeight={600}>
-                    OTRAS INSTALACIONES
-                  </Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="caption" fontWeight={600}>
-                    AUTOVALÚO
+                    ESTADO
                   </Typography>
                 </TableCell>
                 <TableCell align="center">
@@ -373,12 +377,18 @@ const ConsultaPredios: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {paginatedPredios.length > 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                    <CircularProgress />
+                  </TableCell>
+                </TableRow>
+              ) : paginatedPredios.length > 0 ? (
                 paginatedPredios.map((predio) => (
-                  <TableRow 
-                    key={predio.id} 
+                  <TableRow
+                    key={predio.codigoPredio}
                     hover
-                    sx={{ '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.05) } }}
+                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
                   >
                     <TableCell>
                       <Typography variant="body2" fontWeight={500}>
@@ -386,59 +396,61 @@ const ConsultaPredios: React.FC = () => {
                       </Typography>
                     </TableCell>
                     <TableCell>
+                      <Stack spacing={0.5}>
+                        <Typography variant="body2">
+                          {predio.direccion || 'Sin dirección'}
+                        </Typography>
+                        {predio.numeroFinca && (
+                          <Typography variant="caption" color="text.secondary">
+                            Finca: {predio.numeroFinca}
+                          </Typography>
+                        )}
+                      </Stack>
+                    </TableCell>
+                    <TableCell>
                       <Chip 
-                        label={predio.tipoPredio} 
+                        label={predio.conductor} 
                         size="small" 
-                        color="default"
                         variant="outlined"
                       />
                     </TableCell>
-                    <TableCell align="center">
+                    <TableCell>
                       <Typography variant="body2">
-                        {formatCurrency(predio.areaTerreno)} m²
+                        {predio.condicionPropiedad}
                       </Typography>
                     </TableCell>
-                    <TableCell align="center">
-                      <Typography variant="body2">
-                        S/ {formatCurrency(predio.valorArancel)}
+                    <TableCell align="right">
+                      <Typography variant="body2" fontWeight={500}>
+                        {predio.areaTerreno.toFixed(2)}
                       </Typography>
                     </TableCell>
-                    <TableCell align="center">
-                      <Typography variant="body2">
-                        S/ {formatCurrency(predio.valorTerreno)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Typography variant="body2">
-                        S/ {formatCurrency(predio.valorConstruccion)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Typography variant="body2">
-                        S/ {formatCurrency(predio.otrasInstalaciones)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Typography variant="body2" fontWeight={600} color="primary">
-                        S/ {formatCurrency(predio.autoavalo)}
-                      </Typography>
+                    <TableCell>
+                      {getEstadoChip(predio.estadoPredio)}
                     </TableCell>
                     <TableCell align="center">
                       <Stack direction="row" spacing={0.5} justifyContent="center">
+                        <Tooltip title="Ver detalles">
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handleView(predio)}
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title="Editar">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleEdit(predio)}
+                          <IconButton 
+                            size="small" 
                             color="primary"
+                            onClick={() => handleEdit(predio)}
                           >
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Eliminar">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleDelete(predio)}
+                          <IconButton 
+                            size="small" 
                             color="error"
+                            onClick={() => handleDelete(predio.codigoPredio)}
                           >
                             <DeleteIcon fontSize="small" />
                           </IconButton>
@@ -449,7 +461,7 @@ const ConsultaPredios: React.FC = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 8 }}>
+                  <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
                     <Stack alignItems="center" spacing={2}>
                       <SearchIcon sx={{ fontSize: 48, color: 'text.disabled' }} />
                       <Typography variant="h6" color="text.secondary">
@@ -474,8 +486,9 @@ const ConsultaPredios: React.FC = () => {
           onPageChange={handleChangePage}
           rowsPerPage={rowsPerPage}
           onRowsPerPageChange={handleChangeRowsPerPage}
-          labelRowsPerPage="Filas por página"
+          labelRowsPerPage="Filas por página:"
           labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+          rowsPerPageOptions={[5, 10, 25, 50]}
         />
       </Paper>
 
@@ -484,14 +497,6 @@ const ConsultaPredios: React.FC = () => {
         <Typography variant="caption" color="text.secondary">
           Mostrando {paginatedPredios.length} de {filteredPredios.length} predios
         </Typography>
-        <Button
-          size="small"
-          startIcon={<RefreshIcon />}
-          onClick={cargarPredios}
-          disabled={loading}
-        >
-          Actualizar
-        </Button>
       </Box>
     </Box>
   );
