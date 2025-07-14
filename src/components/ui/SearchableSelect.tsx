@@ -45,9 +45,16 @@ const SearchableSelect = React.forwardRef<HTMLInputElement, SearchableSelectProp
     const selectedOption = options.find(opt => opt.value === value);
 
     // Filtrar opciones basado en el término de búsqueda
-    const filteredOptions = options.filter(option =>
-      option.label.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredOptions = options.filter(option => {
+      // Verificar que option y option.label existen
+      if (!option || !option.label) return false;
+      
+      // Convertir a string para asegurar que toLowerCase funcione
+      const label = String(option.label).toLowerCase();
+      const search = searchTerm.toLowerCase();
+      
+      return label.includes(search);
+    });
 
     // Manejar clic fuera del componente
     useEffect(() => {
