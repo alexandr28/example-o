@@ -1,5 +1,6 @@
-// src/services/BaseApiService.ts - VERSIÓN CON AUTENTICACIÓN CONFIGURABLE
-import { buildApiUrl, getApiHeaders, API_CONFIG, getAuthToken } from '../config/api.unified.config';
+// src/services/BaseApiService.ts - VERSIÓN CORREGIDA SIN AUTH
+
+import { buildApiUrl, API_CONFIG } from '../config/api.unified.config';
 import { NotificationService } from '../components/utils/Notification';
 
 /**
@@ -35,17 +36,6 @@ export interface QueryParams {
 }
 
 /**
- * Configuración de autenticación por servicio
- */
-export interface AuthConfig {
-  GET?: boolean;
-  POST?: boolean;
-  PUT?: boolean;
-  DELETE?: boolean;
-  PATCH?: boolean;
-}
-
-/**
  * Clase de error personalizada para API
  */
 export class ApiError extends Error {
@@ -63,42 +53,39 @@ export class ApiError extends Error {
 }
 
 /**
- * Clase base abstracta para todos los servicios de API
- * Proporciona métodos CRUD estándar y manejo de errores
- * ACTUALIZADO: Permite configurar qué métodos requieren autenticación
+ * Obtener headers básicos SIN AUTENTICACIÓN
  */
-export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
+const getBasicHeaders = (): HeadersInit => {
+  return {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  };
+};
+
+/**
+ * Clase base para todos los servicios de API
+ * NO MANEJA AUTENTICACIÓN - Todos los métodos son públicos
+ */
+export default abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
   protected endpoint: string;
   protected normalizeOptions: NormalizeOptions<T>;
   protected cacheKey: string;
-  protected authConfig: AuthConfig;
   private cache: Map<string, { data: any; timestamp: number }> = new Map();
   private cacheDuration: number = 5 * 60 * 1000; // 5 minutos por defecto
   
   constructor(
     endpoint: string,
     normalizeOptions: NormalizeOptions<T>,
-    cacheKey: string,
-    authConfig?: AuthConfig
+    cacheKey: string
   ) {
     this.endpoint = endpoint;
     this.normalizeOptions = normalizeOptions;
     this.cacheKey = cacheKey;
     
-    // Configuración de autenticación por defecto
-    // Por defecto: GET no requiere auth, POST/PUT/DELETE/PATCH sí
-    this.authConfig = authConfig || {
-      GET: false,
-      POST: false,    // Cambiado a false para tu caso
-      PUT: false,     // Cambiado a false para tu caso
-      DELETE: false,  // Cambiado a false para tu caso
-      PATCH: false    // Cambiado a false para tu caso
-    };
-    
     console.log(`🔧 [${this.constructor.name}] Inicializado:`);
     console.log(`  - Endpoint: "${this.endpoint}"`);
     console.log(`  - Cache Key: "${this.cacheKey}"`);
-    console.log(`  - Auth Config:`, this.authConfig);
+    console.log(`  - Autenticación: NO REQUERIDA`);
   }
 
   /**
@@ -117,15 +104,7 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
   }
 
   /**
-   * Actualizar configuración de autenticación
-   */
-  public setAuthConfig(config: AuthConfig): void {
-    this.authConfig = { ...this.authConfig, ...config };
-    console.log(`🔐 [${this.constructor.name}] Configuración de auth actualizada:`, this.authConfig);
-  }
-
-  /**
-   * Obtener datos del cache si están disponibles y no han expirado
+   * Obtener datos del cache
    */
   private getCachedData(key: string): any | null {
     const cached = this.cache.get(key);
@@ -144,23 +123,8 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
   }
 
   /**
-   * Verificar si existe un token de autenticación
-   */
-  private hasAuthToken(): boolean {
-    const token = getAuthToken();
-    return !!token;
-  }
-
-  /**
-   * Determinar si un método requiere autenticación
-   */
-  private requiresAuth(method: string): boolean {
-    const methodUpper = method.toUpperCase() as keyof AuthConfig;
-    return this.authConfig[methodUpper] || false;
-  }
-
-  /**
-   * Realiza una petición HTTP con reintentos y manejo de errores mejorado
+   * Realiza una petición HTTP SIN AUTENTICACIÓN
+   * IMPORTANTE: No envía ningún header Authorization
    */
   protected async makeRequest<R = any>(
     path: string = '',
@@ -170,183 +134,139 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
     const url = buildApiUrl(this.endpoint + path);
     const method = (options.method || 'GET').toUpperCase();
     
-    // Determinar si este método específico requiere autenticación
-    const isAuthRequired = this.requiresAuth(method);
+    // IMPORTANTE: Usar solo headers básicos, sin autenticación
+    const basicHeaders = getBasicHeaders();
     
-    // Verificar si hay token disponible cuando es requerido
-    if (isAuthRequired && !this.hasAuthToken()) {
-      console.warn(`⚠️ [${this.constructor.name}] No hay token de autenticación disponible para ${method} ${url}`);
-      // Opcional: puedes decidir si lanzar error o continuar sin auth
-      // throw new ApiError('Se requiere autenticación', 401);
+    // Si hay headers personalizados en options, filtrar Authorization
+    let customHeaders = {};
+    if (options.headers) {
+      if (options.headers instanceof Headers) {
+        customHeaders = {};
+        options.headers.forEach((value, key) => {
+          // IMPORTANTE: Ignorar cualquier header Authorization
+          if (key.toLowerCase() !== 'authorization') {
+            customHeaders[key] = value;
+          }
+        });
+      } else if (Array.isArray(options.headers)) {
+        customHeaders = {};
+        options.headers.forEach(([key, value]) => {
+          if (key.toLowerCase() !== 'authorization') {
+            customHeaders[key] = value;
+          }
+        });
+      } else {
+        // Filtrar Authorization de objeto plano
+        const { Authorization, authorization, ...rest } = options.headers as any;
+        customHeaders = rest;
+      }
     }
     
-    // Obtener headers base
-    const baseHeaders = getApiHeaders(isAuthRequired);
+    // Combinar headers asegurándose de NO incluir Authorization
+    const finalHeaders = {
+      ...basicHeaders,
+      ...customHeaders
+    };
     
-    // Combinar con headers personalizados si existen
-    const customHeaders = options.headers || {};
-    
-    // Crear Headers object para la petición
-    const headers = new Headers();
-    
-    // Agregar headers base
-    Object.entries(baseHeaders).forEach(([key, value]) => {
-      headers.append(key, value);
-    });
-    
-    // Agregar headers personalizados
-    if (customHeaders instanceof Headers) {
-      customHeaders.forEach((value, key) => {
-        headers.set(key, value);
-      });
-    } else if (Array.isArray(customHeaders)) {
-      customHeaders.forEach(([key, value]) => {
-        headers.set(key, value);
-      });
-    } else if (typeof customHeaders === 'object') {
-      Object.entries(customHeaders).forEach(([key, value]) => {
-        headers.set(key, value as string);
-      });
+    // Verificar que no haya Authorization
+    if ('Authorization' in finalHeaders || 'authorization' in finalHeaders) {
+      console.warn('⚠️ Se detectó header Authorization, eliminándolo...');
+      delete finalHeaders['Authorization'];
+      delete finalHeaders['authorization'];
     }
     
     const finalOptions: RequestInit = {
       ...options,
-      headers,
+      method,
+      headers: finalHeaders,
       signal: options.signal || AbortSignal.timeout(API_CONFIG.timeout)
     };
+    
+    // Si hay body, asegurarse de que sea string
+    if (options.body && typeof options.body !== 'string') {
+      finalOptions.body = JSON.stringify(options.body);
+    }
 
     console.log(`🌐 [${this.constructor.name}] ${method} ${url}`);
-    console.log(`🔐 [${this.constructor.name}] Autenticación: ${isAuthRequired ? 'INCLUIDA' : 'NO REQUERIDA'}`);
-    // Agregar este log detallado de headers
-  console.log('📋 Headers enviados:', {
-  method: method,
-  headers: Object.fromEntries(headers.entries()),
-  body: options.body ? JSON.parse(options.body as string) : undefined
-});
-    
-    // Verificar conectividad básica
-    if (!navigator.onLine) {
-      console.warn(`📵 [${this.constructor.name}] Sin conexión a internet`);
-      throw new ApiError('Sin conexión a internet', 0);
-    }
+    console.log(`🔓 [${this.constructor.name}] Sin autenticación`);
+    console.log(`📋 Headers enviados:`, finalHeaders);
 
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         const response = await fetch(url, finalOptions);
         
-        // Log detallado de la respuesta
-        console.log(`📡 [${this.constructor.name}] Respuesta:`, {
-          status: response.status,
-          statusText: response.statusText,
-          ok: response.ok
-        });
-
-        // Manejar respuestas no exitosas
+        console.log(`📡 [${this.constructor.name}] Respuesta: ${response.status}`);
+        
         if (!response.ok) {
-          // Extraer mensaje de error del body si es posible
-          let errorMessage = `Error ${response.status}: ${response.statusText}`;
-          let errorData: any = null;
+          const errorText = await response.text();
+          let errorData;
           
           try {
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-              errorData = await response.json();
-              errorMessage = errorData.message || errorData.error || errorMessage;
-            }
-          } catch (e) {
-            console.warn('No se pudo parsear el error como JSON');
-          }
-
-          // Manejar errores específicos
-          if (response.status === 401) {
-            console.error(`🚫 [${this.constructor.name}] No autorizado`);
-            throw new ApiError('No autorizado. Por favor, inicie sesión.', 401, errorData);
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { message: errorText };
           }
           
-          if (response.status === 403) {
-            throw new ApiError('No tiene permisos para realizar esta acción', 403, errorData);
-          }
+          console.error(`❌ Error Response:`, errorData);
           
-          if (response.status === 404) {
-            throw new ApiError('Recurso no encontrado', 404, errorData);
-          }
-          
-          if (response.status === 422) {
-            throw new ApiError('Datos de entrada inválidos', 422, errorData);
-          }
-          
-          if (response.status >= 500) {
-            throw new ApiError('Error del servidor. Por favor, intente más tarde.', response.status, errorData);
-          }
-          
-          throw new ApiError(errorMessage, response.status, errorData);
+          throw new ApiError(
+            errorData?.message || `Error ${response.status}: ${response.statusText}`,
+            response.status,
+            errorData
+          );
         }
-
+        
         // Manejar respuesta vacía
         if (response.status === 204 || response.headers.get('content-length') === '0') {
-          return {} as R;
+          return null as any;
         }
-
-        // Parsear respuesta JSON
-        const data = await response.json();
-        return data as R;
-
+        
+        // Intentar parsear JSON
+        const responseText = await response.text();
+        if (!responseText) {
+          return null as any;
+        }
+        
+        try {
+          return JSON.parse(responseText);
+        } catch {
+          // Si no es JSON, devolver el texto
+          return responseText as any;
+        }
+        
       } catch (error: any) {
         console.error(`❌ [${this.constructor.name}] Error en intento ${attempt + 1}:`, error);
         
-        // Si es el último intento, lanzar el error
         if (attempt === retries) {
-          if (error instanceof ApiError) {
-            throw error;
-          }
-          
-          if (error.name === 'AbortError') {
-            throw new ApiError('La petición excedió el tiempo límite', 0);
-          }
-          
-          if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-            throw new ApiError('Error de conexión. Verifique su conexión a internet.', 0);
-          }
-          
-          throw new ApiError(error.message || 'Error desconocido', 0);
+          throw error;
         }
         
         // Esperar antes de reintentar
-        const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
-        console.log(`⏳ Reintentando en ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
       }
     }
     
-    throw new ApiError('Máximo de reintentos alcanzado', 0);
+    throw new Error('Máximo de reintentos alcanzado');
   }
 
   /**
-   * Normaliza los datos según las opciones de normalización
+   * Normalizar datos según las opciones de normalización
    */
   protected normalizeData(data: any[]): T[] {
     if (!Array.isArray(data)) {
-      console.warn(`⚠️ [${this.constructor.name}] Se esperaba un array, se recibió:`, typeof data);
+      console.warn(`⚠️ [${this.constructor.name}] Datos no son un array:`, data);
       return [];
     }
 
-    const normalized = data
-      .map((item, index) => {
-        try {
-          return this.normalizeOptions.normalizeItem(item, index);
-        } catch (error) {
-          console.error(`❌ [${this.constructor.name}] Error normalizando item ${index}:`, error);
-          return null;
-        }
-      })
-      .filter((item): item is T => item !== null);
+    const normalized = data.map((item, index) => 
+      this.normalizeOptions.normalizeItem(item, index)
+    );
 
-    // Validar items si se proporciona validador
     if (this.normalizeOptions.validateItem) {
       const validItems = normalized.filter((item, index) => {
         const isValid = this.normalizeOptions.validateItem!(item, index);
         if (!isValid) {
-          console.warn(`⚠️ [${this.constructor.name}] Item ${index} no pasó la validación`);
+          console.warn(`⚠️ [${this.constructor.name}] Item ${index} no válido`);
         }
         return isValid;
       });
@@ -358,8 +278,13 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
     return normalized;
   }
 
-  // ... resto de los métodos permanecen igual ...
+  // ========================================
+  // MÉTODOS CRUD - SIN AUTENTICACIÓN
+  // ========================================
 
+  /**
+   * Obtener todos los registros
+   */
   public async getAll(params?: QueryParams, useCache: boolean = true): Promise<T[]> {
     const cacheKey = `${this.cacheKey}_all_${JSON.stringify(params || {})}`;
     
@@ -372,7 +297,9 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
     
     try {
       const queryString = params ? `?${new URLSearchParams(params as any).toString()}` : '';
-      const response = await this.makeRequest<any>(queryString);
+      const response = await this.makeRequest<any>(queryString, {
+        method: 'GET'
+      });
       
       const data = Array.isArray(response) ? response : response.data || [];
       const normalized = this.normalizeData(data);
@@ -386,6 +313,9 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
     }
   }
 
+  /**
+   * Obtener por ID
+   */
   public async getById(id: string | number): Promise<T | null> {
     const cacheKey = `${this.cacheKey}_${id}`;
     
@@ -395,7 +325,9 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
     }
     
     try {
-      const response = await this.makeRequest<any>(`/${id}`);
+      const response = await this.makeRequest<any>(`/${id}`, {
+        method: 'GET'
+      });
       const data = response.data || response;
       const normalized = this.normalizeData([data])[0];
       
@@ -411,40 +343,41 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
     }
   }
 
+  /**
+   * Crear nuevo registro
+   */
   public async create(data: CreateDTO): Promise<T> {
     try {
-      console.log('➕ [BaseApiService] Creando con datos:', data);
-      console.log('🔧 Auth config para POST:', this.authConfig.POST);
-      const response = await this.makeRequest<ApiResponse<T>>('', {
+      console.log('➕ [BaseApiService] Creando:', data);
+      
+      const response = await this.makeRequest<any>('', {
         method: 'POST',
         body: JSON.stringify(data)
-        
       });
       
       const created = response.data || response;
       const normalized = this.normalizeData([created])[0];
       
+      // Limpiar cache después de crear
       this.clearCache();
-      
-      // Notificar éxito
-      NotificationService.success(`${this.constructor.name.replace('Service', '')} creado exitosamente`);
+      NotificationService.success('Registro creado exitosamente');
       
       return normalized;
-    } catch (error) {
-      console.error(`❌ [${this.constructor.name}] Error creando:`, error);
-      
-      // Notificar error
-      if (error instanceof ApiError) {
-        NotificationService.error(error.message);
-      }
-      
+    } catch (error: any) {
+      console.error('❌ [BaseApiService] Error al crear:', error);
+      NotificationService.error(error.message || 'Error al crear el registro');
       throw error;
     }
   }
 
+  /**
+   * Actualizar registro
+   */
   public async update(id: string | number, data: UpdateDTO): Promise<T> {
     try {
-      const response = await this.makeRequest<ApiResponse<T>>(`/${id}`, {
+      console.log('📝 [BaseApiService] Actualizando:', id, data);
+      
+      const response = await this.makeRequest<any>(`/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data)
       });
@@ -452,147 +385,56 @@ export abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any> {
       const updated = response.data || response;
       const normalized = this.normalizeData([updated])[0];
       
+      // Limpiar cache después de actualizar
       this.clearCache();
-      
-      NotificationService.success(`Actualizado exitosamente`);
+      NotificationService.success('Registro actualizado exitosamente');
       
       return normalized;
-    } catch (error) {
-      console.error(`❌ [${this.constructor.name}] Error actualizando:`, error);
-      
-      if (error instanceof ApiError) {
-        NotificationService.error(error.message);
-      }
-      
+    } catch (error: any) {
+      console.error('❌ [BaseApiService] Error al actualizar:', error);
+      NotificationService.error(error.message || 'Error al actualizar el registro');
       throw error;
     }
   }
 
+  /**
+   * Eliminar registro
+   */
   public async delete(id: string | number): Promise<void> {
     try {
+      console.log('🗑️ [BaseApiService] Eliminando:', id);
+      
       await this.makeRequest(`/${id}`, {
         method: 'DELETE'
       });
       
+      // Limpiar cache después de eliminar
       this.clearCache();
+      NotificationService.success('Registro eliminado exitosamente');
       
-      NotificationService.success(`Eliminado exitosamente`);
-    } catch (error) {
-      console.error(`❌ [${this.constructor.name}] Error eliminando:`, error);
-      
-      if (error instanceof ApiError) {
-        NotificationService.error(error.message);
-      }
-      
+    } catch (error: any) {
+      console.error('❌ [BaseApiService] Error al eliminar:', error);
+      NotificationService.error(error.message || 'Error al eliminar el registro');
       throw error;
     }
   }
 
-  // Otros métodos...
-  
-  public async search(params: any): Promise<T[]> {
-    const cacheKey = `${this.cacheKey}_search_${JSON.stringify(params)}`;
-    
-    const cached = this.getCachedData(cacheKey);
-    if (cached) {
-      return cached;
-    }
-    
+  /**
+   * Buscar registros
+   */
+  public async search(params: Record<string, any>): Promise<T[]> {
     try {
-      const queryString = `?${new URLSearchParams(params).toString()}`;
-      const response = await this.makeRequest<any>(queryString);
+      const queryString = new URLSearchParams(params).toString();
+      const response = await this.makeRequest<any>(`?${queryString}`, {
+        method: 'GET'
+      });
       
       const data = Array.isArray(response) ? response : response.data || [];
-      const normalized = this.normalizeData(data);
+      return this.normalizeData(data);
       
-      this.setCachedData(cacheKey, normalized);
-      
-      return normalized;
     } catch (error) {
       console.error(`❌ [${this.constructor.name}] Error en búsqueda:`, error);
       throw error;
     }
   }
-
-  public async patch(id: string | number, data: Partial<UpdateDTO>): Promise<T> {
-    try {
-      const response = await this.makeRequest<ApiResponse<T>>(`/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data)
-      });
-      
-      const updated = response.data || response;
-      const normalized = this.normalizeData([updated])[0];
-      
-      this.clearCache();
-      
-      return normalized;
-    } catch (error) {
-      console.error(`❌ [${this.constructor.name}] Error actualizando parcialmente:`, error);
-      throw error;
-    }
-  }
-
-  public async deleteMany(ids: (string | number)[]): Promise<void> {
-    try {
-      await this.makeRequest('/batch-delete', {
-        method: 'POST',
-        body: JSON.stringify({ ids })
-      });
-      
-      this.clearCache();
-    } catch (error) {
-      console.error(`❌ [${this.constructor.name}] Error eliminando múltiples:`, error);
-      throw error;
-    }
-  }
-
-  public async getPaginated(params: QueryParams): Promise<PaginatedResponse<T>> {
-    try {
-      const queryString = `?${new URLSearchParams(params as any).toString()}`;
-      const response = await this.makeRequest<PaginatedResponse<any>>(queryString);
-      
-      const normalized = this.normalizeData(response.data);
-      
-      return {
-        ...response,
-        data: normalized
-      };
-    } catch (error) {
-      console.error(`❌ [${this.constructor.name}] Error obteniendo paginado:`, error);
-      throw error;
-    }
-  }
-
-  public async exists(id: string | number): Promise<boolean> {
-    try {
-      await this.makeRequest(`/${id}/exists`, {
-        method: 'HEAD'
-      });
-      return true;
-    } catch (error) {
-      if ((error as ApiError).statusCode === 404) {
-        return false;
-      }
-      throw error;
-    }
-  }
-
-  public async executeAction(id: string | number, action: string, data?: any): Promise<any> {
-    try {
-      const response = await this.makeRequest(`/${id}/${action}`, {
-        method: 'POST',
-        body: data ? JSON.stringify(data) : undefined
-      });
-      
-      this.clearCache();
-      
-      return response;
-    } catch (error) {
-      console.error(`❌ [${this.constructor.name}] Error ejecutando acción ${action}:`, error);
-      throw error;
-    }
-  }
 }
-
-export default BaseApiService;

@@ -1,7 +1,10 @@
-// src/components/barrio/BarrioList.tsx - VERSIÓN COMPLETA CORREGIDA
-import React, { useState, useEffect, useMemo } from 'react';
+// src/components/barrio/BarrioList.tsx
+import React, { useMemo, useState } from 'react';
+import { Barrio } from '../../models/Barrio';
+import { Sector } from '../../models/Sector';
+
+// Material-UI imports
 import {
-  Paper,
   Table,
   TableBody,
   TableCell,
@@ -10,375 +13,184 @@ import {
   TableRow,
   TablePagination,
   IconButton,
-  Chip,
   Box,
   Typography,
-  TextField,
-  InputAdornment,
-  Tooltip,
-  TableSortLabel,
-  Skeleton,
-  Alert,
-  Stack,
-  useTheme,
-  alpha,
-  Fade,
-  Collapse
+  CircularProgress,
+  Tooltip
 } from '@mui/material';
 import {
-  Search as SearchIcon,
-  Delete as DeleteIcon,
-  LocationCity as LocationCityIcon,
-  Home as HomeIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  CloudOff as CloudOffIcon,
-  Clear as ClearIcon
+  Edit as EditIcon,
+  LocationOn as LocationIcon
 } from '@mui/icons-material';
-import { BarrioData } from '../../services/barrioService';
 
 interface BarrioListProps {
-  barrios: BarrioData[];
-  onSelectBarrio: (barrio: BarrioData) => void;
-  isOfflineMode?: boolean;
-  onEliminar?: (id: number) => void;
+  barrios: Barrio[];
+  sectores?: Sector[];
+  onEdit?: (barrio: Barrio) => void;
+  onDelete?: (barrio: Barrio) => void;
+  onView?: (barrio: Barrio) => void;
   loading?: boolean;
-  onSearch?: (term: string) => void;
   searchTerm?: string;
-  obtenerNombreSector?: (sectorId: number) => string;
 }
 
-type Order = 'asc' | 'desc';
-
-interface HeadCell {
-  id: keyof BarrioData | 'sector' | 'acciones';
-  label: string;
-  align?: 'left' | 'center' | 'right';
-  sortable?: boolean;
-}
-
-const headCells: HeadCell[] = [
-  { id: 'nombre', label: 'Barrio', sortable: true },
-  { id: 'sector', label: 'Sector', sortable: true },
-  { id: 'estado', label: 'Estado', align: 'center', sortable: true },
-  { id: 'acciones', label: 'Acciones', align: 'center' }
-];
-
-const BarrioListMUI: React.FC<BarrioListProps> = ({
-  barrios,
-  onSelectBarrio,
-  isOfflineMode = false,
-  onEliminar,
+const BarrioList: React.FC<BarrioListProps> = ({
+  barrios = [],
+  sectores = [],
+  onEdit,
+  onDelete,
+  onView,
   loading = false,
-  onSearch,
-  searchTerm = '',
-  obtenerNombreSector
+  searchTerm = ''
 }) => {
-  const theme = useTheme();
+  // Estados para paginación
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [order, setOrder] = useState<Order>('asc');
-  const [orderBy, setOrderBy] = useState<string>('nombre');
-  const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [rowsPerPage, setRowsPerPage] = useState(5); // 5 filas por página
 
-   // LOGS DE DEBUG
-  useEffect(() => {
-    console.log('🔍 [BarrioList] Props recibidas:', {
-      barrios,
-      cantidadBarrios: barrios?.length,
-      loading,
-      searchTerm
-    });
-    
-    if (barrios && barrios.length > 0) {
-      console.log('📋 [BarrioList] Primer barrio:', barrios[0]);
+  // Crear un mapa de sectores para búsqueda eficiente
+  const sectoresMap = useMemo(() => {
+    const map = new Map<number, Sector>();
+    if (Array.isArray(sectores)) {
+      sectores.forEach(sector => {
+        map.set(sector.id, sector);
+      });
     }
-  }, [barrios, loading]);
-  
-  useEffect(() => {
-    setLocalSearchTerm(searchTerm);
-  }, [searchTerm]);
+    return map;
+  }, [sectores]);
 
-  // Manejo de ordenamiento
-  const handleRequestSort = (property: string) => {
-    const isAsc = orderBy === property && order === 'asc';
-    setOrder(isAsc ? 'desc' : 'asc');
-    setOrderBy(property);
+  // Obtener el nombre del sector
+  const getNombreSector = (codSector: number | undefined): string => {
+    if (!codSector) return 'Sin sector';
+    const sector = sectoresMap.get(codSector);
+    return sector?.nombre || `Sector ${codSector}`;
   };
 
-  // Manejo de búsqueda local
-  const handleLocalSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
-    setLocalSearchTerm(value);
-    setPage(0);
-    
-    if (onSearch) {
-      onSearch(value);
-    }
-  };
-
-  // Limpiar búsqueda
-  const handleClearSearch = () => {
-    setLocalSearchTerm('');
-    if (onSearch) {
-      onSearch('');
-    }
-  };
-
-  // Cambio de página
+  // Manejar cambio de página
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
   };
 
-  // Cambio de filas por página
+  // Manejar cambio de filas por página
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
-  // Seleccionar barrio
-  const handleSelectBarrio = (barrio: BarrioData) => {
-    setSelectedId(barrio.codigo);
-    onSelectBarrio(barrio);
-  };
+  // Calcular los barrios a mostrar en la página actual
+  const barriosPaginados = useMemo(() => {
+    const inicio = page * rowsPerPage;
+    const fin = inicio + rowsPerPage;
+    return barrios.slice(inicio, fin);
+  }, [barrios, page, rowsPerPage]);
 
-  // Filtrado y ordenamiento
-  const sortedAndFilteredBarrios = useMemo(() => {
-    let filtered = [...barrios];
+  // Verificar si el array es válido
+  if (!Array.isArray(barrios)) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Typography color="error">
+          Error: No se pudieron cargar los barrios
+        </Typography>
+      </Box>
+    );
+  }
 
-    // Filtrado local
-    if (localSearchTerm) {
-      const searchLower = localSearchTerm.toLowerCase();
-      filtered = filtered.filter(barrio => 
-        barrio.nombre.toLowerCase().includes(searchLower) ||
-        (obtenerNombreSector && obtenerNombreSector(barrio.codigoSector).toLowerCase().includes(searchLower))
-      );
-    }
+  // Estado de carga
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
-    // Ordenamiento
-    filtered.sort((a, b) => {
-      let comparison = 0;
-      
-      switch (orderBy) {
-        case 'nombre':
-          comparison = a.nombre.localeCompare(b.nombre);
-          break;
-        case 'sector':
-          const sectorA = obtenerNombreSector ? obtenerNombreSector(a.codigoSector) : '';
-          const sectorB = obtenerNombreSector ? obtenerNombreSector(b.codigoSector) : '';
-          comparison = sectorA.localeCompare(sectorB);
-          break;
-        case 'estado':
-          comparison = (a.estado === b.estado) ? 0 : (a.estado === 'ACTIVO' ? -1 : 1);
-          break;
-      }
-      
-      return order === 'desc' ? -comparison : comparison;
-    });
-
-    return filtered;
-  }, [barrios, localSearchTerm, orderBy, order, obtenerNombreSector]);
-
-  // Paginación
-  const paginatedBarrios = useMemo(() => {
-    const startIndex = page * rowsPerPage;
-    return sortedAndFilteredBarrios.slice(startIndex, startIndex + rowsPerPage);
-  }, [sortedAndFilteredBarrios, page, rowsPerPage]);
-
-  // Renderizado de skeleton
-  const renderSkeleton = () => (
-    <>
-      {[...Array(5)].map((_, index) => (
-        <TableRow key={index}>
-          <TableCell><Skeleton variant="text" /></TableCell>
-          <TableCell><Skeleton variant="text" /></TableCell>
-          <TableCell align="center"><Skeleton variant="rounded" width={80} height={24} /></TableCell>
-          <TableCell align="center"><Skeleton variant="circular" width={32} height={32} /></TableCell>
-        </TableRow>
-      ))}
-    </>
-  );
+  // Lista vacía
+  if (barrios.length === 0) {
+    return (
+      <Box sx={{ p: 5, textAlign: 'center' }}>
+        <LocationIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+        <Typography variant="h6" color="text.secondary" gutterBottom>
+          No hay barrios
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {searchTerm
+            ? `No se encontraron barrios que coincidan con "${searchTerm}"`
+            : 'Comience creando un nuevo barrio'}
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
-    <Paper elevation={2} sx={{ width: '100%', overflow: 'hidden' }}>
-      {/* Header con búsqueda */}
-      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-        <Stack direction="row" spacing={2} alignItems="center">
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Buscar por nombre de barrio..."
-            value={localSearchTerm}
-            onChange={handleLocalSearch}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-              endAdornment: localSearchTerm && (
-                <InputAdornment position="end">
-                  <IconButton size="small" onClick={handleClearSearch}>
-                    <ClearIcon fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              )
-            }}
-          />
-          
-          {isOfflineMode && (
-            <Chip
-              icon={<CloudOffIcon />}
-              label="Offline"
-              color="warning"
-              size="small"
-              variant="outlined"
-            />
-          )}
-        </Stack>
-      </Box>
-
-      {/* Mensaje cuando no hay datos */}
-      <Collapse in={!loading && barrios.length === 0}>
-        <Alert 
-          severity="info" 
-          sx={{ m: 2 }}
-          icon={<HomeIcon />}
-        >
-          <Typography variant="body2">
-            No hay barrios registrados
-          </Typography>
-        </Alert>
-      </Collapse>
-
-      {/* Tabla */}
-      <TableContainer sx={{ maxHeight: 440 }}>
-        <Table stickyHeader size="small">
+    <Box>
+      <TableContainer>
+        <Table size="small">
           <TableHead>
             <TableRow>
-              {headCells.map((headCell) => (
-                <TableCell
-                  key={headCell.id}
-                  align={headCell.align || 'left'}
-                  sortDirection={orderBy === headCell.id ? order : false}
-                >
-                  {headCell.sortable ? (
-                    <TableSortLabel
-                      active={orderBy === headCell.id}
-                      direction={orderBy === headCell.id ? order : 'asc'}
-                      onClick={() => handleRequestSort(headCell.id as string)}
-                    >
-                      {headCell.label}
-                    </TableSortLabel>
-                  ) : (
-                    headCell.label
-                  )}
-                </TableCell>
-              ))}
+              <TableCell width="50%">Nombre</TableCell>
+              <TableCell width="40%">Sector</TableCell>
+              <TableCell width="10%" align="center">Acciones</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading ? (
-              renderSkeleton()
-            ) : paginatedBarrios.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} align="center">
-                  <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
-                    {localSearchTerm 
-                      ? `No se encontraron barrios que coincidan con "${localSearchTerm}"`
-                      : 'No hay barrios para mostrar'}
+            {barriosPaginados.map((barrio) => (
+              <TableRow 
+                key={barrio.id}
+                hover
+                sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+              >
+                <TableCell>
+                  <Typography variant="body2" fontWeight="medium">
+                    {barrio.nombre}
                   </Typography>
                 </TableCell>
-              </TableRow>
-            ) : (
-              paginatedBarrios.map((barrio, index) => (
-                <Fade
-                  key={barrio.codigo}
-                  in={true}
-                  timeout={300 + index * 50}
-                >
-                  <TableRow
-                    hover
-                    onClick={() => handleSelectBarrio(barrio)}
-                    selected={selectedId === barrio.codigo}
-                    sx={{
-                      cursor: 'pointer',
-                      '&:hover': {
-                        backgroundColor: alpha(theme.palette.primary.main, 0.05)
-                      },
-                      '&.Mui-selected': {
-                        backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                        '&:hover': {
-                          backgroundColor: alpha(theme.palette.primary.main, 0.12)
-                        }
-                      }
-                    }}
-                  >
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <HomeIcon fontSize="small" color="action" />
-                        <Typography variant="body2" fontWeight={500}>
-                          {barrio.nombre}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <LocationCityIcon fontSize="small" color="action" />
-                        <Typography variant="body2" color="text.secondary">
-                          {obtenerNombreSector ? obtenerNombreSector(barrio.codigoSector) : `Sector ${barrio.codigoSector}`}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip
-                        icon={barrio.estado === 'INACTIVO' ? <CancelIcon /> : <CheckCircleIcon />}
-                        label={barrio.estado === 'INACTIVO' ? 'Inactivo' : 'Activo'}
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <LocationIcon fontSize="small" color="action" sx={{ fontSize: 16 }} />
+                    <Typography variant="body2" fontSize="0.875rem">
+                      {getNombreSector(barrio.codSector)}
+                    </Typography>
+                  </Box>
+                </TableCell>
+                <TableCell align="center">
+                  {onEdit && (
+                    <Tooltip title="Editar">
+                      <IconButton
                         size="small"
-                        color={barrio.estado === 'INACTIVO' ? 'error' : 'success'}
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      {onEliminar && (
-                        <Tooltip title="Eliminar barrio">
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onEliminar(barrio.codigo);
-                            }}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                </Fade>
+                        onClick={() => onEdit(barrio)}
+                        color="primary"
+                        sx={{ padding: '4px' }}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+            {/* Filas vacías para mantener altura consistente */}
+            {barriosPaginados.length < rowsPerPage && (
+              Array.from({ length: rowsPerPage - barriosPaginados.length }).map((_, index) => (
+                <TableRow key={`empty-${index}`} sx={{ height: 41 }}>
+                  <TableCell colSpan={3} />
+                </TableRow>
               ))
             )}
           </TableBody>
         </Table>
       </TableContainer>
-
-      {/* Paginación */}
       <TablePagination
+        rowsPerPageOptions={[5, 10, 15]}
         component="div"
-        count={sortedAndFilteredBarrios.length}
+        count={barrios.length}
+        rowsPerPage={rowsPerPage}
         page={page}
         onPageChange={handleChangePage}
-        rowsPerPage={rowsPerPage}
         onRowsPerPageChange={handleChangeRowsPerPage}
         labelRowsPerPage="Filas por página:"
         labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
-        rowsPerPageOptions={[5, 10, 25, 50]}
         sx={{ borderTop: 1, borderColor: 'divider' }}
       />
-    </Paper>
+    </Box>
   );
 };
 
-export default BarrioListMUI;
+export default BarrioList;

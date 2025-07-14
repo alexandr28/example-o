@@ -154,41 +154,74 @@ export const useSectores = () => {
       setError(null);
       
       console.log('💾 [useSectores] Guardando sector:', data);
-      
-      let resultado: SectorData;
+      console.log('🔄 [useSectores] Modo edición:', modoEdicion);
       
       if (modoEdicion && sectorSeleccionado) {
-        // Actualizar
-        resultado = await sectorService.update(sectorSeleccionado.id, {
-          nombre: data.nombre.trim(),
-          descripcion: data.descripcion?.trim()
-        });
+        // Modo edición
+        console.log('📝 [useSectores] Actualizando sector ID:', sectorSeleccionado.id);
+        
+        const resultado = await sectorService.actualizarSector(
+          sectorSeleccionado.id, 
+          {
+            nombre: data.nombre.trim(),
+            descripcion: data.descripcion?.trim() || ''
+          }
+        );
+        
         console.log('✅ [useSectores] Sector actualizado:', resultado);
         NotificationService.success('Sector actualizado correctamente');
         
       } else {
-        // Crear nuevo
-        const createDto: CreateSectorDTO = {
+        // Modo creación
+        console.log('➕ [useSectores] Creando nuevo sector');
+        
+        const resultado = await sectorService.crearSector({
           nombre: data.nombre.trim(),
-          descripcion: data.descripcion?.trim() || '',
-          codUsuario: 1
-        };
-        resultado = await sectorService.create(createDto);
+          descripcion: data.descripcion?.trim() || ''
+        });
+        
         console.log('✅ [useSectores] Sector creado:', resultado);
-        NotificationService.success('Sector creado correctamente');
+        
+        // Verificar si se creó con éxito (incluso con ID temporal)
+        if (resultado && resultado.codigo) {
+          NotificationService.success('Sector creado correctamente');
+        }
       }
       
-      // Recargar lista completa
+      // IMPORTANTE: Recargar la lista después de crear/actualizar
+      console.log('🔄 [useSectores] Recargando lista de sectores...');
+      
+      // Pequeña demora para asegurar que el servidor procesó el cambio
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Recargar lista
       await cargarSectores();
       
-      // Limpiar selección después de guardar
+      // Limpiar formulario y cerrar modal
       limpiarSeleccion();
       
       return true;
       
     } catch (error: any) {
       console.error('❌ [useSectores] Error al guardar:', error);
-      const mensaje = error.message || 'Error al guardar el sector';
+      
+      // Mensaje de error más específico
+      let mensaje = 'Error al guardar el sector';
+      
+      if (error.message) {
+        if (error.message.includes('403')) {
+          mensaje = 'No tiene permisos para realizar esta acción';
+        } else if (error.message.includes('400')) {
+          mensaje = 'Datos inválidos. Verifique la información';
+        } else if (error.message.includes('500')) {
+          mensaje = 'Error del servidor. Intente nuevamente';
+        } else if (error.message.includes('NaN')) {
+          mensaje = 'Error al procesar la respuesta del servidor';
+        } else {
+          mensaje = error.message;
+        }
+      }
+      
       setError(mensaje);
       NotificationService.error(mensaje);
       return false;

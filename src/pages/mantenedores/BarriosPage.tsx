@@ -1,221 +1,221 @@
-// src/pages/mantenedores/BarriosPage.tsx - VERSIÓN COMPLETA CORREGIDA
-import React, { useState, useCallback } from 'react';
-import {
-  Box,
-  Paper,
-  Grid,
-  Alert,
-  LinearProgress,
-  Typography,
-  Collapse
-} from '@mui/material';
+// src/pages/mantenedores/BarrioPage.tsx
+import React, { useState } from 'react';
 import { MainLayout } from '../../layout';
 import { Breadcrumb } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useBarrios } from '../../hooks/useBarrios';
-import { CreateBarrioDTO } from '../../services/barrioService';
-import BarrioFormMUI from '../../components/barrio/BarrioForm';
-import BarrioListMUI from '../../components/barrio/BarrioList';
-import { NotificationService } from '../../components/utils/Notification';
-import { NotificationContainer } from '../../components';
+import { useSectores } from '../../hooks/useSectores';
+import BarrioList from '../../components/barrio/BarrioList';
+import BarrioForm from '../../components/barrio/BarrioForm';
 
-const BarriosPage: React.FC = () => {
-  // Hook de barrios con las propiedades correctas
+// Material-UI imports
+import {
+  Box,
+  Paper,
+  Typography,
+  TextField,
+  InputAdornment,
+  Grid,
+  Alert
+} from '@mui/material';
+import {
+  Search as SearchIcon
+} from '@mui/icons-material';
+
+const BarrioPage: React.FC = () => {
+  // Hooks
   const {
-    // Estados del hook
     barrios,
-    barrioSeleccionado,
     loading,
     error,
     searchTerm,
-    isOffline, // Nota: es isOffline, no isOfflineMode
-    
-    // Estados adicionales
-    sectores,
-    loadingSectores,
-    
-    // Acciones CRUD
-    cargarBarrios,
-    crearBarrio,
-    actualizarBarrio,
-    eliminarBarrio,
+    setSearchTerm,
+    barrioSeleccionado,
+    modoEdicion,
     seleccionarBarrio,
-    buscarBarrios,
     limpiarSeleccion,
-    
-    // Acciones adicionales
-    buscarPorSector,
-    cargarSectores,
-    refrescar,
-    limpiarError
+    guardarBarrio,
+    eliminarBarrio,
+    estadisticas,
+    setError  // Agregar setError
   } = useBarrios();
 
-  // Estados locales del componente
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [modoEdicion, setModoEdicion] = useState(false);
+  const { sectores } = useSectores();
+
+  // Estados locales
+  const [guardando, setGuardando] = useState(false);
 
   // Breadcrumb items
   const breadcrumbItems: BreadcrumbItem[] = [
-    { label: 'Módulo', href: '/' },
-    { label: 'Mantenedores', href: '/mantenedores' },
-    { label: 'Ubicación', href: '/mantenedores/ubicacion' },
-    { label: 'Barrios', active: true }
+    { label: 'Inicio', path: '/' },
+    { label: 'Mantenedores', path: '/mantenedores' },
+    { label: 'Barrios', path: '/mantenedores/barrios', active: true }
   ];
 
-  // Función helper para obtener nombre del sector
-  const obtenerNombreSector = useCallback((sectorId: number): string => {
-    const sector = sectores.find(s => s.codigo === sectorId);
-    return sector?.nombre || `Sector ${sectorId}`;
-  }, [sectores]);
+  // Abrir modal para editar
+  const abrirModal = (barrio?: any) => {
+    if (barrio) {
+      seleccionarBarrio(barrio);
+    } else {
+      limpiarSeleccion();
+    }
+  };
 
   // Manejar guardado
-  const handleGuardar = useCallback(async (formData: any) => {
+  const handleGuardar = async (datos: any) => {
+    setGuardando(true);
     try {
-      setSuccessMessage(null);
-      
-      const barrioData: CreateBarrioDTO = {
-        codigoSector: formData.sectorId,
-        nombre: formData.nombre,
-        descripcion: formData.descripcion || '',
-        codUsuario: 1
-      };
-
-      if (modoEdicion && barrioSeleccionado) {
-        await actualizarBarrio(barrioSeleccionado.codigo, barrioData);
-        setSuccessMessage('Barrio actualizado exitosamente');
-        NotificationService.success('Barrio actualizado exitosamente');
-      } else {
-        await crearBarrio(barrioData);
-        setSuccessMessage('Barrio creado exitosamente');
-        NotificationService.success('Barrio creado exitosamente');
+      const exito = await guardarBarrio(datos);
+      if (exito) {
+        limpiarSeleccion();
       }
-
-      limpiarSeleccion();
-      setModoEdicion(false);
-      await refrescar();
-      
-    } catch (error: any) {
-      console.error('Error al guardar:', error);
-      NotificationService.error(error.message || 'Error al guardar el barrio');
+    } finally {
+      setGuardando(false);
     }
-  }, [modoEdicion, barrioSeleccionado, actualizarBarrio, crearBarrio, limpiarSeleccion, refrescar]);
-
-  // Manejar edición
-  const handleEditar = useCallback(() => {
-    if (barrioSeleccionado) {
-      setModoEdicion(true);
-    }
-  }, [barrioSeleccionado]);
-
-  // Manejar nuevo
-  const handleNuevo = useCallback(() => {
-    limpiarSeleccion();
-    setModoEdicion(false);
-    setSuccessMessage(null);
-  }, [limpiarSeleccion]);
-
-  // Manejar selección
-  const handleSeleccionarBarrio = useCallback((barrio: any) => {
-    seleccionarBarrio(barrio);
-    setModoEdicion(false);
-  }, [seleccionarBarrio]);
+  };
 
   // Manejar eliminación
-  const handleEliminar = useCallback(async (id: number) => {
-    if (window.confirm('¿Está seguro de eliminar este barrio?')) {
-      try {
-        await eliminarBarrio(id);
-        setSuccessMessage('Barrio eliminado exitosamente');
-        NotificationService.success('Barrio eliminado exitosamente');
-      } catch (error: any) {
-        console.error('Error al eliminar:', error);
-        NotificationService.error(error.message || 'Error al eliminar el barrio');
-      }
-    }
-  }, [eliminarBarrio]);
+  const handleEliminar = async (barrio: any) => {
+    await eliminarBarrio(barrio.id);
+  };
 
   return (
-    <MainLayout title="Mantenedor de Barrios">
+    <MainLayout>
       <Box sx={{ p: 3 }}>
         {/* Breadcrumb */}
-        <Box sx={{ mb: 3 }}>
-          <Breadcrumb items={breadcrumbItems} />
+        <Breadcrumb items={breadcrumbItems} />
+
+        {/* Encabezado */}
+        <Box sx={{ mb: 4, mt: 2 }}>
+          <Typography variant="h4" component="h1" gutterBottom>
+            Gestión de Barrios
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Administre los barrios del sistema
+          </Typography>
         </Box>
 
-        {/* Progress bar */}
-        {(loading || loadingSectores) && (
-          <Box sx={{ width: '100%', mb: 2 }}>
-            <LinearProgress />
-          </Box>
-        )}
-
-        {/* Mensaje de éxito */}
-        <Collapse in={!!successMessage}>
-          <Alert 
-            severity="success" 
-            sx={{ mb: 2 }} 
-            onClose={() => setSuccessMessage(null)}
-          >
-            {successMessage}
-          </Alert>
-        </Collapse>
-
-        {/* Mensaje de error */}
-        <Collapse in={!!error}>
-          <Alert 
-            severity="error" 
-            sx={{ mb: 2 }} 
-            onClose={limpiarError}
-          >
-            {error}
-          </Alert>
-        </Collapse>
-
-        {/* Modo offline */}
-        {isOffline && (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            <Typography variant="body2">
-              Trabajando sin conexión. Los cambios se guardarán localmente.
-            </Typography>
-          </Alert>
-        )}
-
-        {/* Layout principal */}
+        {/* Contenedor principal con dos columnas */}
         <Grid container spacing={3}>
-          {/* Formulario */}
-          <Grid item xs={12} md={4}>
-            <Paper sx={{ p: 2 }}>
-              <BarrioFormMUI
-                barrio={barrioSeleccionado}
-                sectores={sectores}
+          {/* Columna izquierda - Formulario */}
+          <Grid item xs={12} md={6}>
+            <Paper sx={{ p: 3, height: '100%' }}>
+              <Typography variant="h6" gutterBottom>
+                {modoEdicion ? 'Editar Barrio' : 'Nuevo Barrio'}
+              </Typography>
+              
+              <BarrioForm
                 onSubmit={handleGuardar}
-                onNuevo={handleNuevo}
-                onEditar={handleEditar}
-                loading={loading || loadingSectores}
-                isEditMode={modoEdicion}
+                onCancel={limpiarSeleccion}
+                initialData={barrioSeleccionado || undefined}
+                isSubmitting={guardando}
               />
             </Paper>
           </Grid>
 
-          {/* Lista */}
-          <Grid item xs={12} md={8}>
-            <BarrioListMUI
-              barrios={barrios}
-              onSelectBarrio={handleSeleccionarBarrio}
-              onEliminar={handleEliminar}
-              loading={loading}
-              onSearch={buscarBarrios}
-              searchTerm={searchTerm}
-              obtenerNombreSector={obtenerNombreSector}
-            />
+          {/* Columna derecha - Lista y búsqueda */}
+          <Grid item xs={12} md={6}>
+            <Paper sx={{ p: 3, height: '100%' }}>
+              {/* Barra de búsqueda */}
+              <Box sx={{ mb: 2 }}>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  placeholder="Buscar barrios..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                  size="small"
+                />
+              </Box>
+
+              {/* Estadísticas compactas */}
+              {estadisticas && (
+                <Grid container spacing={1} sx={{ mb: 2 }}>
+                  <Grid item xs={4}>
+                    <Box sx={{ 
+                      bgcolor: 'grey.100', 
+                      p: 1, 
+                      borderRadius: 1,
+                      textAlign: 'center' 
+                    }}>
+                      <Typography variant="caption" color="textSecondary">
+                        TOTAL
+                      </Typography>
+                      <Typography variant="h6" fontWeight="bold">
+                        {estadisticas.total}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={4}>
+                    <Box sx={{ 
+                      bgcolor: 'success.50', 
+                      p: 1, 
+                      borderRadius: 1,
+                      textAlign: 'center' 
+                    }}>
+                      <Typography variant="caption" color="textSecondary">
+                        ACTIVOS
+                      </Typography>
+                      <Typography variant="h6" color="success.main" fontWeight="bold">
+                        {estadisticas.activos}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={4}>
+                    <Box sx={{ 
+                      bgcolor: 'error.50', 
+                      p: 1, 
+                      borderRadius: 1,
+                      textAlign: 'center' 
+                    }}>
+                      <Typography variant="caption" color="textSecondary">
+                        INACTIVOS
+                      </Typography>
+                      <Typography variant="h6" color="error.main" fontWeight="bold">
+                        {estadisticas.inactivos}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              )}
+
+              {/* Lista de barrios */}
+              <Box sx={{ 
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1
+              }}>
+                <BarrioList
+                  barrios={barrios || []}
+                  sectores={sectores || []}
+                  onEdit={abrirModal}
+                  onDelete={handleEliminar}
+                  loading={loading}
+                  searchTerm={searchTerm}
+                />
+              </Box>
+            </Paper>
           </Grid>
         </Grid>
 
-        {/* Contenedor de notificaciones */}
-        <NotificationContainer />
+        {/* Mensaje de error global */}
+        {error && (
+          <Box sx={{ mt: 2 }}>
+            <Alert severity="error" onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          </Box>
+        )}
       </Box>
     </MainLayout>
   );
 };
 
-export default BarriosPage;
+export default BarrioPage;

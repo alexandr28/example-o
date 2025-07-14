@@ -1,4 +1,5 @@
-// src/services/sectorService.ts
+// src/services/sectorService.ts - VERSIÓN CORREGIDA CON nombreSector
+
 import BaseApiService from './BaseApiService';
 import { API_CONFIG } from '../config/api.unified.config';
 
@@ -16,13 +17,16 @@ export interface SectorData {
 }
 
 export interface CreateSectorDTO {
-  nombre: string;
+  nombreSector: string;  // ← IMPORTANTE: Usar nombreSector, no nombre
   descripcion?: string;
   codUsuario?: number;
 }
 
-export interface UpdateSectorDTO extends Partial<CreateSectorDTO> {
+export interface UpdateSectorDTO {
+  nombreSector?: string;  // ← IMPORTANTE: Usar nombreSector
+  descripcion?: string;
   estado?: string;
+  fechaModificacion?: string;
 }
 
 export interface BusquedaSectorParams {
@@ -33,9 +37,7 @@ export interface BusquedaSectorParams {
 
 /**
  * Servicio para gestión de sectores
- * 
- * Autenticación:
- * - Ningún método requiere autenticación según tu API
+ * IMPORTANTE: El API espera "nombreSector" no "nombre"
  */
 class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSectorDTO> {
   private static instance: SectorService;
@@ -46,7 +48,7 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
       {
         normalizeItem: (item: any) => ({
           codigo: item.codSector || item.codigo || 0,
-          nombre: item.nombre || item.nombreSector || '',
+          nombre: item.nombre || item.nombreSector || '',  // Mapear nombreSector a nombre
           descripcion: item.descripcion || '',
           estado: item.estado || 'ACTIVO',
           fechaRegistro: item.fechaRegistro,
@@ -55,19 +57,10 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
         }),
         
         validateItem: (item: SectorData) => {
-          // Validar que tenga código y nombre
           return !!item.codigo && !!item.nombre && item.nombre.trim().length > 0;
         }
       },
-      'sector_cache',
-      // Configuración de autenticación: ningún método requiere auth
-      {
-        GET: false,
-        POST: false,
-        PUT: false,
-        DELETE: false,
-        PATCH: false
-      }
+      'sector_cache'
     );
   }
   
@@ -79,14 +72,121 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
   }
   
   /**
-   * Crea un nuevo sector
-   * NO requiere autenticación
+   * Sobrescribir create para manejar la respuesta numérica
    */
-  async crearSector(datos: CreateSectorDTO): Promise<SectorData> {
+  async create(data: CreateSectorDTO): Promise<SectorData> {
     try {
-      console.log('📝 [SectorService] Creando sector:', datos);
+      console.log('📝 [SectorService] Creando sector con datos:', data);
       
-      // Validaciones básicas
+      // IMPORTANTE: Asegurarse de que NO se envíe ningún header de autorización
+      const response = await fetch(buildApiUrl(this.endpoint), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+          // NO Authorization header
+        },
+        body: JSON.stringify(data)
+      });
+      
+      console.log('📡 Status:', response.status);
+      const responseText = await response.text();
+      console.log('📡 Respuesta:', responseText);
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${responseText || response.statusText}`);
+      }
+      
+      // Manejar diferentes tipos de respuesta
+      console.log('📋 Tipo de respuesta:', typeof responseText);
+      console.log('📋 Longitud respuesta:', responseText.length);
+      console.log('📋 Respuesta exacta:', responseText);
+      
+      // Limpiar la respuesta de espacios y comillas
+      const cleanResponse = responseText.trim().replace(/['"]/g, '');
+      
+      // Si la respuesta es "null" (string) o vacía
+      if (cleanResponse === 'null' || cleanResponse === '' || responseText.trim() === '') {
+        console.log('⚠️ Servidor devolvió null o vacío, pero status es OK');
+        console.log('✅ Asumiendo éxito, creando con ID temporal');
+        
+        // Generar un ID temporal único
+        const tempId = Math.floor(Date.now() / 1000); // Usar segundos para evitar IDs muy largos
+        
+        const nuevoSector: SectorData = {
+          codigo: tempId,
+          nombre: data.nombreSector,
+          descripcion: data.descripcion || '',
+          estado: 'ACTIVO',
+          fechaRegistro: new Date().toISOString(),
+          codUsuario: data.codUsuario || API_CONFIG.defaultParams.codUsuario
+        };
+        
+        this.clearCache();
+        
+        // Importante: El ID es temporal, será actualizado al recargar
+        console.log('ℹ️ Sector creado con ID temporal:', tempId);
+        
+        return nuevoSector;
+      }
+      
+      // Intentar parsear como número
+      const responseNumber = parseInt(cleanResponse, 10);
+      
+      // Si es un número válido y positivo
+      if (!isNaN(responseNumber) && responseNumber > 0) {
+        console.log('✅ Sector creado con ID:', responseNumber);
+        
+        const nuevoSector: SectorData = {
+          codigo: responseNumber,
+          nombre: data.nombreSector,
+          descripcion: data.descripcion || '',
+          estado: 'ACTIVO',
+          fechaRegistro: new Date().toISOString(),
+          codUsuario: data.codUsuario || API_CONFIG.defaultParams.codUsuario
+        };
+        
+        this.clearCache();
+        return nuevoSector;
+      }
+      
+      // Si el parse resulta en NaN o número inválido, pero el status es OK
+      if (response.ok) {
+        console.log('⚠️ No se pudo parsear el ID, pero la respuesta fue exitosa');
+        console.log('✅ Creando con ID temporal');
+        
+        const tempId = Math.floor(Date.now() / 1000);
+        
+        const nuevoSector: SectorData = {
+          codigo: tempId,
+          nombre: data.nombreSector,
+          descripcion: data.descripcion || '',
+          estado: 'ACTIVO',
+          fechaRegistro: new Date().toISOString(),
+          codUsuario: data.codUsuario || API_CONFIG.defaultParams.codUsuario
+        };
+        
+        this.clearCache();
+        return nuevoSector;
+      }
+      
+      // Si llegamos aquí, algo salió mal
+      console.error('❌ Respuesta no manejable:', responseText);
+      throw new Error(`Error al crear sector`);
+      
+    } catch (error: any) {
+      console.error('❌ [SectorService] Error al crear:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Crea un nuevo sector
+   * IMPORTANTE: Convierte "nombre" a "nombreSector" para el API
+   */
+  async crearSector(datos: { nombre: string; descripcion?: string }): Promise<SectorData> {
+    try {
+      // Validaciones
       if (!datos.nombre || datos.nombre.trim().length === 0) {
         throw new Error('El nombre del sector es requerido');
       }
@@ -95,15 +195,18 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
         throw new Error('El nombre del sector debe tener al menos 3 caracteres');
       }
       
-      // Preparar datos para enviar
-      const datosCompletos: CreateSectorDTO = {
-        nombre: datos.nombre.trim(),
-        descripcion: datos.descripcion?.trim() || '',
-        codUsuario: datos.codUsuario || API_CONFIG.defaultParams.codUsuario
+      // IMPORTANTE: Convertir nombre a nombreSector
+      const datosParaAPI: CreateSectorDTO = {
+        nombreSector: datos.nombre.trim(),  // ← Usar nombreSector
+        descripcion: datos.descripcion?.trim() || ''
+        // NO incluir codUsuario si no es necesario
       };
       
-      // Usar el método create del BaseApiService
-      return await this.create(datosCompletos);
+      console.log('📤 Enviando al API:', datosParaAPI);
+      
+      const resultado = await this.create(datosParaAPI);
+      
+      return resultado;
       
     } catch (error: any) {
       console.error('❌ [SectorService] Error creando sector:', error);
@@ -113,9 +216,8 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
   
   /**
    * Actualiza un sector existente
-   * NO requiere autenticación
    */
-  async actualizarSector(id: number, datos: UpdateSectorDTO): Promise<SectorData> {
+  async actualizarSector(id: number, datos: { nombre?: string; descripcion?: string; estado?: string }): Promise<SectorData> {
     try {
       console.log('📝 [SectorService] Actualizando sector:', id, datos);
       
@@ -130,14 +232,22 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
         }
       }
       
-      const datosCompletos = {
-        ...datos,
-        nombre: datos.nombre?.trim(),
-        descripcion: datos.descripcion?.trim(),
-        fechaModificacion: new Date().toISOString()
-      };
+      // Convertir nombre a nombreSector para el API
+      const datosParaAPI: UpdateSectorDTO = {};
       
-      return await this.update(id, datosCompletos);
+      if (datos.nombre !== undefined) {
+        datosParaAPI.nombreSector = datos.nombre.trim();
+      }
+      if (datos.descripcion !== undefined) {
+        datosParaAPI.descripcion = datos.descripcion.trim();
+      }
+      if (datos.estado !== undefined) {
+        datosParaAPI.estado = datos.estado;
+      }
+      
+      datosParaAPI.fechaModificacion = new Date().toISOString();
+      
+      return await this.update(id, datosParaAPI);
       
     } catch (error: any) {
       console.error('❌ [SectorService] Error actualizando sector:', error);
@@ -147,13 +257,11 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
   
   /**
    * Elimina un sector (cambio de estado lógico)
-   * NO requiere autenticación
    */
   async eliminarSector(id: number): Promise<void> {
     try {
       console.log('🗑️ [SectorService] Eliminando sector:', id);
       
-      // En lugar de eliminar físicamente, cambiar estado a INACTIVO
       await this.update(id, {
         estado: 'INACTIVO',
         fechaModificacion: new Date().toISOString()
@@ -169,7 +277,6 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
   
   /**
    * Busca sectores por nombre
-   * NO requiere autenticación
    */
   async buscarPorNombre(nombre: string): Promise<SectorData[]> {
     try {
@@ -188,7 +295,6 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
   
   /**
    * Obtiene sectores activos
-   * NO requiere autenticación
    */
   async obtenerActivos(): Promise<SectorData[]> {
     try {
@@ -200,28 +306,31 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
   }
   
   /**
-   * Verifica si un sector existe por nombre
-   * NO requiere autenticación
+   * Obtiene todos los sectores
    */
-  async existePorNombre(nombre: string, excluirId?: number): Promise<boolean> {
+  async obtenerTodos(params?: BusquedaSectorParams): Promise<SectorData[]> {
     try {
-      const sectores = await this.buscarPorNombre(nombre);
+      console.log('📋 [SectorService] Obteniendo todos los sectores');
       
-      return sectores.some(sector => 
-        sector.nombre.toLowerCase() === nombre.toLowerCase() &&
-        (!excluirId || sector.codigo !== excluirId)
-      );
+      const queryParams = {
+        ...API_CONFIG.defaultParams,
+        ...params
+      };
+      
+      return await this.getAll(queryParams);
       
     } catch (error: any) {
-      console.error('❌ [SectorService] Error verificando existencia:', error);
-      return false;
+      console.error('❌ [SectorService] Error obteniendo sectores:', error);
+      throw error;
     }
   }
 }
+
+// IMPORTANTE: Necesitamos importar buildApiUrl
+import { buildApiUrl } from '../config/api.unified.config';
 
 // Exportar instancia singleton
 const sectorService = SectorService.getInstance();
 export default sectorService;
 
-// Exportar también la clase por si se necesita extender
 export { SectorService };

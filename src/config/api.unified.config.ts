@@ -1,13 +1,10 @@
-// src/config/api.unified.config.ts - VERSIÓN COMPLETA CORREGIDA
+// src/config/api.unified.config.ts - VERSIÓN SIN AUTENTICACIÓN
 
 // ========================================
-// IMPORTACIONES Y CONFIGURACIÓN INICIAL
+// CONFIGURACIÓN INICIAL
 // ========================================
 
-// Detectar si estamos en desarrollo
-//const isDevelopment = import.meta.env.DEV;
-
-// IMPORTANTE: Usar siempre la URL completa del backend
+// URL del backend
 export const API_BASE_URL = 'http://192.168.20.160:8080';
 
 // ========================================
@@ -19,19 +16,11 @@ type ComplexEndpoint = {
   base: string;
   [key: string]: string;
 };
-type AuthEndpoint = {
-  login: string;
-  logout: string;
-  refresh: string;
-  profile: string;
-};
 
 interface EndpointsConfig {
-  auth: AuthEndpoint;
   barrio: SimpleEndpoint;
   sector: SimpleEndpoint;
-  via: SimpleEndpoint;
-  calle: SimpleEndpoint;
+  via: SimpleEndpoint;  // Reemplaza a calle
   contribuyente: SimpleEndpoint;
   arancel: SimpleEndpoint;
   valorUnitario: SimpleEndpoint;
@@ -46,7 +35,7 @@ interface EndpointsConfig {
 }
 
 // ========================================
-// CONFIGURACIÓN PRINCIPAL - DEBE ESTAR EXPORTADA
+// CONFIGURACIÓN PRINCIPAL
 // ========================================
 
 export const API_CONFIG = {
@@ -54,22 +43,27 @@ export const API_CONFIG = {
   timeout: 30000,
   retries: 3,
   
+  // Headers por defecto SIN autenticación
   defaultHeaders: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
   
+  // IMPORTANTE: NO se requiere autenticación para ningún endpoint
+  requiresAuth: false,
+  
   endpoints: {
-    auth: {
-      login: '/auth/login',
-      logout: '/auth/logout',
-      refresh: '/auth/refresh',
-      profile: '/auth/profile'
-    },
     barrio: '/api/barrio',
     sector: '/api/sector',
-    via: '/api/via/listarVia',
-    calle: '/api/calle',
+    via: '/api/via/listarVia',  // ← CORREGIDO: era /api/calle
+    contribuyente: '/api/contribuyente',
+    arancel: '/api/arancel',
+    valorUnitario: '/api/valoresunitarios',
+    uit: '/api/uitEpa',
+    alcabala: '/api/alcabala',
+    depreciacion: '/api/depreciacion',
+    predio: '/api/predio',
+    piso: '/api/piso',
     direccion: {
       base: '/api/direccion',
       listarPorNombreVia: '/api/direccion/listarDireccionPorNombreVia',
@@ -81,14 +75,6 @@ export const API_CONFIG = {
       listarPorContribuyente: '/api/persona/listarPersonaPorTipoPersonaNombreRazonContribuyente',
       listarPorTipoVia: '/api/persona/listarPersonaPorTipoPersonaNombreVia'
     },
-    contribuyente: '/api/contribuyente',
-    arancel: '/api/arancel',
-    valorUnitario: '/api/valoresunitarios',
-    uit: '/api/uitEpa',
-    alcabala: '/api/alcabala',
-    depreciacion: '/api/depreciacion',
-    predio: '/api/predio',
-    piso: '/api/piso',
     constante: {
       base: '/api/constante',
       listarPadre: '/api/constante/listarConstantePadre',
@@ -121,7 +107,7 @@ export const API_CONSTANTS = {
   
   ERROR_MESSAGES: {
     NETWORK: 'Error de conexión. Verifique su internet.',
-    UNAUTHORIZED: 'No autorizado. Por favor, inicie sesión.',
+    UNAUTHORIZED: 'No autorizado.',
     FORBIDDEN: 'No tiene permisos para realizar esta acción.',
     NOT_FOUND: 'Recurso no encontrado.',
     SERVER_ERROR: 'Error del servidor. Intente más tarde.',
@@ -153,21 +139,17 @@ export const API_CONSTANTS = {
 // ========================================
 
 /**
- * Función unificada para construir URLs
- * SIEMPRE usa la URL completa
+ * Construir URL completa
  */
 export const buildApiUrl = (endpoint: string, params?: Record<string, any>): string => {
-  // Si ya es una URL completa, devolverla tal cual
   if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
     return endpoint;
   }
   
-  // SIEMPRE construir la URL completa con el host
   const baseURL = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   let url = `${baseURL}${cleanEndpoint}`;
   
-  // Agregar parámetros si existen
   if (params && Object.keys(params).length > 0) {
     const queryString = new URLSearchParams(params).toString();
     url += `?${queryString}`;
@@ -177,42 +159,33 @@ export const buildApiUrl = (endpoint: string, params?: Record<string, any>): str
 };
 
 /**
- * Función para obtener headers
+ * Obtener headers - NUNCA incluye autenticación
+ * @param includeAuth - Se ignora, solo por compatibilidad
  */
 export const getApiHeaders = (includeAuth: boolean = false): Record<string, string> => {
-  const headers: Record<string, string> = {
+  // IMPORTANTE: Nunca incluir Authorization
+  return {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   };
-  
-  if (includeAuth) {
-    const token = getAuthToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      console.log('🔐 Token Bearer incluido en headers');
-    } else {
-      console.warn('⚠️ Se requiere autenticación pero no se encontró token');
-    }
-  }
-  
-  return headers;
 };
 
 /**
- * Helper para obtener el token de autenticación
+ * NO se usa autenticación, pero mantenemos la función por compatibilidad
  */
 export const getAuthToken = (): string | null => {
-  const token = 
-    localStorage.getItem('auth_token') || 
-    localStorage.getItem('authToken') ||
-    sessionStorage.getItem('auth_token') ||
-    sessionStorage.getItem('authToken');
-  
-  return token;
+  return null;
 };
 
 /**
- * Helper para obtener endpoint
+ * Determinar si requiere auth - SIEMPRE retorna false
+ */
+export const requiresAuth = (method: string): boolean => {
+  return false; // Ningún método requiere autenticación
+};
+
+/**
+ * Obtener endpoint
  */
 export function getEndpoint<K extends keyof EndpointsConfig>(
   module: K,
@@ -225,17 +198,22 @@ export function getEndpoint<K extends keyof EndpointsConfig>(
   }
   
   if (typeof endpoint === 'object' && endpoint !== null) {
-    if (subEndpoint && subEndpoint in endpoint) {
-      return endpoint[subEndpoint];
+    const endpointObj = endpoint as any;
+    
+    if (subEndpoint && endpointObj[subEndpoint]) {
+      return endpointObj[subEndpoint];
     }
-    return endpoint.base || '';
+    
+    if ('base' in endpointObj) {
+      return endpointObj.base;
+    }
   }
   
   throw new Error(`Endpoint no encontrado: ${String(module)}`);
 }
 
 /**
- * Función para obtener los endpoints de health check
+ * Endpoints para health check
  */
 export const getHealthCheckEndpoints = (): string[] => {
   return [
@@ -243,11 +221,11 @@ export const getHealthCheckEndpoints = (): string[] => {
     API_CONFIG.endpoints.barrio,
     API_CONFIG.endpoints.contribuyente,
     API_CONFIG.endpoints.predio
-  ];
+  ] as string[];
 };
 
 /**
- * Función para obtener mensaje de error basado en el código de estado
+ * Mensaje de error por código
  */
 export const getErrorMessage = (statusCode: number): string => {
   const messages = API_CONSTANTS.ERROR_MESSAGES;
@@ -272,11 +250,11 @@ export const getErrorMessage = (statusCode: number): string => {
   }
 };
 
-/**
- * Función para determinar si un método requiere autenticación
- */
-export const requiresAuth = (method: string): boolean => {
-  // Por defecto, GET no requiere auth, otros métodos sí
-  const methodUpper = method.toUpperCase();
-  return methodUpper !== 'GET';
+// ========================================
+// EXPORTAR TIPOS
+// ========================================
+
+export type { 
+  EndpointsConfig, 
+  ComplexEndpoint
 };

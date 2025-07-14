@@ -1,46 +1,43 @@
-// src/models/Barrio.ts - CORREGIDO PARA MANEJAR SECTOR NULL
+// src/models/Barrio.ts
 
-import { Sector } from './';
-
-// Interfaz para la entidad Barrio
+/**
+ * Modelo principal de Barrio
+ */
 export interface Barrio {
-  id?: number;
-  codBarrio?: number; // Campo adicional que viene de la API
-  nombre?: string; // Campo normalizado
-  nombreBarrio?: string; // Campo que viene de la API
-  sectorId: number; // ✅ OBLIGATORIO - siempre debe tener un sectorId válido
-  sector?: Sector | null; // ✅ PUEDE SER NULL - relación opcional
+  id: number;
+  nombre: string;
+  codSector: number;
+  descripcion?: string;
+  estado?: string;
+  fechaRegistro?: string;
+  fechaModificacion?: string;
+  usuarioCreacion?: string;
+  usuarioModificacion?: string;
 }
 
-// Tipo para el formulario de Barrio
-export type BarrioFormData = {
+/**
+ * Datos del formulario de Barrio
+ */
+export interface BarrioFormData {
   nombre: string;
-  sectorId: number;
+  codSector: number;
+}
+
+/**
+ * Funciones helper
+ */
+export const isBarrioActivo = (barrio: Barrio): boolean => {
+  return barrio.estado === 'ACTIVO';
 };
 
-// ✅ FUNCIONES HELPER PARA MANEJAR BARRIOS
 export const getBarrioDisplayName = (barrio: Barrio): string => {
-  return barrio.nombre || barrio.nombreBarrio || `Barrio ${barrio.id || 'S/N'}`;
+  return barrio.nombre || `Barrio ${barrio.id}`;
 };
 
-export const getBarrioSectorName = (barrio: Barrio, sectores: Sector[] = []): string => {
-  if (barrio.sector && barrio.sector.nombre) {
-    return barrio.sector.nombre;
-  }
-  
-  const sector = sectores.find(s => s.id === barrio.sectorId);
-  return sector?.nombre || `Sector ID: ${barrio.sectorId}`;
+/**
+ * Valores por defecto para un nuevo barrio
+ */
+export const defaultBarrioFormData: BarrioFormData = {
+  nombre: '',
+  codSector: 0
 };
-
-export const isBarrioValid = (barrio: Barrio): boolean => {
-  return !!(
-    barrio.sectorId && 
-    barrio.sectorId > 0 && 
-    (barrio.nombre || barrio.nombreBarrio) && 
-    (barrio.nombre || barrio.nombreBarrio)!.trim().length > 0
-  );
-};
-
-// ✅ CONSTANTES PARA MANEJO DE SECTORES DEFAULT
-export const DEFAULT_SECTOR_ID = 1; // ID del sector por defecto para barrios sin sector
-export const DEFAULT_SECTOR_NAME = 'Sin Sector Asignado';

@@ -1,19 +1,15 @@
-// src/services/calleApiService.ts
+// src/services/calleApiService.ts - USANDO ENDPOINT CORRECTO
+
 import BaseApiService from './BaseApiService';
 import { API_CONFIG } from '../config/api.unified.config';
-import tipoViaService from './viaService';
 
 /**
- * Interfaces para Calle
+ * Interfaces para Calle/Via
  */
 export interface CalleData {
   codigo: number;
-  codigoBarrio: number;
-  codigoVia: number;
   nombre: string;
-  nombreBarrio?: string;
-  nombreVia?: string;
-  nombreCompleto?: string;
+  tipo?: string;
   descripcion?: string;
   estado?: string;
   fechaRegistro?: string;
@@ -22,291 +18,154 @@ export interface CalleData {
 }
 
 export interface CreateCalleDTO {
-  codigoBarrio: number;
-  codigoVia: number;
   nombre: string;
+  tipo?: string;
   descripcion?: string;
   codUsuario?: number;
 }
 
 export interface UpdateCalleDTO extends Partial<CreateCalleDTO> {
   estado?: string;
+  fechaModificacion?: string;
 }
 
 export interface BusquedaCalleParams {
   nombre?: string;
-  codigoBarrio?: number;
-  codigoVia?: number;
+  tipo?: string;
   estado?: string;
   codUsuario?: number;
 }
 
 /**
- * Servicio para gestión de calles
- * 
- * NOTA: Las calles en realidad vienen del endpoint de vías
- * Este servicio actúa como un adaptador para mantener la compatibilidad
+ * Servicio para gestión de calles/vías
+ * USA EL ENDPOINT: /api/via/listarVia
+ * NO REQUIERE AUTENTICACIÓN
  */
-class CalleService extends BaseApiService<CalleData, CreateCalleDTO, UpdateCalleDTO> {
-  private static instance: CalleService;
+class CalleApiService extends BaseApiService<CalleData, CreateCalleDTO, UpdateCalleDTO> {
+  private static instance: CalleApiService;
   
   private constructor() {
     super(
-      '/api/via', // Usamos el mismo endpoint que vías
+      '/api/via/listarVia', // ← ENDPOINT CORRECTO
       {
-        normalizeItem: (item: any) => {
-          if (!item || typeof item !== 'object') {
-            console.warn('⚠️ [CalleService] Item inválido recibido:', item);
-            return null;
-          }
-
-          // Debug para ver qué campos vienen de la API
-          console.log('📝 [CalleService] Item recibido de vías:', item);
-
-          // Adaptamos los datos de vía a formato de calle
-          // Las vías que tienen codBarrio son calles específicas
-          const codigo = parseInt(item.codVia || item.codigo || '0');
-          const codigoBarrio = item.codBarrio !== null && item.codBarrio !== undefined 
-            ? parseInt(item.codBarrio) 
-            : 0;
-          const codigoVia = parseInt(item.codTipoVia || '0'); // El tipo de vía
-          const nombre = (item.nombreVia || item.nombre || '').toString().trim();
-
-          if (!nombre) {
-            console.warn('⚠️ [CalleService] Item sin nombre:', item);
-            return null;
-          }
-
-          return {
-            codigo: codigo,
-            codigoBarrio: codigoBarrio,
-            codigoVia: codigoVia,
-            nombre: nombre,
-            nombreBarrio: item.nombreBarrio || '',
-            nombreVia: item.descTipoVia || item.tipoVia || '',
-            nombreCompleto: nombre, // Ya viene completo desde la API
-            descripcion: item.descTipoVia || item.descripcion || '',
-            estado: item.estado || 'ACTIVO',
-            fechaRegistro: item.fechaRegistro || null,
-            fechaModificacion: item.fechaModificacion || null,
-            codUsuario: parseInt(item.codUsuario || API_CONFIG.defaultParams.codUsuario || '1')
-          } as CalleData;
-        },
+        normalizeItem: (item: any) => ({
+          codigo: item.codVia || item.codigo || 0,
+          nombre: item.nombreVia || item.nombre || '',
+          tipo: item.tipoVia || item.tipo || 'CALLE',
+          descripcion: item.descripcion || '',
+          estado: item.estado || 'ACTIVO',
+          fechaRegistro: item.fechaRegistro,
+          fechaModificacion: item.fechaModificacion,
+          codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario
+        }),
         
         validateItem: (item: CalleData) => {
-          if (!item || typeof item !== 'object') {
-            return false;
-          }
-
-          // Para las vías/calles, solo validar que tenga nombre
-          // No requerir barrio porque puede ser 0
-          const hasValidNombre = typeof item.nombre === 'string' && item.nombre.trim().length > 0;
-          const hasValidCodigo = typeof item.codigo === 'number' && item.codigo >= 0;
-
-          // Log para debugging
-          console.log('🔍 [CalleService] Validando item:', {
-            codigo: item.codigo,
-            nombre: item.nombre,
-            codigoBarrio: item.codigoBarrio,
-            codigoVia: item.codigoVia,
-            esValido: hasValidNombre && hasValidCodigo
-          });
-
-          // Aceptar todos los items que tengan nombre válido
-          return hasValidNombre && hasValidCodigo;
+          return !!item.codigo && !!item.nombre && item.nombre.trim().length > 0;
         }
       },
-      'calle',
-      // Configuración de autenticación
-      {
-        GET: false,    // GET no requiere token
-        POST: true,
-        PUT: true,
-        DELETE: true,
-        PATCH: true
-      }
+      'calle_cache'
     );
   }
   
-  /**
-   * Obtiene la instancia singleton del servicio
-   */
-  static getInstance(): CalleService {
-    if (!CalleService.instance) {
-      CalleService.instance = new CalleService();
+  static getInstance(): CalleApiService {
+    if (!CalleApiService.instance) {
+      CalleApiService.instance = new CalleApiService();
     }
-    return CalleService.instance;
+    return CalleApiService.instance;
   }
   
   /**
-   * Construye el nombre completo de la calle
+   * Sobrescribir getAll para manejar el endpoint específico
    */
-  private static construirNombreCompleto(item: any): string {
-    const tipoVia = item.nombreVia || item.tipoVia || '';
-    const nombreCalle = item.nombre || item.nombreCalle || '';
-    
-    if (tipoVia && nombreCalle) {
-      return `${tipoVia} ${nombreCalle}`.trim();
-    }
-    
-    return nombreCalle;
-  }
-  
-  /**
-   * Lista todas las calles
-   * Usa el servicio de vías y filtra solo las que tienen barrio
-   */
-  async listarCalles(incluirInactivos: boolean = false): Promise<CalleData[]> {
+  async getAll(params?: any): Promise<CalleData[]> {
     try {
-      console.log('🔍 [CalleService] Listando calles desde vías');
+      console.log('📋 [CalleApiService] Obteniendo todas las vías');
       
-      // Obtener todas las vías
-      const todasLasVias = await tipoViaService.listarTiposVia();
+      // El endpoint listarVia puede requerir parámetros específicos
+      const queryParams = {
+        ...API_CONFIG.defaultParams,
+        ...params
+      };
       
-      // Normalizar y filtrar solo las que son calles (tienen barrio)
-      const calles = this.normalizeData(todasLasVias);
+      return await super.getAll(queryParams);
+    } catch (error) {
+      console.error('❌ [CalleApiService] Error obteniendo vías:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Buscar calles/vías por nombre
+   */
+  async buscarPorNombre(nombre: string): Promise<CalleData[]> {
+    try {
+      const params: BusquedaCalleParams = {
+        nombre: nombre.trim(),
+        estado: 'ACTIVO'
+      };
       
-      // Filtrar por estado si es necesario
-      if (!incluirInactivos) {
-        return calles.filter(c => c.estado === 'ACTIVO');
-      }
-      
-      return calles;
+      return await this.search(params);
       
     } catch (error: any) {
-      console.error('❌ [CalleService] Error listando calles:', error);
-      return [];
+      console.error('❌ [CalleApiService] Error buscando vías:', error);
+      throw error;
     }
   }
   
   /**
-   * Sobrescribe el método getAll para usar el endpoint de vías
+   * Obtener vías activas
    */
-  public async getAll(params?: any): Promise<CalleData[]> {
+  async obtenerActivas(): Promise<CalleData[]> {
     try {
-      console.log('🔍 [CalleService] Obteniendo calles desde endpoint de vías');
-      
-      // Hacer la petición al endpoint de vías
-      const response = await this.makeRequest<any>('/listarVia', {
-        method: 'GET'
-      });
-
-      // La API devuelve un objeto con data
-      const data = response.data || [];
-      
-      // Normalizar y filtrar solo calles (las que tienen barrio)
-      const calles = this.normalizeData(data);
-      
-      return calles;
-      
+      return await this.search({ estado: 'ACTIVO' });
     } catch (error: any) {
-      console.error('❌ [CalleService] Error obteniendo calles:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Lista calles por barrio
-   */
-  async listarPorBarrio(codigoBarrio: number, incluirInactivos: boolean = false): Promise<CalleData[]> {
-    try {
-      console.log('🔍 [CalleService] Listando calles del barrio:', codigoBarrio);
-      
-      const todasLasCalles = await this.listarCalles(incluirInactivos);
-      return todasLasCalles.filter(c => c.codigoBarrio === codigoBarrio);
-      
-    } catch (error: any) {
-      console.error('❌ [CalleService] Error listando calles por barrio:', error);
-      return [];
+      console.error('❌ [CalleApiService] Error obteniendo vías activas:', error);
+      throw error;
     }
   }
   
   /**
-   * Lista calles por tipo de vía
+   * Verificar si existe una vía por nombre
    */
-  async listarPorTipoVia(codigoVia: number, incluirInactivos: boolean = false): Promise<CalleData[]> {
+  async existePorNombre(nombre: string, excluirId?: number): Promise<boolean> {
     try {
-      console.log('🔍 [CalleService] Listando calles por tipo de vía:', codigoVia);
+      const vias = await this.buscarPorNombre(nombre);
       
-      const todasLasCalles = await this.listarCalles(incluirInactivos);
-      return todasLasCalles.filter(c => c.codigoVia === codigoVia);
-      
-    } catch (error: any) {
-      console.error('❌ [CalleService] Error listando calles por tipo de vía:', error);
-      return [];
-    }
-  }
-  
-  /**
-   * Busca calles por nombre
-   */
-  async buscarPorNombre(
-    nombre: string, 
-    codigoBarrio?: number,
-    codigoVia?: number
-  ): Promise<CalleData[]> {
-    try {
-      console.log('🔍 [CalleService] Buscando calles por nombre:', nombre);
-      
-      if (!nombre || nombre.trim().length < 2) {
-        return [];
-      }
-      
-      const todasLasCalles = await this.listarCalles(true);
-      let callesFiltradas = todasLasCalles.filter(c => 
-        c.nombre.toLowerCase().includes(nombre.toLowerCase())
+      return vias.some(via => 
+        via.nombre.toLowerCase() === nombre.toLowerCase() &&
+        (!excluirId || via.codigo !== excluirId)
       );
       
-      if (codigoBarrio) {
-        callesFiltradas = callesFiltradas.filter(c => c.codigoBarrio === codigoBarrio);
-      }
-      
-      if (codigoVia) {
-        callesFiltradas = callesFiltradas.filter(c => c.codigoVia === codigoVia);
-      }
-      
-      return callesFiltradas;
-      
     } catch (error: any) {
-      console.error('❌ [CalleService] Error buscando calles:', error);
-      return [];
+      console.error('❌ [CalleApiService] Error verificando existencia:', error);
+      return false;
     }
   }
-
+  
   /**
-   * Sobrescribe el método search
+   * NOTA: Los métodos create, update y delete pueden no estar disponibles
+   * si el endpoint /api/via/listarVia es solo de lectura
    */
-  public async search(params: any): Promise<CalleData[]> {
-    try {
-      const todasLasCalles = await this.listarCalles(true);
-      let callesFiltradas = todasLasCalles;
-      
-      if (params.nombre) {
-        callesFiltradas = callesFiltradas.filter(c => 
-          c.nombre.toLowerCase().includes(params.nombre.toLowerCase())
-        );
-      }
-      
-      if (params.codigoBarrio) {
-        callesFiltradas = callesFiltradas.filter(c => c.codigoBarrio === params.codigoBarrio);
-      }
-      
-      if (params.codigoVia) {
-        callesFiltradas = callesFiltradas.filter(c => c.codigoVia === params.codigoVia);
-      }
-      
-      return callesFiltradas;
-      
-    } catch (error) {
-      console.error(`❌ [${this.constructor.name}] Error en búsqueda:`, error);
-      return [];
-    }
+  
+  async create(data: CreateCalleDTO): Promise<CalleData> {
+    console.warn('⚠️ [CalleApiService] El endpoint listarVia puede no soportar creación');
+    throw new Error('Operación no soportada por el endpoint');
+  }
+  
+  async update(id: number, data: UpdateCalleDTO): Promise<CalleData> {
+    console.warn('⚠️ [CalleApiService] El endpoint listarVia puede no soportar actualización');
+    throw new Error('Operación no soportada por el endpoint');
+  }
+  
+  async delete(id: number): Promise<void> {
+    console.warn('⚠️ [CalleApiService] El endpoint listarVia puede no soportar eliminación');
+    throw new Error('Operación no soportada por el endpoint');
   }
 }
 
 // Exportar instancia singleton
-const calleService = CalleService.getInstance();
+const calleService = CalleApiService.getInstance();
 export default calleService;
 
 // Exportar también la clase por si se necesita extender
-export { CalleService };
+export { CalleApiService };

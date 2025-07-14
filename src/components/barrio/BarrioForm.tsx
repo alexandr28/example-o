@@ -1,321 +1,171 @@
-// src/components/barrio/BarrioForm.tsx - VERSIÓN CORREGIDA
-import React, { FC, useEffect, useState } from 'react';
-import {
-  Paper,
-  TextField,
-  Button,
-  Box,
-  Typography,
-  FormControl,
-  Stack,
-  Chip,
-  Alert,
-  CircularProgress,
-  Divider,
-  IconButton,
-  Tooltip,
-  useTheme,
-  alpha,
-  Autocomplete
-} from '@mui/material';
-import {
-  Save as SaveIcon,
-  Add as AddIcon,
-  Edit as EditIcon,
-  Clear as ClearIcon,
-  LocationCity as LocationCityIcon,
-  Home as HomeIcon
-} from '@mui/icons-material';
-import { BarrioData } from '../../services/barrioService';
-import { SectorData } from '../../services/sectorService';
+// src/components/barrio/BarrioForm.tsx
+import React, { useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
+import Input from '../ui/Input';
+import Button from '../ui/Button';
+import SearchableSelect from '../ui/SearchableSelect';
+import { BarrioFormData } from '../../models/Barrio';
+import { useSectores } from '../../hooks/useSectores';
+
+// Esquema de validación con tipo explícito
+const schema = yup.object().shape({
+  nombre: yup
+    .string()
+    .trim()
+    .required('El nombre del barrio es requerido')
+    .min(3, 'El nombre debe tener al menos 3 caracteres')
+    .max(100, 'El nombre no puede exceder 100 caracteres')
+    .default(''),
+  codSector: yup
+    .number()
+    .positive('Debe seleccionar un sector')
+    .integer()
+    .required('El sector es requerido')
+    .typeError('Debe seleccionar un sector válido')
+    .default(0)
+});
 
 interface BarrioFormProps {
-  barrio?: BarrioData | null;
-  sectores: SectorData[];
-  onSubmit: (data: any) => void;
-  onNuevo: () => void;
-  onEditar: () => void;
-  loading?: boolean;
-  isEditMode?: boolean;
+  onSubmit: (data: BarrioFormData) => void | Promise<void>;
+  onCancel: () => void;
+  initialData?: Partial<BarrioFormData>;
+  isSubmitting?: boolean;
 }
 
-const BarrioFormMUI: FC<BarrioFormProps> = ({
-  barrio,
-  sectores,
+const BarrioForm: React.FC<BarrioFormProps> = ({
   onSubmit,
-  onNuevo,
-  onEditar,
-  loading = false,
-  isEditMode = false
+  onCancel,
+  initialData,
+  isSubmitting = false
 }) => {
-  const theme = useTheme();
+  // Hook para obtener sectores
+  const { sectores, cargarSectores } = useSectores();
   
-  // Estados del formulario
-  const [formData, setFormData] = useState({
-    nombre: '',
-    sectorId: 0,
-    descripcion: ''
+  // Configurar react-hook-form
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    watch,
+    control
+  } = useForm<BarrioFormData>({
+    resolver: yupResolver(schema),
+    defaultValues: {
+      nombre: initialData?.nombre || '',
+      codSector: initialData?.codSector || 0
+    },
+    mode: 'onChange'
   });
-  
-  const [errors, setErrors] = useState<{
-    nombre?: string;
-    sectorId?: string;
-  }>({});
 
-  // Inicializar con datos si existe barrio seleccionado
+  // Cargar sectores al montar
   useEffect(() => {
-    if (barrio && isEditMode) {
-      setFormData({
-        nombre: barrio.nombre || '',
-        sectorId: barrio.codigoSector || 0,
-        descripcion: barrio.descripcion || ''
-      });
-      setErrors({});
-    } else if (!isEditMode) {
-      // Limpiar formulario si no es modo edición
-      setFormData({
-        nombre: '',
-        sectorId: 0,
-        descripcion: ''
-      });
-      setErrors({});
-    }
-  }, [barrio, isEditMode]);
+    cargarSectores();
+  }, [cargarSectores]);
 
-  // Manejar cambios en los inputs
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Limpiar error del campo modificado
-    if (errors[name as keyof typeof errors]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: undefined
-      }));
+  // Observar cambios en el formulario para debug
+  const formValues = watch();
+  
+  useEffect(() => {
+    console.log('📝 [BarrioForm] Valores del formulario:', formValues);
+  }, [formValues]);
+
+  // Manejar envío del formulario
+  const onFormSubmit = async (data: BarrioFormData) => {
+    try {
+      console.log('📤 [BarrioForm] Enviando datos:', data);
+      
+      // Asegurar que los datos tengan el formato correcto
+      const datosFormateados: BarrioFormData = {
+        nombre: data.nombre?.trim() || '',
+        codSector: Number(data.codSector) || 0
+      };
+      
+      await onSubmit(datosFormateados);
+    } catch (error) {
+      console.error('❌ [BarrioForm] Error al enviar:', error);
     }
   };
-
-  // Manejar cambio en el autocomplete de sector
-  const handleSectorChange = (value: SectorData | null) => {
-    setFormData(prev => ({
-      ...prev,
-      sectorId: value ? value.codigo : 0
-    }));
-    
-    // Limpiar error si había
-    if (errors.sectorId) {
-      setErrors(prev => ({
-        ...prev,
-        sectorId: undefined
-      }));
-    }
-  };
-
-  // Validar formulario
-  const validateForm = (): boolean => {
-    const newErrors: typeof errors = {};
-    
-    if (!formData.nombre.trim()) {
-      newErrors.nombre = 'El nombre del barrio es requerido';
-    } else if (formData.nombre.trim().length < 3) {
-      newErrors.nombre = 'El nombre debe tener al menos 3 caracteres';
-    }
-    
-    if (!formData.sectorId || formData.sectorId === 0) {
-      newErrors.sectorId = 'Debe seleccionar un sector';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // Manejar submit
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-    
-    console.log('📤 Enviando datos del barrio:', formData);
-    onSubmit(formData);
-  };
-
-  // Obtener el sector seleccionado
-  const sectorSeleccionado = sectores.find(s => s.codigo === formData.sectorId);
-
-  // Determinar si el formulario está válido
-  const isFormValid = formData.nombre.trim().length > 0 && formData.sectorId > 0;
 
   return (
-    <Paper
-      sx={{
-        p: 3,
-        height: '100%',
-        position: 'relative',
-        overflow: 'hidden'
-      }}
-    >
-      {/* Header del formulario */}
-      <Box sx={{ mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-          <HomeIcon color="primary" />
-          <Typography variant="h6" component="h2">
-            {isEditMode ? 'Editar Barrio' : 'Nuevo Barrio'}
-          </Typography>
-        </Box>
-        
-        {/* Info del barrio seleccionado */}
-        {barrio && !isEditMode && (
-          <Stack direction="row" spacing={1}>
-            <Chip
-              label={`Seleccionado: ${barrio.nombre}`}
-              size="small"
-              color="info"
-              onDelete={onNuevo}
-            />
-          </Stack>
-        )}
-      </Box>
+    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-3">
+      {/* Campo Nombre */}
+      <div>
+        <label htmlFor="nombre" className="block text-xs font-medium text-gray-700 mb-1">
+          Nombre del Barrio <span className="text-red-500">*</span>
+        </label>
+        <Input
+          id="nombre"
+          type="text"
+          placeholder="Ingrese el nombre del barrio"
+          {...register('nombre')}
+          error={errors.nombre?.message}
+          disabled={isSubmitting}
+          className="h-9 text-sm"
+        />
+      </div>
 
-      <Divider sx={{ mb: 3 }} />
-
-      {/* Formulario */}
-      <form onSubmit={handleSubmit}>
-        <Stack spacing={3}>
-          {/* Selector de Sector */}
-          <Autocomplete
-            options={sectores}
-            getOptionLabel={(option) => option.nombre || ''}
-            value={sectorSeleccionado || null}
-            onChange={(event, newValue) => handleSectorChange(newValue)}
-            disabled={loading}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Sector *"
-                error={!!errors.sectorId}
-                helperText={errors.sectorId}
-                InputProps={{
-                  ...params.InputProps,
-                  startAdornment: (
-                    <>
-                      <LocationCityIcon sx={{ color: 'action.disabled', mr: 1 }} />
-                      {params.InputProps.startAdornment}
-                    </>
-                  )
-                }}
-              />
-            )}
-          />
-
-          {/* Mostrar sector seleccionado */}
-          {sectorSeleccionado && (
-            <Alert severity="info" icon={<LocationCityIcon />}>
-              <Typography variant="body2">
-                Sector seleccionado: <strong>{sectorSeleccionado.nombre}</strong>
-              </Typography>
-            </Alert>
-          )}
-
-          {/* Campo de nombre */}
-          <TextField
-            name="nombre"
-            label="Nombre del Barrio *"
-            fullWidth
-            value={formData.nombre}
-            onChange={handleInputChange}
-            error={!!errors.nombre}
-            helperText={errors.nombre}
-            disabled={loading}
-            placeholder="Ingrese el nombre del barrio"
-            InputProps={{
-              startAdornment: (
-                <HomeIcon sx={{ color: 'action.disabled', mr: 1 }} />
-              )
-            }}
-          />
-
-          {/* Debug info en desarrollo */}
-          {process.env.NODE_ENV === 'development' && (
-            <Alert severity="info" sx={{ mt: 1 }}>
-              <Typography variant="caption">
-                Debug: Sector ID: {formData.sectorId} | 
-                Estado: {isEditMode ? 'Edición' : 'Nuevo'} |
-                Modo: Nuevo
-              </Typography>
-            </Alert>
-          )}
-
-          {/* Botones de acción */}
-          <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
-            {/* Botón Nuevo */}
-            <Button
-              variant="outlined"
-              onClick={onNuevo}
-              disabled={loading}
-              startIcon={<AddIcon />}
-              fullWidth
-            >
-              Nuevo
-            </Button>
-
-            {/* Botón Editar */}
-            <Button
-              variant="outlined"
-              onClick={onEditar}
-              disabled={loading || !barrio || isEditMode}
-              startIcon={<EditIcon />}
-              fullWidth
-            >
-              Editar
-            </Button>
-
-            {/* Botón Guardar */}
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={loading || !isFormValid}
-              startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
-              fullWidth
-              sx={{
-                bgcolor: isEditMode ? 'warning.main' : 'primary.main',
-                '&:hover': {
-                  bgcolor: isEditMode ? 'warning.dark' : 'primary.dark'
-                }
+      {/* Campo Sector con SearchableSelect */}
+      <div>
+        <label htmlFor="codSector" className="block text-xs font-medium text-gray-700 mb-1">
+          Sector <span className="text-red-500">*</span>
+        </label>
+        <Controller
+          name="codSector"
+          control={control}
+          render={({ field }) => (
+            <SearchableSelect
+              id="codSector"
+              name={field.name}
+              value={field.value}
+              onChange={(value) => {
+                const numValue = typeof value === 'string' ? parseInt(value, 10) : value;
+                field.onChange(numValue);
               }}
-            >
-              {loading ? 'Guardando...' : (isEditMode ? 'Actualizar' : 'Guardar')}
-            </Button>
-          </Stack>
-        </Stack>
-      </form>
+              onBlur={field.onBlur}
+              options={sectores.map(sector => ({
+                value: sector.id,
+                label: sector.nombre
+              }))}
+              placeholder="Buscar y seleccionar un sector"
+              error={errors.codSector?.message}
+              disabled={isSubmitting || sectores.length === 0}
+              required
+              className="h-9 text-sm"
+            />
+          )}
+        />
+        {sectores.length === 0 && !isSubmitting && (
+          <p className="text-xs text-gray-500 mt-1">
+            No hay sectores disponibles. Debe crear un sector primero.
+          </p>
+        )}
+      </div>
 
-      {/* Loading overlay */}
-      {loading && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            bgcolor: alpha(theme.palette.background.paper, 0.8),
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10
-          }}
+      {/* Botones */}
+      <div className="flex justify-end space-x-2 pt-2">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onCancel}
+          disabled={isSubmitting}
+          className="h-8 px-3 text-sm"
         >
-          <CircularProgress />
-        </Box>
-      )}
-    </Paper>
+          Cancelar
+        </Button>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={isSubmitting || sectores.length === 0}
+          className="h-8 px-3 text-sm"
+        >
+          {isSubmitting ? 'Guardando...' : initialData ? 'Actualizar' : 'Guardar'}
+        </Button>
+      </div>
+    </form>
   );
 };
 
-export default BarrioFormMUI;
+export default BarrioForm;

@@ -1,459 +1,310 @@
-// src/components/calles/CalleFormMUI.tsx
-import React, { FC, useEffect, useState } from 'react';
-import {
-  Paper,
-  TextField,
-  Button,
-  Box,
-  Typography,
-  Stack,
-  Chip,
-  Alert,
-  CircularProgress,
-  Divider,
-  useTheme,
-  alpha
-} from '@mui/material';
-import {
-  Save as SaveIcon,
-  Add as AddIcon,
-  Edit as EditIcon,
-  Map as MapIcon,
-  LocationCity as LocationCityIcon,
-  Home as HomeIcon,
-  Route as RouteIcon
-} from '@mui/icons-material';
+// src/components/calles/CalleForm.tsx
+import React, { useEffect, useState } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
+import Input from '../ui/Input';
+import Button from '../ui/Button';
 import SearchableSelect from '../ui/SearchableSelect';
-import { Sector } from '../../models/Sector';
-import { Barrio } from '../../models/Barrio';
-import { TIPO_VIA_OPTIONS } from '../../models/Calle';
+import { CalleFormData } from '../../models/Calle';
+import { useBarrios } from '../../hooks/useBarrios';
+import { buildApiUrl } from '../../config/api.unified.config';
+
+// Esquema de validación
+const schema = yup.object().shape({
+  tipoVia: yup
+    .number()
+    .positive('Debe seleccionar un tipo de vía')
+    .required('El tipo de vía es requerido')
+    .typeError('Debe seleccionar un tipo de vía válido'),
+  codSector: yup
+    .number()
+    .positive('Debe seleccionar un sector')
+    .required('El sector es requerido')
+    .typeError('Debe seleccionar un sector válido'),
+  codBarrio: yup
+    .number()
+    .positive('Debe seleccionar un barrio')
+    .required('El barrio es requerido')
+    .typeError('Debe seleccionar un barrio válido'),
+  nombreCalle: yup
+    .string()
+    .trim()
+    .required('El nombre de la calle es requerido')
+    .min(3, 'El nombre debe tener al menos 3 caracteres')
+    .max(100, 'El nombre no puede exceder 100 caracteres')
+});
 
 interface CalleFormProps {
-  calleSeleccionada?: any;
-  sectores: Sector[];
-  barrios: Barrio[];
-  barriosFiltrados: Barrio[];
-  tiposVia: Array<{value: string; descripcion: string}>;
-  onSubmit: (data: { sectorId: number; barrioId: number; tipoVia: string; nombre: string }) => void;
-  onNuevo: () => void;
-  onEditar: () => void;
-  onSectorChange: (sectorId: number) => void;
-  loading?: boolean;
-  loadingSectores?: boolean;
-  loadingBarrios?: boolean;
-  loadingTiposVia?: boolean;
-  isEditMode?: boolean;
+  onSubmit: (data: CalleFormData) => void | Promise<void>;
+  onCancel: () => void;
+  initialData?: Partial<CalleFormData>;
+  isSubmitting?: boolean;
 }
 
-const CalleFormMUI: FC<CalleFormProps> = ({
-  calleSeleccionada,
-  sectores,
-  barrios,
-  barriosFiltrados,
-  tiposVia,
+interface TipoViaOption {
+  codConstante: number;
+  nombre: string;
+  descripcion?: string;
+}
+
+const CalleForm: React.FC<CalleFormProps> = ({
   onSubmit,
-  onNuevo,
-  onEditar,
-  onSectorChange,
-  loading = false,
-  loadingSectores = false,
-  loadingBarrios = false,
-  loadingTiposVia = false,
-  isEditMode = false
+  onCancel,
+  initialData,
+  isSubmitting = false
 }) => {
-  const theme = useTheme();
+  // Estados
+  const [tiposVia, setTiposVia] = useState<TipoViaOption[]>([]);
+  const [loadingTiposVia, setLoadingTiposVia] = useState(false);
+  const [sectores, setSectores] = useState<any[]>([]);
+  const [barriosFiltrados, setBarriosFiltrados] = useState<any[]>([]);
   
-  // Estados del formulario
-  const [formData, setFormData] = useState({
-    sectorId: 0,
-    barrioId: 0,
-    tipoVia: '',
-    nombre: ''
+  // Hook para barrios
+  const { barrios } = useBarrios();
+  
+  // Configurar react-hook-form
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    control,
+    watch,
+    setValue
+  } = useForm<CalleFormData>({
+    resolver: yupResolver(schema),
+    defaultValues: {
+      tipoVia: initialData?.tipoVia || 0,
+      codSector: initialData?.codSector || 0,
+      codBarrio: initialData?.codBarrio || 0,
+      nombreCalle: initialData?.nombreCalle || ''
+    }
   });
-  
-  const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
-  const [selectedBarrio, setSelectedBarrio] = useState<Barrio | null>(null);
-  const [selectedTipoVia, setSelectedTipoVia] = useState<any>(null);
-  
-  const [errors, setErrors] = useState<{
-    sectorId?: string;
-    barrioId?: string;
-    tipoVia?: string;
-    nombre?: string;
-  }>({});
 
-  // Inicializar con datos si es edición
+  // Observar cambios en sector para filtrar barrios
+  const selectedSector = watch('codSector');
+
+  // Cargar tipos de vía desde la API
   useEffect(() => {
-    if (calleSeleccionada && isEditMode) {
-      setFormData({
-        sectorId: calleSeleccionada.sectorId || 0,
-        barrioId: calleSeleccionada.barrioId || 0,
-        tipoVia: calleSeleccionada.tipoVia || '',
-        nombre: calleSeleccionada.nombre || ''
-      });
+    const cargarTiposVia = async () => {
+      setLoadingTiposVia(true);
+      try {
+        // Construir URL con parámetros
+        const params = new URLSearchParams();
+        params.append('codConstante', '38');
+        
+        const url = buildApiUrl('/api/constante/listarConstantePadre') + '?' + params.toString();
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Error al cargar tipos de vía');
+        }
+        
+        const data = await response.json();
+        console.log('Tipos de vía cargados:', data);
+        
+        // Adaptar la respuesta según la estructura de la API
+        if (Array.isArray(data)) {
+          setTiposVia(data);
+        } else if (data.data && Array.isArray(data.data)) {
+          setTiposVia(data.data);
+        }
+        
+      } catch (error) {
+        console.error('Error cargando tipos de vía:', error);
+      } finally {
+        setLoadingTiposVia(false);
+      }
+    };
+    
+    cargarTiposVia();
+  }, []);
+
+  // Cargar sectores únicos desde los barrios
+  useEffect(() => {
+    if (barrios && barrios.length > 0) {
+      // Extraer sectores únicos de los barrios
+      const sectoresUnicos = Array.from(
+        new Map(
+          barrios
+            .filter(b => b.codSector)
+            .map(b => [b.codSector, { id: b.codSector, nombre: `Sector ${b.codSector}` }])
+        ).values()
+      );
+      setSectores(sectoresUnicos);
+    }
+  }, [barrios]);
+
+  // Filtrar barrios cuando cambie el sector
+  useEffect(() => {
+    if (selectedSector && barrios) {
+      const barriosDelSector = barrios.filter(b => b.codSector === selectedSector);
+      setBarriosFiltrados(barriosDelSector);
       
-      // Establecer objetos seleccionados
-      const sector = sectores.find(s => s.id === calleSeleccionada.sectorId);
-      const barrio = barrios.find(b => b.id === calleSeleccionada.barrioId);
-      const tipo = tiposVia.find(t => t.value === calleSeleccionada.tipoVia);
-      
-      setSelectedSector(sector || null);
-      setSelectedBarrio(barrio || null);
-      setSelectedTipoVia(tipo || null);
-      
-      setErrors({});
+      // Limpiar selección de barrio si no pertenece al sector
+      const barrioActual = watch('codBarrio');
+      if (barrioActual && !barriosDelSector.find(b => b.id === barrioActual)) {
+        setValue('codBarrio', 0);
+      }
     } else {
-      // Limpiar formulario
-      setFormData({
-        sectorId: 0,
-        barrioId: 0,
-        tipoVia: '',
-        nombre: ''
-      });
-      setSelectedSector(null);
-      setSelectedBarrio(null);
-      setSelectedTipoVia(null);
-      setErrors({});
+      setBarriosFiltrados([]);
     }
-  }, [calleSeleccionada, isEditMode, sectores, barrios, tiposVia]);
+  }, [selectedSector, barrios, setValue, watch]);
 
-  // Convertir datos para SearchableSelect
-  const sectorOptions = sectores.map(s => ({
-    ...s,
-    label: s.nombre
-  }));
-  
-  const barrioOptions = (barriosFiltrados.length > 0 ? barriosFiltrados : barrios).map(b => ({
-    ...b,
-    label: b.nombre || b.nombreBarrio || ''
-  }));
-  
-  const tipoViaOptions = (tiposVia.length > 0 ? tiposVia : TIPO_VIA_OPTIONS).map(t => ({
-    ...t,
-    id: t.value,
-    label: t.descripcion
-  }));
-
-  // Manejar cambio de sector
-  const handleSectorChange = (sector: any) => {
-    setSelectedSector(sector);
-    setFormData(prev => ({
-      ...prev,
-      sectorId: sector ? sector.id : 0
-    }));
-    
-    // Limpiar barrio cuando cambia el sector
-    setSelectedBarrio(null);
-    setFormData(prev => ({
-      ...prev,
-      barrioId: 0
-    }));
-    
-    // Filtrar barrios si hay función
-    if (sector && onSectorChange) {
-      onSectorChange(sector.id);
-    }
-    
-    // Limpiar errores
-    if (errors.sectorId) {
-      setErrors(prev => ({ ...prev, sectorId: undefined }));
+  // Manejar envío del formulario
+  const onFormSubmit = async (data: CalleFormData) => {
+    try {
+      console.log('📤 [CalleForm] Enviando datos:', data);
+      await onSubmit(data);
+    } catch (error) {
+      console.error('❌ [CalleForm] Error al enviar:', error);
     }
   };
-
-  // Manejar cambio de barrio
-  const handleBarrioChange = (barrio: any) => {
-    setSelectedBarrio(barrio);
-    setFormData(prev => ({
-      ...prev,
-      barrioId: barrio ? barrio.id : 0
-    }));
-    
-    if (errors.barrioId) {
-      setErrors(prev => ({ ...prev, barrioId: undefined }));
-    }
-  };
-
-  // Manejar cambio de tipo de vía
-  const handleTipoViaChange = (tipo: any) => {
-    setSelectedTipoVia(tipo);
-    setFormData(prev => ({
-      ...prev,
-      tipoVia: tipo ? tipo.value : ''
-    }));
-    
-    if (errors.tipoVia) {
-      setErrors(prev => ({ ...prev, tipoVia: undefined }));
-    }
-  };
-
-  // Manejar cambio en el nombre
-  const handleNombreChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setFormData(prev => ({
-      ...prev,
-      nombre: value
-    }));
-    
-    if (errors.nombre) {
-      setErrors(prev => ({ ...prev, nombre: undefined }));
-    }
-  };
-
-  // Validar formulario
-  const validateForm = (): boolean => {
-    const newErrors: typeof errors = {};
-    
-    if (!formData.sectorId) {
-      newErrors.sectorId = 'Debe seleccionar un sector';
-    }
-    
-    if (!formData.barrioId) {
-      newErrors.barrioId = 'Debe seleccionar un barrio';
-    }
-    
-    if (!formData.tipoVia) {
-      newErrors.tipoVia = 'Debe seleccionar un tipo de vía';
-    }
-    
-    if (!formData.nombre.trim()) {
-      newErrors.nombre = 'El nombre de la calle es requerido';
-    } else if (formData.nombre.trim().length < 2) {
-      newErrors.nombre = 'El nombre debe tener al menos 2 caracteres';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // Manejar submit
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-    
-    console.log('📤 Enviando datos de la calle:', formData);
-    onSubmit(formData);
-  };
-
-  // Determinar si el formulario está deshabilitado
-  const isDisabled = loading || 
-    (sectores.length === 0 && !loadingSectores) || 
-    (barrios.length === 0 && !loadingBarrios);
 
   return (
-    <Paper
-      sx={{
-        p: 3,
-        height: '100%',
-        position: 'relative',
-        overflow: 'hidden'
-      }}
-    >
-      {/* Header del formulario */}
-      <Box sx={{ mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-          <MapIcon color="primary" />
-          <Typography variant="h6" component="h2">
-            {isEditMode ? 'Editar Calle' : 'Nueva Calle'}
-          </Typography>
-        </Box>
-        
-        {/* Chips de estado */}
-        <Stack direction="row" spacing={1}>
-          {calleSeleccionada && !isEditMode && (
-            <Chip
-              label={`Seleccionada: ${calleSeleccionada.nombre}`}
-              size="small"
-              color="info"
-              onDelete={onNuevo}
+    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-3">
+      {/* Tipo de Vía */}
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">
+          Tipo de Vía <span className="text-red-500">*</span>
+        </label>
+        <Controller
+          name="tipoVia"
+          control={control}
+          render={({ field }) => (
+            <SearchableSelect
+              value={field.value}
+              onChange={(value) => field.onChange(Number(value))}
+              onBlur={field.onBlur}
+              options={tiposVia.map(tipo => ({
+                value: tipo.codConstante,
+                label: tipo.nombre
+              }))}
+              placeholder="Buscar tipo de vía..."
+              error={errors.tipoVia?.message}
+              disabled={isSubmitting || loadingTiposVia}
+              required
+              className="h-9 text-sm"
             />
           )}
-        </Stack>
-      </Box>
+        />
+      </div>
 
-      <Divider sx={{ mb: 3 }} />
-
-      {/* Formulario */}
-      <form onSubmit={handleSubmit}>
-        <Stack spacing={3}>
-          {/* Select de Tipo de Vía */}
-          <SearchableSelect
-            id="tipo-via"
-            label="Tipo de Vía"
-            options={tipoViaOptions}
-            value={selectedTipoVia}
-            onChange={handleTipoViaChange}
-            required
-            error={!!errors.tipoVia}
-            helperText={errors.tipoVia}
-            disabled={isDisabled || loadingTiposVia}
-            loading={loadingTiposVia}
-            startIcon={<RouteIcon sx={{ color: 'action.disabled' }} />}
-            placeholder="Buscar tipo de vía..."
-            noOptionsText="No se encontraron tipos de vía"
-          />
-
-          {/* Select de Sector */}
-          <SearchableSelect
-            id="sector"
-            label="Sector"
-            options={sectorOptions}
-            value={selectedSector}
-            onChange={handleSectorChange}
-            required
-            error={!!errors.sectorId}
-            helperText={errors.sectorId || (sectores.length === 0 && !loadingSectores ? "No hay sectores disponibles" : "")}
-            disabled={isDisabled || loadingSectores}
-            loading={loadingSectores}
-            startIcon={<LocationCityIcon sx={{ color: 'action.disabled' }} />}
-            placeholder="Buscar sector..."
-            noOptionsText="No se encontraron sectores"
-          />
-
-          {/* Select de Barrio */}
-          <SearchableSelect
-            id="barrio"
-            label="Barrio"
-            options={barrioOptions}
-            value={selectedBarrio}
-            onChange={handleBarrioChange}
-            required
-            error={!!errors.barrioId}
-            helperText={
-              errors.barrioId || 
-              (!selectedSector ? "Seleccione primero un sector" : "") ||
-              (barrios.length === 0 && !loadingBarrios ? "No hay barrios disponibles" : "")
-            }
-            disabled={isDisabled || loadingBarrios || !selectedSector}
-            loading={loadingBarrios}
-            startIcon={<HomeIcon sx={{ color: 'action.disabled' }} />}
-            placeholder="Buscar barrio..."
-            noOptionsText="No se encontraron barrios"
-          />
-
-          {/* Mostrar información de ubicación seleccionada */}
-          {selectedSector && selectedBarrio && (
-            <Alert 
-              severity="info" 
-              icon={<MapIcon />}
-              sx={{ 
-                bgcolor: alpha(theme.palette.info.main, 0.05),
-                border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
-              }}
-            >
-              <Typography variant="body2">
-                <strong>Ubicación:</strong> {selectedSector.label} - {selectedBarrio.label}
-              </Typography>
-            </Alert>
+      {/* Sector */}
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">
+          Sector <span className="text-red-500">*</span>
+        </label>
+        <Controller
+          name="codSector"
+          control={control}
+          render={({ field }) => (
+            <SearchableSelect
+              value={field.value}
+              onChange={(value) => field.onChange(Number(value))}
+              onBlur={field.onBlur}
+              options={sectores.map(sector => ({
+                value: sector.id,
+                label: sector.nombre
+              }))}
+              placeholder="Pueblo Libre"
+              error={errors.codSector?.message}
+              disabled={isSubmitting || sectores.length === 0}
+              required
+              className="h-9 text-sm"
+            />
           )}
+        />
+      </div>
 
-          {/* Campo Nombre */}
-          <TextField
-            fullWidth
-            id="nombre"
-            name="nombre"
-            label="Nombre de la Calle"
-            value={formData.nombre}
-            onChange={handleNombreChange}
-            error={!!errors.nombre}
-            helperText={errors.nombre}
-            disabled={isDisabled}
-            required
-            placeholder="Ingrese el nombre de la calle"
-            InputProps={{
-              startAdornment: (
-                <MapIcon 
-                  sx={{ 
-                    color: 'action.disabled', 
-                    mr: 1
-                  }} 
-                />
-              )
-            }}
-          />
-
-          {/* Preview del nombre completo */}
-          {selectedTipoVia && formData.nombre && (
-            <Alert 
-              severity="success" 
-              sx={{ 
-                bgcolor: alpha(theme.palette.success.main, 0.05),
-                border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`
-              }}
-            >
-              <Typography variant="body2">
-                <strong>Nombre completo:</strong> {selectedTipoVia.label} {formData.nombre}
-              </Typography>
-            </Alert>
+      {/* Barrio */}
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">
+          Barrio <span className="text-red-500">*</span>
+        </label>
+        <Controller
+          name="codBarrio"
+          control={control}
+          render={({ field }) => (
+            <SearchableSelect
+              value={field.value}
+              onChange={(value) => field.onChange(Number(value))}
+              onBlur={field.onBlur}
+              options={barriosFiltrados.map(barrio => ({
+                value: barrio.id,
+                label: barrio.nombre
+              }))}
+              placeholder="Buscar barrio..."
+              error={errors.codBarrio?.message}
+              disabled={isSubmitting || !selectedSector || barriosFiltrados.length === 0}
+              required
+              className="h-9 text-sm"
+            />
           )}
+        />
+        {selectedSector && barriosFiltrados.length === 0 && (
+          <p className="text-xs text-gray-500 mt-1">
+            No hay barrios en este sector
+          </p>
+        )}
+      </div>
 
-          {/* Botones de acción */}
-          <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
-            {/* Botón Nuevo */}
-            <Button
-              variant="outlined"
-              onClick={onNuevo}
-              disabled={loading}
-              startIcon={<AddIcon />}
-              fullWidth
-            >
-              Nuevo
-            </Button>
+      {/* Nombre de la Calle */}
+      <div>
+        <label htmlFor="nombreCalle" className="block text-xs font-medium text-gray-700 mb-1">
+          Nombre de la Calle <span className="text-red-500">*</span>
+        </label>
+        <Input
+          id="nombreCalle"
+          type="text"
+          placeholder="Ingrese el nombre de la calle"
+          {...register('nombreCalle')}
+          error={errors.nombreCalle?.message}
+          disabled={isSubmitting}
+          className="h-9 text-sm"
+        />
+      </div>
 
-            {/* Botón Editar */}
-            <Button
-              variant="outlined"
-              onClick={onEditar}
-              disabled={loading || !calleSeleccionada || isEditMode}
-              startIcon={<EditIcon />}
-              fullWidth
-            >
-              Editar
-            </Button>
-
-            {/* Botón Guardar */}
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={isDisabled || !formData.nombre || !formData.sectorId || !formData.barrioId || !formData.tipoVia}
-              startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
-              fullWidth
-              sx={{
-                bgcolor: isEditMode ? 'warning.main' : 'primary.main',
-                '&:hover': {
-                  bgcolor: isEditMode ? 'warning.dark' : 'primary.dark'
-                }
-              }}
-            >
-              {loading ? 'Guardando...' : (isEditMode ? 'Actualizar' : 'Guardar')}
-            </Button>
-          </Stack>
-        </Stack>
-      </form>
-
-      {/* Loading overlay */}
-      {(loadingSectores || loadingBarrios || loadingTiposVia) && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            bgcolor: alpha(theme.palette.background.paper, 0.8),
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10
-          }}
+      {/* Botones */}
+      <div className="flex justify-between pt-2">
+        <Button
+          type="button"
+          variant="primary"
+          onClick={() => {/* Lógica para nuevo */}}
+          disabled={isSubmitting}
+          className="h-8 px-3 text-sm flex items-center gap-1"
         >
-          <CircularProgress />
-        </Box>
-      )}
-    </Paper>
+          <span className="text-lg">+</span> Nuevo
+        </Button>
+        
+        <div className="flex space-x-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onCancel}
+            disabled={isSubmitting}
+            className="h-8 px-3 text-sm flex items-center gap-1"
+          >
+            <span>✏️</span> Editar
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={isSubmitting}
+            className="h-8 px-3 text-sm flex items-center gap-1"
+          >
+            <span>💾</span> Guardar
+          </Button>
+        </div>
+      </div>
+    </form>
   );
 };
 
-export default CalleFormMUI;
+export default CalleForm;
