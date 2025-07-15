@@ -81,8 +81,6 @@ const FiltroContribuyenteFormMUI: React.FC<FiltroContribuyenteFormProps> = ({
           label: tipo.nombreCategoria
         }));
         
-        // NO agregar opción "Todos" - usar solo los datos de la API
-        
         setTipoContribuyenteOptions(opcionesContribuyente);
         setTipoDocumentoOptions(opcionesDocumento);
         
@@ -102,7 +100,6 @@ const FiltroContribuyenteFormMUI: React.FC<FiltroContribuyenteFormProps> = ({
         ]);
         
         setTipoDocumentoOptions([
-          { id: 'todos', label: 'Todos' },
           { id: '4101', label: 'DNI' },
           { id: '4102', label: 'RUC' }
         ]);
@@ -168,60 +165,28 @@ const FiltroContribuyenteFormMUI: React.FC<FiltroContribuyenteFormProps> = ({
             <Box sx={{ flex: '0 0 180px' }}>
               <SearchableSelect
                 id="tipo-contribuyente"
-                label="Tipo de Contribuyente"
                 options={tipoContribuyenteOptions}
                 value={tipoContribuyente}
                 onChange={(newValue) => {
                   console.log('Tipo contribuyente seleccionado:', newValue);
                   setTipoContribuyente(newValue);
                 }}
-                placeholder="Seleccione"
+                placeholder="Tipo Contribuyente"
                 disabled={loadingOptions}
-                textFieldProps={{ 
-                  size: 'small',
-                  sx: { 
-                    '& .MuiInputBase-root': { 
-                      fontSize: '0.875rem',
-                      backgroundColor: theme.palette.background.paper 
-                    }
-                  }
-                }}
-                getOptionLabel={(option) => option?.label || ''}
-                isOptionEqualToValue={(option, value) => option?.id === value?.id}
-                renderOption={(props, option) => (
-                  <Box component="li" {...props} sx={{ fontSize: '0.875rem' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {option.icon}
-                      {option.label}
-                    </Box>
-                  </Box>
-                )}
               />
             </Box>
 
             <Box sx={{ flex: '0 0 150px' }}>
               <SearchableSelect
                 id="tipo-documento"
-                label="Tipo de Documento"
                 options={tipoDocumentoOptions}
                 value={tipoDocumento}
                 onChange={(newValue) => {
                   console.log('Tipo documento seleccionado:', newValue);
                   setTipoDocumento(newValue);
                 }}
-                placeholder="Seleccione tipo"
+                placeholder="Tipo Documento"
                 disabled={loadingOptions}
-                textFieldProps={{ 
-                  size: 'small',
-                  sx: { 
-                    '& .MuiInputBase-root': { 
-                      fontSize: '0.875rem',
-                      backgroundColor: theme.palette.background.paper 
-                    }
-                  }
-                }}
-                getOptionLabel={(option) => option?.label || ''}
-                isOptionEqualToValue={(option, value) => option?.id === value?.id}
               />
             </Box>
 
@@ -238,114 +203,66 @@ const FiltroContribuyenteFormMUI: React.FC<FiltroContribuyenteFormProps> = ({
                     handleBuscar();
                   }
                 }}
-                sx={{ 
-                  '& .MuiInputBase-root': { 
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon sx={{ fontSize: 18 }} />
+                    </InputAdornment>
+                  ),
+                  sx: { 
                     fontSize: '0.875rem',
                     backgroundColor: theme.palette.background.paper 
                   }
                 }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: busqueda && (
-                    <InputAdornment position="end">
-                      <IconButton
-                        size="small"
-                        onClick={() => setBusqueda('')}
-                        edge="end"
-                      >
-                        <ClearIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }}
               />
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Tooltip title="Buscar contribuyentes">
+                <Button
+                  variant="contained"
+                  onClick={handleBuscar}
+                  disabled={loading || loadingOptions}
+                  startIcon={loading ? <CircularProgress size={16} /> : <SearchIcon />}
+                  sx={{ 
+                    height: '40px',
+                    minWidth: '100px',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  {loading ? 'Buscando...' : 'Buscar'}
+                </Button>
+              </Tooltip>
+
+              {onNuevo && (
+                <Tooltip title="Nuevo contribuyente">
+                  <Button
+                    variant="contained"
+                    color="success"
+                    onClick={onNuevo}
+                    disabled={loading}
+                    startIcon={<PersonAddIcon />}
+                    sx={{ 
+                      height: '40px',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    Nuevo Contribuyente
+                  </Button>
+                </Tooltip>
+              )}
             </Box>
           </Box>
 
-          {/* Botones de acción */}
-          <Box sx={{ 
-            display: 'flex', 
-            gap: 1,
-            justifyContent: 'flex-end',
-            pt: 0.5
-          }}>
-            {onNuevo && (
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={onNuevo}
-                startIcon={<PersonAddIcon sx={{ fontSize: 18 }} />}
-                sx={{ 
-                  fontSize: '0.813rem',
-                  textTransform: 'none',
-                  px: 2
-                }}
-              >
-                Nuevo Contribuyente
-              </Button>
-            )}
-            
-            <Button
-              variant="contained"
-              size="small"
-              onClick={handleBuscar}
-              disabled={loading || loadingOptions}
-              startIcon={loading ? 
-                <CircularProgress size={16} color="inherit" /> : 
-                <SearchIcon sx={{ fontSize: 18 }} />
-              }
-              sx={{ 
-                fontSize: '0.813rem',
-                textTransform: 'none',
-                px: 2,
-                minWidth: 100
-              }}
-            >
-              {loading ? 'Buscando...' : 'Buscar'}
-            </Button>
+          {/* Información adicional */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+            <InfoIcon sx={{ fontSize: 16, color: theme.palette.text.secondary }} />
+            <Typography variant="caption" color="text.secondary">
+              Puede buscar por nombre completo, número de documento o dirección
+            </Typography>
           </Box>
         </Stack>
-
-        {/* Indicador de carga de opciones */}
-        {loadingOptions && (
-          <Box sx={{ 
-            position: 'absolute', 
-            top: 0, 
-            left: 0, 
-            right: 0, 
-            height: 2 
-          }}>
-            <Box sx={{ 
-              width: '100%', 
-              height: '100%', 
-              backgroundColor: theme.palette.primary.main,
-              animation: 'pulse 1.5s ease-in-out infinite',
-              '@keyframes pulse': {
-                '0%': { opacity: 0.6 },
-                '50%': { opacity: 1 },
-                '100%': { opacity: 0.6 }
-              }
-            }} />
-          </Box>
-        )}
       </Paper>
-
-      {/* Información adicional */}
-      <Box sx={{ 
-        mt: 1, 
-        display: 'flex', 
-        alignItems: 'center',
-        px: 1 
-      }}>
-        <InfoIcon sx={{ fontSize: 14, color: theme.palette.text.secondary, mr: 0.5 }} />
-        <Typography variant="caption" color="text.secondary">
-          Puede buscar por nombre completo, número de documento o dirección
-        </Typography>
-      </Box>
     </Box>
   );
 };

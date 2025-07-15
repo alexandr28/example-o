@@ -160,14 +160,6 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
   }
   
   /**
-   * Sobrescribe el método search del BaseApiService para usar la estrategia correcta
-   */
-  async search(params: Record<string, any>): Promise<ContribuyenteData[]> {
-    // Usar el método que maneja form-data
-    return await this.buscarConFormData(params as BusquedaContribuyenteParams);
-  }
-  
-  /**
    * Construye el nombre completo según el tipo de persona
    */
   private static construirNombreCompleto(item: any): string {
@@ -189,18 +181,32 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
 
   /**
    * Método especial para manejar las peticiones del API que espera form-data
-   * Como los navegadores no permiten GET con body, usamos varias estrategias
+   * Usando una estrategia alternativa para navegadores modernos
    */
   async buscarConFormData(params: BusquedaContribuyenteParams): Promise<ContribuyenteData[]> {
     try {
-      console.log('🔍 [ContribuyenteService] Buscando contribuyentes:', params);
+      console.log('🔍 [ContribuyenteService] Buscando contribuyentes con form-data:', params);
       
-      // Construir URL base
       const url = buildApiUrl(this.endpoint);
       
-      // Estrategia 1: Intentar con query parameters (más estándar)
-      const queryParams = new URLSearchParams();
+      // Para navegadores modernos, intentar con fetch y POST
+      // ya que GET con body no está soportado en fetch
+      const formData = new FormData();
       
+      // Agregar parámetros al FormData
+      if (params.codigoContribuyente !== undefined) {
+        formData.append('codigoContribuyente', String(params.codigoContribuyente));
+      }
+      if (params.codigoPersona !== undefined) {
+        formData.append('codigoPersona', String(params.codigoPersona));
+      }
+      
+      // Log para debugging
+      console.log('📡 Enviando petición al endpoint:', url);
+      
+      // Intentar con un GET normal primero (sin body)
+      // Algunos servidores pueden aceptar los parámetros en query string
+      const queryParams = new URLSearchParams();
       if (params.codigoContribuyente !== undefined) {
         queryParams.append('codigoContribuyente', String(params.codigoContribuyente));
       }
@@ -208,10 +214,11 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
         queryParams.append('codigoPersona', String(params.codigoPersona));
       }
       
-      console.log('📡 Intentando con query params:', queryParams.toString());
-      
       try {
-        const response = await fetch(`${url}?${queryParams.toString()}`, {
+        const getUrl = `${url}?${queryParams.toString()}`;
+        console.log('📡 Intentando GET con query params:', getUrl);
+        
+        const response = await fetch(getUrl, {
           method: 'GET',
           headers: {
             'Accept': 'application/json'
@@ -220,45 +227,21 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
         
         if (response.ok) {
           const responseData = await response.json();
-          console.log('✅ Respuesta exitosa con query params:', responseData);
+          console.log('✅ Respuesta exitosa:', responseData);
           
           if (responseData.success && responseData.data) {
-            const items = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+            const items = Array.isArray(responseData.data) ? 
+              responseData.data : [responseData.data];
             return this.normalizeData(items);
           }
         }
       } catch (error) {
-        console.log('⚠️ Query params falló, intentando siguiente estrategia...');
+        console.log('⚠️ GET con query params falló, intentando alternativa...');
       }
       
-      // Estrategia 2: Si el servidor realmente necesita form-data, intentar con POST
-      const formData = new FormData();
-      if (params.codigoContribuyente !== undefined) {
-        formData.append('codigoContribuyente', String(params.codigoContribuyente));
-      }
-      if (params.codigoPersona !== undefined) {
-        formData.append('codigoPersona', String(params.codigoPersona));
-      }
-      
-      console.log('📡 Intentando con POST y form-data...');
-      
-      const postResponse = await fetch(url, {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (postResponse.ok) {
-        const responseData = await postResponse.json();
-        console.log('✅ Respuesta exitosa con POST:', responseData);
-        
-        if (responseData.success && responseData.data) {
-          const items = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
-          return this.normalizeData(items);
-        }
-      }
-      
-      // Si ambas estrategias fallan, retornar array vacío
-      console.warn('⚠️ Todas las estrategias fallaron');
+      // Si el GET normal falla, devolver datos vacíos por ahora
+      // En producción, esto debería manejarse según la API real
+      console.warn('⚠️ No se pudieron obtener datos del servidor');
       return [];
       
     } catch (error: any) {
@@ -269,84 +252,23 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
 
   /**
    * Lista todos los contribuyentes
-   * Primero intenta con el endpoint de personas que es el que realmente funciona
+   * Usa form-data con los parámetros por defecto
    */
-  async listarContribuyentes(params?: BusquedaContribuyenteParams): Promise<ContribuyenteData[]> {
+  async listarContribuyentes(params?: any): Promise<ContribuyenteData[]> {
     try {
-      console.log('🔍 [ContribuyenteService] Listando contribuyentes:', params);
+      console.log('📋 [ContribuyenteService] Listando todos los contribuyentes');
       
-      // Si hay parámetros de búsqueda, usar el endpoint de personas
-      if (params?.busqueda || params?.tipoContribuyente || params?.parametroBusqueda) {
-        return await this.buscarPersonasPorTipoYNombre({
-          codTipoPersona: params.tipoContribuyente || '0301',
-          parametroBusqueda: params.busqueda || params.parametroBusqueda || 'a'
-        });
-      }
+      // Usar el endpoint con form-data
+      // Por defecto buscar con codigoContribuyente = 1 y codigoPersona = 0
+      const defaultParams = {
+        codigoContribuyente: params?.codigoContribuyente ?? '1',
+        codigoPersona: params?.codigoPersona ?? '0'
+      };
       
-      // Si no hay parámetros, buscar todos con 'a'
-      return await this.buscarPersonasPorTipoYNombre({
-        codTipoPersona: '0301',
-        parametroBusqueda: 'a'
-      });
+      return await this.buscarConFormData(defaultParams);
       
     } catch (error: any) {
       console.error('❌ [ContribuyenteService] Error listando contribuyentes:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Busca personas usando el endpoint que realmente funciona
-   * GET /api/persona/listarPersonaPorTipoPersonaNombreRazon
-   */
-  private async buscarPersonasPorTipoYNombre(params: {
-    codTipoPersona: string;
-    parametroBusqueda: string;
-  }): Promise<ContribuyenteData[]> {
-    try {
-      console.log('🔍 [ContribuyenteService] Buscando personas:', params);
-      
-      // Construir URL base
-      const url = buildApiUrl('/api/persona/listarPersonaPorTipoPersonaNombreRazon');
-      
-      // Crear FormData
-      const formData = new FormData();
-      formData.append('codTipoPersona', params.codTipoPersona);
-      formData.append('parametroBusqueda', params.parametroBusqueda);
-      
-      // Como es GET con form-data, intentar con query parameters
-      const queryParams = new URLSearchParams();
-      queryParams.append('codTipoPersona', params.codTipoPersona);
-      queryParams.append('parametroBusqueda', params.parametroBusqueda);
-      
-      console.log('📡 Intentando con query params:', queryParams.toString());
-      
-      const response = await fetch(`${url}?${queryParams.toString()}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
-      }
-      
-      const responseData = await response.json();
-      console.log('📡 Respuesta recibida:', responseData);
-      
-      // Manejar la estructura de respuesta
-      if (responseData.success && responseData.data) {
-        const items = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
-        
-        // Convertir formato de persona a contribuyente
-        return items.map(persona => this.convertirPersonaAContribuyente(persona));
-      }
-      
-      return [];
-      
-    } catch (error: any) {
-      console.error('❌ [ContribuyenteService] Error en búsqueda de personas:', error);
       return [];
     }
   }
@@ -360,17 +282,12 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
       console.log('🔍 [ContribuyenteService] Buscando contribuyentes:', criterios);
       
       // Si tiene parámetros específicos que requieren form-data
-      if (criterios.codigoContribuyente || criterios.codigoPersona) {
+      if (criterios.codigoContribuyente !== undefined || criterios.codigoPersona !== undefined) {
         return await this.buscarConFormData(criterios);
       }
       
-      // Para otros criterios, usar búsqueda estándar
-      const params = {
-        ...criterios,
-        codUsuario: criterios.codUsuario || API_CONFIG.defaultParams.codUsuario
-      };
-      
-      return await this.search(params);
+      // Para otros criterios, usar los valores por defecto
+      return await this.listarContribuyentes();
       
     } catch (error: any) {
       console.error('❌ [ContribuyenteService] Error buscando contribuyentes:', error);
@@ -386,12 +303,11 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
     try {
       console.log('🔍 [ContribuyenteService] Buscando por documento:', numeroDocumento);
       
-      const results = await this.search({ 
-        numeroDocumento,
-        codUsuario: API_CONFIG.defaultParams.codUsuario
-      });
+      // Obtener todos y filtrar localmente
+      const todos = await this.listarContribuyentes();
+      const encontrado = todos.find(c => c.numeroDocumento === numeroDocumento);
       
-      return results.length > 0 ? results[0] : null;
+      return encontrado || null;
       
     } catch (error: any) {
       console.error('❌ [ContribuyenteService] Error buscando por documento:', error);
@@ -407,8 +323,11 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
     try {
       console.log('🔍 [ContribuyenteService] Buscando por código de persona:', codPersona);
       
-      // Usar form-data para buscar por código de persona
-      const results = await this.buscarConFormData({ codigoPersona: codPersona });
+      // Usar form-data para buscar por código de persona específico
+      const results = await this.buscarConFormData({ 
+        codigoPersona: codPersona,
+        codigoContribuyente: '0' // Para buscar específicamente por persona
+      });
       
       return results.length > 0 ? results[0] : null;
       
@@ -464,13 +383,6 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
       console.error('❌ [ContribuyenteService] Error eliminando contribuyente:', error);
       throw error;
     }
-  }
-  
-  /**
-   * Convierte un objeto persona a formato contribuyente
-   */
-  private convertirPersonaAContribuyente(persona: any): ContribuyenteData {
-    return this.normalizeOptions.normalizeItem(persona, 0);
   }
 }
 

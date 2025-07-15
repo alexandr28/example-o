@@ -26,14 +26,24 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  useTheme,
+  alpha,
+  Fade,
+  Tooltip
 } from '@mui/material';
 import {
   Search as SearchIcon,
   Close as CloseIcon,
   LocationOn as LocationIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  FilterList as FilterIcon,
+  Apartment as ApartmentIcon,
+  Map as MapIcon,
+  CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
+import { direccionService, DireccionData } from '../../services/direccionService';
+import { NotificationService } from '../utils/Notification';
 
 interface Direccion {
   id: number;
@@ -46,7 +56,7 @@ interface Direccion {
   lado: string;
   loteInicial: number;
   loteFinal: number;
-  estado?: boolean;
+  descripcion?: string;
 }
 
 interface SelectorDireccionesProps {
@@ -56,78 +66,23 @@ interface SelectorDireccionesProps {
   direccionSeleccionada?: Direccion | null;
 }
 
-// Datos de ejemplo para desarrollo
-const direccionesEjemplo: Direccion[] = [
-  {
-    id: 1,
-    codigo: '001',
-    sector: 'Centro',
-    barrio: 'San Juan',
-    tipoVia: 'Calle',
-    nombreVia: 'Los Álamos',
-    cuadra: 1,
-    lado: 'Derecho',
-    loteInicial: 1,
-    loteFinal: 10,
-    estado: true
-  },
-  {
-    id: 2,
-    codigo: '002',
-    sector: 'Norte',
-    barrio: 'Las Flores',
-    tipoVia: 'Avenida',
-    nombreVia: 'Principal',
-    cuadra: 2,
-    lado: 'Izquierdo',
-    loteInicial: 1,
-    loteFinal: 20,
-    estado: true
-  },
-  {
-    id: 3,
-    codigo: '003',
-    sector: 'Sur',
-    barrio: 'Villa Sol',
-    tipoVia: 'Jirón',
-    nombreVia: 'Las Palmeras',
-    cuadra: 3,
-    lado: 'Ambos',
-    loteInicial: 1,
-    loteFinal: 15,
-    estado: true
-  }
-];
-
-const sectoresEjemplo = [
-  { id: 1, nombre: 'Centro' },
-  { id: 2, nombre: 'Norte' },
-  { id: 3, nombre: 'Sur' },
-  { id: 4, nombre: 'Este' },
-  { id: 5, nombre: 'Oeste' }
-];
-
-const barriosEjemplo = [
-  { id: 1, nombre: 'San Juan' },
-  { id: 2, nombre: 'Las Flores' },
-  { id: 3, nombre: 'Villa Sol' },
-  { id: 4, nombre: 'Los Pinos' },
-  { id: 5, nombre: 'Santa Rosa' }
-];
-
 const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
   open,
   onClose,
   onSelectDireccion,
   direccionSeleccionada
 }) => {
+  const theme = useTheme();
+  
   // Estados
   const [selectedDireccion, setSelectedDireccion] = useState<Direccion | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sectorFilter, setSectorFilter] = useState('');
   const [barrioFilter, setBarrioFilter] = useState('');
-  const [direcciones, setDirecciones] = useState<Direccion[]>(direccionesEjemplo);
+  const [direcciones, setDirecciones] = useState<Direccion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sectores, setSectores] = useState<string[]>([]);
+  const [barrios, setBarrios] = useState<string[]>([]);
 
   // Efecto para establecer la dirección seleccionada al abrir
   useEffect(() => {
@@ -136,44 +91,95 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
     }
   }, [open, direccionSeleccionada]);
 
-  // Efecto para simular búsqueda
+  // Efecto para cargar direcciones cuando se abre el modal
+  useEffect(() => {
+    if (open) {
+      cargarDirecciones();
+    }
+  }, [open]);
+
+  // Efecto para buscar con debounce
   useEffect(() => {
     const timer = setTimeout(() => {
-      buscarDirecciones();
-    }, 300);
+      if (open) {
+        buscarDirecciones();
+      }
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [searchTerm, sectorFilter, barrioFilter]);
 
-  // Buscar direcciones (simulado)
-  const buscarDirecciones = () => {
-    setLoading(true);
-    
-    setTimeout(() => {
-      let filtered = [...direccionesEjemplo];
-
-      // Filtrar por término de búsqueda
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        filtered = filtered.filter(d => 
-          d.nombreVia.toLowerCase().includes(term) ||
-          d.codigo.toLowerCase().includes(term)
-        );
-      }
-
-      // Filtrar por sector
-      if (sectorFilter) {
-        filtered = filtered.filter(d => d.sector === sectorFilter);
-      }
-
-      // Filtrar por barrio
-      if (barrioFilter) {
-        filtered = filtered.filter(d => d.barrio === barrioFilter);
-      }
-
-      setDirecciones(filtered);
+  // Cargar todas las direcciones inicialmente
+  const cargarDirecciones = async () => {
+    try {
+      setLoading(true);
+      const data = await direccionService.listarDireccionPorNombreVia('a'); // Buscar con 'a' para obtener más resultados
+      
+      // Convertir datos de la API al formato del componente
+      const direccionesFormateadas = data.map(item => ({
+        id: item.codDireccion,
+        codigo: String(item.codDireccion).padStart(3, '0'),
+        sector: item.nombreSector || 'Sin sector',
+        barrio: item.nombreBarrio || 'Sin barrio',
+        tipoVia: item.nombreTipoVia || 'CALLE',
+        nombreVia: item.nombreVia || '',
+        cuadra: item.cuadra || 0,
+        lado: item.lado || '-',
+        loteInicial: item.loteInicial || 0,
+        loteFinal: item.loteFinal || 0,
+        descripcion: `${item.nombreSector || ''} + ${item.nombreBarrio || ''} + ${item.nombreTipoVia || 'CALLE'} ${item.nombreVia || ''} - Cuadra ${item.cuadra || 0} - Lado ${item.lado || '-'} - Lotes ${item.loteInicial || 0}-${item.loteFinal || 0}`
+      }));
+      
+      setDirecciones(direccionesFormateadas);
+      
+      // Extraer sectores y barrios únicos
+      const sectoresUnicos = [...new Set(data.map(d => d.nombreSector).filter((x): x is string => Boolean(x)))];
+      const barriosUnicos = [...new Set(data.map(d => d.nombreBarrio).filter((x): x is string => Boolean(x)))];
+      
+      setSectores(sectoresUnicos);
+      setBarrios(barriosUnicos);
+      
+    } catch (error) {
+      console.error('Error cargando direcciones:', error);
+      NotificationService.error('Error al cargar las direcciones');
+    } finally {
       setLoading(false);
-    }, 500);
+    }
+  };
+
+  // Buscar direcciones con filtros
+  const buscarDirecciones = async () => {
+    try {
+      setLoading(true);
+      
+      const data = await direccionService.buscarDirecciones({
+        nombreVia: searchTerm,
+        sector: sectorFilter,
+        barrio: barrioFilter
+      });
+      
+      // Convertir y filtrar localmente si es necesario
+      const direccionesFormateadas = data.map(item => ({
+        id: item.codDireccion,
+        codigo: String(item.codDireccion).padStart(3, '0'),
+        sector: item.nombreSector || 'Sin sector',
+        barrio: item.nombreBarrio || 'Sin barrio',
+        tipoVia: item.nombreTipoVia || 'CALLE',
+        nombreVia: item.nombreVia || '',
+        cuadra: item.cuadra || 0,
+        lado: item.lado || '-',
+        loteInicial: item.loteInicial || 0,
+        loteFinal: item.loteFinal || 0,
+        descripcion: `${item.nombreSector || ''} + ${item.nombreBarrio || ''} + ${item.nombreTipoVia || 'CALLE'} ${item.nombreVia || ''} - Cuadra ${item.cuadra || 0} - Lado ${item.lado || '-'} - Lotes ${item.loteInicial || 0}-${item.loteFinal || 0}`
+      }));
+      
+      setDirecciones(direccionesFormateadas);
+      
+    } catch (error) {
+      console.error('Error buscando direcciones:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handlers
@@ -183,7 +189,12 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
 
   const handleConfirm = () => {
     if (selectedDireccion) {
-      onSelectDireccion(selectedDireccion);
+      // Asegurar que la dirección tenga una descripción
+      const direccionConDescripcion = {
+        ...selectedDireccion,
+        descripcion: formatDireccion(selectedDireccion)
+      };
+      onSelectDireccion(direccionConDescripcion);
       handleClose();
     }
   };
@@ -204,32 +215,48 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
 
   // Formatear dirección para mostrar
   const formatDireccion = (direccion: Direccion) => {
-    return `${direccion.tipoVia} ${direccion.nombreVia} - Cuadra ${direccion.cuadra} - Lado ${direccion.lado} - Lotes ${direccion.loteInicial}-${direccion.loteFinal}`;
+    return `${direccion.sector} + ${direccion.barrio} + ${direccion.tipoVia} ${direccion.nombreVia} - Cuadra ${direccion.cuadra} - Lado ${direccion.lado} - Lotes ${direccion.loteInicial}-${direccion.loteFinal}`;
   };
 
   return (
     <Dialog
       open={open}
       onClose={handleClose}
-      maxWidth="lg"
+      maxWidth="md" // Cambiado de "lg" a "md" para reducir el ancho
       fullWidth
+      TransitionComponent={Fade}
       PaperProps={{
-        sx: { minHeight: '80vh' }
+        sx: { 
+          minHeight: '70vh', // Reducido de 80vh
+          borderRadius: 2
+        }
       }}
     >
-      <DialogTitle>
+      <DialogTitle sx={{ pb: 1 }}>
         <Box display="flex" alignItems="center" justifyContent="space-between">
           <Box display="flex" alignItems="center" gap={1}>
-            <LocationIcon color="primary" />
-            <Typography variant="h6">Seleccionar Dirección</Typography>
+            <LocationIcon sx={{ color: theme.palette.primary.main }} />
+            <Typography variant="h6" fontWeight={600}>
+              Seleccionar Dirección
+            </Typography>
           </Box>
-          <IconButton onClick={handleClose} size="small">
+          <IconButton 
+            onClick={handleClose} 
+            size="small"
+            sx={{ 
+              color: theme.palette.grey[500],
+              '&:hover': { 
+                backgroundColor: alpha(theme.palette.error.main, 0.1),
+                color: theme.palette.error.main 
+              }
+            }}
+          >
             <CloseIcon />
           </IconButton>
         </Box>
       </DialogTitle>
 
-      <DialogContent dividers>
+      <DialogContent dividers sx={{ pt: 3 }}>
         {/* Filtros de búsqueda */}
         <Box mb={3}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
@@ -242,9 +269,16 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon />
+                    <SearchIcon sx={{ color: theme.palette.text.secondary }} />
                   </InputAdornment>
                 ),
+                sx: { 
+                  '& .MuiOutlinedInput-root': {
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    }
+                  }
+                }
               }}
             />
             
@@ -254,66 +288,98 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
                 value={sectorFilter}
                 onChange={(e) => setSectorFilter(e.target.value)}
                 label="Sector"
+                startAdornment={
+                  <InputAdornment position="start">
+                    <ApartmentIcon sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+                  </InputAdornment>
+                }
               >
-                <MenuItem value="">Todos</MenuItem>
-                {sectoresEjemplo.map((sector) => (
-                  <MenuItem key={sector.id} value={sector.nombre}>
-                    {sector.nombre}
+                <MenuItem value="">
+                  <em>Todos</em>
+                </MenuItem>
+                {sectores.map(sector => (
+                  <MenuItem key={sector} value={sector}>
+                    {sector}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
-            
+
             <FormControl size="small" sx={{ minWidth: 200 }}>
               <InputLabel>Barrio</InputLabel>
               <Select
                 value={barrioFilter}
                 onChange={(e) => setBarrioFilter(e.target.value)}
                 label="Barrio"
+                startAdornment={
+                  <InputAdornment position="start">
+                    <MapIcon sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+                  </InputAdornment>
+                }
               >
-                <MenuItem value="">Todos</MenuItem>
-                {barriosEjemplo.map((barrio) => (
-                  <MenuItem key={barrio.id} value={barrio.nombre}>
-                    {barrio.nombre}
+                <MenuItem value="">
+                  <em>Todos</em>
+                </MenuItem>
+                {barrios.map(barrio => (
+                  <MenuItem key={barrio} value={barrio}>
+                    {barrio}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
-            
-            <Button
-              variant="outlined"
-              startIcon={<ClearIcon />}
-              onClick={handleClearFilters}
-              size="small"
-            >
-              Limpiar
-            </Button>
+
+            <Tooltip title="Limpiar filtros">
+              <Button
+                variant="outlined"
+                onClick={handleClearFilters}
+                startIcon={<ClearIcon />}
+                sx={{ 
+                  minWidth: 'auto',
+                  borderColor: theme.palette.grey[300],
+                  color: theme.palette.text.secondary,
+                  '&:hover': {
+                    borderColor: theme.palette.primary.main,
+                    backgroundColor: alpha(theme.palette.primary.main, 0.05)
+                  }
+                }}
+              >
+                Limpiar
+              </Button>
+            </Tooltip>
           </Stack>
         </Box>
 
         {/* Tabla de direcciones */}
-        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400 }}>
+        <TableContainer 
+          component={Paper} 
+          variant="outlined"
+          sx={{ 
+            maxHeight: 400,
+            '& .MuiTable-root': {
+              minWidth: 500 // Reducido de 650
+            }
+          }}
+        >
           <Table stickyHeader size="small">
             <TableHead>
               <TableRow>
-                <TableCell width={50}></TableCell>
-                <TableCell>Código</TableCell>
-                <TableCell>Sector</TableCell>
-                <TableCell>Barrio</TableCell>
-                <TableCell>Dirección</TableCell>
-                <TableCell align="center">Estado</TableCell>
+                <TableCell padding="checkbox" sx={{ width: 50 }}></TableCell>
+                <TableCell sx={{ fontWeight: 600, width: 80 }}>Código</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: 120 }}>Sector</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: 120 }}>Barrio</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Dirección</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                    <CircularProgress />
+                  <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                    <CircularProgress size={32} />
                   </TableCell>
                 </TableRow>
               ) : direcciones.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                     <Typography variant="body2" color="text.secondary">
                       No se encontraron direcciones
                     </Typography>
@@ -326,29 +392,50 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
                     hover
                     sx={{
                       cursor: 'pointer',
-                      '&.Mui-selected': {
-                        backgroundColor: 'action.selected',
-                      }
+                      '&.MuiTableRow-hover:hover': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.05)
+                      },
+                      ...(selectedDireccion?.id === direccion.id && {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                        '&.MuiTableRow-hover:hover': {
+                          backgroundColor: alpha(theme.palette.primary.main, 0.12)
+                        }
+                      })
                     }}
-                    selected={selectedDireccion?.id === direccion.id}
                     onClick={() => handleSelectDireccion(direccion)}
                   >
-                    <TableCell>
+                    <TableCell padding="checkbox">
                       <Radio
                         checked={selectedDireccion?.id === direccion.id}
                         size="small"
+                        sx={{
+                          color: theme.palette.grey[400],
+                          '&.Mui-checked': {
+                            color: theme.palette.primary.main
+                          }
+                        }}
                       />
                     </TableCell>
-                    <TableCell>{direccion.codigo}</TableCell>
-                    <TableCell>{direccion.sector}</TableCell>
-                    <TableCell>{direccion.barrio}</TableCell>
-                    <TableCell>{formatDireccion(direccion)}</TableCell>
-                    <TableCell align="center">
-                      <Chip
-                        label={direccion.estado !== false ? 'Activo' : 'Inactivo'}
-                        size="small"
-                        color={direccion.estado !== false ? 'success' : 'default'}
-                      />
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={500}>
+                        {direccion.codigo}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {direccion.sector}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {direccion.barrio}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
+                        {direccion.tipoVia} {direccion.nombreVia} - Cuadra {direccion.cuadra} - 
+                        Lado {direccion.lado} - Lotes {direccion.loteInicial}-{direccion.loteFinal}
+                      </Typography>
                     </TableCell>
                   </TableRow>
                 ))
@@ -359,23 +446,49 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
 
         {/* Dirección seleccionada */}
         {selectedDireccion && (
-          <Alert severity="info" sx={{ mt: 2 }}>
-            <Typography variant="subtitle2">Dirección seleccionada:</Typography>
-            <Typography variant="body2">
-              {selectedDireccion.sector} + {selectedDireccion.barrio} + {formatDireccion(selectedDireccion)}
-            </Typography>
-          </Alert>
+          <Fade in={true}>
+            <Alert 
+              severity="info" 
+              sx={{ 
+                mt: 2,
+                backgroundColor: alpha(theme.palette.info.main, 0.05),
+                '& .MuiAlert-icon': {
+                  color: theme.palette.info.main
+                }
+              }}
+              icon={<LocationIcon />}
+            >
+              <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                Dirección seleccionada:
+              </Typography>
+              <Typography variant="body2">
+                {formatDireccion(selectedDireccion)}
+              </Typography>
+            </Alert>
+          </Fade>
         )}
       </DialogContent>
 
-      <DialogActions>
-        <Button onClick={handleClose} color="inherit">
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button 
+          onClick={handleClose} 
+          color="inherit"
+          sx={{ mr: 1 }}
+        >
           Cancelar
         </Button>
         <Button
           onClick={handleConfirm}
           variant="contained"
           disabled={!selectedDireccion}
+          startIcon={<CheckCircleIcon />}
+          sx={{
+            minWidth: 120,
+            boxShadow: theme.shadows[2],
+            '&:hover': {
+              boxShadow: theme.shadows[4]
+            }
+          }}
         >
           Confirmar
         </Button>

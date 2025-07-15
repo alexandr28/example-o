@@ -1,4 +1,4 @@
-// src/components/contribuyentes/ContribuyenteFormMUI.tsx
+// src/components/contribuyentes/ContribuyenteForm.tsx
 import React, { useState, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -29,7 +29,7 @@ import {
 } from '@mui/icons-material';
 import PersonaFormMUI from './PersonaForm';
 import FormSectionMUI from '../utils/FormSecction';
-import SelectorDireccionesMUI from '../modal/SelectorDirecciones';
+import SelectorDirecciones from '../modal/SelectorDirecciones'; // CORREGIDO: Importación correcta
 import { NotificationService } from '../utils/Notification';
 
 interface ContribuyenteFormMUIProps {
@@ -92,12 +92,12 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
       otroNumero: '',
       telefono: '',
       sexo: 'Masculino',
-      estadoCivil: 'Soltero/a',
+      estadoCivil: 'Casado/a',
       fechaNacimiento: null
     }
   });
 
-  const esPersonaJuridica = principalForm.watch('esPersonaJuridica');
+  const esPersonaJuridica = tipoContribuyente === 'juridica';
 
   // Manejar cambio de tipo de contribuyente
   const handleTipoContribuyenteChange = useCallback((
@@ -105,20 +105,28 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
     newValue: 'natural' | 'juridica' | null
   ) => {
     if (newValue !== null) {
-      const esJuridica = newValue === 'juridica';
       setTipoContribuyente(newValue);
-      principalForm.setValue('esPersonaJuridica', esJuridica);
+      principalForm.setValue('esPersonaJuridica', newValue === 'juridica');
       
-      // Cambiar tipo de documento según el tipo de contribuyente
-      if (esJuridica) {
+      // Resetear algunos campos según el tipo
+      if (newValue === 'juridica') {
         principalForm.setValue('tipoDocumento', 'RUC');
+        principalForm.setValue('nombres', '');
+        principalForm.setValue('apellidoPaterno', '');
+        principalForm.setValue('apellidoMaterno', '');
       } else {
         principalForm.setValue('tipoDocumento', 'DNI');
+        principalForm.setValue('razonSocial', '');
       }
     }
   }, [principalForm]);
 
-  // Manejo de modales
+  // Toggle cónyuge/representante
+  const toggleConyugeForm = useCallback(() => {
+    setShowConyugeRepresentante(!showConyugeRepresentante);
+  }, [showConyugeRepresentante]);
+
+  // Manejar apertura de modal de dirección
   const handleOpenDireccionModal = useCallback(() => {
     setIsDireccionModalOpen(true);
   }, []);
@@ -138,21 +146,13 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
   // Manejar selección de dirección
   const handleSelectDireccion = useCallback((direccion: any) => {
     principalForm.setValue('direccion', direccion);
-    setIsDireccionModalOpen(false);
-  }, [principalForm]);
+    handleCloseDireccionModal();
+  }, [principalForm, handleCloseDireccionModal]);
 
   const handleSelectConyugeDireccion = useCallback((direccion: any) => {
     conyugeRepresentanteForm.setValue('direccion', direccion);
-    setIsConyugeDireccionModalOpen(false);
-  }, [conyugeRepresentanteForm]);
-
-  // Toggle cónyuge/representante
-  const toggleConyugeForm = useCallback(() => {
-    setShowConyugeRepresentante(!showConyugeRepresentante);
-    if (!showConyugeRepresentante) {
-      conyugeRepresentanteForm.reset();
-    }
-  }, [showConyugeRepresentante, conyugeRepresentanteForm]);
+    handleCloseConyugeDireccionModal();
+  }, [conyugeRepresentanteForm, handleCloseConyugeDireccionModal]);
 
   // Obtener texto completo de dirección
   const getDireccionTextoCompleto = useCallback((direccion: any, nFinca: string, otroNumero?: string) => {
@@ -255,102 +255,106 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
 
           <Divider sx={{ mb: 3 }} />
 
-          {/* Datos principales */}
-          <FormSectionMUI title="Datos del Contribuyente" icon={<BadgeIcon />}>
-            <PersonaFormMUI
-              form={principalForm}
-              isJuridica={esPersonaJuridica}
-              onOpenDireccionModal={handleOpenDireccionModal}
-              direccion={principalForm.watch('direccion')}
-              getDireccionTextoCompleto={getDireccionTextoCompleto}
-              disablePersonaFields={loading}
-            />
-          </FormSectionMUI>
-
-          {/* Botón para agregar cónyuge/representante */}
-          <Box sx={{ my: 3 }}>
-            <Button
-              variant={showConyugeRepresentante ? 'outlined' : 'contained'}
-              onClick={toggleConyugeForm}
-              disabled={loading}
-              startIcon={<GroupsIcon />}
-              sx={{
-                backgroundColor: showConyugeRepresentante ? 'transparent' : alpha(theme.palette.primary.main, 0.9),
-                '&:hover': {
-                  backgroundColor: showConyugeRepresentante ? alpha(theme.palette.primary.main, 0.08) : theme.palette.primary.dark
-                }
-              }}
-            >
-              {showConyugeRepresentante 
-                ? 'Ocultar' 
-                : esPersonaJuridica 
-                  ? 'Agregar datos del representante legal' 
-                  : 'Agregar datos del cónyuge'}
-            </Button>
-          </Box>
-
-          {/* Formulario de cónyuge/representante */}
-          <Collapse in={showConyugeRepresentante}>
-            <FormSectionMUI 
-              title={esPersonaJuridica ? 'Datos del Representante Legal' : 'Datos del Cónyuge'}
-              icon={<GroupsIcon />}
-              onDelete={() => {
-                conyugeRepresentanteForm.reset();
-                toggleConyugeForm();
-              }}
-            >
+          {/* Contenedor principal con ancho limitado */}
+          <Box sx={{ maxWidth: '600px' }}>
+            {/* Datos principales */}
+            <FormSectionMUI title="Datos del Contribuyente" icon={<BadgeIcon />}>
               <PersonaFormMUI
-                form={conyugeRepresentanteForm}
-                isRepresentante={true}
-                onOpenDireccionModal={handleOpenConyugeDireccionModal}
-                direccion={conyugeRepresentanteForm.watch('direccion')}
+                form={principalForm}
+                isJuridica={esPersonaJuridica}
+                onOpenDireccionModal={handleOpenDireccionModal}
+                direccion={principalForm.watch('direccion')}
                 getDireccionTextoCompleto={getDireccionTextoCompleto}
                 disablePersonaFields={loading}
               />
             </FormSectionMUI>
-          </Collapse>
 
-          <Divider sx={{ my: 3 }} />
+            {/* Botón para agregar cónyuge/representante */}
+            <Box sx={{ my: 3 }}>
+              <Button
+                variant={showConyugeRepresentante ? 'outlined' : 'contained'}
+                onClick={toggleConyugeForm}
+                disabled={loading}
+                startIcon={<GroupsIcon />}
+                sx={{
+                  backgroundColor: showConyugeRepresentante ? 'transparent' : alpha(theme.palette.primary.main, 0.9),
+                  '&:hover': {
+                    backgroundColor: showConyugeRepresentante ? 
+                      alpha(theme.palette.primary.main, 0.08) : theme.palette.primary.dark
+                  }
+                }}
+              >
+                {showConyugeRepresentante 
+                  ? 'Ocultar' 
+                  : esPersonaJuridica 
+                    ? 'Agregar datos del representante legal' 
+                    : 'Agregar datos del cónyuge'}
+              </Button>
+            </Box>
 
-          {/* Botones de acción */}
-          <Stack direction="row" spacing={2} justifyContent="flex-end">
-            <Button
-              variant="outlined"
-              onClick={handleNuevo}
-              disabled={loading}
-              startIcon={<ClearIcon />}
-            >
-              Nuevo
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={handleEditar}
-              disabled={loading}
-              startIcon={<EditIcon />}
-            >
-              Editar
-            </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={loading}
-              startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
-            >
-              {loading ? 'Guardando...' : 'Guardar'}
-            </Button>
-          </Stack>
+            {/* Formulario de cónyuge/representante */}
+            <Collapse in={showConyugeRepresentante}>
+              <FormSectionMUI 
+                title={esPersonaJuridica ? 'Datos del Representante Legal' : 'Datos del Cónyuge'}
+                icon={<GroupsIcon />}
+                onDelete={() => {
+                  conyugeRepresentanteForm.reset();
+                  toggleConyugeForm();
+                }}
+              >
+                <PersonaFormMUI
+                  form={conyugeRepresentanteForm}
+                  isRepresentante={true}
+                  onOpenDireccionModal={handleOpenConyugeDireccionModal}
+                  direccion={conyugeRepresentanteForm.watch('direccion')}
+                  getDireccionTextoCompleto={getDireccionTextoCompleto}
+                  disablePersonaFields={loading}
+                />
+              </FormSectionMUI>
+            </Collapse>
+
+            <Divider sx={{ my: 3 }} />
+
+            {/* Botones de acción - AJUSTADOS AL ANCHO DEL FORMULARIO */}
+            <Stack direction="row" spacing={2} justifyContent="flex-end">
+              <Button
+                variant="outlined"
+                onClick={handleNuevo}
+                disabled={loading}
+                startIcon={<ClearIcon />}
+              >
+                Nuevo
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={handleEditar}
+                disabled={loading}
+                startIcon={<EditIcon />}
+              >
+                Editar
+              </Button>
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={loading}
+                startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
+              >
+                {loading ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </Stack>
+          </Box>
         </form>
       </Paper>
 
-      {/* Modales */}
-      <SelectorDireccionesMUI
-        isOpen={isDireccionModalOpen}
+      {/* Modales - CORREGIDO: Usando las props correctas */}
+      <SelectorDirecciones
+        open={isDireccionModalOpen}
         onClose={handleCloseDireccionModal}
         onSelectDireccion={handleSelectDireccion}
       />
       
-      <SelectorDireccionesMUI
-        isOpen={isConyugeDireccionModalOpen}
+      <SelectorDirecciones
+        open={isConyugeDireccionModalOpen}
         onClose={handleCloseConyugeDireccionModal}
         onSelectDireccion={handleSelectConyugeDireccion}
       />

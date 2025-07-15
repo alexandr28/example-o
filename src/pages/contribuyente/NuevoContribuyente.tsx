@@ -11,7 +11,7 @@ import { MainLayout } from '../../layout';
 import { Breadcrumb, NotificationContainer } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import ContribuyenteFormMUI from '../../components/contribuyentes/ContribuyenteForm';
-import { useContribuyenteAPI } from '../../hooks/useContribuyenteApi';
+import { useContribuyentes } from '../../hooks/useContribuyentes';
 import { NotificationService } from '../../components/utils/Notification';
 
 /**
@@ -19,7 +19,7 @@ import { NotificationService } from '../../components/utils/Notification';
  */
 const NuevoContribuyente: React.FC = () => {
   const navigate = useNavigate();
-  const { guardarContribuyente } = useContribuyenteAPI();
+  const { guardarContribuyente } = useContribuyentes();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
