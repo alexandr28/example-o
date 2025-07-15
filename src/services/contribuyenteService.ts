@@ -1,7 +1,6 @@
-// src/services/contribuyenteService.ts
+// src/services/contribuyenteService.ts - ACTUALIZADO CON SOPORTE FORM-DATA
 import BaseApiService from './BaseApiService';
-import { API_CONFIG } from '../config/api.unified.config';
-
+import { API_CONFIG, buildApiUrl } from '../config/api.unified.config';
 import { personaService } from './personaService';
 
 /**
@@ -87,31 +86,26 @@ export interface BusquedaContribuyenteParams {
   parametroBusqueda?: string;
   estado?: string;
   codUsuario?: number;
+  // Parámetros específicos para form-data
+  codigoContribuyente?: string | number;
+  codigoPersona?: string | number;
 }
-
-// Constantes
-export const TIPO_PERSONA = {
-  NATURAL: '0301',
-  JURIDICA: '0302'
-} as const;
-
-export const TIPO_DOCUMENTO = {
-  DNI: '0101',
-  RUC: '0102',
-  CE: '0103',
-  PASAPORTE: '0104'
-} as const;
 
 /**
  * Servicio unificado para gestión de contribuyentes
- * Combina funcionalidades de contribuyenteService y contribuyenteListService
  * 
- * Autenticación:
- * - GET (listar, buscar): No requiere token
- * - POST/PUT/DELETE: Requieren token Bearer
+ * IMPORTANTE: Este servicio NO requiere autenticación Bearer Token
+ * Todos los métodos (GET, POST, PUT, DELETE) funcionan sin token
  */
 class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContribuyenteDTO, UpdateContribuyenteDTO> {
   private static instance: ContribuyenteService;
+  
+  public static getInstance(): ContribuyenteService {
+    if (!ContribuyenteService.instance) {
+      ContribuyenteService.instance = new ContribuyenteService();
+    }
+    return ContribuyenteService.instance;
+  }
   
   private constructor() {
     super(
@@ -136,22 +130,22 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
           estadoCivil: item.estadoCivil || item.codestadocivil,
           sexo: item.sexo || item.codsexo,
           lote: item.lote || '',
-          estado: item.estado || 'ACTIVO',
+          estado: item.estado || item.codestado || 'ACTIVO',
           fechaRegistro: item.fechaRegistro,
           codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario,
           // Mapear datos del cónyuge si existen
           conyuge: item.conyugeNombres ? {
             nombres: item.conyugeNombres,
-            apellidoPaterno: item.conyugeApellidoPaterno || '',
-            apellidoMaterno: item.conyugeApellidoMaterno || '',
+            apellidoPaterno: item.conyugeApellidopaterno || '',
+            apellidoMaterno: item.conyugeApellidomaterno || '',
             numeroDocumento: item.conyugeNumeroDocumento || '',
             tipoDocumento: item.conyugeTipoDocumento || ''
           } : undefined,
           // Mapear datos del representante legal si existen
           representanteLegal: item.repreNombres ? {
             nombres: item.repreNombres,
-            apellidoPaterno: item.repreApellidoPaterno || '',
-            apellidoMaterno: item.repreApellidoMaterno || '',
+            apellidoPaterno: item.repreApellidopaterno || '',
+            apellidoMaterno: item.repreApellidomaterno || '',
             numeroDocumento: item.repreNumeroDocumento || '',
             tipoDocumento: item.repreTipoDocumento || ''
           } : undefined
@@ -166,21 +160,19 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
   }
   
   /**
-   * Obtiene la instancia singleton del servicio
+   * Sobrescribe el método search del BaseApiService para usar la estrategia correcta
    */
-  static getInstance(): ContribuyenteService {
-    if (!ContribuyenteService.instance) {
-      ContribuyenteService.instance = new ContribuyenteService();
-    }
-    return ContribuyenteService.instance;
+  async search(params: Record<string, any>): Promise<ContribuyenteData[]> {
+    // Usar el método que maneja form-data
+    return await this.buscarConFormData(params as BusquedaContribuyenteParams);
   }
   
   /**
    * Construye el nombre completo según el tipo de persona
    */
   private static construirNombreCompleto(item: any): string {
-    // Si es persona jurídica y tiene razón social
-    if ((item.tipoPersona === TIPO_PERSONA.JURIDICA || item.codTipopersona === TIPO_PERSONA.JURIDICA) 
+    // Si es persona jurídica (0302) y tiene razón social
+    if ((item.tipoPersona === '0302' || item.codTipopersona === '0302') 
         && item.razonSocial) {
       return item.razonSocial;
     }
@@ -194,73 +186,168 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
     
     return partes.join(' ').trim() || 'Sin nombre';
   }
-  
+
+  /**
+   * Método especial para manejar las peticiones del API que espera form-data
+   * Como los navegadores no permiten GET con body, usamos varias estrategias
+   */
+  async buscarConFormData(params: BusquedaContribuyenteParams): Promise<ContribuyenteData[]> {
+    try {
+      console.log('🔍 [ContribuyenteService] Buscando contribuyentes:', params);
+      
+      // Construir URL base
+      const url = buildApiUrl(this.endpoint);
+      
+      // Estrategia 1: Intentar con query parameters (más estándar)
+      const queryParams = new URLSearchParams();
+      
+      if (params.codigoContribuyente !== undefined) {
+        queryParams.append('codigoContribuyente', String(params.codigoContribuyente));
+      }
+      if (params.codigoPersona !== undefined) {
+        queryParams.append('codigoPersona', String(params.codigoPersona));
+      }
+      
+      console.log('📡 Intentando con query params:', queryParams.toString());
+      
+      try {
+        const response = await fetch(`${url}?${queryParams.toString()}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const responseData = await response.json();
+          console.log('✅ Respuesta exitosa con query params:', responseData);
+          
+          if (responseData.success && responseData.data) {
+            const items = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+            return this.normalizeData(items);
+          }
+        }
+      } catch (error) {
+        console.log('⚠️ Query params falló, intentando siguiente estrategia...');
+      }
+      
+      // Estrategia 2: Si el servidor realmente necesita form-data, intentar con POST
+      const formData = new FormData();
+      if (params.codigoContribuyente !== undefined) {
+        formData.append('codigoContribuyente', String(params.codigoContribuyente));
+      }
+      if (params.codigoPersona !== undefined) {
+        formData.append('codigoPersona', String(params.codigoPersona));
+      }
+      
+      console.log('📡 Intentando con POST y form-data...');
+      
+      const postResponse = await fetch(url, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (postResponse.ok) {
+        const responseData = await postResponse.json();
+        console.log('✅ Respuesta exitosa con POST:', responseData);
+        
+        if (responseData.success && responseData.data) {
+          const items = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+          return this.normalizeData(items);
+        }
+      }
+      
+      // Si ambas estrategias fallan, retornar array vacío
+      console.warn('⚠️ Todas las estrategias fallaron');
+      return [];
+      
+    } catch (error: any) {
+      console.error('❌ [ContribuyenteService] Error en búsqueda:', error);
+      return [];
+    }
+  }
+
   /**
    * Lista todos los contribuyentes
-   * NO requiere autenticación (método GET)
+   * Primero intenta con el endpoint de personas que es el que realmente funciona
    */
   async listarContribuyentes(params?: BusquedaContribuyenteParams): Promise<ContribuyenteData[]> {
     try {
       console.log('🔍 [ContribuyenteService] Listando contribuyentes:', params);
       
-      // Si no hay parámetros específicos, usar el endpoint de personas
-      if (!params || Object.keys(params).length === 0) {
-        return await this.listarDesdePersonas();
+      // Si hay parámetros de búsqueda, usar el endpoint de personas
+      if (params?.busqueda || params?.tipoContribuyente || params?.parametroBusqueda) {
+        return await this.buscarPersonasPorTipoYNombre({
+          codTipoPersona: params.tipoContribuyente || '0301',
+          parametroBusqueda: params.busqueda || params.parametroBusqueda || 'a'
+        });
       }
       
-      // Si hay parámetros, usar el endpoint de contribuyentes
-      return await this.search(params);
+      // Si no hay parámetros, buscar todos con 'a'
+      return await this.buscarPersonasPorTipoYNombre({
+        codTipoPersona: '0301',
+        parametroBusqueda: 'a'
+      });
       
     } catch (error: any) {
       console.error('❌ [ContribuyenteService] Error listando contribuyentes:', error);
       throw error;
     }
   }
-  
+
   /**
-   * Lista contribuyentes usando el endpoint de personas
-   * NO requiere autenticación
+   * Busca personas usando el endpoint que realmente funciona
+   * GET /api/persona/listarPersonaPorTipoPersonaNombreRazon
    */
-  private async listarDesdePersonas(parametroBusqueda: string = 'a'): Promise<ContribuyenteData[]> {
+  private async buscarPersonasPorTipoYNombre(params: {
+    codTipoPersona: string;
+    parametroBusqueda: string;
+  }): Promise<ContribuyenteData[]> {
     try {
-      console.log('🔍 [ContribuyenteService] Listando desde endpoint de personas');
+      console.log('🔍 [ContribuyenteService] Buscando personas:', params);
       
-      // Usar personaService para obtener la lista
-      const personas = await personaService.listarPorTipoYNombre({
-        parametroBusqueda,
-        codUsuario: API_CONFIG.defaultParams.codUsuario
+      // Construir URL base
+      const url = buildApiUrl('/api/persona/listarPersonaPorTipoPersonaNombreRazon');
+      
+      // Crear FormData
+      const formData = new FormData();
+      formData.append('codTipoPersona', params.codTipoPersona);
+      formData.append('parametroBusqueda', params.parametroBusqueda);
+      
+      // Como es GET con form-data, intentar con query parameters
+      const queryParams = new URLSearchParams();
+      queryParams.append('codTipoPersona', params.codTipoPersona);
+      queryParams.append('parametroBusqueda', params.parametroBusqueda);
+      
+      console.log('📡 Intentando con query params:', queryParams.toString());
+      
+      const response = await fetch(`${url}?${queryParams.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
       });
       
-      // Convertir personas a formato de contribuyente
-      const contribuyentes = personas.map(persona => ({
-        codigo: 0, // No tenemos código de contribuyente desde personas
-        codigoPersona: persona.codPersona,
-        tipoPersona: persona.codTipopersona || '',
-        tipoDocumento: persona.codTipoDocumento || '',
-        numeroDocumento: persona.numerodocumento,
-        nombres: persona.nombres || '',
-        apellidoPaterno: persona.apellidopaterno || '',
-        apellidoMaterno: persona.apellidomaterno || '',
-        razonSocial: persona.razonSocial || '',
-        nombreCompleto: persona.nombrePersona,
-        direccion: persona.direccion || '',
-        telefono: persona.telefono || '',
-        email: persona.email || '',
-        fechaNacimiento: persona.fechanacimiento,
-        estadoCivil: persona.codestadocivil,
-        sexo: persona.codsexo,
-        lote: persona.lote,
-        estado: persona.estado || 'ACTIVO',
-        fechaRegistro: persona.fechaRegistro,
-        codUsuario: persona.codUsuario
-      }));
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status}`);
+      }
       
-      console.log(`✅ [ContribuyenteService] ${contribuyentes.length} contribuyentes obtenidos desde personas`);
-      return contribuyentes;
+      const responseData = await response.json();
+      console.log('📡 Respuesta recibida:', responseData);
+      
+      // Manejar la estructura de respuesta
+      if (responseData.success && responseData.data) {
+        const items = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+        
+        // Convertir formato de persona a contribuyente
+        return items.map(persona => this.convertirPersonaAContribuyente(persona));
+      }
+      
+      return [];
       
     } catch (error: any) {
-      console.error('❌ [ContribuyenteService] Error listando desde personas:', error);
-      throw error;
+      console.error('❌ [ContribuyenteService] Error en búsqueda de personas:', error);
+      return [];
     }
   }
   
@@ -272,6 +359,12 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
     try {
       console.log('🔍 [ContribuyenteService] Buscando contribuyentes:', criterios);
       
+      // Si tiene parámetros específicos que requieren form-data
+      if (criterios.codigoContribuyente || criterios.codigoPersona) {
+        return await this.buscarConFormData(criterios);
+      }
+      
+      // Para otros criterios, usar búsqueda estándar
       const params = {
         ...criterios,
         codUsuario: criterios.codUsuario || API_CONFIG.defaultParams.codUsuario
@@ -314,21 +407,10 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
     try {
       console.log('🔍 [ContribuyenteService] Buscando por código de persona:', codPersona);
       
-      // Primero intentar buscar en contribuyentes
-      const contribuyentes = await this.getAll();
-      const encontrado = contribuyentes.find(c => c.codigoPersona === codPersona);
+      // Usar form-data para buscar por código de persona
+      const results = await this.buscarConFormData({ codigoPersona: codPersona });
       
-      if (encontrado) {
-        return encontrado;
-      }
-      
-      // Si no se encuentra, buscar en personas y convertir
-      const persona = await personaService.obtenerPorCodigo(codPersona);
-      if (persona) {
-        return this.convertirPersonaAContribuyente(persona);
-      }
-      
-      return null;
+      return results.length > 0 ? results[0] : null;
       
     } catch (error: any) {
       console.error('❌ [ContribuyenteService] Error buscando por código de persona:', error);
@@ -338,26 +420,13 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
   
   /**
    * Crea un nuevo contribuyente
-   * REQUIERE autenticación (método POST)
+   * NO requiere autenticación
    */
   async crearContribuyente(datos: CreateContribuyenteDTO): Promise<ContribuyenteData> {
     try {
       console.log('➕ [ContribuyenteService] Creando contribuyente:', datos);
       
-      // Verificar token
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        throw new Error('Se requiere autenticación para crear contribuyentes');
-      }
-      
-      const datosCompletos = {
-        ...datos,
-        codUsuario: datos.codUsuario || API_CONFIG.defaultParams.codUsuario,
-        estado: 'ACTIVO',
-        fechaRegistro: new Date().toISOString()
-      };
-      
-      return await this.create(datosCompletos);
+      return await this.create(datos);
       
     } catch (error: any) {
       console.error('❌ [ContribuyenteService] Error creando contribuyente:', error);
@@ -367,27 +436,13 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
   
   /**
    * Actualiza un contribuyente existente
-   * REQUIERE autenticación (método PUT)
+   * NO requiere autenticación
    */
-  async actualizarContribuyente(
-    codigo: number, 
-    datos: UpdateContribuyenteDTO
-  ): Promise<ContribuyenteData> {
+  async actualizarContribuyente(id: number, datos: UpdateContribuyenteDTO): Promise<ContribuyenteData> {
     try {
-      console.log('📝 [ContribuyenteService] Actualizando contribuyente:', codigo, datos);
+      console.log('📝 [ContribuyenteService] Actualizando contribuyente:', id, datos);
       
-      // Verificar token
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        throw new Error('Se requiere autenticación para actualizar contribuyentes');
-      }
-      
-      const datosCompletos = {
-        ...datos,
-        fechaModificacion: new Date().toISOString()
-      };
-      
-      return await this.update(codigo, datosCompletos);
+      return await this.update(id, datos);
       
     } catch (error: any) {
       console.error('❌ [ContribuyenteService] Error actualizando contribuyente:', error);
@@ -397,19 +452,13 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
   
   /**
    * Elimina un contribuyente
-   * REQUIERE autenticación (método DELETE)
+   * NO requiere autenticación
    */
-  async eliminarContribuyente(codigo: number): Promise<void> {
+  async eliminarContribuyente(id: number): Promise<void> {
     try {
-      console.log('🗑️ [ContribuyenteService] Eliminando contribuyente:', codigo);
+      console.log('🗑️ [ContribuyenteService] Eliminando contribuyente:', id);
       
-      // Verificar token
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        throw new Error('Se requiere autenticación para eliminar contribuyentes');
-      }
-      
-      return await this.delete(codigo);
+      await this.delete(id);
       
     } catch (error: any) {
       console.error('❌ [ContribuyenteService] Error eliminando contribuyente:', error);
@@ -418,75 +467,12 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
   }
   
   /**
-   * Convierte una persona a formato de contribuyente
+   * Convierte un objeto persona a formato contribuyente
    */
   private convertirPersonaAContribuyente(persona: any): ContribuyenteData {
-    return {
-      codigo: 0,
-      codigoPersona: persona.codPersona,
-      tipoPersona: persona.codTipopersona || '',
-      tipoDocumento: persona.codTipoDocumento || '',
-      numeroDocumento: persona.numerodocumento || '',
-      nombres: persona.nombres || '',
-      apellidoPaterno: persona.apellidopaterno || '',
-      apellidoMaterno: persona.apellidomaterno || '',
-      razonSocial: persona.razonSocial || '',
-      nombreCompleto: persona.nombrePersona || ContribuyenteService.construirNombreCompleto(persona),
-      direccion: persona.direccion || '',
-      telefono: persona.telefono || '',
-      email: persona.email || '',
-      fechaNacimiento: persona.fechanacimiento,
-      estadoCivil: persona.codestadocivil,
-      sexo: persona.codsexo,
-      lote: persona.lote,
-      estado: persona.estado || 'ACTIVO',
-      codUsuario: persona.codUsuario
-    };
-  }
-  
-  /**
-   * Valida un número de documento según el tipo
-   */
-  validarDocumento(tipoDocumento: string, numeroDocumento: string): {
-    valido: boolean;
-    mensaje?: string;
-  } {
-    // DNI: 8 dígitos
-    if (tipoDocumento === TIPO_DOCUMENTO.DNI || tipoDocumento === 'DNI') {
-      if (!/^\d{8}$/.test(numeroDocumento)) {
-        return { 
-          valido: false, 
-          mensaje: 'El DNI debe tener exactamente 8 dígitos' 
-        };
-      }
-    }
-    
-    // RUC: 11 dígitos
-    if (tipoDocumento === TIPO_DOCUMENTO.RUC || tipoDocumento === 'RUC') {
-      if (!/^\d{11}$/.test(numeroDocumento)) {
-        return { 
-          valido: false, 
-          mensaje: 'El RUC debe tener exactamente 11 dígitos' 
-        };
-      }
-    }
-    
-    // Carnet de extranjería: hasta 12 caracteres alfanuméricos
-    if (tipoDocumento === TIPO_DOCUMENTO.CE || tipoDocumento === 'CE') {
-      if (!/^[A-Z0-9]{4,12}$/.test(numeroDocumento.toUpperCase())) {
-        return { 
-          valido: false, 
-          mensaje: 'El Carnet de Extranjería debe tener entre 4 y 12 caracteres alfanuméricos' 
-        };
-      }
-    }
-    
-    return { valido: true };
+    return this.normalizeOptions.normalizeItem(persona, 0);
   }
 }
 
 // Exportar instancia singleton
 export const contribuyenteService = ContribuyenteService.getInstance();
-
-// Exportar también la clase por si se necesita extender
-export default ContribuyenteService;

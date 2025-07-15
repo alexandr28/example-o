@@ -1,4 +1,4 @@
-// src/components/contribuyentes/PersonaFormMUI.tsx
+// src/components/contribuyentes/PersonaForm.tsx - ACTUALIZADO
 import React from 'react';
 import { Controller, UseFormReturn } from 'react-hook-form';
 import {
@@ -82,7 +82,9 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
   // Estilos comunes para los campos
   const fieldStyles = {
     '& .MuiInputBase-root': {
-      backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+      backgroundColor: theme.palette.mode === 'dark' 
+        ? 'rgba(255, 255, 255, 0.05)' 
+        : 'rgba(0, 0, 0, 0.02)',
     },
     '& .MuiOutlinedInput-root': {
       '&:hover fieldset': {
@@ -109,9 +111,9 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
         </Typography>
       </Box>
 
-      <Stack spacing={2}>
+      <Stack spacing={2.5}>
         {/* Primera fila - Tipo Doc, Número Doc, Nombres/Razón Social */}
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
           <Box sx={{ flex: '0 0 170px' }}>
             <Controller
               name="tipoDocumento"
@@ -163,19 +165,13 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
                   helperText={typeof errors.numeroDocumento?.message === 'string' ? errors.numeroDocumento.message : ''}
                   disabled={disablePersonaFields}
                   sx={fieldStyles}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <BadgeIcon sx={{ fontSize: 16 }} />
-                      </InputAdornment>
-                    )
-                  }}
                 />
               )}
             />
           </Box>
 
-          <Box sx={{ flex: '1 1 auto', minWidth: '200px' }}>
+          {/* Nombres - TAMAÑO REDUCIDO A LA MITAD */}
+          <Box sx={{ flex: '1 1 280px', maxWidth: '400px' }}>
             {isJuridica ? (
               <Controller
                 name="razonSocial"
@@ -234,8 +230,9 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
 
         {/* Segunda fila - Apellidos y Fecha (solo personas naturales) */}
         {!isJuridica && (
-          <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-            <Box sx={{ flex: '1 1 200px' }}>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            {/* Apellido Paterno - TAMAÑO REDUCIDO */}
+            <Box sx={{ flex: '1 1 180px', maxWidth: '250px' }}>
               <Controller
                 name="apellidoPaterno"
                 control={control}
@@ -256,7 +253,8 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
               />
             </Box>
 
-            <Box sx={{ flex: '1 1 200px' }}>
+            {/* Apellido Materno - TAMAÑO REDUCIDO */}
+            <Box sx={{ flex: '1 1 180px', maxWidth: '250px' }}>
               <Controller
                 name="apellidoMaterno"
                 control={control}
@@ -309,7 +307,7 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
         )}
 
         {/* Tercera fila - Sexo, Estado Civil y Teléfono */}
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
           {!isJuridica && (
             <>
               <Box sx={{ flex: '0 0 auto' }}>
@@ -341,7 +339,8 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
                 </FormControl>
               </Box>
 
-              <Box sx={{ flex: '1 1 200px' }}>
+              {/* Estado Civil - TAMAÑO REDUCIDO */}
+              <Box sx={{ flex: '1 1 150px', maxWidth: '200px' }}>
                 <Controller
                   name="estadoCivil"
                   control={control}
@@ -363,7 +362,8 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
             </>
           )}
 
-          <Box sx={{ flex: isJuridica ? '0 0 250px' : '1 1 180px' }}>
+          {/* Teléfono - TAMAÑO REDUCIDO */}
+          <Box sx={{ flex: '1 1 150px', maxWidth: '200px' }}>
             <Controller
               name="telefono"
               control={control}
@@ -389,8 +389,8 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
           </Box>
         </Box>
 
-        {/* Sección de Dirección Fiscal - Más compacta */}
-        <Box sx={{ mt: 1 }}>
+        {/* Sección de Dirección Fiscal */}
+        <Box sx={{ mt: 2 }}>
           <Typography 
             variant="body2" 
             sx={{ 
@@ -401,27 +401,30 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
               alignItems: 'center'
             }}
           >
-            <LocationIcon sx={{ mr: 0.5, fontSize: 18 }} />
+            <LocationIcon sx={{ fontSize: 18, mr: 0.5 }} />
             Dirección Fiscal
           </Typography>
-          
-          {/* Botón Seleccionar, N° Finca, Otro Número - En una sola línea */}
-          <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-            <Box sx={{ flex: '0 0 180px' }}>
+
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            {/* Botón Seleccione Dirección - CENTRADO */}
+            <Box sx={{ flex: '0 0 auto' }}>
               <Button
                 variant="contained"
-                fullWidth
+                color="primary"
+                size="small"
                 onClick={onOpenDireccionModal}
                 disabled={disablePersonaFields}
-                startIcon={<LocationIcon sx={{ fontSize: 16 }} />}
-                size="small"
+                startIcon={<HomeIcon sx={{ fontSize: 16 }} />}
                 sx={{ 
-                  height: '40px',
+                  height: 40,
+                  px: 2,
+                  minWidth: 150,
                   textTransform: 'none',
                   fontSize: '0.875rem',
-                  backgroundColor: theme.palette.primary.main,
+                  fontWeight: 500,
+                  boxShadow: 1,
                   '&:hover': {
-                    backgroundColor: theme.palette.primary.dark,
+                    boxShadow: 2
                   }
                 }}
               >
@@ -429,7 +432,8 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
               </Button>
             </Box>
 
-            <Box sx={{ flex: '0 0 120px' }}>
+            {/* N° Finca - TAMAÑO REDUCIDO */}
+            <Box sx={{ flex: '1 1 100px', maxWidth: '150px' }}>
               <Controller
                 name="nFinca"
                 control={control}
@@ -440,21 +444,15 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
                     size="small"
                     label="N° Finca"
                     placeholder="123"
-                    disabled={disablePersonaFields || !direccion}
+                    disabled={disablePersonaFields}
                     sx={fieldStyles}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <HomeIcon sx={{ fontSize: 16 }} />
-                        </InputAdornment>
-                      )
-                    }}
                   />
                 )}
               />
             </Box>
 
-            <Box sx={{ flex: '1 1 auto', minWidth: '150px' }}>
+            {/* Otro Número - TAMAÑO REDUCIDO */}
+            <Box sx={{ flex: '1 1 180px', maxWidth: '250px' }}>
               <Controller
                 name="otroNumero"
                 control={control}
@@ -465,7 +463,7 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
                     size="small"
                     label="Otro Número"
                     placeholder="Dpto, Int, etc."
-                    disabled={disablePersonaFields || !direccion}
+                    disabled={disablePersonaFields}
                     sx={fieldStyles}
                   />
                 )}
@@ -473,59 +471,23 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
             </Box>
           </Box>
 
-          {/* Campo de dirección y alerta - Solo si hay dirección */}
+          {/* Mostrar dirección seleccionada */}
           {direccion && (
-            <Box sx={{ mt: 1.5 }}>
-              {(nFinca || otroNumero) ? (
-                <Alert 
-                  severity="info" 
-                  icon={<LocationIcon sx={{ fontSize: 18 }} />}
-                  sx={{ 
-                    py: 0.5,
-                    '& .MuiAlert-message': { py: 0.5 },
-                    backgroundColor: theme.palette.mode === 'dark' 
-                      ? 'rgba(33, 150, 243, 0.08)' 
-                      : 'rgba(33, 150, 243, 0.08)',
-                    '& .MuiAlert-icon': {
-                      color: theme.palette.info.main
-                    }
-                  }}
-                >
-                  <Typography variant="body2">
-                    <strong>Dirección:</strong> {getDireccionTextoCompleto(direccion, nFinca, otroNumero)}
-                  </Typography>
-                </Alert>
-              ) : (
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Dirección seleccionada"
-                  value={direccion.descripcion}
-                  disabled
-                  sx={{
-                    ...fieldStyles,
-                    '& .MuiInputBase-root': {
-                      backgroundColor: theme.palette.action.disabledBackground,
-                    }
-                  }}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <Tooltip title="Limpiar dirección">
-                          <IconButton
-                            size="small"
-                            onClick={() => setValue('direccion', null)}
-                            disabled={disablePersonaFields}
-                          >
-                            <ClearIcon sx={{ fontSize: 16 }} />
-                          </IconButton>
-                        </Tooltip>
-                      </InputAdornment>
-                    )
-                  }}
-                />
-              )}
-            </Box>
+            <Alert 
+              severity="info" 
+              sx={{ 
+                mt: 2, 
+                py: 0.5,
+                '& .MuiAlert-message': {
+                  fontSize: '0.813rem'
+                }
+              }}
+              icon={<LocationIcon sx={{ fontSize: 20 }} />}
+            >
+              <Typography variant="body2">
+                <strong>Dirección:</strong> {getDireccionTextoCompleto(direccion, nFinca, otroNumero)}
+              </Typography>
+            </Alert>
           )}
         </Box>
       </Stack>

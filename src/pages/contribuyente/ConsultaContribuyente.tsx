@@ -1,10 +1,11 @@
 // src/pages/contribuyente/ConsultaContribuyente.tsx
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Stack,
   Button,
+  Typography,
   useTheme
 } from '@mui/material';
 import {
@@ -26,12 +27,12 @@ const ConsultaContribuyente: React.FC = () => {
   const navigate = useNavigate();
   
   // Hook personalizado para manejar contribuyentes
+  // El hook ya carga los contribuyentes automáticamente en su useEffect
   const { 
     contribuyentes, 
     loading, 
     error, 
-    buscarContribuyentes,
-    cargarContribuyentes
+    buscarContribuyentes
   } = useContribuyentes();
 
   // Migas de pan para la navegación
@@ -40,11 +41,6 @@ const ConsultaContribuyente: React.FC = () => {
     { label: 'Contribuyente', path: '/contribuyente' },
     { label: 'Consulta contribuyente', active: true }
   ];
-
-  // Cargar contribuyentes al montar el componente
-  useEffect(() => {
-    cargarContribuyentes();
-  }, [cargarContribuyentes]);
 
   // Manejar la búsqueda de contribuyentes
   const handleBuscar = (filtro: any) => {
@@ -112,6 +108,13 @@ const ConsultaContribuyente: React.FC = () => {
                 onVer={handleVer}
                 loading={loading}
               />
+
+              {/* Mostrar error si existe */}
+              {error && (
+                <Box sx={{ p: 2, textAlign: 'center' }}>
+                  <Typography color="error">{error}</Typography>
+                </Box>
+              )}
             </Stack>
           </Box>
         </Box>

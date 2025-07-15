@@ -1,5 +1,5 @@
-// src/components/contribuyentes/FiltroContribuyenteFormMUI.tsx
-import React, { useState } from 'react';
+// src/components/contribuyentes/FiltroContribuyenteForm.tsx
+import React, { useState, useEffect } from 'react';
 import {
   Paper,
   Box,
@@ -11,7 +11,8 @@ import {
   Chip,
   useTheme,
   Tooltip,
-  IconButton
+  IconButton,
+  CircularProgress
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -21,9 +22,12 @@ import {
   Person as PersonIcon,
   Business as BusinessIcon,
   Badge as BadgeIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  AccountBalance as AccountBalanceIcon
 } from '@mui/icons-material';
 import SearchableSelect from '../ui/SearchableSelect';
+import { constanteService, ConstanteData } from '../../services/constanteService';
+import { NotificationService } from '../utils/Notification';
 
 interface FiltroContribuyenteFormProps {
   onBuscar: (filtro: any) => void;
@@ -43,27 +47,72 @@ const FiltroContribuyenteFormMUI: React.FC<FiltroContribuyenteFormProps> = ({
   const [tipoDocumento, setTipoDocumento] = useState<any>(null);
   const [busqueda, setBusqueda] = useState('');
   
-  // Opciones para los selectores
-  const tipoContribuyenteOptions = [
-    { 
-      id: 'natural', 
-      label: 'Natural',
-      icon: <PersonIcon sx={{ fontSize: 16 }} />
-    },
-    { 
-      id: 'juridica', 
-      label: 'Jurídica',
-      icon: <BusinessIcon sx={{ fontSize: 16 }} />
-    }
-  ];
-
-  const tipoDocumentoOptions = [
-    { id: 'todos', label: 'Todos' },
-    { id: 'DNI', label: 'DNI' },
-    { id: 'RUC', label: 'RUC' },
-    { id: 'CE', label: 'CE' },
-    { id: 'PASAPORTE', label: 'Pasaporte' }
-  ];
+  // Estados para las opciones cargadas desde la API
+  const [tipoContribuyenteOptions, setTipoContribuyenteOptions] = useState<any[]>([]);
+  const [tipoDocumentoOptions, setTipoDocumentoOptions] = useState<any[]>([]);
+  const [loadingOptions, setLoadingOptions] = useState(true);
+  
+  // Cargar opciones desde la API al montar el componente
+  useEffect(() => {
+    const cargarOpciones = async () => {
+      try {
+        setLoadingOptions(true);
+        
+        // Cargar tipos de contribuyente en paralelo
+        const [tiposContribuyente, tiposDocumento] = await Promise.all([
+          constanteService.obtenerTiposContribuyente(),
+          constanteService.obtenerTiposDocumento()
+        ]);
+        
+        // Formatear opciones de tipo contribuyente
+        const opcionesContribuyente = tiposContribuyente.map((tipo: ConstanteData) => ({
+          id: tipo.codConstante,
+          label: tipo.nombreCategoria,
+          icon: tipo.nombreCategoria.includes('NATURAL') ? 
+            <PersonIcon sx={{ fontSize: 16 }} /> : 
+            tipo.nombreCategoria.includes('JURIDIC') ?
+            <BusinessIcon sx={{ fontSize: 16 }} /> :
+            <AccountBalanceIcon sx={{ fontSize: 16 }} />
+        }));
+        
+        // Formatear opciones de tipo documento
+        const opcionesDocumento = tiposDocumento.map((tipo: ConstanteData) => ({
+          id: tipo.codConstante,
+          label: tipo.nombreCategoria
+        }));
+        
+        // NO agregar opción "Todos" - usar solo los datos de la API
+        
+        setTipoContribuyenteOptions(opcionesContribuyente);
+        setTipoDocumentoOptions(opcionesDocumento);
+        
+        console.log('✅ Opciones cargadas:', {
+          tiposContribuyente: opcionesContribuyente,
+          tiposDocumento: opcionesDocumento
+        });
+        
+      } catch (error) {
+        console.error('❌ Error cargando opciones:', error);
+        NotificationService.error('Error al cargar las opciones de búsqueda');
+        
+        // Establecer opciones por defecto en caso de error
+        setTipoContribuyenteOptions([
+          { id: '0301', label: 'Natural', icon: <PersonIcon sx={{ fontSize: 16 }} /> },
+          { id: '0302', label: 'Jurídica', icon: <BusinessIcon sx={{ fontSize: 16 }} /> }
+        ]);
+        
+        setTipoDocumentoOptions([
+          { id: 'todos', label: 'Todos' },
+          { id: '4101', label: 'DNI' },
+          { id: '4102', label: 'RUC' }
+        ]);
+      } finally {
+        setLoadingOptions(false);
+      }
+    };
+    
+    cargarOpciones();
+  }, []);
 
   // Manejar búsqueda
   const handleBuscar = () => {
@@ -116,14 +165,18 @@ const FiltroContribuyenteFormMUI: React.FC<FiltroContribuyenteFormProps> = ({
         {/* Filtros en una sola línea */}
         <Stack spacing={2}>
           <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-            <Box sx={{ flex: '0 0 140px' }}>
+            <Box sx={{ flex: '0 0 180px' }}>
               <SearchableSelect
                 id="tipo-contribuyente"
-                label="Tipo de Contr..."
+                label="Tipo de Contribuyente"
                 options={tipoContribuyenteOptions}
                 value={tipoContribuyente}
-                onChange={setTipoContribuyente}
+                onChange={(newValue) => {
+                  console.log('Tipo contribuyente seleccionado:', newValue);
+                  setTipoContribuyente(newValue);
+                }}
                 placeholder="Seleccione"
+                disabled={loadingOptions}
                 textFieldProps={{ 
                   size: 'small',
                   sx: { 
@@ -133,6 +186,8 @@ const FiltroContribuyenteFormMUI: React.FC<FiltroContribuyenteFormProps> = ({
                     }
                   }
                 }}
+                getOptionLabel={(option) => option?.label || ''}
+                isOptionEqualToValue={(option, value) => option?.id === value?.id}
                 renderOption={(props, option) => (
                   <Box component="li" {...props} sx={{ fontSize: '0.875rem' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -144,14 +199,18 @@ const FiltroContribuyenteFormMUI: React.FC<FiltroContribuyenteFormProps> = ({
               />
             </Box>
 
-            <Box sx={{ flex: '0 0 120px' }}>
+            <Box sx={{ flex: '0 0 150px' }}>
               <SearchableSelect
                 id="tipo-documento"
-                label="Tipo de..."
+                label="Tipo de Documento"
                 options={tipoDocumentoOptions}
                 value={tipoDocumento}
-                onChange={setTipoDocumento}
-                placeholder="Todos"
+                onChange={(newValue) => {
+                  console.log('Tipo documento seleccionado:', newValue);
+                  setTipoDocumento(newValue);
+                }}
+                placeholder="Seleccione tipo"
+                disabled={loadingOptions}
                 textFieldProps={{ 
                   size: 'small',
                   sx: { 
@@ -161,6 +220,8 @@ const FiltroContribuyenteFormMUI: React.FC<FiltroContribuyenteFormProps> = ({
                     }
                   }
                 }}
+                getOptionLabel={(option) => option?.label || ''}
+                isOptionEqualToValue={(option, value) => option?.id === value?.id}
               />
             </Box>
 
@@ -168,12 +229,12 @@ const FiltroContribuyenteFormMUI: React.FC<FiltroContribuyenteFormProps> = ({
               <TextField
                 fullWidth
                 size="small"
-                label="Buscar por"
-                placeholder="Nombre, apellido, razón social..."
+                label="Buscar contribuyente"
+                placeholder="Nombre, documento, dirección..."
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
                 onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !loading) {
+                  if (e.key === 'Enter' && !loading && !loadingOptions) {
                     handleBuscar();
                   }
                 }}
@@ -186,7 +247,7 @@ const FiltroContribuyenteFormMUI: React.FC<FiltroContribuyenteFormProps> = ({
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <SearchIcon sx={{ fontSize: 18 }} />
+                      <SearchIcon sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
                     </InputAdornment>
                   ),
                   endAdornment: busqueda && (
@@ -203,38 +264,88 @@ const FiltroContribuyenteFormMUI: React.FC<FiltroContribuyenteFormProps> = ({
                 }}
               />
             </Box>
+          </Box>
 
-            <Box sx={{ flex: '0 0 auto' }}>
+          {/* Botones de acción */}
+          <Box sx={{ 
+            display: 'flex', 
+            gap: 1,
+            justifyContent: 'flex-end',
+            pt: 0.5
+          }}>
+            {onNuevo && (
               <Button
-                variant="contained"
-                onClick={handleBuscar}
-                disabled={loading}
-                startIcon={<FilterIcon sx={{ fontSize: 16 }} />}
+                variant="outlined"
+                size="small"
+                onClick={onNuevo}
+                startIcon={<PersonAddIcon sx={{ fontSize: 18 }} />}
                 sx={{ 
-                  height: '40px',
+                  fontSize: '0.813rem',
                   textTransform: 'none',
-                  backgroundColor: theme.palette.success.main,
-                  '&:hover': {
-                    backgroundColor: theme.palette.success.dark,
-                  },
-                  fontSize: '0.875rem',
-                  px: 3
+                  px: 2
                 }}
               >
-                Filtrar
+                Nuevo Contribuyente
               </Button>
-            </Box>
-          </Box>
-
-          {/* Sugerencia */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <InfoIcon sx={{ fontSize: 16, color: theme.palette.warning.main }} />
-            <Typography variant="caption" color="text.secondary">
-              <strong>Sugerencia:</strong> Puedes buscar por nombre completo, número de documento, razón social o cualquier combinación. Los filtros te ayudan a refinar los resultados.
-            </Typography>
+            )}
+            
+            <Button
+              variant="contained"
+              size="small"
+              onClick={handleBuscar}
+              disabled={loading || loadingOptions}
+              startIcon={loading ? 
+                <CircularProgress size={16} color="inherit" /> : 
+                <SearchIcon sx={{ fontSize: 18 }} />
+              }
+              sx={{ 
+                fontSize: '0.813rem',
+                textTransform: 'none',
+                px: 2,
+                minWidth: 100
+              }}
+            >
+              {loading ? 'Buscando...' : 'Buscar'}
+            </Button>
           </Box>
         </Stack>
+
+        {/* Indicador de carga de opciones */}
+        {loadingOptions && (
+          <Box sx={{ 
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            height: 2 
+          }}>
+            <Box sx={{ 
+              width: '100%', 
+              height: '100%', 
+              backgroundColor: theme.palette.primary.main,
+              animation: 'pulse 1.5s ease-in-out infinite',
+              '@keyframes pulse': {
+                '0%': { opacity: 0.6 },
+                '50%': { opacity: 1 },
+                '100%': { opacity: 0.6 }
+              }
+            }} />
+          </Box>
+        )}
       </Paper>
+
+      {/* Información adicional */}
+      <Box sx={{ 
+        mt: 1, 
+        display: 'flex', 
+        alignItems: 'center',
+        px: 1 
+      }}>
+        <InfoIcon sx={{ fontSize: 14, color: theme.palette.text.secondary, mr: 0.5 }} />
+        <Typography variant="caption" color="text.secondary">
+          Puede buscar por nombre completo, número de documento o dirección
+        </Typography>
+      </Box>
     </Box>
   );
 };
