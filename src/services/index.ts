@@ -16,9 +16,10 @@ export { default as barrioService } from './barrioService';
 export { default as sectorService } from './sectorService'; 
 export { default as calleService } from './calleApiService';
 export { default as tipoViaService } from './viaService';
-export { default as direccionService, DireccionService } from './direccionService'; // EXPORTAR AMBOS
+export { default as direccionService, DireccionService } from './direccionService';
 export { personaService } from './personaService';
-export { contribuyenteService } from './contribuyenteService';
+export { contribuyenteService} from './contribuyenteService'; // EXPORTAR AMBOS
+export { constanteService } from './constanteService'; // NUEVO
 export { pisoService } from './pisoService';
 export { predioService } from './predioService';
 export { arancelService } from './arancelService';
@@ -38,10 +39,15 @@ export type {
   ContribuyenteData,
   CreateContribuyenteDTO,
   UpdateContribuyenteDTO,
-  BusquedaContribuyenteParams,
-  TIPO_PERSONA,
-  TIPO_DOCUMENTO
+  BusquedaContribuyenteParams
 } from './contribuyenteService';
+
+// Tipos del servicio de constantes - NUEVO
+export type {
+  ConstanteData,
+  ConstanteResponse,
+  CODIGO_CONSTANTE_PADRE
+} from './constanteService';
 
 export type {
   ArancelData,
@@ -73,7 +79,21 @@ export type {
   LetraValorUnitario
 } from './valorUnitarioService';
 
-// Nuevos tipos exportados
+export type {
+  PisoData,
+  CreatePisoDTO,
+  UpdatePisoDTO,
+  BusquedaPisoParams
+} from './pisoService';
+
+export type {
+  
+  CreatePredioDTO,
+  UpdatePredioDTO,
+  BusquedaPredioParams
+} from './predioService';
+
+// Tipos de los mantenedores
 export type {
   BarrioData,
   CreateBarrioDTO,
