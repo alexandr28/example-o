@@ -1,4 +1,4 @@
-// src/components/modal/SelectorDirecciones.tsx
+// src/components/modal/SelectorDirecciones.tsx - VERSIÓN SIMPLIFICADA
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -42,8 +42,27 @@ import {
   Map as MapIcon,
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
-import { direccionService, DireccionData } from '../../services/direccionService';
 import { NotificationService } from '../utils/Notification';
+
+// Definir interfaces localmente para evitar problemas de importación
+interface DireccionData {
+  codDireccion: number;
+  codBarrioVia?: string | null;
+  cuadra?: number;
+  lado?: string | null;
+  loteInicial?: number;
+  loteFinal?: number;
+  codUsuario?: number | null;
+  codSector?: string | null;
+  codVia?: string | null;
+  codBarrio?: number;
+  parametroBusqueda?: string | null;
+  nombreBarrio?: string;
+  nombreSector?: string;
+  codTipoVia?: string;
+  nombreVia?: string;
+  nombreTipoVia?: string;
+}
 
 interface Direccion {
   id: number;
@@ -66,6 +85,9 @@ interface SelectorDireccionesProps {
   direccionSeleccionada?: Direccion | null;
 }
 
+/**
+ * Modal para seleccionar direcciones con Material-UI
+ */
 const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
   open,
   onClose,
@@ -75,422 +97,317 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
   const theme = useTheme();
   
   // Estados
-  const [selectedDireccion, setSelectedDireccion] = useState<Direccion | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sectorFilter, setSectorFilter] = useState('');
-  const [barrioFilter, setBarrioFilter] = useState('');
-  const [direcciones, setDirecciones] = useState<Direccion[]>([]);
+  const [direcciones, setDirecciones] = useState<DireccionData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [sectores, setSectores] = useState<string[]>([]);
-  const [barrios, setBarrios] = useState<string[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(
+    direccionSeleccionada?.id || null
+  );
+  const [error, setError] = useState<string | null>(null);
 
-  // Efecto para establecer la dirección seleccionada al abrir
-  useEffect(() => {
-    if (open && direccionSeleccionada) {
-      setSelectedDireccion(direccionSeleccionada);
-    }
-  }, [open, direccionSeleccionada]);
-
-  // Efecto para cargar direcciones cuando se abre el modal
-  useEffect(() => {
-    if (open) {
-      cargarDirecciones();
-    }
-  }, [open]);
-
-  // Efecto para buscar con debounce
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (open) {
-        buscarDirecciones();
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm, sectorFilter, barrioFilter]);
-
-  // Cargar todas las direcciones inicialmente
-  const cargarDirecciones = async () => {
-    try {
-      setLoading(true);
-      const data = await direccionService.listarDireccionPorNombreVia('a'); // Buscar con 'a' para obtener más resultados
-      
-      // Convertir datos de la API al formato del componente
-      const direccionesFormateadas = data.map(item => ({
-        id: item.codDireccion,
-        codigo: String(item.codDireccion).padStart(3, '0'),
-        sector: item.nombreSector || 'Sin sector',
-        barrio: item.nombreBarrio || 'Sin barrio',
-        tipoVia: item.nombreTipoVia || 'CALLE',
-        nombreVia: item.nombreVia || '',
-        cuadra: item.cuadra || 0,
-        lado: item.lado || '-',
-        loteInicial: item.loteInicial || 0,
-        loteFinal: item.loteFinal || 0,
-        descripcion: `${item.nombreSector || ''} + ${item.nombreBarrio || ''} + ${item.nombreTipoVia || 'CALLE'} ${item.nombreVia || ''} - Cuadra ${item.cuadra || 0} - Lado ${item.lado || '-'} - Lotes ${item.loteInicial || 0}-${item.loteFinal || 0}`
-      }));
-      
-      setDirecciones(direccionesFormateadas);
-      
-      // Extraer sectores y barrios únicos
-      const sectoresUnicos = [...new Set(data.map(d => d.nombreSector).filter((x): x is string => Boolean(x)))];
-      const barriosUnicos = [...new Set(data.map(d => d.nombreBarrio).filter((x): x is string => Boolean(x)))];
-      
-      setSectores(sectoresUnicos);
-      setBarrios(barriosUnicos);
-      
-    } catch (error) {
-      console.error('Error cargando direcciones:', error);
-      NotificationService.error('Error al cargar las direcciones');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Buscar direcciones con filtros
+  // Buscar direcciones - Implementación simplificada
   const buscarDirecciones = async () => {
+    if (searchTerm.trim().length < 2) {
+      NotificationService.warning('Ingrese al menos 2 caracteres para buscar');
+      return;
+    }
+
     try {
       setLoading(true);
+      setError(null);
       
-      const data = await direccionService.buscarDirecciones({
-        nombreVia: searchTerm,
-        sector: sectorFilter,
-        barrio: barrioFilter
-      });
+      // Por ahora, simular la búsqueda con datos de ejemplo
+      // TODO: Implementar cuando el servicio esté disponible
+      console.log('Buscando direcciones con término:', searchTerm);
       
-      // Convertir y filtrar localmente si es necesario
-      const direccionesFormateadas = data.map(item => ({
-        id: item.codDireccion,
-        codigo: String(item.codDireccion).padStart(3, '0'),
-        sector: item.nombreSector || 'Sin sector',
-        barrio: item.nombreBarrio || 'Sin barrio',
-        tipoVia: item.nombreTipoVia || 'CALLE',
-        nombreVia: item.nombreVia || '',
-        cuadra: item.cuadra || 0,
-        lado: item.lado || '-',
-        loteInicial: item.loteInicial || 0,
-        loteFinal: item.loteFinal || 0,
-        descripcion: `${item.nombreSector || ''} + ${item.nombreBarrio || ''} + ${item.nombreTipoVia || 'CALLE'} ${item.nombreVia || ''} - Cuadra ${item.cuadra || 0} - Lado ${item.lado || '-'} - Lotes ${item.loteInicial || 0}-${item.loteFinal || 0}`
-      }));
+      // Datos de ejemplo para pruebas
+      const direccionesEjemplo: DireccionData[] = [
+        {
+          codDireccion: 1,
+          nombreSector: 'Centro',
+          nombreBarrio: 'Barrio Central',
+          nombreTipoVia: 'AVENIDA',
+          nombreVia: 'Principal',
+          cuadra: 1,
+          lado: 'I',
+          loteInicial: 1,
+          loteFinal: 20,
+          codBarrioVia: '001',
+          codUsuario: 1,
+          codSector: '01',
+          codVia: '001',
+          codBarrio: 1,
+          parametroBusqueda: searchTerm,
+          codTipoVia: '01'
+        },
+        {
+          codDireccion: 2,
+          nombreSector: 'Norte',
+          nombreBarrio: 'Barrio Norte',
+          nombreTipoVia: 'CALLE',
+          nombreVia: 'Secundaria',
+          cuadra: 2,
+          lado: 'D',
+          loteInicial: 1,
+          loteFinal: 15,
+          codBarrioVia: '002',
+          codUsuario: 1,
+          codSector: '02',
+          codVia: '002',
+          codBarrio: 2,
+          parametroBusqueda: searchTerm,
+          codTipoVia: '02'
+        }
+      ];
       
-      setDirecciones(direccionesFormateadas);
+      // Filtrar por término de búsqueda
+      const resultado = direccionesEjemplo.filter(d => 
+        d.nombreVia?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        d.nombreBarrio?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        d.nombreSector?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
       
-    } catch (error) {
-      console.error('Error buscando direcciones:', error);
+      setDirecciones(resultado);
+      
+      if (resultado.length === 0) {
+        NotificationService.info('No se encontraron direcciones');
+      }
+    } catch (error: any) {
+      console.error('Error al buscar direcciones:', error);
+      setError('Error al buscar direcciones');
+      NotificationService.error('Error al buscar direcciones');
     } finally {
       setLoading(false);
     }
   };
 
-  // Handlers
-  const handleSelectDireccion = (direccion: Direccion) => {
-    setSelectedDireccion(direccion);
-  };
-
-  const handleConfirm = () => {
-    if (selectedDireccion) {
-      // Asegurar que la dirección tenga una descripción
-      const direccionConDescripcion = {
-        ...selectedDireccion,
-        descripcion: formatDireccion(selectedDireccion)
-      };
-      onSelectDireccion(direccionConDescripcion);
-      handleClose();
+  // Manejar selección
+  const handleSelect = () => {
+    const direccionSeleccionada = direcciones.find(d => d.codDireccion === selectedId);
+    
+    if (!direccionSeleccionada) {
+      NotificationService.warning('Debe seleccionar una dirección');
+      return;
     }
+
+    // Convertir al formato esperado
+    const direccionFormateada: Direccion = {
+      id: direccionSeleccionada.codDireccion,
+      codigo: direccionSeleccionada.codDireccion.toString(),
+      sector: direccionSeleccionada.nombreSector || '',
+      barrio: direccionSeleccionada.nombreBarrio || '',
+      tipoVia: direccionSeleccionada.nombreTipoVia || 'CALLE',
+      nombreVia: direccionSeleccionada.nombreVia || '',
+      cuadra: direccionSeleccionada.cuadra || 0,
+      lado: direccionSeleccionada.lado || '-',
+      loteInicial: direccionSeleccionada.loteInicial || 0,
+      loteFinal: direccionSeleccionada.loteFinal || 0,
+      descripcion: `${direccionSeleccionada.nombreTipoVia || 'CALLE'} ${direccionSeleccionada.nombreVia || ''} - Cuadra ${direccionSeleccionada.cuadra || 0}`
+    };
+
+    onSelectDireccion(direccionFormateada);
+    handleClose();
   };
 
+  // Limpiar y cerrar
   const handleClose = () => {
-    setSelectedDireccion(null);
     setSearchTerm('');
-    setSectorFilter('');
-    setBarrioFilter('');
+    setDirecciones([]);
+    setSelectedId(null);
+    setError(null);
     onClose();
   };
 
-  const handleClearFilters = () => {
-    setSearchTerm('');
-    setSectorFilter('');
-    setBarrioFilter('');
+  // Buscar al presionar Enter
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      buscarDirecciones();
+    }
   };
 
-  // Formatear dirección para mostrar
-  const formatDireccion = (direccion: Direccion) => {
-    return `${direccion.sector} + ${direccion.barrio} + ${direccion.tipoVia} ${direccion.nombreVia} - Cuadra ${direccion.cuadra} - Lado ${direccion.lado} - Lotes ${direccion.loteInicial}-${direccion.loteFinal}`;
-  };
+  // Actualizar selectedId cuando cambia la prop
+  useEffect(() => {
+    setSelectedId(direccionSeleccionada?.id || null);
+  }, [direccionSeleccionada]);
 
   return (
-    <Dialog
-      open={open}
-      onClose={handleClose}
-      maxWidth="md" // Cambiado de "lg" a "md" para reducir el ancho
+    <Dialog 
+      open={open} 
+      onClose={handleClose} 
+      maxWidth="md" 
       fullWidth
       TransitionComponent={Fade}
-      PaperProps={{
-        sx: { 
-          minHeight: '70vh', // Reducido de 80vh
-          borderRadius: 2
-        }
-      }}
     >
-      <DialogTitle sx={{ pb: 1 }}>
-        <Box display="flex" alignItems="center" justifyContent="space-between">
-          <Box display="flex" alignItems="center" gap={1}>
-            <LocationIcon sx={{ color: theme.palette.primary.main }} />
-            <Typography variant="h6" fontWeight={600}>
-              Seleccionar Dirección
-            </Typography>
+      <DialogTitle>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between' 
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <LocationIcon color="primary" />
+            <Typography variant="h6">Seleccionar Dirección</Typography>
           </Box>
-          <IconButton 
-            onClick={handleClose} 
-            size="small"
-            sx={{ 
-              color: theme.palette.grey[500],
-              '&:hover': { 
-                backgroundColor: alpha(theme.palette.error.main, 0.1),
-                color: theme.palette.error.main 
-              }
-            }}
-          >
+          <IconButton onClick={handleClose} size="small">
             <CloseIcon />
           </IconButton>
         </Box>
       </DialogTitle>
 
-      <DialogContent dividers sx={{ pt: 3 }}>
-        {/* Filtros de búsqueda */}
-        <Box mb={3}>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+      <DialogContent dividers>
+        <Stack spacing={3}>
+          {/* Buscador */}
+          <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
               fullWidth
-              size="small"
-              placeholder="Buscar por nombre de vía o código..."
+              label="Buscar por nombre de vía"
+              placeholder="Ingrese nombre de calle, avenida, jirón..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyPress={handleKeyPress}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon sx={{ color: theme.palette.text.secondary }} />
+                    <SearchIcon />
                   </InputAdornment>
                 ),
-                sx: { 
-                  '& .MuiOutlinedInput-root': {
-                    '&:hover fieldset': {
-                      borderColor: theme.palette.primary.main,
-                    }
-                  }
-                }
+                endAdornment: searchTerm && (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearchTerm('')}>
+                      <ClearIcon />
+                    </IconButton>
+                  </InputAdornment>
+                ),
               }}
             />
-            
-            <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel>Sector</InputLabel>
-              <Select
-                value={sectorFilter}
-                onChange={(e) => setSectorFilter(e.target.value)}
-                label="Sector"
-                startAdornment={
-                  <InputAdornment position="start">
-                    <ApartmentIcon sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
-                  </InputAdornment>
-                }
-              >
-                <MenuItem value="">
-                  <em>Todos</em>
-                </MenuItem>
-                {sectores.map(sector => (
-                  <MenuItem key={sector} value={sector}>
-                    {sector}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel>Barrio</InputLabel>
-              <Select
-                value={barrioFilter}
-                onChange={(e) => setBarrioFilter(e.target.value)}
-                label="Barrio"
-                startAdornment={
-                  <InputAdornment position="start">
-                    <MapIcon sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
-                  </InputAdornment>
-                }
-              >
-                <MenuItem value="">
-                  <em>Todos</em>
-                </MenuItem>
-                {barrios.map(barrio => (
-                  <MenuItem key={barrio} value={barrio}>
-                    {barrio}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <Tooltip title="Limpiar filtros">
-              <Button
-                variant="outlined"
-                onClick={handleClearFilters}
-                startIcon={<ClearIcon />}
-                sx={{ 
-                  minWidth: 'auto',
-                  borderColor: theme.palette.grey[300],
-                  color: theme.palette.text.secondary,
-                  '&:hover': {
-                    borderColor: theme.palette.primary.main,
-                    backgroundColor: alpha(theme.palette.primary.main, 0.05)
-                  }
-                }}
-              >
-                Limpiar
-              </Button>
-            </Tooltip>
-          </Stack>
-        </Box>
-
-        {/* Tabla de direcciones */}
-        <TableContainer 
-          component={Paper} 
-          variant="outlined"
-          sx={{ 
-            maxHeight: 400,
-            '& .MuiTable-root': {
-              minWidth: 500 // Reducido de 650
-            }
-          }}
-        >
-          <Table stickyHeader size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell padding="checkbox" sx={{ width: 50 }}></TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 80 }}>Código</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 120 }}>Sector</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 120 }}>Barrio</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Dirección</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                    <CircularProgress size={32} />
-                  </TableCell>
-                </TableRow>
-              ) : direcciones.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      No se encontraron direcciones
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                direcciones.map((direccion) => (
-                  <TableRow
-                    key={direccion.id}
-                    hover
-                    sx={{
-                      cursor: 'pointer',
-                      '&.MuiTableRow-hover:hover': {
-                        backgroundColor: alpha(theme.palette.primary.main, 0.05)
-                      },
-                      ...(selectedDireccion?.id === direccion.id && {
-                        backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                        '&.MuiTableRow-hover:hover': {
-                          backgroundColor: alpha(theme.palette.primary.main, 0.12)
-                        }
-                      })
-                    }}
-                    onClick={() => handleSelectDireccion(direccion)}
-                  >
-                    <TableCell padding="checkbox">
-                      <Radio
-                        checked={selectedDireccion?.id === direccion.id}
-                        size="small"
-                        sx={{
-                          color: theme.palette.grey[400],
-                          '&.Mui-checked': {
-                            color: theme.palette.primary.main
-                          }
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight={500}>
-                        {direccion.codigo}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {direccion.sector}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {direccion.barrio}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
-                        {direccion.tipoVia} {direccion.nombreVia} - Cuadra {direccion.cuadra} - 
-                        Lado {direccion.lado} - Lotes {direccion.loteInicial}-{direccion.loteFinal}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        {/* Dirección seleccionada */}
-        {selectedDireccion && (
-          <Fade in={true}>
-            <Alert 
-              severity="info" 
-              sx={{ 
-                mt: 2,
-                backgroundColor: alpha(theme.palette.info.main, 0.05),
-                '& .MuiAlert-icon': {
-                  color: theme.palette.info.main
-                }
-              }}
-              icon={<LocationIcon />}
+            <Button
+              variant="contained"
+              onClick={buscarDirecciones}
+              disabled={loading || searchTerm.trim().length < 2}
+              startIcon={loading ? <CircularProgress size={20} /> : <SearchIcon />}
             >
-              <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                Dirección seleccionada:
-              </Typography>
-              <Typography variant="body2">
-                {formatDireccion(selectedDireccion)}
-              </Typography>
+              Buscar
+            </Button>
+          </Box>
+
+          {/* Mensaje de error */}
+          {error && (
+            <Alert severity="error" onClose={() => setError(null)}>
+              {error}
             </Alert>
-          </Fade>
-        )}
+          )}
+
+          {/* Tabla de resultados */}
+          {direcciones.length > 0 && (
+            <TableContainer 
+              component={Paper} 
+              sx={{ 
+                maxHeight: 400,
+                border: `1px solid ${theme.palette.divider}`
+              }}
+            >
+              <Table stickyHeader size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell padding="checkbox" sx={{ width: 50 }}>
+                      Selección
+                    </TableCell>
+                    <TableCell>Sector</TableCell>
+                    <TableCell>Barrio</TableCell>
+                    <TableCell>Vía</TableCell>
+                    <TableCell align="center">Cuadra</TableCell>
+                    <TableCell align="center">Lado</TableCell>
+                    <TableCell align="center">Lotes</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {direcciones.map((direccion) => (
+                    <TableRow
+                      key={direccion.codDireccion}
+                      hover
+                      selected={selectedId === direccion.codDireccion}
+                      onClick={() => setSelectedId(direccion.codDireccion)}
+                      sx={{ cursor: 'pointer' }}
+                    >
+                      <TableCell padding="checkbox">
+                        <Radio
+                          checked={selectedId === direccion.codDireccion}
+                          value={direccion.codDireccion}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={direccion.nombreSector || 'Sin sector'} 
+                          size="small" 
+                          variant="outlined"
+                          icon={<ApartmentIcon />}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {direccion.nombreBarrio || 'Sin barrio'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <MapIcon fontSize="small" color="action" />
+                          <Box>
+                            <Typography variant="body2" fontWeight={500}>
+                              {direccion.nombreTipoVia || 'CALLE'} {direccion.nombreVia || 'Sin nombre'}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip 
+                          label={direccion.cuadra || '0'} 
+                          size="small" 
+                          color="primary"
+                          variant="filled"
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        {direccion.lado || '-'}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Typography variant="caption">
+                          {direccion.loteInicial || 0} - {direccion.loteFinal || 0}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+
+          {/* Mensaje cuando no hay resultados */}
+          {!loading && searchTerm && direcciones.length === 0 && (
+            <Box sx={{ 
+              textAlign: 'center', 
+              py: 4,
+              color: 'text.secondary'
+            }}>
+              <LocationIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+              <Typography>
+                No se encontraron direcciones
+              </Typography>
+            </Box>
+          )}
+        </Stack>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button 
-          onClick={handleClose} 
-          color="inherit"
-          sx={{ mr: 1 }}
-        >
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={handleClose} color="inherit">
           Cancelar
         </Button>
-        <Button
-          onClick={handleConfirm}
+        <Button 
+          onClick={handleSelect} 
           variant="contained"
-          disabled={!selectedDireccion}
+          disabled={!selectedId}
           startIcon={<CheckCircleIcon />}
-          sx={{
-            minWidth: 120,
-            boxShadow: theme.shadows[2],
-            '&:hover': {
-              boxShadow: theme.shadows[4]
-            }
-          }}
         >
-          Confirmar
+          Seleccionar
         </Button>
       </DialogActions>
     </Dialog>

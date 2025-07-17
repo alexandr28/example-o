@@ -1529,5 +1529,6 @@ class ConstanteService {
 
    
 } 
-
- export default ConstanteService;
+const constanteService = ConstanteService.getInstance();
+export default constanteService;
+export { ConstanteService };

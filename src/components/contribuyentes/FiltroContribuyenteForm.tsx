@@ -26,7 +26,7 @@ import {
   AccountBalance as AccountBalanceIcon
 } from '@mui/icons-material';
 import SearchableSelect from '../ui/SearchableSelect';
-import { constanteService, ConstanteData } from '../../services/constanteService';
+import  constanteService, {ConstanteData } from '../../services/constanteService';
 import { NotificationService } from '../utils/Notification';
 
 interface FiltroContribuyenteFormProps {
