@@ -1,5 +1,5 @@
 // src/components/modal/SelectorContribuyente.tsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -76,7 +76,7 @@ const SelectorContribuyente: React.FC<SelectorContribuyenteProps> = ({
 }) => {
   const theme = useTheme();
   
-  // Hook de contribuyentes - solo usar las funciones que existen
+  // Hook de contribuyentes
   const { 
     contribuyentes, 
     loading, 
@@ -90,13 +90,41 @@ const SelectorContribuyente: React.FC<SelectorContribuyenteProps> = ({
   const [tabValue, setTabValue] = useState(0); // 0: Todos, 1: Naturales, 2: Jurídicas
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  
+  // Ref para controlar la carga inicial
+  const hasLoadedRef = useRef(false);
+  const previousIsOpenRef = useRef(isOpen);
 
-  // Cargar contribuyentes al abrir el modal
+  // Cargar contribuyentes al abrir el modal - VERSIÓN CORREGIDA
   useEffect(() => {
-    if (isOpen) {
-      cargarContribuyentes();
+    // Solo cargar si el modal se acaba de abrir (transición de cerrado a abierto)
+    if (isOpen && !previousIsOpenRef.current) {
+      // Solo cargar si no están cargados o si no se está cargando actualmente
+      if (contribuyentes.length === 0 && !loading && !hasLoadedRef.current) {
+        console.log('🔄 [SelectorContribuyente] Cargando contribuyentes...');
+        cargarContribuyentes();
+        hasLoadedRef.current = true;
+      }
     }
-  }, [isOpen, cargarContribuyentes]);
+    
+    // Actualizar el estado previo
+    previousIsOpenRef.current = isOpen;
+    
+    // Si el modal se cierra, resetear la bandera
+    if (!isOpen) {
+      hasLoadedRef.current = false;
+    }
+  }, [isOpen]); // Solo depender de isOpen, no de cargarContribuyentes
+
+  // Resetear estados cuando se cierra el modal
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchTerm('');
+      setSelectedContribuyente(null);
+      setPage(0);
+      setTabValue(0);
+    }
+  }, [isOpen]);
 
   // Filtrar contribuyentes por búsqueda y tipo
   const filteredContribuyentes = useMemo(() => {
@@ -173,26 +201,24 @@ const SelectorContribuyente: React.FC<SelectorContribuyenteProps> = ({
   };
 
   const getPersonTypeChip = (tipo?: 'natural' | 'juridica') => {
-    if (tipo === 'natural') {
+    if (tipo === 'juridica') {
       return (
         <Chip 
-          icon={<PersonIcon sx={{ fontSize: 16 }} />} 
-          label="Natural" 
           size="small" 
-          color="primary" 
-        />
-      );
-    } else if (tipo === 'juridica') {
-      return (
-        <Chip 
-          icon={<BusinessIcon sx={{ fontSize: 16 }} />} 
           label="Jurídica" 
-          size="small" 
-          color="secondary" 
+          color="primary"
+          icon={<BusinessIcon />}
         />
       );
     }
-    return null;
+    return (
+      <Chip 
+        size="small" 
+        label="Natural" 
+        color="info"
+        icon={<PersonIcon />}
+      />
+    );
   };
 
   return (
@@ -203,31 +229,23 @@ const SelectorContribuyente: React.FC<SelectorContribuyenteProps> = ({
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 2,
-          minHeight: '70vh'
+          height: '80vh',
+          maxHeight: '800px'
         }
       }}
     >
-      <DialogTitle sx={{ m: 0, p: 2 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Typography variant="h6" fontWeight={600}>
-            {title}
-          </Typography>
-          <IconButton
-            aria-label="cerrar"
-            onClick={onClose}
-            sx={{
-              color: theme.palette.grey[500],
-            }}
-          >
+      <DialogTitle>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6">{title}</Typography>
+          <IconButton onClick={onClose} edge="end">
             <CloseIcon />
           </IconButton>
         </Stack>
       </DialogTitle>
 
       <DialogContent dividers sx={{ p: 0 }}>
+        {/* Barra de búsqueda */}
         <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          {/* Barra de búsqueda */}
           <TextField
             fullWidth
             placeholder="Buscar por nombre, documento, dirección o teléfono..."
@@ -238,14 +256,22 @@ const SelectorContribuyente: React.FC<SelectorContribuyenteProps> = ({
                 <InputAdornment position="start">
                   <SearchIcon />
                 </InputAdornment>
-              ),
+              )
             }}
-            sx={{ mb: 2 }}
           />
+        </Box>
 
-          {/* Tabs para filtrar por tipo */}
+        {/* Tabs de filtro */}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs value={tabValue} onChange={handleTabChange}>
-            <Tab label={`Todos (${contribuyentes.length})`} />
+            <Tab 
+              label={`Todos (${contribuyentes.length})`} 
+              icon={<Stack direction="row" spacing={0.5}>
+                <PersonIcon sx={{ fontSize: 20 }} />
+                <BusinessIcon sx={{ fontSize: 20 }} />
+              </Stack>} 
+              iconPosition="start"
+            />
             <Tab 
               label={`Personas Naturales (${contribuyentes.filter(c => c.tipoPersona === 'natural').length})`} 
               icon={<PersonIcon sx={{ fontSize: 20 }} />} 

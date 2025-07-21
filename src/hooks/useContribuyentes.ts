@@ -1,5 +1,5 @@
-// src/hooks/useContribuyentes.ts - ACTUALIZADO SIN AUTENTICACIÓN
-import { useState, useCallback, useEffect } from 'react';
+// src/hooks/useContribuyentes.ts - VERSIÓN CORREGIDA SIN DEPENDENCIAS CIRCULARES
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { NotificationService } from '../components/utils/Notification';
 import { contribuyenteService } from '../services/contribuyenteService';
 
@@ -32,6 +32,9 @@ export const useContribuyentes = () => {
   const [contribuyentes, setContribuyentes] = useState<ContribuyenteListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Ref para controlar si ya se está cargando
+  const isLoadingRef = useRef(false);
   
   /**
    * Convierte datos de la API al formato de lista
@@ -66,14 +69,17 @@ export const useContribuyentes = () => {
   
   /**
    * Carga todos los contribuyentes
+   * VERSIÓN CORREGIDA sin dependencia de loading
    */
   const cargarContribuyentes = useCallback(async () => {
-    if (loading) {
+    // Usar ref para evitar cargas múltiples
+    if (isLoadingRef.current) {
       console.log('⏭️ [useContribuyentes] Carga ya en proceso, omitiendo...');
       return;
     }
     
     try {
+      isLoadingRef.current = true;
       setLoading(true);
       setError(null);
       
@@ -99,8 +105,9 @@ export const useContribuyentes = () => {
       // No mostrar notificación en la carga inicial
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
-  }, [loading]);
+  }, []); // Sin dependencias
   
   /**
    * Busca contribuyentes con filtros
@@ -254,10 +261,10 @@ export const useContribuyentes = () => {
   // Efecto para cargar contribuyentes al montar
   useEffect(() => {
     // Solo cargar si no hay contribuyentes y no está cargando
-    if (contribuyentes.length === 0 && !loading) {
+    if (contribuyentes.length === 0 && !loading && !isLoadingRef.current) {
       cargarContribuyentes();
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // Sin dependencias
   
   return {
     contribuyentes,
