@@ -5,7 +5,7 @@
 
 // Servicios base
 export { default as BaseApiService } from './BaseApiService';
-export type { NormalizeOptions } from './BaseApiService';
+export type { NormalizeOptions, ApiError, ApiResponse, PaginatedResponse, QueryParams } from './BaseApiService';
 
 // Servicios de utilidades
 export { connectivityService } from './connectivityService';
@@ -16,14 +16,14 @@ export { default as barrioService } from './barrioService';
 export { default as sectorService } from './sectorService'; 
 export { default as calleService } from './calleApiService';
 export { default as tipoViaService } from './viaService';
-export { default as direccionService } from './direccionService'; // AGREGADO
+export { default as direccionService } from './direccionService';
 
 export { personaService } from './personaService';
 export { contribuyenteService } from './contribuyenteService';
-export { default as constanteService, ConstanteService } from './constanteService'; // AGREGADO
+export { default as constanteService, ConstanteService } from './constanteService';
 export { pisoService } from './pisoService';
 export { predioService } from './predioService';
-export { arancelService } from './arancelService';
+export { default as arancelService } from './arancelService'; // ACTUALIZADO - exportación por defecto
 export { valorUnitarioService } from './valorUnitarioService';
 export { uitService } from './uitService';
 // export { alcabalaService } from './alcabalaService';
@@ -52,12 +52,12 @@ export type {
 // También exportar CODIGO_CONSTANTE_PADRE
 export { CODIGO_CONSTANTE_PADRE } from './constanteService';
 
+// Tipos del servicio de arancel - ACTUALIZADO
 export type {
   ArancelData,
   CreateArancelDTO,
   UpdateArancelDTO,
-  UNIDADES_MEDIDA,
-  CATEGORIAS_ARANCEL
+  ArancelResponse
 } from './arancelService';
 
 export type {
@@ -67,12 +67,22 @@ export type {
   BusquedaDireccionParams
 } from './direccionService';
 
+// Tipos del servicio de predio - Usa Predio del modelo, no PredioData
 export type {
-  PredioData,
   CreatePredioDTO,
   UpdatePredioDTO,
   BusquedaPredioParams
 } from './predioService';
+
+// Importar Predio del modelo
+export type { Predio as PredioData } from '../models/Predio';
+
+export type {
+  PisoData,
+  CreatePisoDTO,
+  UpdatePisoDTO,
+  BusquedaPisoParams
+} from './pisoService';
 
 export type {
   ValorUnitarioData,
@@ -80,3 +90,22 @@ export type {
   UpdateValorUnitarioDTO,
   BusquedaValorUnitarioParams
 } from './valorUnitarioService';
+
+export type {
+  UITData,
+  CreateUITDTO,
+  UpdateUITDTO
+} from './uitService';
+
+// Exportar tipos de barrio y sector
+export type {
+  BarrioData,
+  CreateBarrioDTO,
+  UpdateBarrioDTO
+} from './barrioService';
+
+export type {
+  SectorData,
+  CreateSectorDTO,
+  UpdateSectorDTO
+} from './sectorService';

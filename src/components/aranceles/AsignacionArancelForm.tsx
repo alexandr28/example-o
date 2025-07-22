@@ -1,4 +1,4 @@
-// src/components/mantenedores/aranceles/AsignacionArancelForm.tsx
+// src/components/aranceles/AsignacionArancelForm.tsx
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -9,40 +9,63 @@ import {
   Button,
   Stack,
   InputAdornment,
-  Alert
+  Alert,
+  CircularProgress,
+  FormControl,
+  FormHelperText
 } from '@mui/material';
 import { Save as SaveIcon, Edit as EditIcon, Add as AddIcon } from '@mui/icons-material';
 import SearchableSelect from '../ui/SearchableSelect';
-import { useAranceles } from '../../hooks/useAranceles';
-// Importar el modal correctamente - ajusta la ruta según tu estructura
-// Si el modal está en src/components/modal/SelectorDirecciones.tsx
+import { useAranceles, useArancel } from '../../hooks/useAranceles';
+import { NotificationService } from '../utils/Notification';
 import SelectorDirecciones from '../modal/SelectorDirecciones';
 
 interface ArancelFormData {
-  anio: {id: number, value: number, label: string} | null;
-  direccionId: number | null;
-  monto: number;
+  anio: number | null;
+  codDireccion: number | null;
+  costoArancel: number;
 }
 
 export const AsignacionArancelForm: React.FC = () => {
   // Estados
   const [formData, setFormData] = useState<ArancelFormData>({
     anio: null,
-    direccionId: null,
-    monto: 0
+    codDireccion: null,
+    costoArancel: 0
   });
   const [direccionSeleccionada, setDireccionSeleccionada] = useState<any>(null);
   const [modalDireccionOpen, setModalDireccionOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isEditMode, setIsEditMode] = useState(false);
+  const [codArancelActual, setCodArancelActual] = useState<number | null>(null);
 
   // Hooks
-  const { crearArancel, actualizarArancel, loading } = useAranceles();
+  const { crearArancel, actualizarArancel, obtenerPorAnioYDireccion, loading } = useAranceles();
 
-  // Generar opciones de años (últimos 10 años)
+  // Hook para obtener arancel existente cuando se selecciona año y dirección
+  const { arancel: arancelExistente } = useArancel(
+    formData.anio || 0,
+    formData.codDireccion || 0
+  );
+
+  // Efecto para cargar arancel existente
+  useEffect(() => {
+    if (arancelExistente) {
+      setFormData(prev => ({
+        ...prev,
+        costoArancel: arancelExistente.costoArancel
+      }));
+      setCodArancelActual(arancelExistente.codArancel);
+      setIsEditMode(true);
+    } else {
+      setIsEditMode(false);
+      setCodArancelActual(null);
+    }
+  }, [arancelExistente]);
+
+  // Generar opciones de años
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 10 }, (_, i) => ({
-    id: currentYear - i,
     value: currentYear - i,
     label: (currentYear - i).toString()
   }));
@@ -54,11 +77,11 @@ export const AsignacionArancelForm: React.FC = () => {
     if (!formData.anio) {
       newErrors.anio = 'El año es requerido';
     }
-    if (!formData.direccionId) {
+    if (!formData.codDireccion) {
       newErrors.direccion = 'La dirección es requerida';
     }
-    if (formData.monto < 0) {
-      newErrors.monto = 'El monto no puede ser negativo';
+    if (formData.costoArancel < 0) {
+      newErrors.costoArancel = 'El costo no puede ser negativo';
     }
 
     setErrors(newErrors);
@@ -66,20 +89,20 @@ export const AsignacionArancelForm: React.FC = () => {
   };
 
   // Handlers
-  const handleAnioChange = (option: any) => {
-    setFormData(prev => ({ ...prev, anio: option }));
+  const handleAnioChange = (value: string | number) => {
+    setFormData(prev => ({ ...prev, anio: Number(value) }));
     setErrors(prev => ({ ...prev, anio: '' }));
   };
 
-  const handleMontoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCostoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value) || 0;
-    setFormData(prev => ({ ...prev, monto: value }));
-    setErrors(prev => ({ ...prev, monto: '' }));
+    setFormData(prev => ({ ...prev, costoArancel: value }));
+    setErrors(prev => ({ ...prev, costoArancel: '' }));
   };
 
   const handleSelectDireccion = (direccion: any) => {
     setDireccionSeleccionada(direccion);
-    setFormData(prev => ({ ...prev, direccionId: direccion.id }));
+    setFormData(prev => ({ ...prev, codDireccion: direccion.id || direccion.codDireccion }));
     setErrors(prev => ({ ...prev, direccion: '' }));
     setModalDireccionOpen(false);
   };
@@ -88,20 +111,21 @@ export const AsignacionArancelForm: React.FC = () => {
     if (!validateForm()) return;
 
     try {
-      if (isEditMode && formData.direccionId) {
-        await actualizarArancel(formData.direccionId, {
-          anio: formData.anio!.value,
-          monto: formData.monto
+      if (isEditMode && codArancelActual) {
+        await actualizarArancel(codArancelActual, {
+          anio: formData.anio!,
+          codDireccion: formData.codDireccion!,
+          costoArancel: formData.costoArancel
         });
       } else {
         await crearArancel({
-          anio: formData.anio!.value,
-          direccionId: formData.direccionId!,
-          monto: formData.monto
+          anio: formData.anio!,
+          codDireccion: formData.codDireccion!,
+          costoArancel: formData.costoArancel
         });
       }
 
-      // Limpiar formulario
+      // Limpiar formulario después de guardar exitosamente
       handleNuevo();
     } catch (error) {
       console.error('Error al guardar arancel:', error);
@@ -111,51 +135,74 @@ export const AsignacionArancelForm: React.FC = () => {
   const handleNuevo = () => {
     setFormData({
       anio: null,
-      direccionId: null,
-      monto: 0
+      codDireccion: null,
+      costoArancel: 0
     });
     setDireccionSeleccionada(null);
     setIsEditMode(false);
+    setCodArancelActual(null);
     setErrors({});
+  };
+
+  // Función para formatear la dirección mostrada
+  const formatearDireccion = (direccion: any) => {
+    if (!direccion) return 'Seleccione una dirección';
+    
+    const partes = [];
+    if (direccion.sector) partes.push(direccion.sector);
+    if (direccion.barrio) partes.push(direccion.barrio);
+    if (direccion.tipoVia && direccion.nombreVia) {
+      partes.push(`${direccion.tipoVia} ${direccion.nombreVia}`);
+    }
+    if (direccion.cuadra) partes.push(`CUADRA ${direccion.cuadra}`);
+    if (direccion.lado) partes.push(`LADO ${direccion.lado}`);
+    if (direccion.loteInicial && direccion.loteFinal) {
+      partes.push(`LT ${direccion.loteInicial} - ${direccion.loteFinal}`);
+    }
+    
+    return partes.join(' + ');
   };
 
   return (
     <Card sx={{ maxWidth: 800, mx: 'auto' }}>
       <CardContent>
         <Typography variant="h5" gutterBottom>
-          Asignación de aranceles
+          {isEditMode ? 'Editar Arancel' : 'Asignación de Aranceles'}
         </Typography>
         
         <Box component="form" noValidate sx={{ mt: 3 }}>
-          {/* Fila 1: Año y Monto (compactado a la mitad) */}
+          {/* Fila 1: Año y Costo */}
           <Box sx={{ maxWidth: '50%', mb: 3 }}>
             <Stack direction="row" spacing={2}>
-              <Box sx={{ flex: 1 }}>
+              <FormControl sx={{ flex: 1 }} error={!!errors.anio}>
                 <SearchableSelect
-                  label="Año"
-                  options={yearOptions}
-                  value={formData.anio}
+                  id="anio-select"
+                  name="anio"
+                  value={formData.anio || ''}
                   onChange={handleAnioChange}
-                  error={!!errors.anio}
-                  helperText={errors.anio}
+                  options={yearOptions}
+                  placeholder="Seleccione un año"
+                  error={errors.anio}
                   required
-                  fullWidth
+                  disabled={loading}
                 />
-              </Box>
+                {errors.anio && (
+                  <FormHelperText error>{errors.anio}</FormHelperText>
+                )}
+              </FormControl>
+              
               <Box sx={{ flex: 1 }}>
                 <TextField
-                  label="Monto"
+                  label="Costo Arancel"
                   type="number"
-                  value={formData.monto}
-                  onChange={handleMontoChange}
-                  error={!!errors.monto}
-                  helperText={errors.monto}
+                  value={formData.costoArancel}
+                  onChange={handleCostoChange}
+                  error={!!errors.costoArancel}
+                  helperText={errors.costoArancel}
                   fullWidth
-                  slotProps={{
-                    input: {
-                      startAdornment: <InputAdornment position="start">S/</InputAdornment>,
-                      inputProps: { min: 0, step: 0.01 }
-                    }
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start">S/</InputAdornment>,
+                    inputProps: { min: 0, step: 0.01 }
                   }}
                 />
               </Box>
@@ -193,10 +240,7 @@ export const AsignacionArancelForm: React.FC = () => {
               </Button>
               
               <Typography variant="body1" color="text.secondary" sx={{ flexGrow: 1 }}>
-                {direccionSeleccionada ? 
-                  `${direccionSeleccionada.sector} + ${direccionSeleccionada.barrio} + ${direccionSeleccionada.tipoVia} + ${direccionSeleccionada.nombreVia} + CUADRA ${direccionSeleccionada.cuadra} + LADO ${direccionSeleccionada.lado} + LT ${direccionSeleccionada.loteInicial} - ${direccionSeleccionada.loteFinal}`
-                  : 'Seleccione una dirección'
-                }
+                {formatearDireccion(direccionSeleccionada)}
               </Typography>
             </Box>
             {errors.direccion && (
@@ -206,24 +250,23 @@ export const AsignacionArancelForm: React.FC = () => {
             )}
           </Box>
 
+          {/* Mostrar estado de edición */}
+          {isEditMode && (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              Ya existe un arancel para esta dirección y año. Puede modificar el costo.
+            </Alert>
+          )}
+
           {/* Botones de acción */}
           <Box sx={{ mt: 4, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
             <Button
               variant="contained"
               color="success"
-              startIcon={<SaveIcon />}
+              startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
               onClick={handleSubmit}
               disabled={loading}
             >
-              Guardar
-            </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<EditIcon />}
-              disabled={!direccionSeleccionada || loading}
-            >
-              Editar
+              {isEditMode ? 'Actualizar' : 'Guardar'}
             </Button>
             <Button
               variant="contained"
@@ -243,6 +286,7 @@ export const AsignacionArancelForm: React.FC = () => {
         open={modalDireccionOpen}
         onClose={() => setModalDireccionOpen(false)}
         onSelectDireccion={handleSelectDireccion}
+        direccionSeleccionada={direccionSeleccionada}
       />
     </Card>
   );

@@ -20,7 +20,12 @@ import {
   Stack,
   InputAdornment,
   Chip,
-  Alert
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button
 } from '@mui/material';
 import { 
   Search as SearchIcon,
@@ -33,21 +38,8 @@ import {
 import SearchableSelect from '../ui/SearchableSelect';
 import { useAranceles } from '../../hooks/useAranceles';
 import { formatCurrency } from '../../utils/formatters';
-
-interface ArancelDireccion {
-  id: number;
-  anio: number;
-  direccion: string;
-  sector: string;
-  barrio: string;
-  tipoVia: string;
-  nombreVia: string;
-  cuadra: number;
-  lado: string;
-  loteInicial: number;
-  loteFinal: number;
-  monto: number;
-}
+import { ArancelData } from '../../services/arancelService';
+import { NotificationService } from '../utils/Notification';
 
 export const ListaArancelesPorDireccion: React.FC = () => {
   // Estados
@@ -55,9 +47,11 @@ export const ListaArancelesPorDireccion: React.FC = () => {
   const [busqueda, setBusqueda] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [arancelToDelete, setArancelToDelete] = useState<ArancelData | null>(null);
 
   // Hook
-  const { arancelesPorDireccion, loading, buscarArancelesPorDireccion } = useAranceles();
+  const { aranceles, loading, eliminarArancel, recargar } = useAranceles(anioSeleccionado?.value);
 
   // Generar opciones de años
   const currentYear = new Date().getFullYear();
@@ -70,24 +64,18 @@ export const ListaArancelesPorDireccion: React.FC = () => {
     }));
   }, [currentYear]);
 
-  // Efecto para buscar cuando cambia el año
-  useEffect(() => {
-    if (anioSeleccionado) {
-      buscarArancelesPorDireccion(anioSeleccionado.value);
-    }
-  }, [anioSeleccionado, buscarArancelesPorDireccion]);
-
   // Filtrar aranceles según búsqueda
   const arancelesFiltrados = useMemo(() => {
-    if (!busqueda) return arancelesPorDireccion;
+    if (!busqueda) return aranceles;
     
     const searchTerm = busqueda.toLowerCase();
-    return arancelesPorDireccion.filter(arancel => {
-      const direccionCompleta = `${arancel.sector} ${arancel.barrio} ${arancel.tipoVia} ${arancel.nombreVia} ${arancel.cuadra} ${arancel.lado}`.toLowerCase();
-      return direccionCompleta.includes(searchTerm) || 
-             arancel.monto.toString().includes(searchTerm);
+    return aranceles.filter(arancel => {
+      // Como ahora no tenemos los datos de dirección completos en el arancel,
+      // solo podemos buscar por costo o ID de dirección
+      return arancel.costoArancel.toString().includes(searchTerm) ||
+             arancel.codDireccion.toString().includes(searchTerm);
     });
-  }, [arancelesPorDireccion, busqueda]);
+  }, [aranceles, busqueda]);
 
   // Paginación
   const arancelesPaginados = useMemo(() => {
@@ -106,8 +94,26 @@ export const ListaArancelesPorDireccion: React.FC = () => {
     setPage(0);
   };
 
-  const formatearDireccion = (arancel: ArancelDireccion) => {
-    return `${arancel.sector} + ${arancel.barrio}, ${arancel.tipoVia} ${arancel.nombreVia} - Cuadra ${arancel.cuadra}`;
+  const handleDeleteClick = (arancel: ArancelData) => {
+    setArancelToDelete(arancel);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (arancelToDelete?.codArancel) {
+      try {
+        await eliminarArancel(arancelToDelete.codArancel);
+        setDeleteDialogOpen(false);
+        setArancelToDelete(null);
+      } catch (error) {
+        console.error('Error al eliminar:', error);
+      }
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setArancelToDelete(null);
   };
 
   return (
@@ -116,7 +122,7 @@ export const ListaArancelesPorDireccion: React.FC = () => {
         <Stack direction="row" alignItems="center" spacing={1} mb={2}>
           <LocationIcon color="primary" />
           <Typography variant="h6" component="h3">
-            Lista de Aranceles por Dirección
+            Lista de Aranceles por Año
           </Typography>
         </Stack>
 
@@ -149,11 +155,11 @@ export const ListaArancelesPorDireccion: React.FC = () => {
           />
 
           {/* Campo de búsqueda */}
-          {anioSeleccionado && arancelesPorDireccion.length > 0 && (
+          {anioSeleccionado && aranceles.length > 0 && (
             <TextField
               fullWidth
               size="small"
-              placeholder="Buscar por dirección o monto..."
+              placeholder="Buscar por costo o código de dirección..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               InputProps={{
@@ -200,37 +206,27 @@ export const ListaArancelesPorDireccion: React.FC = () => {
               <Skeleton key={index} height={60} sx={{ mb: 1 }} />
             ))}
           </Box>
-        ) : anioSeleccionado && arancelesPorDireccion.length > 0 ? (
+        ) : anioSeleccionado && aranceles.length > 0 ? (
           <TableContainer component={Paper} variant="outlined">
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell>Dirección</TableCell>
-                  <TableCell>Sector</TableCell>
-                  <TableCell>Barrio</TableCell>
-                  <TableCell>Cuadra</TableCell>
-                  <TableCell>Lado</TableCell>
-                  <TableCell>Lotes</TableCell>
-                  <TableCell align="right">Monto</TableCell>
+                  <TableCell>Código</TableCell>
+                  <TableCell>Año</TableCell>
+                  <TableCell>Código Dirección</TableCell>
+                  <TableCell align="right">Costo Arancel</TableCell>
                   <TableCell align="center">Acciones</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {arancelesPaginados.map((arancel) => (
-                  <TableRow key={arancel.id} hover>
-                    <TableCell>
-                      <Typography variant="body2" noWrap sx={{ maxWidth: 250 }}>
-                        {`${arancel.tipoVia} ${arancel.nombreVia}`}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{arancel.sector}</TableCell>
-                    <TableCell>{arancel.barrio}</TableCell>
-                    <TableCell align="center">{arancel.cuadra}</TableCell>
-                    <TableCell>{arancel.lado}</TableCell>
-                    <TableCell>{`${arancel.loteInicial} - ${arancel.loteFinal}`}</TableCell>
+                  <TableRow key={arancel.codArancel || `${arancel.anio}-${arancel.codDireccion}`} hover>
+                    <TableCell>{arancel.codArancel || 'N/A'}</TableCell>
+                    <TableCell>{arancel.anio}</TableCell>
+                    <TableCell>{arancel.codDireccion}</TableCell>
                     <TableCell align="right">
                       <Chip
-                        label={formatCurrency(arancel.monto)}
+                        label={formatCurrency(arancel.costoArancel)}
                         color="success"
                         size="small"
                         icon={<MoneyIcon />}
@@ -238,12 +234,24 @@ export const ListaArancelesPorDireccion: React.FC = () => {
                     </TableCell>
                     <TableCell align="center">
                       <Tooltip title="Editar">
-                        <IconButton size="small" color="primary">
+                        <IconButton 
+                          size="small" 
+                          color="primary"
+                          onClick={() => {
+                            // Navegar a la página de edición o abrir modal
+                            NotificationService.info('Seleccione el arancel en el formulario de asignación para editarlo');
+                          }}
+                        >
                           <EditIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Eliminar">
-                        <IconButton size="small" color="error">
+                        <IconButton 
+                          size="small" 
+                          color="error"
+                          onClick={() => handleDeleteClick(arancel)}
+                          disabled={!arancel.codArancel}
+                        >
                           <DeleteIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
@@ -253,7 +261,7 @@ export const ListaArancelesPorDireccion: React.FC = () => {
               </TableBody>
             </Table>
           </TableContainer>
-        ) : anioSeleccionado && arancelesPorDireccion.length === 0 ? (
+        ) : anioSeleccionado && aranceles.length === 0 ? (
           <Alert severity="warning">
             No se encontraron aranceles para el año {anioSeleccionado.label}
           </Alert>
@@ -261,7 +269,7 @@ export const ListaArancelesPorDireccion: React.FC = () => {
       </Box>
 
       {/* Paginación */}
-      {anioSeleccionado && arancelesPorDireccion.length > 0 && (
+      {anioSeleccionado && aranceles.length > 0 && (
         <TablePagination
           component="div"
           count={arancelesFiltrados.length}
@@ -269,11 +277,36 @@ export const ListaArancelesPorDireccion: React.FC = () => {
           onPageChange={handleChangePage}
           rowsPerPage={rowsPerPage}
           onRowsPerPageChange={handleChangeRowsPerPage}
-          rowsPerPageOptions={[5, 10, 25, 50]}
-          labelRowsPerPage="Filas por página:"
+          labelRowsPerPage="Filas por página"
           labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
         />
       )}
+
+      {/* Diálogo de confirmación para eliminar */}
+      <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
+        <DialogTitle>Confirmar eliminación</DialogTitle>
+        <DialogContent>
+          <Typography>
+            ¿Está seguro de que desea eliminar este arancel?
+          </Typography>
+          {arancelToDelete && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                Año: {arancelToDelete.anio}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Costo: {formatCurrency(arancelToDelete.costoArancel)}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel}>Cancelar</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+            Eliminar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   );
 };

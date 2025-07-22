@@ -419,60 +419,65 @@ const PredioForm: React.FC<PredioFormProps> = ({
             </Grid>
 
             {/* Segunda fila: Arancel, Botón seleccionar dirección, Dirección seleccionada */}
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12} md={2}>
-                <Controller
-                  name="arancel"
-                  control={control}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      fullWidth
-                      label="Arancel"
-                      type="number"
-                      size="medium"
-                      error={!!errors.arancel}
-                      helperText={errors.arancel?.message}
-                    />
-                  )}
-                />
-              </Grid>
+            {/* Segunda fila: Arancel, Botón seleccionar dirección, Dirección seleccionada */}
+<Grid container spacing={2} sx={{ mt: 1 }}>
+  <Grid item xs={12} md={2}>
+    <Controller
+      name="arancel"
+      control={control}
+      render={({ field }) => (
+        <TextField
+          {...field}
+          fullWidth
+          label="Arancel"
+          type="number"
+          size="medium"
+          error={!!errors.arancel}
+          helperText={errors.arancel?.message}
+        />
+      )}
+    />
+  </Grid>
 
-              <Grid item xs={12} md={2}>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<LocationIcon />}
-                  onClick={() => setShowSelectorDirecciones(true)}
-                  sx={{ height: '56px' }}
-                >
-                  Seleccionar dirección
-                </Button>
-              </Grid>
+  <Grid item xs={12} md={2}>
+    <Button
+      variant="outlined"
+      fullWidth
+      startIcon={<LocationIcon />}
+      onClick={() => setShowSelectorDirecciones(true)}
+      sx={{ height: '56px' }}
+    >
+      Seleccionar dirección
+    </Button>
+  </Grid>
 
-              <Grid item xs={12} md={8}>
-                <TextField
-                  fullWidth
-                  label="Dirección seleccionada"
-                  value={direccionCompleta}
-                  disabled
-                  size="medium"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <LocationIcon />
-                      </InputAdornment>
-                    )
-                  }}
-                  sx={{ 
-                    '& .MuiInputBase-input.Mui-disabled': {
-                      WebkitTextFillColor: 'rgba(0, 0, 0, 0.87)',
-                      color: 'rgba(0, 0, 0, 0.87)'
-                    }
-                  }}
-                />
-              </Grid>
-            </Grid>
+  <Grid item xs={12} md={8}>
+    <TextField
+      fullWidth
+      label="Dirección seleccionada"
+      value={direccionCompleta}
+      disabled
+      size="medium"
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <LocationIcon />
+          </InputAdornment>
+        )
+      }}
+      sx={{ 
+        width: '100%',
+        '& .MuiInputBase-root': {
+          width: '100%'
+        },
+        '& .MuiInputBase-input.Mui-disabled': {
+          WebkitTextFillColor: 'rgba(0, 0, 0, 0.87)',
+          color: 'rgba(0, 0, 0, 0.87)'
+        }
+      }}
+    />
+  </Grid>
+</Grid>
 
             {/* Tercera fila: Tipo predio, Conductor, Uso predio */}
             <Grid container spacing={2} sx={{ mt: 1 }}>
@@ -511,10 +516,6 @@ const PredioForm: React.FC<PredioFormProps> = ({
                   'Seleccione uso'
                 )}
               </Grid>
-            </Grid>
-
-            {/* Cuarta fila: Área de terreno y Número de pisos */}
-            <Grid container spacing={2} sx={{ mt: 1 }}>
               <Grid item xs={12} md={6}>
                 <Controller
                   name="areaTerreno"
@@ -557,6 +558,11 @@ const PredioForm: React.FC<PredioFormProps> = ({
                   )}
                 />
               </Grid>
+            </Grid>
+
+            {/* Cuarta fila: Área de terreno y Número de pisos */}
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              
             </Grid>
 
             {/* Quinta fila: N° Condominios, Estado del Predio, Modo de Declaración */}

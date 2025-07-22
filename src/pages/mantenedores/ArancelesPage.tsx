@@ -6,12 +6,10 @@ import {
   Tabs,
   Tab,
   Paper,
-  Card,
-  CardContent,
   Stack,
-  Chip,
   Alert,
-  Button
+  Button,
+  Container
 } from '@mui/material';
 import { 
   Assignment as AssignmentIcon,
@@ -21,9 +19,9 @@ import {
 } from '@mui/icons-material';
 
 // Importar el MainLayout
-import { MainLayout } from '../../layout';
+import MainLayout from '../../layout/MainLayout';
 
-// Importar los componentes (usa la versión standalone si tienes problemas de importación)
+// Importar los componentes
 import { AsignacionArancelForm } from '../../components/aranceles/AsignacionArancelForm';
 import { ListaArancelesPorDireccion } from '../../components/aranceles/ListaArancelesPorDireccion';
 
@@ -56,151 +54,104 @@ const ArancelesPage: React.FC = () => {
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
+    // Forzar recarga de los componentes
+    window.location.reload();
   };
 
   return (
-    <MainLayout>
-      <Box sx={{ width: '100%' }}>
-        {/* Header */}
-        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-          <Box>
-            <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
-              Gestión de Aranceles
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Configure y administre los aranceles por dirección para cada año fiscal
-            </Typography>
-          </Box>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={handleRefresh}
-            size="small"
-          >
-            Actualizar
-          </Button>
-        </Stack>
-
-        {/* Alert informativo */}
-        <Alert severity="info" icon={<InfoIcon />} sx={{ mb: 3 }}>
-          <Typography variant="body2">
-            Los aranceles se asignan por dirección y año. Cada dirección puede tener un único valor de arancel por año fiscal.
-          </Typography>
-        </Alert>
-
-        {/* Tabs Container */}
-        <Card elevation={0} sx={{ border: 1, borderColor: 'divider' }}>
-          <Tabs
-            value={activeTab}
-            onChange={handleTabChange}
-            indicatorColor="primary"
-            textColor="primary"
-            variant="fullWidth"
-            sx={{
-              borderBottom: 1,
-              borderColor: 'divider',
-              bgcolor: 'grey.50',
-              '& .MuiTab-root': {
-                textTransform: 'none',
-                fontWeight: 600,
-                fontSize: '0.95rem',
-                py: 2.5,
-                '&.Mui-selected': {
-                  bgcolor: 'background.paper',
-                }
-              }
-            }}
-          >
-            <Tab 
-              icon={<AssignmentIcon />} 
-              iconPosition="start" 
-              label="Asignar Aranceles" 
-              id="arancel-tab-0"
-              aria-controls="arancel-tabpanel-0"
-            />
-            <Tab 
-              icon={<ListIcon />} 
-              iconPosition="start" 
-              label="Consultar Aranceles" 
-              id="arancel-tab-1"
-              aria-controls="arancel-tabpanel-1"
-            />
-          </Tabs>
-
-          <CardContent>
-            {/* Tab Panel 1 - Asignación */}
-            <TabPanel value={activeTab} index={0}>
-              <Box key={`asignacion-${refreshKey}`}>
-                <AsignacionArancelForm />
-              </Box>
-            </TabPanel>
-
-            {/* Tab Panel 2 - Lista */}
-            <TabPanel value={activeTab} index={1}>
-              <Box key={`lista-${refreshKey}`}>
-                <ListaArancelesPorDireccion />
-              </Box>
-            </TabPanel>
-          </CardContent>
-        </Card>
-
-        {/* Footer con información */}
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            mt: 4, 
-            p: 3, 
-            bgcolor: 'grey.50',
-            border: 1,
-            borderColor: 'divider',
-            borderRadius: 2
-          }}
-        >
-          <Stack spacing={2}>
-            <Typography variant="h6" gutterBottom>
-              Información Adicional
-            </Typography>
-            
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <Chip 
-                label="Año Fiscal: 2025" 
-                color="primary" 
-                size="small"
-              />
-              <Chip 
-                label="Moneda: Soles (S/)" 
-                color="success" 
-                size="small"
-              />
-              <Chip 
-                label="Actualización: Anual" 
-                color="info" 
-                size="small"
-              />
-            </Box>
-
+    <MainLayout title="Gestión de Aranceles">
+      <Container maxWidth="xl">
+        <Box sx={{ width: '100%', py: 3 }}>
+          {/* Header */}
+          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
             <Box>
-              <Typography variant="subtitle2" gutterBottom fontWeight="bold">
-                Reglas de Negocio:
+              <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
+                Gestión de Aranceles
               </Typography>
-              <Stack spacing={1} sx={{ pl: 2 }}>
-                <Typography variant="body2" color="text.secondary">
-                  • Cada dirección puede tener solo un arancel activo por año
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  • Los aranceles se aplican a todos los predios de la dirección
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  • Los cambios en los aranceles no son retroactivos
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  • El monto mínimo del arancel es S/ 0.00
-                </Typography>
-              </Stack>
+              <Typography variant="body1" color="text.secondary">
+                Configure y administre los aranceles por dirección para cada año fiscal
+              </Typography>
             </Box>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={handleRefresh}
+              size="small"
+            >
+              Actualizar
+            </Button>
           </Stack>
-        </Paper>
-      </Box>
+
+          {/* Alert informativo */}
+          <Alert severity="info" icon={<InfoIcon />} sx={{ mb: 3 }}>
+            <Typography variant="body2">
+              Los aranceles se asignan por dirección y año. Cada dirección puede tener un único valor de arancel por año fiscal.
+              El sistema utiliza formularios tipo form-data y no requiere autenticación.
+            </Typography>
+          </Alert>
+
+          {/* Tabs */}
+          <Paper sx={{ width: '100%' }}>
+            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+              <Tabs 
+                value={activeTab} 
+                onChange={handleTabChange} 
+                aria-label="Tabs de gestión de aranceles"
+                variant="fullWidth"
+              >
+                <Tab 
+                  icon={<AssignmentIcon />} 
+                  iconPosition="start" 
+                  label="Asignación de Aranceles" 
+                  id="arancel-tab-0"
+                  aria-controls="arancel-tabpanel-0"
+                />
+                <Tab 
+                  icon={<ListIcon />} 
+                  iconPosition="start" 
+                  label="Lista de Aranceles" 
+                  id="arancel-tab-1"
+                  aria-controls="arancel-tabpanel-1"
+                />
+              </Tabs>
+            </Box>
+
+            {/* Tab Panels */}
+            <TabPanel value={activeTab} index={0}>
+              <Box sx={{ p: 3 }}>
+                <AsignacionArancelForm key={`asignacion-${refreshKey}`} />
+              </Box>
+            </TabPanel>
+
+            <TabPanel value={activeTab} index={1}>
+              <Box sx={{ p: 3 }}>
+                <ListaArancelesPorDireccion key={`lista-${refreshKey}`} />
+              </Box>
+            </TabPanel>
+          </Paper>
+
+          {/* Información adicional */}
+          <Box sx={{ mt: 3 }}>
+            <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+              <Typography variant="subtitle2" gutterBottom color="primary">
+                Información importante:
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                • Los aranceles se asignan por año y dirección específica
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                • Cada dirección solo puede tener un arancel por año
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                • El costo del arancel se expresa en soles (S/)
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                • Para editar un arancel existente, seleccione el mismo año y dirección
+              </Typography>
+            </Paper>
+          </Box>
+        </Box>
+      </Container>
     </MainLayout>
   );
 };
