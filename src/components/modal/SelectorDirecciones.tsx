@@ -39,10 +39,136 @@ import {
   Apartment as ApartmentIcon,
   Map as MapIcon,
   CheckCircle as CheckCircleIcon,
-  FilterList as FilterIcon
+  FilterList as FilterIcon,
+  Info as InfoIcon
 } from '@mui/icons-material';
-import { NotificationService } from '../utils/Notification';
-import direccionService from '../../services/direccionService';
+
+// Importaciones de servicios
+let NotificationService: any;
+let direccionService: any;
+
+try {
+  NotificationService = require('../utils/Notification').NotificationService;
+} catch (e) {
+  console.warn('NotificationService no disponible');
+  NotificationService = {
+    success: (msg: string) => console.log('Success:', msg),
+    error: (msg: string) => console.error('Error:', msg),
+    info: (msg: string) => console.info('Info:', msg),
+    warning: (msg: string) => console.warn('Warning:', msg)
+  };
+}
+
+try {
+  direccionService = require('../../services/direccionService').default;
+} catch (e) {
+  console.warn('direccionService no disponible, usando servicio temporal');
+  // Servicio temporal que hace la petición directamente
+  direccionService = {
+    obtenerTodos: async () => {
+      try {
+        console.log('🔄 Usando servicio temporal para cargar direcciones...');
+        const url = 'http://192.168.20.160:8080/api/direccion/listarDireccionPorNombreVia?parametrosBusqueda=a&codUsuario=1';
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const responseData = await response.json();
+        console.log('📊 Respuesta directa de la API:', responseData);
+        
+        if (responseData.success && responseData.data) {
+          const data = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+          // Mapear los datos correctamente
+          return data.map((item: any) => ({
+            id: item.codDireccion || 0,
+            codigo: item.codDireccion,
+            codigoSector: item.codSector || 0,
+            codigoBarrio: item.codBarrio || 0,
+            codigoCalle: item.codVia || 0,
+            nombreSector: item.nombreSector || '',
+            nombreBarrio: item.nombreBarrio || '',
+            nombreVia: item.nombreVia || '',
+            nombreTipoVia: item.nombreTipoVia || 'CALLE',
+            cuadra: item.cuadra?.toString() || '',
+            lado: item.lado || 'D',
+            loteInicial: parseInt(item.loteInicial || '1'),
+            loteFinal: parseInt(item.loteFinal || '1'),
+            descripcion: `${item.nombreTipoVia || 'CALLE'} ${item.nombreVia || ''} ${item.cuadra ? `CUADRA ${item.cuadra}` : ''}`.trim(),
+            estado: item.estado || 'ACTIVO'
+          }));
+        }
+        
+        return [];
+      } catch (error) {
+        console.error('Error en servicio temporal:', error);
+        return [];
+      }
+    },
+    buscarPorNombreVia: async (nombreVia: string) => {
+      // Implementación similar a obtenerTodos pero con parámetro de búsqueda
+      return [];
+    }
+  };
+}
+
+// Función para generar datos de ejemplo
+const generarDatosEjemplo = () => {
+  return [
+    {
+      id: 1,
+      codigo: 1,
+      codigoSector: 1,
+      codigoBarrio: 1,
+      codigoCalle: 11,
+      nombreSector: 'Centro',
+      nombreBarrio: 'Los Jardines',
+      nombreVia: 'Secundaria',
+      nombreTipoVia: 'CALLE',
+      cuadra: '17',
+      lado: 'D',
+      loteInicial: 1,
+      loteFinal: 37,
+      descripcion: 'CALLE Secundaria CUADRA 17',
+      estado: 'ACTIVO'
+    },
+    {
+      id: 2,
+      codigo: 2,
+      codigoSector: 1,
+      codigoBarrio: 2,
+      codigoCalle: 14,
+      nombreSector: 'Centro',
+      nombreBarrio: 'Vista Hermosa',
+      nombreVia: 'San Martin',
+      nombreTipoVia: 'PROLONGACION',
+      cuadra: '14',
+      lado: 'D',
+      loteInicial: 1,
+      loteFinal: 27,
+      descripcion: 'PROLONGACION San Martin CUADRA 14',
+      estado: 'ACTIVO'
+    },
+    {
+      id: 3,
+      codigo: 3,
+      codigoSector: 2,
+      codigoBarrio: 3,
+      codigoCalle: 11,
+      nombreSector: 'Este',
+      nombreBarrio: 'El Porvenir',
+      nombreVia: 'Secundaria',
+      nombreTipoVia: 'CALLE',
+      cuadra: '11',
+      lado: 'D',
+      loteInicial: 1,
+      loteFinal: 22,
+      descripcion: 'CALLE Secundaria CUADRA 11',
+      estado: 'ACTIVO'
+    }
+  ];
+};
 
 // Interfaces
 interface DireccionData {
@@ -83,356 +209,228 @@ interface SelectorDireccionesProps {
   onClose: () => void;
   onSelectDireccion: (direccion: Direccion) => void;
   direccionSeleccionada?: Direccion | null;
+  titulo?: string;
 }
 
-/**
- * Modal mejorado para seleccionar direcciones
- */
 const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
   open,
   onClose,
   onSelectDireccion,
-  direccionSeleccionada
+  direccionSeleccionada,
+  titulo = "Seleccionar Dirección"
 }) => {
   const theme = useTheme();
-  
-  // Estados principales
-  const [searchTerm, setSearchTerm] = useState('');
+  const [busqueda, setBusqueda] = useState('');
   const [direcciones, setDirecciones] = useState<DireccionData[]>([]);
+  const [direccionesFiltradas, setDireccionesFiltradas] = useState<DireccionData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedId, setSelectedId] = useState<number | null>(
-    direccionSeleccionada?.id || null
-  );
   const [error, setError] = useState<string | null>(null);
-  
-  // Estados de paginación
+  const [selectedId, setSelectedId] = useState<number | null>(direccionSeleccionada?.id || null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [totalDirecciones, setTotalDirecciones] = useState(0);
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const [usandoDatosLocales, setUsandoDatosLocales] = useState(false);
 
-  // Cargar todas las direcciones al abrir el modal
+  // Cargar direcciones al abrir el modal
   useEffect(() => {
     if (open) {
       cargarDirecciones();
     }
   }, [open]);
 
-  // Cargar todas las direcciones
+  // Aplicar filtro cuando cambie la búsqueda
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      if (busqueda.trim()) {
+        aplicarFiltroBusqueda(busqueda);
+      } else {
+        setDireccionesFiltradas(direcciones);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [busqueda, direcciones]);
+
+  // Cargar direcciones desde el servicio
   const cargarDirecciones = async () => {
+    setLoading(true);
+    setError(null);
+    setUsandoDatosLocales(false);
+    
     try {
-      setLoading(true);
-      setError(null);
+      console.log('🔄 Cargando direcciones desde el servicio...');
       
-      console.log('📍 Cargando direcciones...');
-      
-      // Usar el servicio real si está disponible
-      try {
-        const resultado = await direccionService.obtenerTodos();
-        console.log('✅ Direcciones cargadas:', resultado);
-        setDirecciones(resultado);
-        setTotalDirecciones(resultado.length);
-      } catch (apiError) {
-        console.log('⚠️ Usando datos de ejemplo debido a error en API');
-        // Usar datos de ejemplo si falla la API
-        const direccionesEjemplo = generarDireccionesEjemplo();
-        setDirecciones(direccionesEjemplo);
-        setTotalDirecciones(direccionesEjemplo.length);
+      if (!direccionService) {
+        throw new Error('Servicio de direcciones no disponible');
       }
       
+      const data = await direccionService.obtenerTodos();
+      console.log('📊 Respuesta del servicio:', data);
+      
+      if (data && data.length > 0) {
+        console.log(`✅ ${data.length} direcciones cargadas desde la base de datos`);
+        setDirecciones(data);
+        setDireccionesFiltradas(data);
+        setUsandoDatosLocales(false);
+      } else {
+        console.log('⚠️ No se encontraron direcciones en la base de datos');
+        // Intentar con una búsqueda más amplia
+        const dataAmplia = await direccionService.buscarPorNombreVia('');
+        if (dataAmplia && dataAmplia.length > 0) {
+          console.log(`✅ ${dataAmplia.length} direcciones encontradas con búsqueda amplia`);
+          setDirecciones(dataAmplia);
+          setDireccionesFiltradas(dataAmplia);
+          setUsandoDatosLocales(false);
+        } else {
+          console.log('📌 Usando datos de ejemplo como fallback');
+          cargarDatosDeEjemplo();
+        }
+      }
     } catch (error: any) {
       console.error('❌ Error al cargar direcciones:', error);
-      setError('Error al cargar las direcciones');
-      NotificationService.error('Error al cargar direcciones');
+      setError('No se pudieron cargar las direcciones de la base de datos. Mostrando datos de ejemplo.');
+      cargarDatosDeEjemplo();
     } finally {
       setLoading(false);
     }
   };
 
-  // Buscar direcciones con filtro
-  const buscarDirecciones = async () => {
-    if (!searchTerm.trim()) {
-      // Si no hay término de búsqueda, cargar todas
-      cargarDirecciones();
-      return;
-    }
-
-    if (searchTerm.trim().length < 2) {
-      NotificationService.warning('Ingrese al menos 2 caracteres para buscar');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-      
-      console.log('🔍 Buscando direcciones con:', searchTerm);
-      
-      // Intentar buscar con el servicio real
-      try {
-        const parametros = {
-          nombreVia: searchTerm,
-          parametrosBusqueda: searchTerm
-        };
-        
-        const resultado = await direccionService.buscar(parametros);
-        setDirecciones(resultado);
-        setTotalDirecciones(resultado.length);
-        
-        if (resultado.length === 0) {
-          NotificationService.info('No se encontraron direcciones con ese criterio');
-        }
-      } catch (apiError) {
-        // Si falla la API, filtrar localmente
-        const todasLasDirecciones = await cargarTodasLasDirecciones();
-        const filtradas = filtrarDireccionesLocalmente(todasLasDirecciones, searchTerm);
-        setDirecciones(filtradas);
-        setTotalDirecciones(filtradas.length);
-      }
-      
-    } catch (error: any) {
-      console.error('❌ Error al buscar direcciones:', error);
-      setError('Error al buscar direcciones');
-      NotificationService.error('Error al buscar direcciones');
-    } finally {
-      setLoading(false);
-    }
+  // Cargar datos de ejemplo
+  const cargarDatosDeEjemplo = () => {
+    console.log('📌 Cargando datos de ejemplo...');
+    setUsandoDatosLocales(true);
+    const datosEjemplo = generarDatosEjemplo();
+    setDirecciones(datosEjemplo);
+    setDireccionesFiltradas(datosEjemplo);
   };
 
-  // Filtrar direcciones localmente
-  const filtrarDireccionesLocalmente = (dirs: DireccionData[], termino: string): DireccionData[] => {
-    const term = termino.toLowerCase();
-    return dirs.filter(d => 
-      d.nombreVia?.toLowerCase().includes(term) ||
-      d.nombreBarrio?.toLowerCase().includes(term) ||
-      d.nombreSector?.toLowerCase().includes(term) ||
-      d.descripcion?.toLowerCase().includes(term) ||
-      d.cuadra?.toLowerCase().includes(term)
+  // Aplicar filtro de búsqueda
+  const aplicarFiltroBusqueda = (termino: string) => {
+    const terminoLower = termino.toLowerCase();
+    const filtradas = direcciones.filter(dir => 
+      dir.nombreVia?.toLowerCase().includes(terminoLower) ||
+      dir.nombreBarrio?.toLowerCase().includes(terminoLower) ||
+      dir.nombreSector?.toLowerCase().includes(terminoLower) ||
+      dir.descripcion?.toLowerCase().includes(terminoLower) ||
+      dir.cuadra?.toLowerCase().includes(terminoLower) ||
+      dir.nombreTipoVia?.toLowerCase().includes(terminoLower)
     );
-  };
-
-  // Cargar todas las direcciones (helper)
-  const cargarTodasLasDirecciones = async (): Promise<DireccionData[]> => {
-    try {
-      return await direccionService.obtenerTodos();
-    } catch {
-      return generarDireccionesEjemplo();
-    }
-  };
-
-  // Generar direcciones de ejemplo
-  const generarDireccionesEjemplo = (): DireccionData[] => {
-    const sectores = ['Centro', 'Norte', 'Sur', 'Este', 'Oeste'];
-    const barrios = ['San Juan', 'La Esperanza', 'Los Jardines', 'Vista Hermosa', 'El Porvenir'];
-    const tiposVia = ['AVENIDA', 'CALLE', 'JIRON', 'PASAJE', 'PROLONGACION'];
-    const nombresVia = ['Principal', 'Secundaria', 'Los Olivos', 'Las Flores', 'San Martin', 'Bolivar', 'Grau'];
-    
-    const direcciones: DireccionData[] = [];
-    let id = 1;
-    
-    // Generar 50 direcciones de ejemplo
-    for (let i = 0; i < 50; i++) {
-      const sector = sectores[Math.floor(Math.random() * sectores.length)];
-      const barrio = barrios[Math.floor(Math.random() * barrios.length)];
-      const tipoVia = tiposVia[Math.floor(Math.random() * tiposVia.length)];
-      const nombreVia = nombresVia[Math.floor(Math.random() * nombresVia.length)];
-      const cuadra = Math.floor(Math.random() * 20) + 1;
-      const lado = Math.random() > 0.5 ? 'I' : 'D';
-      
-      direcciones.push({
-        id: id++,
-        codigo: id,
-        codigoSector: Math.floor(Math.random() * 5) + 1,
-        codigoBarrio: Math.floor(Math.random() * 5) + 1,
-        codigoCalle: Math.floor(Math.random() * 10) + 1,
-        nombreSector: sector,
-        nombreBarrio: barrio,
-        nombreTipoVia: tipoVia,
-        nombreVia: nombreVia,
-        cuadra: cuadra.toString(),
-        lado: lado,
-        loteInicial: 1,
-        loteFinal: Math.floor(Math.random() * 50) + 10,
-        descripcion: `${tipoVia} ${nombreVia} CUADRA ${cuadra}`,
-        estado: 'ACTIVO'
-      });
-    }
-    
-    return direcciones;
+    setDireccionesFiltradas(filtradas);
+    setPage(0);
   };
 
   // Manejar selección
   const handleSelect = () => {
-    const direccionSeleccionada = direcciones.find(d => d.id === selectedId);
-    
-    if (!direccionSeleccionada) {
-      NotificationService.warning('Debe seleccionar una dirección');
-      return;
-    }
-
-    // Convertir al formato esperado
-    const direccionFormateada: Direccion = {
-      id: direccionSeleccionada.id,
-      codigo: direccionSeleccionada.codigo?.toString() || direccionSeleccionada.id.toString(),
-      sector: direccionSeleccionada.nombreSector || '',
-      barrio: direccionSeleccionada.nombreBarrio || '',
-      tipoVia: direccionSeleccionada.nombreTipoVia || 'CALLE',
-      nombreVia: direccionSeleccionada.nombreVia || '',
-      cuadra: direccionSeleccionada.cuadra || '0',
-      lado: direccionSeleccionada.lado || '-',
-      loteInicial: direccionSeleccionada.loteInicial || 0,
-      loteFinal: direccionSeleccionada.loteFinal || 0,
-      descripcion: direccionSeleccionada.descripcion || 
-        `${direccionSeleccionada.nombreTipoVia || 'CALLE'} ${direccionSeleccionada.nombreVia || ''} - CUADRA ${direccionSeleccionada.cuadra || '0'}`
-    };
-
-    onSelectDireccion(direccionFormateada);
-    handleClose();
-  };
-
-  // Limpiar y cerrar
-  const handleClose = () => {
-    setSearchTerm('');
-    setPage(0);
-    setSelectedId(null);
-    setError(null);
-    onClose();
-  };
-
-  // Buscar al presionar Enter
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      buscarDirecciones();
+    const direccionSeleccionada = direccionesFiltradas.find(d => d.id === selectedId);
+    if (direccionSeleccionada) {
+      const direccionFormateada: Direccion = {
+        id: direccionSeleccionada.id,
+        codigo: direccionSeleccionada.codigo?.toString() || direccionSeleccionada.id.toString(),
+        sector: direccionSeleccionada.nombreSector || '',
+        barrio: direccionSeleccionada.nombreBarrio || '',
+        tipoVia: direccionSeleccionada.nombreTipoVia || 'CALLE',
+        nombreVia: direccionSeleccionada.nombreVia || '',
+        cuadra: direccionSeleccionada.cuadra || '',
+        lado: direccionSeleccionada.lado || 'D',
+        loteInicial: direccionSeleccionada.loteInicial || 1,
+        loteFinal: direccionSeleccionada.loteFinal || 1,
+        descripcion: direccionSeleccionada.descripcion
+      };
+      onSelectDireccion(direccionFormateada);
+      onClose();
     }
   };
 
-  // Limpiar búsqueda
-  const handleClearSearch = () => {
-    setSearchTerm('');
-    cargarDirecciones();
-  };
-
-  // Manejar cambio de página
+  // Paginación
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
   };
 
-  // Manejar cambio de filas por página
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
-  // Obtener direcciones paginadas
+  // Direcciones paginadas
   const direccionesPaginadas = useMemo(() => {
-    const inicio = page * rowsPerPage;
-    const fin = inicio + rowsPerPage;
-    return direcciones.slice(inicio, fin);
-  }, [direcciones, page, rowsPerPage]);
-
-  // Actualizar selectedId cuando cambia la prop
-  useEffect(() => {
-    setSelectedId(direccionSeleccionada?.id || null);
-  }, [direccionSeleccionada]);
+    const start = page * rowsPerPage;
+    const end = start + rowsPerPage;
+    return direccionesFiltradas.slice(start, end);
+  }, [direccionesFiltradas, page, rowsPerPage]);
 
   return (
     <Dialog 
       open={open} 
-      onClose={handleClose} 
-      maxWidth="lg" 
+      onClose={onClose}
+      maxWidth="lg"
       fullWidth
       TransitionComponent={Fade}
-      PaperProps={{
-        sx: { height: '90vh', display: 'flex', flexDirection: 'column' }
-      }}
+      TransitionProps={{ timeout: 300 }}
     >
       <DialogTitle>
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between' 
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Stack direction="row" alignItems="center" spacing={1}>
             <LocationIcon color="primary" />
-            <Typography variant="h6">Seleccionar Dirección</Typography>
-            {totalDirecciones > 0 && (
-              <Chip 
-                label={`${totalDirecciones} direcciones`} 
-                size="small" 
-                color="primary" 
-                variant="outlined"
-              />
-            )}
-          </Box>
-          <Stack direction="row" spacing={1}>
-            <Tooltip title="Recargar">
-              <IconButton onClick={cargarDirecciones} size="small" disabled={loading}>
-                <RefreshIcon />
-              </IconButton>
-            </Tooltip>
-            <IconButton onClick={handleClose} size="small">
-              <CloseIcon />
-            </IconButton>
+            <Typography variant="h6">{titulo}</Typography>
           </Stack>
-        </Box>
+          <IconButton onClick={onClose} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Stack>
       </DialogTitle>
 
-      <DialogContent dividers sx={{ flex: 1, overflow: 'hidden', p: 0 }}>
-        <Stack sx={{ height: '100%', p: 2 }}>
-          {/* Buscador */}
-          <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-            <TextField
-              fullWidth
-              label="Buscar por nombre de vía"
-              placeholder="Ingrese nombre de calle, avenida, jirón..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyPress={handleKeyPress}
-              size="small"
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-                endAdornment: searchTerm && (
-                  <InputAdornment position="end">
-                    <IconButton size="small" onClick={handleClearSearch}>
-                      <ClearIcon />
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <Button
-              variant="contained"
-              onClick={buscarDirecciones}
-              disabled={loading}
-              startIcon={loading ? <CircularProgress size={20} /> : <SearchIcon />}
-            >
-              Buscar
-            </Button>
-          </Box>
+      <DialogContent dividers>
+        <Stack spacing={2}>
+          {/* Búsqueda */}
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Buscar por nombre de vía, barrio, sector, tipo de vía..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+              endAdornment: busqueda && (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setBusqueda('')}>
+                    <ClearIcon />
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
+          />
 
-          {/* Mensaje de error */}
+          {/* Alertas */}
           {error && (
-            <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
+            <Alert severity="warning" onClose={() => setError(null)}>
               {error}
             </Alert>
           )}
 
-          {/* Tabla de resultados */}
-          <TableContainer 
-            component={Paper} 
-            sx={{ 
-              flex: 1,
-              border: `1px solid ${theme.palette.divider}`,
-              overflow: 'auto'
-            }}
-          >
+          {usandoDatosLocales && (
+            <Alert severity="info" icon={<InfoIcon />}>
+              Mostrando datos de ejemplo. La conexión con el servidor no está disponible.
+            </Alert>
+          )}
+
+          {/* Tabla de direcciones */}
+          <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell padding="checkbox" sx={{ width: 50 }}>
+                  <TableCell padding="checkbox" width={50}>
                     Sel.
                   </TableCell>
                   <TableCell>Sector</TableCell>
@@ -445,81 +443,69 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
               </TableHead>
               <TableBody>
                 {loading ? (
-                  // Skeletons mientras carga
-                  Array.from({ length: 5 }).map((_, index) => (
-                    <TableRow key={`skeleton-${index}`}>
-                      <TableCell colSpan={7}>
-                        <Skeleton variant="rectangular" height={40} />
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <CircularProgress size={30} />
+                    </TableCell>
+                  </TableRow>
                 ) : direccionesPaginadas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
-                      <Stack alignItems="center" spacing={2}>
-                        <LocationIcon sx={{ fontSize: 48, color: 'text.disabled' }} />
-                        <Typography color="text.secondary">
-                          {searchTerm 
-                            ? 'No se encontraron direcciones con ese criterio' 
-                            : 'No hay direcciones disponibles'}
-                        </Typography>
-                      </Stack>
+                    <TableCell colSpan={7} align="center">
+                      <Typography variant="body2" color="text.secondary">
+                        No se encontraron direcciones
+                      </Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
                   direccionesPaginadas.map((direccion) => (
-                    <TableRow
+                    <TableRow 
                       key={direccion.id}
                       hover
-                      selected={selectedId === direccion.id}
                       onClick={() => setSelectedId(direccion.id)}
+                      selected={selectedId === direccion.id}
                       sx={{ cursor: 'pointer' }}
                     >
                       <TableCell padding="checkbox">
                         <Radio
                           checked={selectedId === direccion.id}
-                          value={direccion.id}
                           size="small"
                         />
                       </TableCell>
                       <TableCell>
                         <Chip 
                           label={direccion.nombreSector || 'Sin sector'} 
-                          size="small" 
-                          variant="outlined"
-                          color="primary"
+                          size="small"
+                          icon={<ApartmentIcon />}
+                          sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1) }}
                         />
                       </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {direccion.nombreBarrio || 'Sin barrio'}
-                        </Typography>
-                      </TableCell>
+                      <TableCell>{direccion.nombreBarrio || '-'}</TableCell>
                       <TableCell>
                         <Stack direction="row" spacing={1} alignItems="center">
-                          <MapIcon fontSize="small" color="action" />
-                          <Box>
-                            <Typography variant="body2" fontWeight={500}>
-                              {direccion.nombreTipoVia || 'CALLE'} {direccion.nombreVia || 'Sin nombre'}
-                            </Typography>
-                          </Box>
+                          <Chip 
+                            label={direccion.nombreTipoVia || 'CALLE'} 
+                            size="small"
+                            variant="outlined"
+                            sx={{ fontSize: '0.7rem' }}
+                          />
+                          <Typography variant="body2">
+                            {direccion.nombreVia || '-'}
+                          </Typography>
                         </Stack>
                       </TableCell>
                       <TableCell align="center">
+                        {direccion.cuadra || '-'}
+                      </TableCell>
+                      <TableCell align="center">
                         <Chip 
-                          label={direccion.cuadra || '0'} 
-                          size="small" 
-                          color="default"
+                          label={direccion.lado || 'D'} 
+                          size="small"
+                          color={direccion.lado === 'I' ? 'warning' : 'default'}
                         />
                       </TableCell>
                       <TableCell align="center">
-                        <Typography variant="caption" fontWeight={500}>
-                          {direccion.lado || '-'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center">
                         <Typography variant="caption">
-                          {direccion.loteInicial || 0} - {direccion.loteFinal || 0}
+                          {direccion.loteInicial || 1} - {direccion.loteFinal || 1}
                         </Typography>
                       </TableCell>
                     </TableRow>
@@ -530,29 +516,34 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
           </TableContainer>
 
           {/* Paginación */}
-          {direcciones.length > 0 && (
-            <TablePagination
-              component="div"
-              count={totalDirecciones}
-              page={page}
-              onPageChange={handleChangePage}
-              rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-              rowsPerPageOptions={[5, 10, 25, 50]}
-              labelRowsPerPage="Filas por página:"
-              labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
-            />
-          )}
+          <TablePagination
+            component="div"
+            count={direccionesFiltradas.length}
+            page={page}
+            onPageChange={handleChangePage}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            labelRowsPerPage="Filas por página:"
+            labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+          />
         </Stack>
       </DialogContent>
 
-      <DialogActions sx={{ p: 2 }}>
-        <Button onClick={handleClose} color="inherit">
+      <DialogActions>
+        <Button onClick={onClose} color="inherit">
           Cancelar
         </Button>
-        <Button 
-          onClick={handleSelect} 
+        <Button
+          onClick={cargarDirecciones}
+          startIcon={<RefreshIcon />}
+          disabled={loading}
+        >
+          Recargar
+        </Button>
+        <Button
           variant="contained"
+          onClick={handleSelect}
           disabled={!selectedId}
           startIcon={<CheckCircleIcon />}
         >

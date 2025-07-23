@@ -1,309 +1,243 @@
 // src/hooks/useUIT.ts
-import { useState, useCallback, useEffect } from 'react';
-import { UIT, Alicuota } from '../models/UIT';
-import { uitService } from '../services/uitService';
+import { useState, useEffect, useCallback } from 'react';
+import { uitService, UITData, CreateUITDTO, UpdateUITDTO } from '../services/uitService';
 import { NotificationService } from '../components/utils/Notification';
 
-/**
- * Hook personalizado para la gestión de UIT y cálculos de impuestos
- * Conectado con la API real
- */
-export const useUIT = () => {
+interface UseUITResult {
   // Estados
-  const [uits, setUits] = useState<UIT[]>([]);
-  const [alicuotas, setAlicuotas] = useState<Alicuota[]>([]);
-  const [anioSeleccionado, setAnioSeleccionado] = useState<number | null>(null);
-  const [montoCalculo, setMontoCalculo] = useState<number>(0);
-  const [resultadoCalculo, setResultadoCalculo] = useState<number | null>(null);
+  uits: UITData[];
+  uitSeleccionada: UITData | null;
+  uitVigente: UITData | null;
+  loading: boolean;
+  error: string | null;
+  
+  // Métodos principales
+  cargarUITs: (anio?: number) => Promise<void>;
+  cargarHistorial: (anioInicio?: number, anioFin?: number) => Promise<void>;
+  crearUIT: (datos: CreateUITDTO) => Promise<UITData>;
+  actualizarUIT: (id: number, datos: UpdateUITDTO) => Promise<UITData>;
+  eliminarUIT: (id: number) => Promise<void>;
+  
+  // Métodos de selección
+  seleccionarUIT: (uit: UITData | null) => void;
+  
+  // Métodos de cálculo
+  calcularMontoUIT: (cantidadUITs: number, anio?: number) => Promise<{ valor: number; uitUsado: UITData }>;
+  
+  // Estadísticas
+  obtenerEstadisticas: () => Promise<{
+    total: number;
+    activos: number;
+    inactivos: number;
+    uitActual: UITData | null;
+    promedioUltimos5Anios: number;
+    incrementoAnual: number;
+  }>;
+}
+
+/**
+ * Hook para gestionar valores UIT
+ */
+export const useUIT = (): UseUITResult => {
+  const [uits, setUits] = useState<UITData[]>([]);
+  const [uitSeleccionada, setUitSeleccionada] = useState<UITData | null>(null);
+  const [uitVigente, setUitVigente] = useState<UITData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Lista de años disponibles
-  const [aniosDisponibles, setAniosDisponibles] = useState<{ value: string, label: string }[]>([]);
+  // Cargar UITs por año
+  const cargarUITs = useCallback(async (anio?: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const data = await uitService.listarUITs(anio);
+      setUits(data);
+      
+      // Si no hay año específico, actualizar UIT vigente
+      if (!anio) {
+        const vigente = await uitService.obtenerVigente();
+        setUitVigente(vigente);
+      }
+      
+    } catch (error: any) {
+      console.error('Error cargando UITs:', error);
+      setError(error.message || 'Error al cargar los valores UIT');
+      setUits([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  // Cargar datos iniciales
+  // Cargar historial de UITs
+  const cargarHistorial = useCallback(async (anioInicio?: number, anioFin?: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const data = await uitService.obtenerHistorial(anioInicio, anioFin);
+      setUits(data);
+      
+    } catch (error: any) {
+      console.error('Error cargando historial:', error);
+      setError(error.message || 'Error al cargar el historial');
+      setUits([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Cargar UIT vigente al montar
   useEffect(() => {
-    cargarDatosIniciales();
-  }, []);
-
-  // Cargar todos los datos iniciales
-  const cargarDatosIniciales = async () => {
-    try {
-      setLoading(true);
-      
-      // Cargar UITs, alícuotas y años disponibles en paralelo
-      const [uitsData, alicuotasData, aniosData] = await Promise.all([
-        cargarUIT(),
-        cargarAlicuotas(),
-        cargarAniosDisponibles()
-      ]);
-      
-    } catch (error) {
-      console.error('Error al cargar datos iniciales:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Cargar UIT desde la API
-  const cargarUIT = useCallback(async () => {
-    try {
-      setError(null);
-      
-      const uitsData = await uitService.obtenerTodos();
-      setUits(uitsData);
-      
-      console.log(`✅ [useUIT] ${uitsData.length} UITs cargados`);
-      return uitsData;
-      
-    } catch (err: any) {
-      const mensaje = err.message || 'Error al cargar UITs';
-      setError(mensaje);
-      console.error('❌ [useUIT] Error:', err);
-      return [];
-    }
-  }, []);
-
-  // Cargar alícuotas desde la API
-  const cargarAlicuotas = useCallback(async () => {
-    try {
-      setError(null);
-      
-      const alicuotasData = await uitService.obtenerAlicuotas();
-      setAlicuotas(alicuotasData);
-      
-      console.log(`✅ [useUIT] ${alicuotasData.length} alícuotas cargadas`);
-      return alicuotasData;
-      
-    } catch (err: any) {
-      const mensaje = err.message || 'Error al cargar alícuotas';
-      setError(mensaje);
-      console.error('❌ [useUIT] Error:', err);
-      return [];
-    }
-  }, []);
-
-  // Cargar años disponibles
-  const cargarAniosDisponibles = useCallback(async () => {
-    try {
-      const anios = await uitService.obtenerAniosDisponibles();
-      
-      // Generar lista de años desde 1991 hasta el año actual + 5
-      const currentYear = new Date().getFullYear();
-      const startYear = 1991;
-      const endYear = currentYear + 5;
-      
-      const todosLosAnios = [];
-      for (let year = endYear; year >= startYear; year--) {
-        todosLosAnios.push({
-          value: year.toString(),
-          label: year.toString()
-        });
-      }
-      
-      setAniosDisponibles(todosLosAnios);
-      
-      // Si hay años con datos, seleccionar el más reciente
-      if (anios.length > 0) {
-        setAnioSeleccionado(anios[0]);
-      }
-      
-      return todosLosAnios;
-    } catch (err) {
-      console.error('❌ [useUIT] Error al cargar años:', err);
-      return [];
-    }
-  }, []);
-
-  // Manejar cambio de año
-  const handleAnioChange = useCallback(async (anio: number | null) => {
-    setAnioSeleccionado(anio);
-    setResultadoCalculo(null);
-    
-    if (anio) {
+    const cargarInicial = async () => {
       try {
-        setLoading(true);
-        setError(null);
+        const vigente = await uitService.obtenerVigente();
+        setUitVigente(vigente);
         
-        // Cargar UITs del año seleccionado
-        const uitsAnio = await uitService.obtenerPorAnio(anio);
-        setUits(uitsAnio);
-        
-        console.log(`✅ [useUIT] ${uitsAnio.length} UITs cargados para el año ${anio}`);
-      } catch (err: any) {
-        const mensaje = err.message || `Error al cargar UITs del año ${anio}`;
-        setError(mensaje);
-        console.error('❌ [useUIT] Error:', err);
-      } finally {
-        setLoading(false);
+        // Cargar también los últimos 5 años
+        const anioActual = new Date().getFullYear();
+        await cargarHistorial(anioActual - 5, anioActual);
+      } catch (error) {
+        console.error('Error en carga inicial:', error);
       }
-    }
-  }, []);
+    };
+    
+    cargarInicial();
+  }, [cargarHistorial]);
 
-  // Manejar cambio de monto
-  const handleMontoChange = useCallback((monto: number) => {
-    setMontoCalculo(monto);
-    setResultadoCalculo(null);
-  }, []);
-
-  // Calcular impuesto basado en UIT
-  const calcularImpuesto = useCallback(async () => {
-    if (!anioSeleccionado || montoCalculo <= 0) {
-      setError('Debe seleccionar un año y un monto válido');
-      return;
-    }
-
+  // Crear UIT
+  const crearUIT = useCallback(async (datos: CreateUITDTO): Promise<UITData> => {
     try {
-      setLoading(true);
-      setError(null);
+      const nuevoUIT = await uitService.crearUIT(datos);
       
-      const resultado = await uitService.calcularImpuesto(anioSeleccionado, montoCalculo);
-      setResultadoCalculo(resultado);
+      // Recargar lista
+      await cargarUITs();
       
-      console.log(`✅ [useUIT] Impuesto calculado: S/ ${resultado.toFixed(2)}`);
-      NotificationService.success(`Impuesto calculado: S/ ${resultado.toFixed(2)}`);
+      // Si es del año actual, actualizar UIT vigente
+      if (datos.anio === new Date().getFullYear()) {
+        setUitVigente(nuevoUIT);
+      }
       
-    } catch (err: any) {
-      const mensaje = err.message || 'Error al calcular impuesto';
-      setError(mensaje);
-      NotificationService.error(mensaje);
-      console.error('❌ [useUIT] Error:', err);
-    } finally {
-      setLoading(false);
+      return nuevoUIT;
+    } catch (error: any) {
+      console.error('Error creando UIT:', error);
+      throw error;
     }
-  }, [anioSeleccionado, montoCalculo]);
+  }, [cargarUITs]);
 
-  // Actualizar alícuotas (por ahora es local, se puede implementar API si existe)
-  const actualizarAlicuotas = useCallback(async (nuevasAlicuotas: Alicuota[]) => {
+  // Actualizar UIT
+  const actualizarUIT = useCallback(async (id: number, datos: UpdateUITDTO): Promise<UITData> => {
     try {
-      setLoading(true);
-      setError(null);
+      const uitActualizada = await uitService.actualizarUIT(id, datos);
       
-      // Si hay un endpoint para actualizar alícuotas, usarlo aquí
-      // Por ahora solo actualizamos localmente
-      setAlicuotas(nuevasAlicuotas);
+      // Actualizar en el estado local
+      setUits(prev => prev.map(u => 
+        u.id === id ? uitActualizada : u
+      ));
       
-      NotificationService.success('Alícuotas actualizadas correctamente');
-      console.log('✅ [useUIT] Alícuotas actualizadas');
+      // Si es la seleccionada, actualizar
+      if (uitSeleccionada?.id === id) {
+        setUitSeleccionada(uitActualizada);
+      }
       
-    } catch (err: any) {
-      const mensaje = err.message || 'Error al actualizar alícuotas';
-      setError(mensaje);
-      NotificationService.error(mensaje);
-      console.error('❌ [useUIT] Error:', err);
-    } finally {
-      setLoading(false);
+      // Si es la vigente, actualizar
+      if (uitVigente?.id === id) {
+        setUitVigente(uitActualizada);
+      }
+      
+      return uitActualizada;
+    } catch (error: any) {
+      console.error('Error actualizando UIT:', error);
+      throw error;
     }
-  }, []);
-
-  // Crear nuevo UIT
-  const crearUIT = useCallback(async (datos: {
-    anio: number;
-    valorUit: number;
-    alicuota: number;
-    rangoInicial: number;
-    rangoFinal: number;
-  }) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const nuevoUit = await uitService.crear(datos);
-      
-      // Recargar UITs
-      await cargarUIT();
-      
-      console.log('✅ [useUIT] UIT creado exitosamente');
-      return nuevoUit;
-      
-    } catch (err: any) {
-      const mensaje = err.message || 'Error al crear UIT';
-      setError(mensaje);
-      console.error('❌ [useUIT] Error:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [cargarUIT]);
-
-  // Actualizar UIT existente
-  const actualizarUIT = useCallback(async (id: number, datos: Partial<{
-    anio: number;
-    valorUit: number;
-    alicuota: number;
-    rangoInicial: number;
-    rangoFinal: number;
-  }>) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const uitActualizado = await uitService.actualizar(id, datos);
-      
-      // Recargar UITs
-      await cargarUIT();
-      
-      console.log('✅ [useUIT] UIT actualizado exitosamente');
-      return uitActualizado;
-      
-    } catch (err: any) {
-      const mensaje = err.message || 'Error al actualizar UIT';
-      setError(mensaje);
-      console.error('❌ [useUIT] Error:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [cargarUIT]);
+  }, [uitSeleccionada, uitVigente]);
 
   // Eliminar UIT
   const eliminarUIT = useCallback(async (id: number) => {
     try {
-      setLoading(true);
-      setError(null);
+      await uitService.eliminarUIT(id);
       
-      await uitService.eliminar(id);
+      // Actualizar estado local
+      setUits(prev => prev.map(u => 
+        u.id === id ? { ...u, estado: 'INACTIVO' } : u
+      ));
       
-      // Recargar UITs
-      await cargarUIT();
+      // Si es la seleccionada, limpiar
+      if (uitSeleccionada?.id === id) {
+        setUitSeleccionada(null);
+      }
       
-      console.log('✅ [useUIT] UIT eliminado exitosamente');
-      
-    } catch (err: any) {
-      const mensaje = err.message || 'Error al eliminar UIT';
-      setError(mensaje);
-      console.error('❌ [useUIT] Error:', err);
-      throw err;
-    } finally {
-      setLoading(false);
+    } catch (error: any) {
+      console.error('Error eliminando UIT:', error);
+      throw error;
     }
-  }, [cargarUIT]);
+  }, [uitSeleccionada]);
+
+  // Seleccionar UIT
+  const seleccionarUIT = useCallback((uit: UITData | null) => {
+    setUitSeleccionada(uit);
+  }, []);
+
+  // Calcular monto UIT
+  const calcularMontoUIT = useCallback(async (cantidadUITs: number, anio?: number) => {
+    return await uitService.calcularMontoUIT(cantidadUITs, anio);
+  }, []);
+
+  // Obtener estadísticas
+  const obtenerEstadisticas = useCallback(async () => {
+    return await uitService.obtenerEstadisticas();
+  }, []);
 
   return {
     // Estados
     uits,
-    alicuotas,
-    aniosDisponibles,
-    anioSeleccionado,
-    montoCalculo,
-    resultadoCalculo,
+    uitSeleccionada,
+    uitVigente,
     loading,
     error,
     
-    // Handlers principales
-    handleAnioChange,
-    handleMontoChange,
-    calcularImpuesto,
-    actualizarAlicuotas,
-    
-    // CRUD operations
+    // Métodos
+    cargarUITs,
+    cargarHistorial,
     crearUIT,
     actualizarUIT,
     eliminarUIT,
-    
-    // Refresh
-    recargar: cargarDatosIniciales
+    seleccionarUIT,
+    calcularMontoUIT,
+    obtenerEstadisticas
   };
 };
 
-export default useUIT;
+/**
+ * Hook para obtener un UIT específico por año
+ */
+export const useUITPorAnio = (anio: number) => {
+  const [uit, setUit] = useState<UITData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const cargarUIT = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const data = await uitService.obtenerPorAnio(anio);
+        setUit(data);
+        
+      } catch (error: any) {
+        console.error('Error cargando UIT:', error);
+        setError(error.message || 'Error al cargar el valor UIT');
+        setUit(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (anio) {
+      cargarUIT();
+    }
+  }, [anio]);
+
+  return { uit, loading, error };
+};

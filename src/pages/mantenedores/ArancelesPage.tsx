@@ -23,7 +23,7 @@ import MainLayout from '../../layout/MainLayout';
 
 // Importar los componentes
 import { AsignacionArancelForm } from '../../components/aranceles/AsignacionArancelForm';
-import { ListaArancelesPorDireccion } from '../../components/aranceles/ListaArancelPorDireccion';
+import { ListaArancelesPorDireccion } from '../../components/aranceles/ListaArancelesPorDireccion';
 
 interface TabPanelProps {
   children?: React.ReactNode;

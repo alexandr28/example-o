@@ -6,6 +6,7 @@ import { NotificationService } from '../components/utils/Notification';
 /**
  * IMPORTANTE: Esta API acepta tanto form-data como query parameters.
  * Desde el navegador SOLO podemos usar query parameters en GET.
+ * Las peticiones GET NO requieren autenticación.
  */
 
 export interface ArancelData {
@@ -72,52 +73,52 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
   }
 
   /**
-   * Lista todos los aranceles
-   * IMPORTANTE: Aunque Postman use form-data, desde el navegador
-   * DEBEMOS usar query parameters porque no se puede enviar body en GET
+   * Lista todos los aranceles - NO requiere autenticación
+   * IMPORTANTE: Hacemos la petición directamente sin usar BaseApiService
+   * para evitar que se envíen headers de autenticación
    */
   async listarAranceles(anio?: number): Promise<ArancelData[]> {
     try {
       console.log('🔍 [ArancelService] Listando aranceles para año:', anio);
       
-      // Construir URL con query parameters (única opción desde el navegador)
+      // Construir URL con query parameters
       let url = `${API_CONFIG.baseURL}${this.endpoint}`;
       
-      if (anio) {
-        // Query parameters - funciona igual que form-data pero en la URL
-        const params = new URLSearchParams({
-          codDireccion: '1',
-          anio: anio.toString(),
-          codUsuario: '1'
-        });
-        
-        url += `?${params.toString()}`;
-        console.log('📡 [ArancelService] GET con query params:', url);
-      }
+      // Siempre enviar los parámetros requeridos
+      const params = new URLSearchParams({
+        codDireccion: '1',
+        anio: anio?.toString() || '2025',
+        codUsuario: '1'
+      });
       
+      url += `?${params.toString()}`;
+      console.log('📡 [ArancelService] GET:', url);
+      
+      // Petición directa sin autenticación
       const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
+          // NO incluir Authorization
           // NO incluir Content-Type en GET
         },
-        // NO incluir body en GET (causaría error)
+        // NO incluir body en GET
       });
       
-      console.log('📡 [ArancelService] Status:', response.status);
+      console.log('📡 [ArancelService] Response Status:', response.status);
+      console.log('📡 [ArancelService] Response Headers:', response.headers);
       
       if (!response.ok) {
-        console.error('❌ [ArancelService] Error:', response.status, response.statusText);
+        console.error('❌ [ArancelService] Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries())
+        });
         
-        // Si es 403, el servidor rechaza la petición
-        if (response.status === 403) {
-          console.error('🚫 Error 403: El servidor rechaza la petición. Posibles causas:');
-          console.error('   - CORS no configurado');
-          console.error('   - El servidor espera form-data pero recibe query params');
-          console.error('   - Falta algún header o cookie');
-        }
-        
+        // Intentar leer el body del error
         const errorText = await response.text();
+        console.error('❌ [ArancelService] Error Body:', errorText);
+        
         throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
       }
       
@@ -125,19 +126,20 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
       console.log('✅ [ArancelService] Datos recibidos:', responseData);
       
       if (responseData.success && responseData.data) {
-        return this.normalizeData(Array.isArray(responseData.data) ? responseData.data : [responseData.data]);
+        const data = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+        return this.normalizeData(data);
       }
       
       return [];
       
     } catch (error: any) {
-      console.error('❌ [ArancelService] Error:', error);
+      console.error('❌ [ArancelService] Error completo:', error);
       throw error;
     }
   }
   
   /**
-   * Obtiene un arancel por año y dirección
+   * Obtiene un arancel por año y dirección - NO requiere autenticación
    */
   async obtenerPorAnioYDireccion(anio: number, codDireccion: number): Promise<ArancelData | null> {
     try {
@@ -150,16 +152,20 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
       });
       
       const url = `${API_CONFIG.baseURL}${this.endpoint}?${params.toString()}`;
+      console.log('📡 [ArancelService] GET:', url);
       
+      // Petición directa sin autenticación
       const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Accept': 'application/json'
+          // NO incluir Authorization
         }
       });
       
       if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
       }
       
       const responseData: ArancelResponse = await response.json();
@@ -178,8 +184,7 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
   }
   
   /**
-   * Crea un nuevo arancel
-   * POST sí puede usar FormData
+   * Crea un nuevo arancel - POST puede usar FormData
    */
   async crearArancel(datos: CreateArancelDTO): Promise<ArancelData> {
     try {
@@ -194,10 +199,12 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
       const response = await fetch(`${API_CONFIG.baseURL}${this.endpoint}`, {
         method: 'POST',
         body: formData
+        // NO incluir headers, el navegador los configura automáticamente para FormData
       });
       
       if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
       }
       
       const responseData: ArancelResponse = await response.json();
@@ -218,28 +225,47 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
   }
   
   /**
-   * Actualiza un arancel
+   * Actualiza un arancel - PUT requiere FormData
+   * IMPORTANTE: Usar URL completa para evitar problemas con proxy
    */
   async actualizarArancel(codArancel: number, datos: UpdateArancelDTO): Promise<ArancelData> {
     try {
       console.log('📝 [ArancelService] Actualizando arancel:', codArancel, datos);
       
+      // IMPORTANTE: Usar FormData, no JSON
       const formData = new FormData();
       if (datos.anio !== undefined) formData.append('anio', datos.anio.toString());
       if (datos.codDireccion !== undefined) formData.append('codDireccion', datos.codDireccion.toString());
       if (datos.costoArancel !== undefined) formData.append('costoArancel', datos.costoArancel.toString());
       formData.append('codUsuario', '1');
       
-      const response = await fetch(`${API_CONFIG.baseURL}${this.endpoint}/${codArancel}`, {
+      console.log('📡 [ArancelService] Enviando FormData para actualización');
+      
+      // IMPORTANTE: Usar URL completa
+      const url = `${API_CONFIG.baseURL}${this.endpoint}/${codArancel}`;
+      console.log('🌐 [ArancelService] URL completa:', url);
+      
+      const response = await fetch(url, {
         method: 'PUT',
         body: formData
       });
       
+      console.log('📡 [ArancelService] Response Status:', response.status);
+      console.log('📡 [ArancelService] Response URL:', response.url);
+      
       if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('❌ [ArancelService] Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText,
+          url: response.url
+        });
+        throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
       }
       
       const responseData: ArancelResponse = await response.json();
+      console.log('✅ [ArancelService] Respuesta:', responseData);
       
       if (responseData.success && responseData.data) {
         NotificationService.success('Arancel actualizado exitosamente');
@@ -247,10 +273,11 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
         return this.normalizeData(aranceles)[0];
       }
       
-      throw new Error('Error al actualizar el arancel');
+      throw new Error(responseData.message || 'Error al actualizar el arancel');
       
     } catch (error: any) {
-      console.error('❌ [ArancelService] Error:', error);
+      console.error('❌ [ArancelService] Error completo:', error);
+      console.error('❌ [ArancelService] Stack:', error.stack);
       NotificationService.error(error.message || 'Error al actualizar el arancel');
       throw error;
     }
@@ -271,7 +298,8 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
       });
       
       if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
       }
       
       NotificationService.success('Arancel eliminado exitosamente');
@@ -284,4 +312,9 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
   }
 }
 
-export default ArancelService.getInstance();
+// Exportar la instancia singleton
+const arancelService = ArancelService.getInstance();
+export default arancelService;
+
+// También exportar la clase para tests
+export { ArancelService };

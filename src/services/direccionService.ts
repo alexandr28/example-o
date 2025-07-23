@@ -1,6 +1,6 @@
 // src/services/direccionService.ts
 import BaseApiService from './BaseApiService';
-import { API_CONFIG } from '../config/api.unified.config';
+import { API_CONFIG, buildApiUrl } from '../config/api.unified.config';
 
 /**
  * Interface para los datos de dirección
@@ -62,23 +62,24 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
   
   private constructor() {
     super(
-      '/api/direccion', // Ajustar según tu endpoint real
+      '/api/direccion',
       {
         normalizeItem: (item: any) => ({
+          // Mapeo correcto basado en la respuesta real de la API
           id: item.codDireccion || item.id || 0,
-          codigo: item.codigo || item.codDireccion,
-          codigoSector: item.codigoSector || item.codSector || 0,
-          codigoBarrio: item.codigoBarrio || item.codBarrio || 0,
-          codigoCalle: item.codigoCalle || item.codCalle || item.codVia || 0,
+          codigo: item.codDireccion || item.codigo,
+          codigoSector: item.codSector || item.codigoSector || 0,
+          codigoBarrio: item.codBarrio || item.codigoBarrio || 0,
+          codigoCalle: item.codVia || item.codigoCalle || 0,
           nombreSector: item.nombreSector || '',
           nombreBarrio: item.nombreBarrio || '',
-          nombreCalle: item.nombreCalle || item.nombreVia || '',
-          nombreVia: item.nombreVia || item.nombreCalle || '',
-          nombreTipoVia: item.nombreTipoVia || item.tipoVia || 'CALLE',
+          nombreCalle: item.nombreVia || item.nombreCalle || '',
+          nombreVia: item.nombreVia || '',
+          nombreTipoVia: item.nombreTipoVia || 'CALLE',
           cuadra: item.cuadra?.toString() || '',
-          lado: item.lado || '-',
-          loteInicial: parseInt(item.loteInicial || '0'),
-          loteFinal: parseInt(item.loteFinal || '0'),
+          lado: item.lado || 'D',
+          loteInicial: parseInt(item.loteInicial || '1'),
+          loteFinal: parseInt(item.loteFinal || '1'),
           descripcion: item.descripcion || 
             `${item.nombreTipoVia || 'CALLE'} ${item.nombreVia || ''} ${item.cuadra ? `CUADRA ${item.cuadra}` : ''}`.trim(),
           estado: item.estado || 'ACTIVO',
@@ -88,23 +89,11 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
         }),
         
         validateItem: (item: DireccionData) => {
-          return !!item.id && 
-                 !!item.codigoSector && 
-                 !!item.codigoBarrio && 
-                 !!item.codigoCalle;
-        },
-        
-        transformForCreate: (dto: CreateDireccionDTO) => ({
-          ...dto,
-          codUsuario: dto.codUsuario || API_CONFIG.defaultParams.codUsuario
-        }),
-        
-        transformForUpdate: (dto: UpdateDireccionDTO) => ({
-          ...dto,
-          fechaModificacion: new Date().toISOString()
-        })
+          // Validación mínima para aceptar más registros
+          return !!item.id;
+        }
       },
-      false // requiresAuth = false (tercer parámetro)
+      'direccion_cache'
     );
   }
   
@@ -119,15 +108,106 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
   }
   
   /**
+   * Sobrescribe el método getAll para manejar correctamente las peticiones sin autenticación
+   */
+  async getAll(params?: any): Promise<DireccionData[]> {
+    try {
+      console.log('🔍 [DireccionService] Obteniendo todas las direcciones');
+      
+      // Construir URL con query parameters
+      const queryParams = new URLSearchParams();
+      
+      // Agregar parámetros requeridos para form-data
+      queryParams.append('parametrosBusqueda', params?.parametrosBusqueda || 'a');
+      queryParams.append('codUsuario', '1');
+      
+      // Agregar otros parámetros si existen
+      if (params?.estado) {
+        queryParams.append('estado', params.estado);
+      }
+      
+      const url = `${API_CONFIG.baseURL}${this.endpoint}/listarDireccionPorNombreVia?${queryParams.toString()}`;
+      console.log('📡 [DireccionService] GET:', url);
+      
+      // Petición directa sin autenticación
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+          // NO incluir Authorization
+          // NO incluir Content-Type en GET
+        }
+      });
+      
+      console.log('📡 [DireccionService] Response Status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [DireccionService] Error Response:', errorText);
+        throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('✅ [DireccionService] Datos recibidos:', responseData);
+      
+      // Manejar la estructura de respuesta
+      if (responseData.success && responseData.data) {
+        const data = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+        console.log('📊 [DireccionService] Normalizando', data.length, 'direcciones');
+        
+        // Normalizar los datos según la estructura real de la API
+        const direccionesNormalizadas = data.map((item: any) => ({
+          id: item.codDireccion || 0,
+          codigo: item.codDireccion || 0,
+          codigoSector: item.codSector || 0,
+          codigoBarrio: item.codBarrio || 0,
+          codigoCalle: item.codVia || 0,
+          nombreSector: item.nombreSector || '',
+          nombreBarrio: item.nombreBarrio || '',
+          nombreCalle: item.nombreVia || '',
+          nombreVia: item.nombreVia || '',
+          nombreTipoVia: item.nombreTipoVia || 'CALLE',
+          cuadra: item.cuadra?.toString() || '',
+          lado: item.lado || '-',
+          loteInicial: parseInt(item.loteInicial || '0'),
+          loteFinal: parseInt(item.loteFinal || '0'),
+          descripcion: `${item.nombreTipoVia || 'CALLE'} ${item.nombreVia || ''} ${item.cuadra ? `CUADRA ${item.cuadra}` : ''}`.trim(),
+          estado: 'ACTIVO'
+        }));
+        
+        return direccionesNormalizadas;
+      }
+      
+      // Si la respuesta es directamente un array
+      if (Array.isArray(responseData)) {
+        return this.normalizeData(responseData);
+      }
+      
+      return [];
+      
+    } catch (error: any) {
+      console.error('❌ [DireccionService] Error completo:', error);
+      // NO lanzar el error, devolver array vacío para que el componente use datos de ejemplo
+      return [];
+    }
+  }
+  
+  /**
    * Obtiene todas las direcciones activas
    */
   async obtenerTodos(): Promise<DireccionData[]> {
     try {
-      const params = { estado: 'ACTIVO' };
-      return await this.getAll(params);
+      const params = { 
+        estado: 'ACTIVO',
+        parametrosBusqueda: 'a' // Para obtener todas
+      };
+      const direcciones = await this.getAll(params);
+      console.log(`✅ [DireccionService] obtenerTodos: ${direcciones.length} direcciones`);
+      return direcciones;
     } catch (error) {
       console.error('Error al obtener direcciones:', error);
-      throw error;
+      // Devolver array vacío en caso de error
+      return [];
     }
   }
   
@@ -136,10 +216,41 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
    */
   async buscar(params: BusquedaDireccionParams): Promise<DireccionData[]> {
     try {
-      return await this.search(params);
+      console.log('🔍 [DireccionService] Buscando direcciones:', params);
+      
+      const queryParams = new URLSearchParams();
+      queryParams.append('parametrosBusqueda', params.parametrosBusqueda || params.nombreVia || 'a');
+      queryParams.append('codUsuario', '1');
+      
+      if (params.estado) {
+        queryParams.append('estado', params.estado);
+      }
+      
+      const url = `${API_CONFIG.baseURL}${this.endpoint}/listarDireccionPorNombreVia?${queryParams.toString()}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      const responseData = await response.json();
+      
+      if (responseData.success && responseData.data) {
+        const data = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+        return this.normalizeData(data);
+      }
+      
+      return [];
+      
     } catch (error) {
       console.error('Error al buscar direcciones:', error);
-      throw error;
+      return [];
     }
   }
   
@@ -148,54 +259,20 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
    */
   async buscarPorNombreVia(nombreVia: string): Promise<DireccionData[]> {
     try {
-      if (!nombreVia || nombreVia.length < 2) {
-        throw new Error('El término de búsqueda debe tener al menos 2 caracteres');
+      if (!nombreVia || nombreVia.length < 1) {
+        // Si no hay término de búsqueda, devolver todas
+        return await this.obtenerTodos();
       }
       
       const params: BusquedaDireccionParams = {
-        nombreVia: nombreVia.trim(),
         parametrosBusqueda: nombreVia.trim(),
         estado: 'ACTIVO'
       };
       
-      return await this.search(params);
+      return await this.buscar(params);
     } catch (error) {
       console.error('Error al buscar por nombre de vía:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Obtiene direcciones por sector
-   */
-  async obtenerPorSector(codigoSector: number): Promise<DireccionData[]> {
-    try {
-      const params: BusquedaDireccionParams = {
-        codigoSector,
-        estado: 'ACTIVO'
-      };
-      
-      return await this.search(params);
-    } catch (error) {
-      console.error('Error al obtener direcciones por sector:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Obtiene direcciones por barrio
-   */
-  async obtenerPorBarrio(codigoBarrio: number): Promise<DireccionData[]> {
-    try {
-      const params: BusquedaDireccionParams = {
-        codigoBarrio,
-        estado: 'ACTIVO'
-      };
-      
-      return await this.search(params);
-    } catch (error) {
-      console.error('Error al obtener direcciones por barrio:', error);
-      throw error;
+      return [];
     }
   }
   
@@ -215,7 +292,37 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
         }
       }
       
-      return await this.create(datos);
+      // Usar FormData para POST
+      const formData = new FormData();
+      formData.append('codigoSector', datos.codigoSector.toString());
+      formData.append('codigoBarrio', datos.codigoBarrio.toString());
+      formData.append('codigoCalle', datos.codigoCalle.toString());
+      if (datos.cuadra) formData.append('cuadra', datos.cuadra);
+      if (datos.lado) formData.append('lado', datos.lado);
+      if (datos.loteInicial) formData.append('loteInicial', datos.loteInicial.toString());
+      if (datos.loteFinal) formData.append('loteFinal', datos.loteFinal.toString());
+      if (datos.descripcion) formData.append('descripcion', datos.descripcion);
+      formData.append('codUsuario', '1');
+      
+      const response = await fetch(`${API_CONFIG.baseURL}${this.endpoint}`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
+      }
+      
+      const responseData = await response.json();
+      
+      if (responseData.success && responseData.data) {
+        const direcciones = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+        return this.normalizeData(direcciones)[0];
+      }
+      
+      throw new Error('Error al crear la dirección');
+      
     } catch (error) {
       console.error('Error al crear dirección:', error);
       throw error;
@@ -233,7 +340,38 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
         }
       }
       
-      return await this.update(id, datos);
+      // Usar FormData para PUT
+      const formData = new FormData();
+      if (datos.codigoSector) formData.append('codigoSector', datos.codigoSector.toString());
+      if (datos.codigoBarrio) formData.append('codigoBarrio', datos.codigoBarrio.toString());
+      if (datos.codigoCalle) formData.append('codigoCalle', datos.codigoCalle.toString());
+      if (datos.cuadra) formData.append('cuadra', datos.cuadra);
+      if (datos.lado) formData.append('lado', datos.lado);
+      if (datos.loteInicial) formData.append('loteInicial', datos.loteInicial.toString());
+      if (datos.loteFinal) formData.append('loteFinal', datos.loteFinal.toString());
+      if (datos.descripcion) formData.append('descripcion', datos.descripcion);
+      if (datos.estado) formData.append('estado', datos.estado);
+      formData.append('codUsuario', '1');
+      
+      const response = await fetch(`${API_CONFIG.baseURL}${this.endpoint}/${id}`, {
+        method: 'PUT',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
+      }
+      
+      const responseData = await response.json();
+      
+      if (responseData.success && responseData.data) {
+        const direcciones = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+        return this.normalizeData(direcciones)[0];
+      }
+      
+      throw new Error('Error al actualizar la dirección');
+      
     } catch (error) {
       console.error('Error al actualizar dirección:', error);
       throw error;
@@ -245,7 +383,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
    */
   async eliminarDireccion(id: number): Promise<void> {
     try {
-      await this.update(id, {
+      await this.actualizarDireccion(id, {
         estado: 'INACTIVO'
       });
     } catch (error) {

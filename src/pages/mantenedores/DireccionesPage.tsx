@@ -20,13 +20,12 @@ import {
   Search as SearchIcon
 } from '@mui/icons-material';
 import { MainLayout } from '../../layout';
-import { Breadcrumb } from '../../components';
+import { Breadcrumb, NotificationContainer } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useDirecciones } from '../../hooks/useDirecciones';
 import DireccionFormMUI from '../../components/direcciones/DireccionForm';
 import DireccionListMUI from '../../components/direcciones/DireccionList';
 import { NotificationService } from '../../components/utils/Notification';
-//import { NotificationContainer } from '../../components/utils/Notification';
 
 const DireccionesPage: React.FC = () => {
   const {
@@ -35,8 +34,6 @@ const DireccionesPage: React.FC = () => {
     direccionSeleccionada,
     loading,
     error,
-    searchTerm,
-    modoEdicion,
     
     // Dependencias
     sectores,
@@ -50,27 +47,24 @@ const DireccionesPage: React.FC = () => {
     
     // Funciones principales
     cargarDirecciones,
-    buscarDirecciones,
-    seleccionarDireccion,
-    limpiarSeleccion,
-    guardarDireccion,
+    setDireccionSeleccionada,
+    crearDireccion,
+    actualizarDireccion,
     eliminarDireccion,
-    setModoEdicion,
-    buscarPorNombreVia,
     
-    // Filtros
-    filtrarBarriosPorSector,
-    filtrarCallesPorBarrio,
+    // Handlers
+    handleSectorChange,
+    handleBarrioChange,
     
-    // Acciones adicionales
-    cargarDependencias,
-    refrescar,
-    limpiarError
+    // Funciones de carga
+    cargarSectores,
+    cargarBarrios,
+    cargarCalles
   } = useDirecciones();
 
   // Estados locales
+  const [modoEdicion, setModoEdicion] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [showSearchForm, setShowSearchForm] = useState(false);
 
   // Migas de pan
   const breadcrumbItems: BreadcrumbItem[] = useMemo(() => [
@@ -97,26 +91,28 @@ const DireccionesPage: React.FC = () => {
       setModoEdicion(true);
       showMessage('Modo edición activado', 'success');
     }
-  }, [direccionSeleccionada, setModoEdicion, showMessage]);
+  }, [direccionSeleccionada, showMessage]);
 
   // Manejo de nuevo
   const handleNuevo = useCallback(() => {
-    limpiarSeleccion();
+    setDireccionSeleccionada(null);
     setModoEdicion(false);
-    limpiarError();
     setSuccessMessage(null);
-  }, [limpiarSeleccion, setModoEdicion, limpiarError]);
+  }, [setDireccionSeleccionada]);
 
   // Manejo de guardado
   const handleGuardar = useCallback(async (data: any) => {
     try {
-      await guardarDireccion(data);
-      showMessage(
-        modoEdicion ? '✅ Dirección actualizada exitosamente' : '✅ Dirección creada exitosamente',
-        'success'
-      );
+      if (modoEdicion && direccionSeleccionada) {
+        await actualizarDireccion(direccionSeleccionada.id, data);
+        showMessage('✅ Dirección actualizada exitosamente', 'success');
+      } else {
+        await crearDireccion(data);
+        showMessage('✅ Dirección creada exitosamente', 'success');
+      }
+      
       setModoEdicion(false);
-      await refrescar();
+      await cargarDirecciones();
     } catch (error: any) {
       console.error('❌ [DireccionesPage] Error al guardar:', error);
       showMessage(
@@ -124,7 +120,7 @@ const DireccionesPage: React.FC = () => {
         'error'
       );
     }
-  }, [guardarDireccion, modoEdicion, refrescar, showMessage, setModoEdicion]);
+  }, [modoEdicion, direccionSeleccionada, actualizarDireccion, crearDireccion, cargarDirecciones, showMessage]);
 
   // Manejo de eliminación
   const handleEliminar = useCallback(async (id: number) => {
@@ -132,7 +128,7 @@ const DireccionesPage: React.FC = () => {
       try {
         await eliminarDireccion(id);
         showMessage('✅ Dirección eliminada exitosamente', 'success');
-        await refrescar();
+        await cargarDirecciones();
       } catch (error: any) {
         console.error('❌ [DireccionesPage] Error al eliminar:', error);
         showMessage(
@@ -141,98 +137,78 @@ const DireccionesPage: React.FC = () => {
         );
       }
     }
-  }, [eliminarDireccion, refrescar, showMessage]);
+  }, [eliminarDireccion, cargarDirecciones, showMessage]);
 
   // Manejo de búsqueda
   const handleBuscar = useCallback(async (searchValue: string) => {
     if (searchValue.trim()) {
-      await buscarPorNombreVia(searchValue);
+      // Por ahora solo filtramos localmente
+      // TODO: Implementar búsqueda en el servidor cuando esté disponible
+      console.log('Buscando:', searchValue);
     } else {
       await cargarDirecciones();
     }
-  }, [buscarPorNombreVia, cargarDirecciones]);
+  }, [cargarDirecciones]);
 
   // Recargar datos
   const handleRecargar = useCallback(async () => {
-    limpiarError();
     setSuccessMessage(null);
     await Promise.all([
       cargarDirecciones(),
-      cargarDependencias()
+      cargarSectores(),
+      cargarBarrios(),
+      cargarCalles()
     ]);
     showMessage('✅ Datos recargados', 'success', 2000);
-  }, [cargarDirecciones, cargarDependencias, limpiarError, showMessage]);
+  }, [cargarDirecciones, cargarSectores, cargarBarrios, cargarCalles, showMessage]);
 
-  // Estadísticas
-  const estadisticas = useMemo(() => {
-    const activas = direcciones.filter(d => d.estado === 'ACTIVO').length;
-    const inactivas = direcciones.filter(d => d.estado !== 'ACTIVO').length;
-    const porSector = direcciones.reduce((acc, dir) => {
-      const sector = dir.nombreSector || 'Sin sector';
-      acc[sector] = (acc[sector] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    
-    return { total: direcciones.length, activas, inactivas, porSector };
-  }, [direcciones]);
+  // Función para manejar la selección desde la lista
+  const handleSeleccionarDireccion = useCallback((direccion: any) => {
+    setDireccionSeleccionada(direccion);
+    setModoEdicion(true);
+  }, [setDireccionSeleccionada]);
 
   return (
     <MainLayout title="Gestión de Direcciones">
       <Box sx={{ p: 3 }}>
-        {/* Navegación de migas de pan */}
+        {/* Breadcrumb */}
         <Box sx={{ mb: 3 }}>
           <Breadcrumb items={breadcrumbItems} />
         </Box>
 
+        {/* Header */}
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          justifyContent="space-between"
+          alignItems={{ xs: 'stretch', sm: 'center' }}
+          spacing={2}
+          sx={{ mb: 3 }}
+        >
+          <Box>
+            <Typography variant="h4" component="h1" gutterBottom>
+              Gestión de Direcciones
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Administre las direcciones del sistema
+            </Typography>
+          </Box>
+
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={handleRecargar}
+            disabled={loading}
+          >
+            Recargar
+          </Button>
+        </Stack>
+
         {/* Progress bar */}
-        {(loading || loadingSectores || loadingBarrios || loadingCalles) && (
+        {loading && (
           <Box sx={{ width: '100%', mb: 2 }}>
             <LinearProgress />
           </Box>
         )}
-
-        {/* Header con estadísticas */}
-        <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Box>
-              <Typography variant="h5" component="h1" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <LocationIcon color="primary" />
-                Direcciones
-              </Typography>
-              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                <Chip label={`Total: ${estadisticas.total}`} size="small" color="primary" />
-                <Chip label={`Activas: ${estadisticas.activas}`} size="small" color="success" />
-                <Chip label={`Inactivas: ${estadisticas.inactivas}`} size="small" color="error" />
-              </Stack>
-            </Box>
-            
-            <Stack direction="row" spacing={2}>
-              <Button
-                variant="outlined"
-                startIcon={<SearchIcon />}
-                onClick={() => setShowSearchForm(!showSearchForm)}
-              >
-                {showSearchForm ? 'Ocultar búsqueda' : 'Búsqueda avanzada'}
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<RefreshIcon />}
-                onClick={handleRecargar}
-                disabled={loading}
-              >
-                Recargar
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={handleNuevo}
-                disabled={loading}
-              >
-                Nueva Dirección
-              </Button>
-            </Stack>
-          </Stack>
-        </Paper>
 
         {/* Mensaje de éxito */}
         <Collapse in={!!successMessage}>
@@ -250,39 +226,17 @@ const DireccionesPage: React.FC = () => {
           <Alert 
             severity="error" 
             sx={{ mb: 2 }}
-            onClose={limpiarError}
+            onClose={() => {}}
           >
             <AlertTitle>Error</AlertTitle>
             {error}
           </Alert>
         </Collapse>
 
-        {/* Alertas de dependencias */}
-        {sectores.length === 0 && !loadingSectores && (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            <AlertTitle>Sin sectores disponibles</AlertTitle>
-            No hay sectores registrados. Por favor, registre sectores primero.
-          </Alert>
-        )}
-
-        {barrios.length === 0 && !loadingBarrios && sectores.length > 0 && (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            <AlertTitle>Sin barrios disponibles</AlertTitle>
-            No hay barrios registrados. Por favor, registre barrios primero.
-          </Alert>
-        )}
-
-        {calles.length === 0 && !loadingCalles && barrios.length > 0 && (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            <AlertTitle>Sin calles disponibles</AlertTitle>
-            No hay calles registradas. Por favor, registre calles primero.
-          </Alert>
-        )}
-
-        {/* Layout principal */}
+        {/* Grid principal */}
         <Grid container spacing={3}>
           {/* Formulario */}
-          <Grid item xs={12}>
+          <Grid item xs={12} lg={5}>
             <DireccionFormMUI
               direccionSeleccionada={direccionSeleccionada}
               sectores={sectores}
@@ -293,8 +247,8 @@ const DireccionesPage: React.FC = () => {
               onSubmit={handleGuardar}
               onNuevo={handleNuevo}
               onEditar={handleEditar}
-              onSectorChange={filtrarBarriosPorSector}
-              onBarrioChange={filtrarCallesPorBarrio}
+              onSectorChange={handleSectorChange}
+              onBarrioChange={handleBarrioChange}
               loading={loading}
               loadingSectores={loadingSectores}
               loadingBarrios={loadingBarrios}
@@ -304,25 +258,20 @@ const DireccionesPage: React.FC = () => {
           </Grid>
 
           {/* Lista */}
-          <Grid item xs={12}>
+          <Grid item xs={12} lg={7}>
             <DireccionListMUI
               direcciones={direcciones}
-              direccionSeleccionada={direccionSeleccionada}
-              onSelectDireccion={seleccionarDireccion}
-              onEditDireccion={(direccion) => {
-                seleccionarDireccion(direccion);
-                handleEditar();
-              }}
-              onDeleteDireccion={handleEliminar}
+              onSeleccionar={handleSeleccionarDireccion}
+              onEliminar={handleEliminar}
+              onBuscar={handleBuscar}
               loading={loading}
-              onSearch={handleBuscar}
-              searchTerm={searchTerm}
+              direccionSeleccionada={direccionSeleccionada}
             />
           </Grid>
         </Grid>
 
         {/* Contenedor de notificaciones */}
-       
+        <NotificationContainer />
       </Box>
     </MainLayout>
   );
