@@ -4,276 +4,343 @@ import {
   Paper,
   Box,
   Typography,
-  TextField,
-  Button,
-  Stack,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  IconButton,
+  Stack,
   Chip,
   useTheme,
   alpha,
-  InputAdornment,
   Tooltip,
+  Button,
+  TextField,
+  InputAdornment,
   Collapse,
-  Alert
+  Alert,
+  IconButton,
+  Skeleton,
+  Grid
 } from '@mui/material';
 import {
-  Edit as EditIcon,
-  Save as SaveIcon,
-  Cancel as CancelIcon,
-  Percent as PercentIcon,
   TrendingUp as TrendingUpIcon,
-  AccountBalance as AccountBalanceIcon
+  AttachMoney as MoneyIcon,
+  Percent as PercentIcon,
+  Info as InfoIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  Calculate as CalculateIcon
 } from '@mui/icons-material';
-import { Alicuota } from '../../models/UIT';
+import { useUIT } from '../../hooks/useUIT';
+import { UITData } from '../../services/uitService';
 
 interface AlicuotaProps {
-  alicuotas: Alicuota[];
-  onActualizarAlicuotas?: (alicuotas: Alicuota[]) => void;
-  editable?: boolean;
-  loading?: boolean;
+  anio?: number;
 }
 
 /**
- * Componente para mostrar y editar las alícuotas (rangos y tasas)
+ * Componente para mostrar las alícuotas (rangos y tasas) del impuesto predial
  */
-const AlicuotaComponent: React.FC<AlicuotaProps> = ({
-  alicuotas,
-  onActualizarAlicuotas,
-  editable = false,
-  loading = false
+const Alicuota: React.FC<AlicuotaProps> = ({ 
+  anio = new Date().getFullYear() 
 }) => {
   const theme = useTheme();
-  const [editandoAlicuotas, setEditandoAlicuotas] = useState<Alicuota[]>(alicuotas);
-  const [modoEdicion, setModoEdicion] = useState(false);
-  const [alicuotasModificadas, setAlicuotasModificadas] = useState(false);
+  const { uits, loading, cargarUITs } = useUIT();
+  const [expandido, setExpandido] = useState(true);
+  const [valorPrueba, setValorPrueba] = useState('');
+  const [resultadoCalculo, setResultadoCalculo] = useState<{
+    baseImponible: number;
+    impuesto: number;
+    rangoAplicado: number;
+  } | null>(null);
 
-  // Actualizar cuando cambien las alícuotas externas
+  // Cargar UITs del año si no están cargadas
   useEffect(() => {
-    if (!modoEdicion) {
-      setEditandoAlicuotas(alicuotas);
+    if (!uits || uits.length === 0) {
+      cargarUITs();
     }
-  }, [alicuotas, modoEdicion]);
+  }, [uits, cargarUITs]);
 
-  // Manejar cambio en una alícuota
-  const handleAlicuotaChange = (id: number | undefined, value: string) => {
-    if (modoEdicion && id !== undefined) {
-      const tasa = parseFloat(value) || 0;
-      const nuevasAlicuotas = editandoAlicuotas.map(a => 
-        a.id === id ? { ...a, tasa } : a
-      );
-      setEditandoAlicuotas(nuevasAlicuotas);
-      setAlicuotasModificadas(true);
+  // Filtrar UITs por año y ordenar por rango
+  const alicuotas = uits
+    .filter(uit => uit.anio === anio && uit.rangoInicial !== undefined)
+    .sort((a, b) => (a.rangoInicial || 0) - (b.rangoInicial || 0));
+
+  // Obtener UIT vigente para el año
+  const uitVigente = uits.find(uit => uit.anio === anio && !uit.rangoInicial);
+  const valorUIT = uitVigente?.valor || 0;
+
+  // Formatear moneda
+  const formatCurrency = (value: number): string => {
+    return new Intl.NumberFormat('es-PE', {
+      style: 'currency',
+      currency: 'PEN',
+      minimumFractionDigits: 2
+    }).format(value);
+  };
+
+  // Formatear porcentaje
+  const formatPercentage = (value: number): string => {
+    return `${value.toFixed(2)}%`;
+  };
+
+  // Calcular impuesto según base imponible
+  const calcularImpuesto = () => {
+    if (!valorPrueba || !valorUIT) return;
+
+    const base = parseFloat(valorPrueba);
+    if (isNaN(base) || base <= 0) {
+      setResultadoCalculo(null);
+      return;
     }
-  };
 
-  // Activar modo edición
-  const activarEdicion = () => {
-    setEditandoAlicuotas([...alicuotas]);
-    setModoEdicion(true);
-    setAlicuotasModificadas(false);
-  };
+    // Convertir base imponible a UITs
+    const baseEnUITs = base / valorUIT;
+    
+    // Encontrar el rango aplicable
+    const rangoAplicable = alicuotas.find(a => {
+      const inicio = a.rangoInicial || 0;
+      const fin = a.rangoFinal || Infinity;
+      return baseEnUITs >= inicio && baseEnUITs <= fin;
+    });
 
-  // Guardar cambios
-  const guardarCambios = () => {
-    if (onActualizarAlicuotas) {
-      onActualizarAlicuotas(editandoAlicuotas);
+    if (!rangoAplicable) {
+      setResultadoCalculo(null);
+      return;
     }
-    setModoEdicion(false);
-    setAlicuotasModificadas(false);
+
+    // Calcular impuesto
+    const impuesto = base * (rangoAplicable.alicuota / 100);
+
+    setResultadoCalculo({
+      baseImponible: base,
+      impuesto,
+      rangoAplicado: rangoAplicable.alicuota
+    });
   };
 
-  // Cancelar edición
-  const cancelarEdicion = () => {
-    setEditandoAlicuotas([...alicuotas]);
-    setModoEdicion(false);
-    setAlicuotasModificadas(false);
+  // Obtener color según la alícuota
+  const getAlicuotaColor = (alicuota: number): 'success' | 'warning' | 'error' => {
+    if (alicuota <= 0.2) return 'success';
+    if (alicuota <= 0.6) return 'warning';
+    return 'error';
   };
 
-  // Obtener color según el valor de la tasa
-  const getTasaColor = (tasa: number) => {
-    if (tasa <= 0.2) return theme.palette.success.main;
-    if (tasa <= 0.6) return theme.palette.warning.main;
-    return theme.palette.error.main;
+  // Obtener descripción del rango
+  const getRangoDescripcion = (inicio?: number, fin?: number): string => {
+    if (!inicio && !fin) return 'Todos los valores';
+    if (!fin || fin === 999999) return `Más de ${inicio} UIT`;
+    return `De ${inicio} a ${fin} UIT`;
   };
+
+  if (loading) {
+    return (
+      <Paper elevation={1} sx={{ p: 3 }}>
+        <Skeleton variant="rectangular" height={400} />
+      </Paper>
+    );
+  }
 
   return (
     <Paper 
       elevation={1}
       sx={{ 
         overflow: 'hidden',
-        border: `1px solid ${theme.palette.divider}`,
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column'
+        border: `1px solid ${theme.palette.divider}`
       }}
     >
+      {/* Header */}
       <Box 
         sx={{ 
           px: 3, 
           py: 2, 
-          bgcolor: alpha(theme.palette.primary.main, 0.04),
-          borderBottom: `1px solid ${theme.palette.divider}`
+          bgcolor: alpha(theme.palette.info.main, 0.04),
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          cursor: 'pointer'
         }}
+        onClick={() => setExpandido(!expandido)}
       >
         <Stack direction="row" alignItems="center" justifyContent="space-between">
           <Stack direction="row" alignItems="center" spacing={1}>
-            <TrendingUpIcon color="primary" fontSize="small" />
+            <PercentIcon color="info" />
             <Typography variant="h6" fontWeight={500}>
-              Lista de rangos y tasas
+              Alícuotas del Impuesto Predial - {anio}
             </Typography>
+            {uitVigente && (
+              <Chip 
+                label={`UIT: ${formatCurrency(valorUIT)}`}
+                size="small"
+                color="primary"
+                variant="outlined"
+              />
+            )}
           </Stack>
-          
-          {editable && !modoEdicion && (
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<EditIcon />}
-              onClick={activarEdicion}
-              disabled={loading}
-            >
-              Cambiar tasas
-            </Button>
-          )}
+          <IconButton size="small">
+            {expandido ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          </IconButton>
         </Stack>
       </Box>
-      
-      <Box sx={{ p: 3, flexGrow: 1, overflow: 'auto' }}>
-        {/* Mensaje informativo cuando está en modo edición */}
-        <Collapse in={modoEdicion}>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            Modifique las tasas y haga clic en "Guardar" para aplicar los cambios
-          </Alert>
-        </Collapse>
 
-        {/* Tabla de alícuotas */}
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 600, color: theme.palette.text.secondary }}>
-                  RANGO
-                </TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600, color: theme.palette.text.secondary }}>
-                  ALÍCUOTA
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(modoEdicion ? editandoAlicuotas : alicuotas).map((alicuota) => (
-                <TableRow 
-                  key={alicuota.id} 
-                  sx={{ 
-                    '&:hover': { 
-                      bgcolor: alpha(theme.palette.primary.main, 0.04) 
-                    },
-                    '&:last-child td': { 
-                      borderBottom: 0 
-                    }
+      <Collapse in={expandido}>
+        {/* Información */}
+        <Alert 
+          severity="info" 
+          icon={<InfoIcon />}
+          sx={{ m: 3, mb: 2 }}
+        >
+          <Typography variant="body2">
+            Las alícuotas se aplican de forma progresiva sobre la base imponible expresada en UITs.
+            Para el año {anio}, el valor de la UIT es {formatCurrency(valorUIT)}.
+          </Typography>
+        </Alert>
+
+        <Grid container spacing={3} sx={{ p: 3, pt: 0 }}>
+          {/* Tabla de alícuotas */}
+          <Grid item xs={12} md={7}>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Tramo</TableCell>
+                    <TableCell>Rango (UIT)</TableCell>
+                    <TableCell align="center">Alícuota</TableCell>
+                    <TableCell align="right">Base en S/</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {alicuotas.length > 0 ? (
+                    alicuotas.map((alicuota, index) => (
+                      <TableRow 
+                        key={alicuota.id}
+                        sx={{ 
+                          '&:hover': { 
+                            bgcolor: alpha(theme.palette.primary.main, 0.04) 
+                          }
+                        }}
+                      >
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={500}>
+                            Tramo {index + 1}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {getRangoDescripcion(alicuota.rangoInicial, alicuota.rangoFinal)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={formatPercentage(alicuota.alicuota)}
+                            size="small"
+                            color={getAlicuotaColor(alicuota.alicuota)}
+                            variant="filled"
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2" color="text.secondary">
+                            {alicuota.rangoInicial 
+                              ? formatCurrency(alicuota.rangoInicial * valorUIT)
+                              : '-'}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          No hay alícuotas configuradas para el año {anio}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Grid>
+
+          {/* Calculadora */}
+          <Grid item xs={12} md={5}>
+            <Box 
+              sx={{ 
+                p: 2, 
+                bgcolor: theme.palette.grey[50],
+                borderRadius: 1,
+                border: `1px solid ${theme.palette.divider}`
+              }}
+            >
+              <Stack spacing={2}>
+                <Typography variant="subtitle2" fontWeight={600}>
+                  Calculadora de Impuesto
+                </Typography>
+                
+                <TextField
+                  label="Base Imponible"
+                  value={valorPrueba}
+                  onChange={(e) => setValorPrueba(e.target.value)}
+                  type="number"
+                  size="small"
+                  fullWidth
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start">S/</InputAdornment>
                   }}
+                  helperText="Ingrese el valor del predio"
+                />
+
+                <Button
+                  variant="contained"
+                  startIcon={<CalculateIcon />}
+                  onClick={calcularImpuesto}
+                  disabled={!valorPrueba || !valorUIT}
+                  fullWidth
                 >
-                  <TableCell>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <AccountBalanceIcon fontSize="small" color="action" />
+                  Calcular Impuesto
+                </Button>
+
+                {resultadoCalculo && (
+                  <Alert severity="success" sx={{ mt: 2 }}>
+                    <Stack spacing={1}>
                       <Typography variant="body2">
-                        {alicuota.descripcion}
+                        <strong>Base Imponible:</strong> {formatCurrency(resultadoCalculo.baseImponible)}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Base en UITs:</strong> {(resultadoCalculo.baseImponible / valorUIT).toFixed(2)} UIT
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Alícuota aplicada:</strong> {formatPercentage(resultadoCalculo.rangoAplicado)}
+                      </Typography>
+                      <Typography variant="body2" fontWeight={600} color="success.dark">
+                        <strong>Impuesto a pagar:</strong> {formatCurrency(resultadoCalculo.impuesto)}
                       </Typography>
                     </Stack>
-                  </TableCell>
-                  <TableCell align="right">
-                    {modoEdicion ? (
-                      <TextField
-                        size="small"
-                        type="number"
-                        value={alicuota.tasa}
-                        onChange={(e) => handleAlicuotaChange(alicuota.id, e.target.value)}
-                        sx={{ width: 120 }}
-                        InputProps={{
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <PercentIcon fontSize="small" />
-                            </InputAdornment>
-                          ),
-                        }}
-                        inputProps={{
-                          step: 0.01,
-                          min: 0,
-                          max: 100,
-                          style: { textAlign: 'right' }
-                        }}
-                      />
-                    ) : (
-                      <Chip
-                        label={`${alicuota.tasa.toFixed(2)}%`}
-                        size="small"
-                        sx={{
-                          bgcolor: alpha(getTasaColor(alicuota.tasa), 0.1),
-                          color: getTasaColor(alicuota.tasa),
-                          fontWeight: 500,
-                          minWidth: 80
-                        }}
-                      />
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                  </Alert>
+                )}
+              </Stack>
+            </Box>
+          </Grid>
+        </Grid>
 
-        {/* Botones de acción en modo edición */}
-        {modoEdicion && (
-          <Stack 
-            direction="row" 
-            spacing={2} 
-            justifyContent="flex-end" 
-            sx={{ mt: 3 }}
-          >
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<CancelIcon />}
-              onClick={cancelarEdicion}
-              disabled={loading}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<SaveIcon />}
-              onClick={guardarCambios}
-              disabled={loading || !alicuotasModificadas}
-            >
-              Guardar cambios
-            </Button>
-          </Stack>
-        )}
-
-        {/* Información adicional */}
-        {!modoEdicion && (
-          <Box 
-            sx={{ 
-              mt: 3,
-              p: 2, 
-              bgcolor: alpha(theme.palette.info.main, 0.08),
-              borderRadius: 1,
-              border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
-            }}
-          >
+        {/* Footer con información adicional */}
+        <Box 
+          sx={{ 
+            px: 3, 
+            py: 2, 
+            bgcolor: theme.palette.grey[50],
+            borderTop: `1px solid ${theme.palette.divider}`
+          }}
+        >
+          <Stack direction="row" spacing={2} alignItems="center">
+            <TrendingUpIcon fontSize="small" color="action" />
             <Typography variant="caption" color="text.secondary">
-              Las alícuotas se aplican de forma progresiva según los rangos de UIT establecidos
+              Las alícuotas están establecidas según la normativa vigente y pueden variar según las ordenanzas municipales.
             </Typography>
-          </Box>
-        )}
-      </Box>
+          </Stack>
+        </Box>
+      </Collapse>
     </Paper>
   );
 };
 
-export default AlicuotaComponent;
+export default Alicuota;
