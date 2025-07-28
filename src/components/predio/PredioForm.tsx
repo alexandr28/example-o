@@ -1,217 +1,209 @@
 // src/components/predio/PredioForm.tsx
 import React, { useState, useEffect } from 'react';
-import { useForm, Controller } from 'react-hook-form';
 import {
   Box,
-  Button,
-  Grid,
   Paper,
   Typography,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
+  Button,
+  Grid,
   Stack,
-  Alert,
-  Skeleton,
-  FormHelperText,
-  CircularProgress,
   Divider,
+  IconButton,
+  FormControlLabel,
+  Checkbox,
+  Alert,
+  CircularProgress,
+  Chip,
   Card,
   CardContent,
-  IconButton,
+  Avatar,
+  useTheme,
+  alpha,
   InputAdornment
 } from '@mui/material';
 import {
+  CalendarMonth as CalendarIcon,
   Home as HomeIcon,
-  Save as SaveIcon,
-  Warning as WarningIcon,
-  CalendarToday as CalendarIcon,
-  Search as SearchIcon,
   LocationOn as LocationIcon,
-  Image as ImageIcon
+  PhotoCamera as PhotoIcon,
+  Delete as DeleteIcon,
+  Save as SaveIcon,
+  Person as PersonIcon,
+  Business as BusinessIcon,
+  Search as SearchIcon,
+  Badge as BadgeIcon,
+  Phone as PhoneIcon,
+  Edit as EditIcon
 } from '@mui/icons-material';
-import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { es } from 'date-fns/locale';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+// Componentes
 import SearchableSelect from '../ui/SearchableSelect';
+import SelectorDirecciones from '../modal/SelectorDirecciones';
+import SelectorContribuyente from '../modal/SelectorContribuyente';
+
+// Hooks
 import { 
   useCondicionPropiedadOptions,
   useTipoPredioOptions,
   useConstantesOptions
 } from '../../hooks/useConstantesOptions';
-import { ConstanteService } from '../../services/constanteService';
-import constanteService from '../../services/constanteService';
-import SelectorDirecciones from '../modal/SelectorDirecciones';
 
+// Services
+import constanteService from '../../services/constanteService';
+
+// Tipos
 interface PredioFormData {
-  // Datos del predio
-  anio: number;
-  fechaAdquisicion: Date | null;
+  // Contribuyente
+  codPersona?: number;
+  
+  // Datos básicos
+  anio?: number;
+  fechaAdquisicion?: Date | null;
   condicionPropiedad: string;
-  nroFinca: string;
-  otroNumero: string;
-  arancel: string;
-  
-  // Características del predio
-  tipoPredio: string;
+  tipoPredio?: string;
   conductor: string;
-  usoPredio: string;
+  usoPredio?: string;
+  estadoPredio?: string;
+  modoDeclaracion?: string;
   
-  // Área del terreno
-  areaTerreno: number;
-  
-  // Número de pisos y condominios
-  numeroPisos: number;
-  nroCondominios: number;
-  
-  // Dirección
-  direccion: any;
+  // Ubicación
   direccionId?: number;
+  direccion?: any;
+  numeroFinca?: string;
+  otroNumero?: string;
+  arancel?: string;
   
-  // Estado y declaración
-  estadoPredio: string;
-  modoDeclaracion: string;
+  // Valores
+  areaTerreno: number;
+  numeroPisos?: number;
+  numeroCondominos?: number;
   
-  // Código contribuyente
-  codigoContribuyente?: number;
-  
-  // Archivos
+  // Imágenes
   imagenes?: File[];
 }
 
-interface PredioFormProps {
-  codPersona?: number;
-  predioExistente?: any;
-  onSubmit?: (data: PredioFormData) => void;
-  onCancel?: () => void;
+interface Contribuyente {
+  codigo: number;
+  contribuyente: string;
+  documento: string;
+  direccion: string;
+  telefono?: string;
+  tipoPersona?: 'natural' | 'juridica';
 }
 
+interface PredioFormProps {
+  predioExistente?: PredioFormData;
+  onSubmit?: (data: PredioFormData) => void;
+  codPersona?: number;
+}
+
+// Schema de validación con Zod
+const predioSchema = z.object({
+  codPersona: z.number().optional(),
+  anio: z.number().min(1900).max(new Date().getFullYear() + 1).optional(),
+  fechaAdquisicion: z.date().nullable().optional(),
+  condicionPropiedad: z.string().min(1, 'La condición es requerida'),
+  tipoPredio: z.string().optional(),
+  conductor: z.string().min(1, 'El conductor es requerido'),
+  usoPredio: z.string().optional(),
+  estadoPredio: z.string().optional(),
+  modoDeclaracion: z.string().optional(),
+  direccionId: z.number().optional(),
+  direccion: z.any().optional(),
+  numeroFinca: z.string().optional(),
+  otroNumero: z.string().optional(),
+  arancel: z.string().optional(),
+  areaTerreno: z.number().min(0, 'El área debe ser mayor a 0'),
+  numeroPisos: z.number().min(0).optional(),
+  numeroCondominos: z.number().min(0).optional()
+});
+
 const PredioForm: React.FC<PredioFormProps> = ({
-  codPersona,
   predioExistente,
   onSubmit,
-  onCancel
+  codPersona
 }) => {
-  const currentYear = new Date().getFullYear();
+  const theme = useTheme();
   const [showSelectorDirecciones, setShowSelectorDirecciones] = useState(false);
+  const [showSelectorContribuyente, setShowSelectorContribuyente] = useState(false);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
-  
+  const [contribuyenteSeleccionado, setContribuyenteSeleccionado] = useState<Contribuyente | null>(null);
+
   const {
     control,
     handleSubmit,
-    watch,
     setValue,
+    watch,
     formState: { errors, isSubmitting }
   } = useForm<PredioFormData>({
+    resolver: zodResolver(predioSchema),
     defaultValues: {
-      anio: predioExistente?.anio || currentYear,
-      fechaAdquisicion: predioExistente?.fechaAdquisicion || null,
-      condicionPropiedad: predioExistente?.condicionPropiedad || '',
-      nroFinca: predioExistente?.nroFinca || '',
-      otroNumero: predioExistente?.otroNumero || '',
-      arancel: predioExistente?.arancel || '',
-      tipoPredio: predioExistente?.tipoPredio || '',
-      conductor: predioExistente?.conductor || '',
-      usoPredio: predioExistente?.usoPredio || '',
-      areaTerreno: predioExistente?.areaTerreno || 0,
-      numeroPisos: predioExistente?.numeroPisos || 0,
-      nroCondominios: predioExistente?.nroCondominios || 0,
-      direccion: predioExistente?.direccion || null,
-      estadoPredio: predioExistente?.estadoPredio || '',
-      modoDeclaracion: predioExistente?.modoDeclaracion || '',
-      codigoContribuyente: codPersona
+      codPersona: codPersona,
+      anio: new Date().getFullYear(),
+      fechaAdquisicion: null,
+      condicionPropiedad: '',
+      tipoPredio: '',
+      conductor: '',
+      usoPredio: '',
+      estadoPredio: '',
+      modoDeclaracion: '',
+      direccion: null,
+      numeroFinca: '',
+      otroNumero: '',
+      arancel: '',
+      areaTerreno: 0,
+      numeroPisos: 0,
+      numeroCondominos: 0,
+      ...predioExistente
     }
   });
 
-  const direccionSeleccionada = watch('direccion');
-  const nroFinca = watch('nroFinca');
-  const otroNumero = watch('otroNumero');
+  // Cargar datos usando los hooks correctos
+  const { options: condicionData, loading: loadingCondicion, error: errorCondicion } = 
+    useCondicionPropiedadOptions();
+  
+  const { options: tipoPredioData, loading: loadingTipoPredio, error: errorTipoPredio } = 
+    useTipoPredioOptions();
+  
+  // Para los demás campos, usar useConstantesOptions con funciones del servicio
+  const { options: conductorData, loading: loadingConductor, error: errorConductor } = 
+    useConstantesOptions(
+      () => constanteService.obtenerTiposListaConductor()
+    );
+  
+  const { options: usoPredioData, loading: loadingUsoPredio, error: errorUsoPredio } = 
+    useConstantesOptions(
+      () => constanteService.obtenerTiposListaUsos()
+    );
+  
+  const { options: estadoPredioData, loading: loadingEstadoPredio, error: errorEstadoPredio } = 
+    useConstantesOptions(
+      () => constanteService.obtenerTiposEstadoPredio()
+    );
+  
+  const { options: modoDeclaracionData, loading: loadingModoDeclaracion, error: errorModoDeclaracion } = 
+    useConstantesOptions(
+      () => constanteService.obtenerTiposModoDeclaracion()
+    );
 
-  // Construir la dirección completa con N° finca y Otro número
-  const direccionCompleta = React.useMemo(() => {
-    if (!direccionSeleccionada) return '';
-    
-    let direccion = `${direccionSeleccionada.nombreVia || ''} ${direccionSeleccionada.cuadra || ''} - ${direccionSeleccionada.descripcion || ''}`;
-    
-    // Agregar N° finca si existe
-    if (nroFinca && nroFinca.trim()) {
-      direccion += ` - N° Finca: ${nroFinca}`;
-    }
-    
-    // Agregar Otro número si existe
-    if (otroNumero && otroNumero.trim()) {
-      direccion += ` - Otro N°: ${otroNumero}`;
-    }
-    
-    return direccion.trim();
-  }, [direccionSeleccionada, nroFinca, otroNumero]);
-
-  // Cargar opciones usando hooks personalizados
-  const { 
-    options: condicionPropiedadOptions, 
-    loading: loadingCondicion,
-    error: errorCondicion 
-  } = useCondicionPropiedadOptions();
-
-  const { 
-    options: tipoPredioOptions, 
-    loading: loadingTipoPredio,
-    error: errorTipoPredio 
-  } = useTipoPredioOptions();
-
-  const { 
-    options: conductorOptions, 
-    loading: loadingConductor,
-    error: errorConductor 
-  } = useConstantesOptions(
-    () => constanteService.obtenerTiposListaConductor()
-  );
-
-  const { 
-    options: usoPredioOptions, 
-    loading: loadingUsoPredio,
-    error: errorUsoPredio 
-  } = useConstantesOptions(
-    () => constanteService.obtenerTiposListaUsos()
-  );
-
-  const { 
-    options: estadoPredioOptions, 
-    loading: loadingEstadoPredio,
-    error: errorEstadoPredio 
-  } = useConstantesOptions(
-    () => constanteService.obtenerTiposEstadoPredio()
-  );
-
-  const { 
-    options: modoDeclaracionOptions, 
-    loading: loadingModoDeclaracion,
-    error: errorModoDeclaracion 
-  } = useConstantesOptions(
-    () => constanteService.obtenerTiposModoDeclaracion()
-  );
-
-  // Cargar años desde la API
-  const { 
-    options: anioOptions, 
-    loading: loadingAnios,
-    error: errorAnios 
-  } = useConstantesOptions(
-    () => constanteService.obtenerTiposAnio(),
-    (data) => ({
-      value: parseInt(data.codConstante),
-      label: data.nombreCategoria,
-      id: data.codConstante
-    }),
-    // Valores por defecto mientras carga
-    Array.from({ length: 10 }, (_, i) => ({
-      value: currentYear - i,
-      label: (currentYear - i).toString(),
-      id: (currentYear - i).toString()
-    }))
-  );
+  // Cargar años desde la API usando el servicio de constantes
+  const { options: aniosData, loading: loadingAnios, error: errorAnios } = 
+    useConstantesOptions(
+      () => constanteService.obtenerTiposAnio(),
+      (data) => ({
+        value: parseInt(data.codConstante),
+        label: data.nombreCategoria,
+        id: data.codConstante
+      })
+    );
 
   // Verificar si algún campo está cargando
   const isLoadingOptions = loadingCondicion || loadingTipoPredio || 
@@ -222,7 +214,15 @@ const PredioForm: React.FC<PredioFormProps> = ({
   // Verificar si hay errores en la carga
   const hasLoadingErrors = errorCondicion || errorTipoPredio || 
                           errorConductor || errorUsoPredio || 
-                          errorEstadoPredio || errorModoDeclaracion;
+                          errorEstadoPredio || errorModoDeclaracion ||
+                          errorAnios;
+
+  // Efecto para establecer el código del contribuyente
+  useEffect(() => {
+    if (codPersona) {
+      setValue('codPersona', codPersona);
+    }
+  }, [codPersona, setValue]);
 
   const onFormSubmit = (data: PredioFormData) => {
     console.log('Datos del formulario:', data);
@@ -239,6 +239,13 @@ const PredioForm: React.FC<PredioFormProps> = ({
     setValue('direccion', direccion);
     setValue('direccionId', direccion.id);
     setShowSelectorDirecciones(false);
+  };
+
+  // Manejar selección de contribuyente
+  const handleSelectContribuyente = (contribuyente: Contribuyente) => {
+    setContribuyenteSeleccionado(contribuyente);
+    setValue('codPersona', contribuyente.codigo);
+    setShowSelectorContribuyente(false);
   };
 
   // Manejar carga de imágenes
@@ -293,408 +300,462 @@ const PredioForm: React.FC<PredioFormProps> = ({
             </Typography>
           </Box>
 
-          {/* Mostrar alerta si hay errores de carga */}
-          {hasLoadingErrors && (
-            <Alert severity="warning" icon={<WarningIcon />}>
-              Algunas opciones no pudieron cargarse correctamente. 
-              Se están usando valores por defecto.
-            </Alert>
-          )}
-
-          {/* Información del contribuyente */}
-          {codPersona && (
-            <Alert severity="info">
-              <Typography variant="body2">
-                <strong>Código Contribuyente:</strong> {codPersona}
-              </Typography>
-            </Alert>
-          )}
-
-          {/* Sección: Datos del predio */}
+          {/* Sección de Contribuyente */}
           <Box>
-            <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-              Datos del predio
+            <Typography
+              variant="subtitle1"
+              sx={{
+                mb: 2,
+                fontWeight: 600,
+                color: 'text.primary'
+              }}
+            >
+              Contribuyente Propietario
             </Typography>
-            
-            {/* Primera fila */}
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={2}>
-                <Controller
-                  name="anio"
-                  control={control}
-                  rules={{ required: 'Año es requerido' }}
-                  render={({ field }) => (
-                    <SearchableSelect
-                      {...field}
-                      label="Año"
-                      options={anioOptions}
-                      loading={loadingAnios}
-                      error={!!errors.anio || !!errorAnios}
-                      helperText={errors.anio?.message || errorAnios}
-                      fullWidth
-                      placeholder="Seleccione año"
-                    />
-                  )}
-                />
-              </Grid>
 
-              <Grid item xs={12} md={3}>
-                <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
+            {!contribuyenteSeleccionado && !codPersona ? (
+              // Estado inicial: sin contribuyente seleccionado
+              <Card
+                sx={{
+                  p: 4,
+                  textAlign: 'center',
+                  backgroundColor: theme.palette.action.hover,
+                  border: '2px dashed',
+                  borderColor: theme.palette.divider
+                }}
+              >
+                <SearchIcon
+                  sx={{
+                    fontSize: 60,
+                    color: theme.palette.text.secondary,
+                    mb: 2
+                  }}
+                />
+                <Typography
+                  variant="body1"
+                  color="text.secondary"
+                  sx={{ mb: 3 }}
+                >
+                  No se ha seleccionado ningún contribuyente
+                </Typography>
+                <Button
+                  variant="contained"
+                  startIcon={<PersonIcon />}
+                  onClick={() => setShowSelectorContribuyente(true)}
+                  size="large"
+                >
+                  Seleccionar Contribuyente
+                </Button>
+              </Card>
+            ) : (
+              // Contribuyente seleccionado
+              <Card variant="outlined">
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                    <Avatar
+                      sx={{
+                        width: 56,
+                        height: 56,
+                        bgcolor: contribuyenteSeleccionado?.tipoPersona === 'juridica' 
+                          ? 'primary.main' 
+                          : 'secondary.main'
+                      }}
+                    >
+                      {contribuyenteSeleccionado?.tipoPersona === 'juridica' ? (
+                        <BusinessIcon />
+                      ) : (
+                        <PersonIcon />
+                      )}
+                    </Avatar>
+                    
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="h6" gutterBottom>
+                        {contribuyenteSeleccionado?.contribuyente || 'Contribuyente'}
+                      </Typography>
+                      
+                      <Stack direction="row" spacing={2} sx={{ mb: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <BadgeIcon fontSize="small" color="action" />
+                          <Typography variant="body2" color="text.secondary">
+                            {contribuyenteSeleccionado?.documento || '-'}
+                          </Typography>
+                        </Box>
+                        
+                        {contribuyenteSeleccionado?.telefono && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <PhoneIcon fontSize="small" color="action" />
+                            <Typography variant="body2" color="text.secondary">
+                              {contribuyenteSeleccionado.telefono}
+                            </Typography>
+                          </Box>
+                        )}
+                      </Stack>
+                      
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <LocationIcon fontSize="small" color="action" />
+                        <Typography variant="body2" color="text.secondary">
+                          {contribuyenteSeleccionado?.direccion || '-'}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    
+                    <IconButton
+                      onClick={() => setShowSelectorContribuyente(true)}
+                      sx={{
+                        bgcolor: alpha(theme.palette.primary.main, 0.08),
+                        '&:hover': {
+                          bgcolor: alpha(theme.palette.primary.main, 0.16)
+                        }
+                      }}
+                    >
+                      <EditIcon />
+                    </IconButton>
+                  </Box>
+                </CardContent>
+              </Card>
+            )}
+          </Box>
+
+          <Divider />
+
+          {/* Datos del predio - Solo visible si hay contribuyente */}
+          {(contribuyenteSeleccionado || codPersona) && (
+            <>
+              <Typography
+                variant="subtitle1"
+                sx={{
+                  fontWeight: 600,
+                  color: 'text.primary'
+                }}
+              >
+                Datos del predio
+              </Typography>
+
+              <Grid container spacing={2}>
+                {/* Primera fila */}
+                <Grid item xs={12} sm={6} md={3}>
+                  {renderSearchableSelect(
+                    'anio',
+                    'Año',
+                    aniosData || [],
+                    loadingAnios,
+                    null,
+                    false,
+                    'Seleccione año'
+                  )}
+                </Grid>
+                
+                <Grid item xs={12} sm={6} md={3}>
+                  <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
+                    <Controller
+                      name="fechaAdquisicion"
+                      control={control}
+                      render={({ field }) => (
+                        <DatePicker
+                          {...field}
+                          label="Fecha de adquisición"
+                          slotProps={{
+                            textField: {
+                              fullWidth: true,
+                              error: !!errors.fechaAdquisicion,
+                              helperText: errors.fechaAdquisicion?.message
+                            }
+                          }}
+                        />
+                      )}
+                    />
+                  </LocalizationProvider>
+                </Grid>
+                
+                <Grid item xs={12} sm={6} md={3}>
+                  {renderSearchableSelect(
+                    'condicionPropiedad',
+                    'Condición',
+                    condicionData || [],
+                    loadingCondicion,
+                    errorCondicion,
+                    true
+                  )}
+                </Grid>
+                
+                <Grid item xs={12} sm={6} md={3}>
                   <Controller
-                    name="fechaAdquisicion"
+                    name="numeroFinca"
                     control={control}
                     render={({ field }) => (
-                      <DatePicker
-                        label="Fecha de adquisición"
-                        value={field.value}
-                        onChange={field.onChange}
-                        format="dd/MM/yyyy"
-                        slotProps={{
-                          textField: {
-                            fullWidth: true,
-                            error: !!errors.fechaAdquisicion,
-                            helperText: errors.fechaAdquisicion?.message,
-                            size: "medium"
-                          }
-                        }}
+                      <TextField
+                        {...field}
+                        label="N° finca"
+                        fullWidth
+                        error={!!errors.numeroFinca}
+                        helperText={errors.numeroFinca?.message}
                       />
                     )}
                   />
-                </LocalizationProvider>
-              </Grid>
-
-              <Grid item xs={12} md={3}>
-                <Controller
-                  name="condicionPropiedad"
-                  control={control}
-                  rules={{ required: 'Condición de propiedad es requerida' }}
-                  render={({ field }) => (
-                    <SearchableSelect
-                      {...field}
-                      label="Condición propiedad"
-                      options={condicionPropiedadOptions}
-                      loading={loadingCondicion}
-                      error={!!errors.condicionPropiedad || !!errorCondicion}
-                      helperText={errors.condicionPropiedad?.message || errorCondicion}
-                      fullWidth
-                      placeholder="Seleccione condición"
-                    />
-                  )}
-                />
-              </Grid>
-
-              <Grid item xs={12} md={2}>
-                <Controller
-                  name="nroFinca"
-                  control={control}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      fullWidth
-                      label="N° finca"
-                      size="medium"
-                      error={!!errors.nroFinca}
-                      helperText={errors.nroFinca?.message}
-                    />
-                  )}
-                />
-              </Grid>
-
-              <Grid item xs={12} md={2}>
-                <Controller
-                  name="otroNumero"
-                  control={control}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      fullWidth
-                      label="Otro número"
-                      size="medium"
-                      error={!!errors.otroNumero}
-                      helperText={errors.otroNumero?.message}
-                    />
-                  )}
-                />
-              </Grid>
-            </Grid>
-
-            {/* Segunda fila: Arancel, Botón seleccionar dirección, Dirección seleccionada */}
-            {/* Segunda fila: Arancel, Botón seleccionar dirección, Dirección seleccionada */}
-<Grid container spacing={2} sx={{ mt: 1 }}>
-  <Grid item xs={12} md={2}>
-    <Controller
-      name="arancel"
-      control={control}
-      render={({ field }) => (
-        <TextField
-          {...field}
-          fullWidth
-          label="Arancel"
-          type="number"
-          size="medium"
-          error={!!errors.arancel}
-          helperText={errors.arancel?.message}
-        />
-      )}
-    />
-  </Grid>
-
-  <Grid item xs={12} md={2}>
-    <Button
-      variant="outlined"
-      fullWidth
-      startIcon={<LocationIcon />}
-      onClick={() => setShowSelectorDirecciones(true)}
-      sx={{ height: '56px' }}
-    >
-      Seleccionar dirección
-    </Button>
-  </Grid>
-
-  <Grid item xs={12} md={8}>
-    <TextField
-      fullWidth
-      label="Dirección seleccionada"
-      value={direccionCompleta}
-      disabled
-      size="medium"
-      InputProps={{
-        startAdornment: (
-          <InputAdornment position="start">
-            <LocationIcon />
-          </InputAdornment>
-        )
-      }}
-      sx={{ 
-        width: '100%',
-        '& .MuiInputBase-root': {
-          width: '100%'
-        },
-        '& .MuiInputBase-input.Mui-disabled': {
-          WebkitTextFillColor: 'rgba(0, 0, 0, 0.87)',
-          color: 'rgba(0, 0, 0, 0.87)'
-        }
-      }}
-    />
-  </Grid>
-</Grid>
-
-            {/* Tercera fila: Tipo predio, Conductor, Uso predio */}
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12} md={4}>
-                {renderSearchableSelect(
-                  'tipoPredio',
-                  'Tipo predio',
-                  tipoPredioOptions,
-                  loadingTipoPredio,
-                  errorTipoPredio,
-                  true,
-                  'Seleccione tipo'
-                )}
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                {renderSearchableSelect(
-                  'conductor',
-                  'Conductor',
-                  conductorOptions,
-                  loadingConductor,
-                  errorConductor,
-                  true,
-                  'Seleccione conductor'
-                )}
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                {renderSearchableSelect(
-                  'usoPredio',
-                  'Usos de predio',
-                  usoPredioOptions,
-                  loadingUsoPredio,
-                  errorUsoPredio,
-                  true,
-                  'Seleccione uso'
-                )}
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Controller
-                  name="areaTerreno"
-                  control={control}
-                  rules={{ 
-                    required: 'Área del terreno es requerida',
-                    min: { value: 0, message: 'El área debe ser mayor a 0' }
-                  }}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      fullWidth
-                      label="Área de terreno"
-                      type="number"
-                      size="medium"
-                      InputProps={{
-                        endAdornment: <InputAdornment position="end">m²</InputAdornment>
-                      }}
-                      error={!!errors.areaTerreno}
-                      helperText={errors.areaTerreno?.message}
-                    />
-                  )}
-                />
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <Controller
-                  name="numeroPisos"
-                  control={control}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      fullWidth
-                      label="Número de pisos"
-                      type="number"
-                      size="medium"
-                      error={!!errors.numeroPisos}
-                      helperText={errors.numeroPisos?.message}
-                    />
-                  )}
-                />
-              </Grid>
-            </Grid>
-
-            {/* Cuarta fila: Área de terreno y Número de pisos */}
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              
-            </Grid>
-
-            {/* Quinta fila: N° Condominios, Estado del Predio, Modo de Declaración */}
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12} md={4}>
-                <Controller
-                  name="nroCondominios"
-                  control={control}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      fullWidth
-                      label="N° Condominios"
-                      type="number"
-                      size="medium"
-                      error={!!errors.nroCondominios}
-                      helperText={errors.nroCondominios?.message}
-                    />
-                  )}
-                />
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                {renderSearchableSelect(
-                  'estadoPredio',
-                  'Estado del Predio',
-                  estadoPredioOptions,
-                  loadingEstadoPredio,
-                  errorEstadoPredio,
-                  true,
-                  'Seleccione estado'
-                )}
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                {renderSearchableSelect(
-                  'modoDeclaracion',
-                  'Modo de Declaración',
-                  modoDeclaracionOptions,
-                  loadingModoDeclaracion,
-                  errorModoDeclaracion,
-                  true,
-                  'Seleccione modo'
-                )}
-              </Grid>
-            </Grid>
-          </Box>
-
-          <Divider sx={{ my: 3 }} />
-
-          {/* Sección: Imágenes (mantener como está) */}
-          <Box>
-            <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-              Imágenes
-            </Typography>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={3}>
-                <Button
-                  variant="outlined"
-                  component="label"
-                  startIcon={<ImageIcon />}
-                  fullWidth
-                  sx={{ height: '56px' }}
-                >
-                  Seleccionar archivo
-                  <input
-                    type="file"
-                    hidden
-                    multiple
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                  />
-                </Button>
-              </Grid>
-              
-              <Grid item xs={12} md={9}>
-                <TextField
-                  fullWidth
-                  label="Ruta de fotografía del predio"
-                  placeholder="Se mostrará la ruta de las imágenes seleccionadas"
-                  value={selectedImages.map(f => f.name).join(', ')}
-                  disabled
-                  size="medium"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <ImageIcon />
-                      </InputAdornment>
-                    )
-                  }}
-                  sx={{ 
-                    '& .MuiInputBase-input.Mui-disabled': {
-                      WebkitTextFillColor: 'rgba(0, 0, 0, 0.6)',
-                      color: 'rgba(0, 0, 0, 0.6)'
-                    }
-                  }}
-                />
-              </Grid>
-              
-              {selectedImages.length > 0 && (
-                <Grid item xs={12}>
-                  <Alert severity="info" onClose={() => setSelectedImages([])}>
-                    {selectedImages.length} imagen(es) seleccionada(s)
-                  </Alert>
                 </Grid>
-              )}
-            </Grid>
-          </Box>
 
-          {/* Botones de acción */}
-          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 3 }}>
-            {onCancel && (
-              <Button 
-                variant="outlined" 
-                onClick={onCancel}
-                disabled={isSubmitting}
-                size="large"
-              >
-                Cancelar
-              </Button>
-            )}
-            <Button
-              type="submit"
-              variant="contained"
-              startIcon={isSubmitting ? <CircularProgress size={20} /> : <SaveIcon />}
-              disabled={isSubmitting || isLoadingOptions}
-              size="large"
-              sx={{ minWidth: 200 }}
-            >
-              {isSubmitting ? 'Guardando...' : 'Registrar / editar'}
-            </Button>
-          </Box>
+                {/* Segunda fila */}
+                <Grid item xs={12} sm={6} md={3}>
+                  <Controller
+                    name="otroNumero"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        label="Otro número"
+                        fullWidth
+                        error={!!errors.otroNumero}
+                        helperText={errors.otroNumero?.message}
+                      />
+                    )}
+                  />
+                </Grid>
+                
+                <Grid item xs={12} sm={6} md={3}>
+                  <Controller
+                    name="arancel"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        label="Arancel"
+                        fullWidth
+                        error={!!errors.arancel}
+                        helperText={errors.arancel?.message}
+                      />
+                    )}
+                    disabled={true}
+                  />
+                </Grid>
+                
+                <Grid item xs={12} md={9} sm={12}>
+                  <Stack direction="row" spacing={1} alignItems="flex-start">
+                    <Button
+                      variant="contained"
+                      onClick={() => setShowSelectorDirecciones(true)}
+                      startIcon={<LocationIcon />}
+                      sx={{ 
+                        minWidth: 'auto',
+                        px: 2,
+                        height: 56,
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Seleccionar dirección
+                    </Button>
+                    <TextField
+                      label="Dirección seleccionada"
+                      value={watch('direccion')?.descripcion || ''}
+                      fullWidth
+                      InputProps={{
+                        readOnly: true,
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <LocationIcon color="action" />
+                          </InputAdornment>
+                        )
+                      }}
+                      error={!!errors.direccion}
+                      helperText={errors.direccion?.message || (!watch('direccion') ? 'Seleccione una dirección' : '')}
+                    />
+                  </Stack>
+                </Grid>
+
+                {/* Tercera fila */}
+                <Grid item xs={12} sm={6} md={3}>
+                  {renderSearchableSelect(
+                    'tipoPredio',
+                    'Tipo',
+                    tipoPredioData || [],
+                    loadingTipoPredio,
+                    errorTipoPredio,
+                    false
+                  )}
+                </Grid>
+                
+                <Grid item xs={12} sm={6} md={3}>
+                  {renderSearchableSelect(
+                    'conductor',
+                    'Conductor',
+                    conductorData || [],
+                    loadingConductor,
+                    errorConductor,
+                    true
+                  )}
+                </Grid>
+                
+                <Grid item xs={12} sm={6} md={3}>
+                  {renderSearchableSelect(
+                    'usoPredio',
+                    'Uso',
+                    usoPredioData || [],
+                    loadingUsoPredio,
+                    errorUsoPredio,
+                    false
+                  )}
+                </Grid>
+                
+                <Grid item xs={12} sm={6} md={3}>
+                  <Controller
+                    name="areaTerreno"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        label="Área de terreno"
+                        type="number"
+                        fullWidth
+                        InputProps={{
+                          endAdornment: <Typography variant="body2">m²</Typography>
+                        }}
+                        error={!!errors.areaTerreno}
+                        helperText={errors.areaTerreno?.message}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
+                    )}
+                  />
+                </Grid>
+
+                {/* Cuarta fila */}
+                <Grid item xs={12} sm={6} md={3}>
+                  <Controller
+                    name="numeroPisos"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        label="Número de pisos"
+                        type="number"
+                        fullWidth
+                        error={!!errors.numeroPisos}
+                        helperText={errors.numeroPisos?.message}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                      />
+                    )}
+                  />
+                </Grid>
+                
+                <Grid item xs={12} sm={6} md={3}>
+                  <Controller
+                    name="numeroCondominos"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        label="N° Condóminos"
+                        type="number"
+                        fullWidth
+                        error={!!errors.numeroCondominos}
+                        helperText={errors.numeroCondominos?.message}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                      />
+                    )}
+                  />
+                </Grid>
+                
+                <Grid item xs={12} sm={6} md={3}>
+                  {renderSearchableSelect(
+                    'estadoPredio',
+                    'Estado',
+                    estadoPredioData || [],
+                    loadingEstadoPredio,
+                    errorEstadoPredio,
+                    false
+                  )}
+                </Grid>
+                
+                <Grid item xs={12} sm={6} md={3}>
+                  {renderSearchableSelect(
+                    'modoDeclaracion',
+                    'Modo',
+                    modoDeclaracionData || [],
+                    loadingModoDeclaracion,
+                    errorModoDeclaracion,
+                    false
+                  )}
+                </Grid>
+              </Grid>
+
+              <Divider />
+
+              {/* Sección de imágenes */}
+              <Box>
+                <Typography
+                  variant="subtitle1"
+                  sx={{
+                    mb: 2,
+                    fontWeight: 600,
+                    color: 'text.primary'
+                  }}
+                >
+                  Imágenes
+                </Typography>
+                
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Button
+                    variant="outlined"
+                    component="label"
+                    startIcon={<PhotoIcon />}
+                  >
+                    Seleccionar archivo
+                    <input
+                      type="file"
+                      hidden
+                      multiple
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                    />
+                  </Button>
+                  
+                  <Typography variant="body2" color="text.secondary">
+                    Se mostrará la ruta de las imágenes
+                  </Typography>
+                </Stack>
+                
+                {selectedImages.length > 0 && (
+                  <Box sx={{ mt: 2 }}>
+                    <Stack direction="row" spacing={1} flexWrap="wrap">
+                      {selectedImages.map((file, index) => (
+                        <Chip
+                          key={index}
+                          label={file.name}
+                          onDelete={() => {
+                            setSelectedImages(prev => 
+                              prev.filter((_, i) => i !== index)
+                            );
+                          }}
+                          size="small"
+                          sx={{ mb: 1 }}
+                        />
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
+              </Box>
+
+              <Divider />
+
+              {/* Botón de envío */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  startIcon={<SaveIcon />}
+                  disabled={isSubmitting || isLoadingOptions}
+                  size="large"
+                >
+                  {isSubmitting ? 'Guardando...' : 'Registrar / Editar'}
+                </Button>
+              </Box>
+            </>
+          )}
+
+          {/* Mostrar errores de carga */}
+          {hasLoadingErrors && (
+            <Alert severity="error">
+              Error al cargar las opciones del formulario. Por favor, recargue la página.
+            </Alert>
+          )}
         </Stack>
       </form>
 
@@ -703,7 +764,14 @@ const PredioForm: React.FC<PredioFormProps> = ({
         open={showSelectorDirecciones}
         onClose={() => setShowSelectorDirecciones(false)}
         onSelectDireccion={handleSelectDireccion}
-        direccionSeleccionada={direccionSeleccionada}
+      />
+
+      {/* Modal de selección de contribuyente */}
+      <SelectorContribuyente
+        isOpen={showSelectorContribuyente}
+        onClose={() => setShowSelectorContribuyente(false)}
+        onSelectContribuyente={handleSelectContribuyente}
+        selectedId={contribuyenteSeleccionado?.codigo}
       />
     </Paper>
   );

@@ -1,57 +1,29 @@
 // src/pages/predio/NuevoPredio.tsx
-import React, { FC, memo, useState } from 'react';
+import React, { FC, memo } from 'react';
 import {
   Box,
-  Paper,
-  Typography,
-  Stack,
   Container,
   Breadcrumbs,
   Link,
   Chip,
-  useTheme,
-  alpha,
-  Card,
-  CardContent,
-  Button,
-  Avatar,
-  Divider,
-  Alert
+  useTheme
 } from '@mui/material';
 import {
   NavigateNext as NavigateNextIcon,
   Home as HomeIcon,
-  Domain as DomainIcon,
-  Person as PersonIcon,
-  Business as BusinessIcon,
-  Search as SearchIcon,
-  Badge as BadgeIcon,
-  LocationOn as LocationIcon,
-  Phone as PhoneIcon,
-  Edit as EditIcon
+  Domain as DomainIcon
 } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 import PredioForm from '../../components/predio/PredioForm';
-import SelectorContribuyente from '../../components/modal/SelectorContribuyente';
 import NotificationContainer from '../../components/utils/Notification';
 import MainLayout from '../../layout/MainLayout';
 
-interface Contribuyente {
-  codigo: number;
-  contribuyente: string;
-  documento: string;
-  direccion: string;
-  telefono?: string;
-  tipoPersona?: 'natural' | 'juridica';
-}
-
 /**
- * Página para registrar un nuevo predio con selector de contribuyente
+ * Página para registrar un nuevo predio
+ * Ahora la selección de contribuyente está integrada dentro del PredioForm
  */
 const NuevoPredio: FC = memo(() => {
   const theme = useTheme();
-  const [contribuyenteSeleccionado, setContribuyenteSeleccionado] = useState<Contribuyente | null>(null);
-  const [showSelectorModal, setShowSelectorModal] = useState(false);
 
   // Definir las migas de pan para la navegación
   const breadcrumbItems = [
@@ -60,10 +32,11 @@ const NuevoPredio: FC = memo(() => {
     { label: 'Registro de predio', active: true }
   ];
 
-  // Handler para seleccionar contribuyente
-  const handleSelectContribuyente = (contribuyente: Contribuyente) => {
-    setContribuyenteSeleccionado(contribuyente);
-    setShowSelectorModal(false);
+  // Handler para cuando se envía el formulario
+  const handleSubmitPredio = (data: any) => {
+    console.log('Datos del predio a registrar:', data);
+    // Aquí iría la lógica para enviar los datos al backend
+    // Por ejemplo: await predioService.crearPredio(data);
   };
 
   return (
@@ -84,9 +57,15 @@ const NuevoPredio: FC = memo(() => {
                     <Chip
                       key={item.label}
                       label={item.label}
-                      size="small"
                       icon={item.icon}
-                      color="primary"
+                      size="small"
+                      sx={{
+                        backgroundColor: theme.palette.primary.main,
+                        color: 'white',
+                        '& .MuiChip-icon': {
+                          color: 'white'
+                        }
+                      }}
                     />
                   );
                 }
@@ -97,14 +76,21 @@ const NuevoPredio: FC = memo(() => {
                     component={RouterLink}
                     to={item.path || '/'}
                     underline="hover"
-                    color="inherit"
                     sx={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 0.5
+                      color: 'text.primary',
+                      textDecoration: 'none',
+                      '&:hover': {
+                        textDecoration: 'underline'
+                      }
                     }}
                   >
-                    {item.icon}
+                    {item.icon && (
+                      <Box component="span" sx={{ mr: 0.5, display: 'flex' }}>
+                        {item.icon}
+                      </Box>
+                    )}
                     {item.label}
                   </Link>
                 );
@@ -112,201 +98,12 @@ const NuevoPredio: FC = memo(() => {
             </Breadcrumbs>
           </Box>
 
-          {/* Header con información */}
-          <Paper
-            elevation={0}
-            sx={{
-              p: 3,
-              mb: 3,
-              borderRadius: 2,
-              bgcolor: alpha(theme.palette.primary.main, 0.04),
-              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
-            }}
-          >
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <Box
-                sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 2,
-                  bgcolor: 'primary.main',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  boxShadow: theme.shadows[3]
-                }}
-              >
-                <DomainIcon />
-              </Box>
-              <Box>
-                <Typography variant="h4" fontWeight="bold" color="primary.dark">
-                  Registro de Predio
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Complete la información del predio para su registro en el sistema
-                </Typography>
-              </Box>
-            </Stack>
-          </Paper>
-
-          {/* Sección de Contribuyente */}
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Stack spacing={2}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between">
-                  <Typography variant="h6" fontWeight={600}>
-                    Contribuyente Propietario
-                  </Typography>
-                  {!contribuyenteSeleccionado && (
-                    <Chip 
-                      label="Requerido" 
-                      color="warning" 
-                      size="small" 
-                      variant="outlined"
-                    />
-                  )}
-                </Stack>
-
-                {!contribuyenteSeleccionado ? (
-                  // Mostrar botón para seleccionar contribuyente
-                  <Box
-                    sx={{
-                      p: 4,
-                      textAlign: 'center',
-                      bgcolor: alpha(theme.palette.grey[500], 0.04),
-                      borderRadius: 2,
-                      border: `2px dashed ${theme.palette.divider}`
-                    }}
-                  >
-                    <SearchIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
-                    <Typography variant="body1" color="text.secondary" gutterBottom>
-                      No se ha seleccionado ningún contribuyente
-                    </Typography>
-                    <Button
-                      variant="contained"
-                      startIcon={<PersonIcon />}
-                      onClick={() => setShowSelectorModal(true)}
-                      sx={{ mt: 2 }}
-                    >
-                      Seleccionar Contribuyente
-                    </Button>
-                  </Box>
-                ) : (
-                  // Mostrar información del contribuyente seleccionado
-                  <Paper
-                    sx={{
-                      p: 2,
-                      bgcolor: alpha(theme.palette.success.main, 0.04),
-                      border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`
-                    }}
-                  >
-                    <Stack spacing={2}>
-                      <Stack direction="row" alignItems="center" justifyContent="space-between">
-                        <Stack direction="row" alignItems="center" spacing={2}>
-                          <Avatar sx={{ bgcolor: 'primary.main' }}>
-                            {contribuyenteSeleccionado.tipoPersona === 'juridica' ? 
-                              <BusinessIcon /> : <PersonIcon />
-                            }
-                          </Avatar>
-                          <Box>
-                            <Typography variant="subtitle1" fontWeight={600}>
-                              {contribuyenteSeleccionado.contribuyente}
-                            </Typography>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <Chip
-                                size="small"
-                                icon={<BadgeIcon />}
-                                label={contribuyenteSeleccionado.documento}
-                                variant="outlined"
-                              />
-                              <Chip
-                                size="small"
-                                label={contribuyenteSeleccionado.tipoPersona === 'juridica' ? 
-                                  'Persona Jurídica' : 'Persona Natural'
-                                }
-                                color={contribuyenteSeleccionado.tipoPersona === 'juridica' ? 
-                                  'secondary' : 'primary'
-                                }
-                              />
-                            </Stack>
-                          </Box>
-                        </Stack>
-                        <Button
-                          size="small"
-                          startIcon={<EditIcon />}
-                          onClick={() => setShowSelectorModal(true)}
-                        >
-                          Cambiar
-                        </Button>
-                      </Stack>
-                      
-                      <Divider />
-                      
-                      <Stack spacing={1}>
-                        <Stack direction="row" alignItems="flex-start" spacing={1}>
-                          <LocationIcon sx={{ fontSize: 20, color: 'text.secondary', mt: 0.5 }} />
-                          <Box>
-                            <Typography variant="caption" color="text.secondary">
-                              Dirección:
-                            </Typography>
-                            <Typography variant="body2">
-                              {contribuyenteSeleccionado.direccion}
-                            </Typography>
-                          </Box>
-                        </Stack>
-                        
-                        {contribuyenteSeleccionado.telefono && (
-                          <Stack direction="row" alignItems="center" spacing={1}>
-                            <PhoneIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
-                            <Box>
-                              <Typography variant="caption" color="text.secondary">
-                                Teléfono:
-                              </Typography>
-                              <Typography variant="body2">
-                                {contribuyenteSeleccionado.telefono}
-                              </Typography>
-                            </Box>
-                          </Stack>
-                        )}
-                      </Stack>
-                    </Stack>
-                  </Paper>
-                )}
-              </Stack>
-            </CardContent>
-          </Card>
-
-          {/* Alerta informativa */}
-          {!contribuyenteSeleccionado && (
-            <Alert severity="info" sx={{ mb: 3 }}>
-              Debe seleccionar un contribuyente antes de poder registrar un predio
-            </Alert>
-          )}
-          
-          {/* Contenedor del formulario */}
-          <Paper 
-            elevation={1}
-            sx={{ 
-              borderRadius: 2,
-              overflow: 'hidden',
-              bgcolor: 'background.paper',
-              opacity: !contribuyenteSeleccionado ? 0.6 : 1,
-              pointerEvents: !contribuyenteSeleccionado ? 'none' : 'auto'
-            }}
-          >
-            <PredioForm codPersona={contribuyenteSeleccionado?.codigo} />
-          </Paper>
+          {/* Formulario de Predio con selector de contribuyente integrado */}
+          <PredioForm 
+            onSubmit={handleSubmitPredio}
+          />
         </Box>
       </Container>
-      
-      {/* Modal de selección de contribuyente */}
-      <SelectorContribuyente
-        isOpen={showSelectorModal}
-        onClose={() => setShowSelectorModal(false)}
-        onSelectContribuyente={handleSelectContribuyente}
-        selectedId={contribuyenteSeleccionado?.codigo}
-      />
       
       {/* Contenedor de notificaciones */}
       <NotificationContainer />

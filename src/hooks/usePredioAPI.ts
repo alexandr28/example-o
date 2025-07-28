@@ -1,4 +1,4 @@
-// src/hooks/usePredios.ts
+// src/hooks/usePredioAPI.ts
 import { useState, useEffect, useCallback } from 'react';
 import { predioService } from '../services/predioService';
 import { 
@@ -27,8 +27,10 @@ interface UsePrediosReturn {
   // Acciones
   cargarPredios: () => Promise<void>;
   buscarPredios: (filtros: FiltroPredio) => Promise<void>;
+  buscarPrediosConFormData: (codPredio?: string, anio?: number, direccion?: number) => Promise<void>;
   obtenerPredioPorCodigo: (codigoPredio: string) => Promise<void>;
-  obtenerPrediosPorContribuyente: (codContribuyente: number) => Promise<void>;
+  obtenerPrediosPorAnio: (anio: number) => Promise<void>;
+  obtenerPrediosPorDireccion: (direccionId: number) => Promise<void>;
   seleccionarPredio: (predio: Predio | null) => void;
   crearPredio: (datos: PredioFormData) => Promise<Predio | null>;
   actualizarPredio: (codigoPredio: string, datos: PredioFormData) => Promise<Predio | null>;
@@ -69,20 +71,49 @@ export const usePredios = (): UsePrediosReturn => {
   }, []);
 
   /**
-   * Buscar predios con filtros
+   * Buscar predios con filtros (método legacy)
    */
   const buscarPredios = useCallback(async (filtros: FiltroPredio) => {
     try {
       setLoading(true);
       setError(null);
       
-      // Convertir filtros al formato de la API
+      // Convertir filtros al formato de la API con form-data
       const parametros = {
-        codigoPredio: filtros.codigoPredio,
-        codContribuyente: filtros.contribuyenteId,
-        anio: filtros.fechaDesde ? new Date(filtros.fechaDesde).getFullYear() : undefined,
-        estadoPredio: filtros.tipoPredio,
-        condicionPropiedad: filtros.usoPredio
+        codPredio: filtros.codigoPredio,
+        anio: filtros.anio,
+        direccion: filtros.direccionId
+      };
+      
+      const prediosData = await predioService.buscarPredios(parametros);
+      setPredios(prediosData);
+      
+      NotificationService.info(`${prediosData.length} predios encontrados`);
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al buscar predios';
+      setError(mensaje);
+      NotificationService.error(mensaje);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Buscar predios usando form-data con los parámetros específicos
+   */
+  const buscarPrediosConFormData = useCallback(async (
+    codPredio?: string, 
+    anio?: number, 
+    direccion?: number
+  ) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const parametros = {
+        ...(codPredio && { codPredio }),
+        ...(anio && { anio }),
+        ...(direccion && { direccion })
       };
       
       const prediosData = await predioService.buscarPredios(parametros);
@@ -124,19 +155,40 @@ export const usePredios = (): UsePrediosReturn => {
   }, []);
 
   /**
-   * Obtener predios por contribuyente
+   * Obtener predios por año
    */
-  const obtenerPrediosPorContribuyente = useCallback(async (codContribuyente: number) => {
+  const obtenerPrediosPorAnio = useCallback(async (anio: number) => {
     try {
       setLoading(true);
       setError(null);
       
-      const prediosData = await predioService.obtenerPrediosPorContribuyente(codContribuyente);
+      const prediosData = await predioService.obtenerPrediosPorAnio(anio);
       setPredios(prediosData);
       
-      NotificationService.info(`${prediosData.length} predios del contribuyente`);
+      NotificationService.info(`${prediosData.length} predios del año ${anio}`);
     } catch (err: any) {
-      const mensaje = err.message || 'Error al obtener predios del contribuyente';
+      const mensaje = err.message || 'Error al obtener predios por año';
+      setError(mensaje);
+      NotificationService.error(mensaje);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Obtener predios por dirección
+   */
+  const obtenerPrediosPorDireccion = useCallback(async (direccionId: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const prediosData = await predioService.obtenerPrediosPorDireccion(direccionId);
+      setPredios(prediosData);
+      
+      NotificationService.info(`${prediosData.length} predios en esta dirección`);
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al obtener predios por dirección';
       setError(mensaje);
       NotificationService.error(mensaje);
     } finally {
@@ -298,8 +350,10 @@ export const usePredios = (): UsePrediosReturn => {
     // Acciones
     cargarPredios,
     buscarPredios,
+    buscarPrediosConFormData,
     obtenerPredioPorCodigo,
-    obtenerPrediosPorContribuyente,
+    obtenerPrediosPorAnio,
+    obtenerPrediosPorDireccion,
     seleccionarPredio,
     crearPredio,
     actualizarPredio,
