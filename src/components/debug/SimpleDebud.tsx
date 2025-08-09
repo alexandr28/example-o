@@ -1,5 +1,5 @@
 // src/components/debug/SimpleDebug.tsx
-import React from 'react';
+// import React from 'react';
 
 const SimpleDebug = () => {
   return (

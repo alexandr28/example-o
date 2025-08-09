@@ -1,81 +1,163 @@
-import React, { useEffect } from 'react';
-import classNames from 'classnames';
+// src/components/modal/Modal.tsx
+import React, { ReactNode } from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Box,
+  Typography,
+  useTheme,
+  useMediaQuery,
+  Slide,
+  Paper
+} from '@mui/material';
+import {
+  Close as CloseIcon
+} from '@mui/icons-material';
+import { styled } from '@mui/material/styles';
+import { TransitionProps } from '@mui/material/transitions';
+
+// Animación de slide
+const Transition = React.forwardRef(function Transition(
+  props: TransitionProps & {
+    children: React.ReactElement<any, any>;
+  },
+  ref: React.Ref<unknown>,
+) {
+  return <Slide direction="up" ref={ref} {...props} />;
+});
+
+// Styled components
+const StyledDialog = styled(Dialog)(({ theme }) => ({
+  '& .MuiDialog-paper': {
+    borderRadius: theme.spacing(2),
+    boxShadow: theme.shadows[10],
+    maxHeight: '90vh',
+    margin: theme.spacing(2)
+  }
+}));
+
+const StyledDialogTitle = styled(DialogTitle)(({ theme }) => ({
+  margin: 0,
+  padding: theme.spacing(2, 3),
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  borderBottom: `1px solid ${theme.palette.divider}`,
+  backgroundColor: theme.palette.grey[50]
+}));
+
+const StyledDialogContent = styled(DialogContent)(({ theme }) => ({
+  padding: theme.spacing(3),
+  overflow: 'auto'
+}));
 
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
-  children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg';
+  children: ReactNode;
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'fullscreen';
+  showHeader?: boolean;
+  showCloseButton?: boolean;
+  actions?: ReactNode;
+  disableBackdropClick?: boolean;
+  disableEscapeKeyDown?: boolean;
+  fullWidth?: boolean;
+  className?: string;
 }
 
+/**
+ * Modal base con Material UI que mantiene la misma interfaz
+ * pero usa componentes de Material UI
+ */
 const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
   title,
   children,
   size = 'md',
+  showHeader = true,
+  showCloseButton = true,
+  actions,
+  disableBackdropClick = false,
+  disableEscapeKeyDown = false,
+  fullWidth = true,
+  className
 }) => {
-  useEffect(() => {
-    const handleEsc = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-    if (isOpen) {
-      document.addEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'hidden';
+  // Mapear tamaños a maxWidth de Material UI
+  const getMaxWidth = () => {
+    switch (size) {
+      case 'sm': return 'sm';
+      case 'md': return 'md';
+      case 'lg': return 'lg';
+      case 'xl': return 'xl';
+      case 'fullscreen': return false;
+      default: return 'md';
     }
+  };
 
-    return () => {
-      document.removeEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'auto';
-    };
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
+  // Manejar el cierre del modal
+  const handleClose = (event: {}, reason: 'backdropClick' | 'escapeKeyDown') => {
+    if (reason === 'backdropClick' && disableBackdropClick) {
+      return;
+    }
+    if (reason === 'escapeKeyDown' && disableEscapeKeyDown) {
+      return;
+    }
+    onClose();
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto">
-      <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={onClose} />
-      <div
-        className={classNames(
-          'relative bg-white rounded-lg shadow-xl mx-auto p-4 transition-all transform',
-          {
-            'max-w-md': size === 'sm',
-            'max-w-xl': size === 'md',
-            'max-w-3xl': size === 'lg',
-          }
-        )}
-      >
-        <div className="flex items-center justify-between pb-3 border-b">
-          {title && <h3 className="text-lg font-medium">{title}</h3>}
-          <button
-            type="button"
-            className="text-gray-400 hover:text-gray-500 focus:outline-none"
-            onClick={onClose}
-          >
-            <span className="sr-only">Cerrar</span>
-            <svg
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
+    <StyledDialog
+      open={isOpen}
+      onClose={handleClose}
+      TransitionComponent={Transition}
+      fullWidth={fullWidth}
+      maxWidth={getMaxWidth()}
+      fullScreen={size === 'fullscreen' || isMobile}
+      className={className}
+      aria-labelledby="modal-title"
+    >
+      {showHeader && (
+        <StyledDialogTitle id="modal-title">
+          <Typography variant="h6" component="span" fontWeight={600}>
+            {title || 'Modal'}
+          </Typography>
+          {showCloseButton && (
+            <IconButton
+              aria-label="cerrar"
+              onClick={onClose}
+              size="small"
+              sx={{
+                color: theme.palette.grey[500],
+                '&:hover': {
+                  color: theme.palette.grey[700],
+                  backgroundColor: theme.palette.action.hover
+                }
+              }}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-        <div className="mt-4">{children}</div>
-      </div>
-    </div>
+              <CloseIcon />
+            </IconButton>
+          )}
+        </StyledDialogTitle>
+      )}
+
+      <StyledDialogContent dividers>
+        {children}
+      </StyledDialogContent>
+
+      {actions && (
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          {actions}
+        </DialogActions>
+      )}
+    </StyledDialog>
   );
 };
 

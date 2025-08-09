@@ -11,7 +11,7 @@ export default {
         primary: "#4f566b",
         secondary: "#64D3A4",
         tertiary: "#3B4668",
-        danger: "#FF0000",
+        danger: "#F87171",
       }
     },
   },

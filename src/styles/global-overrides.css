@@ -2,70 +2,70 @@
 
 /* Reset de márgenes y paddings globales */
 * {
-    box-sizing: border-box;
-  }
-  
-  /* Eliminar márgenes del body y root */
-  body,
-  html,
-  #root {
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow-x: hidden;
-  }
-  
-  /* Asegurar que los contenedores MUI no tengan márgenes */
-  .MuiContainer-root {
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-  
-  /* Eliminar márgenes de los Box principales */
-  .MuiBox-root {
-    margin: 0;
-  }
-  
-  /* Específicamente para el main content */
-  main {
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-  
-  /* Eliminar espacios en el layout principal */
-  .MuiDrawer-root + * {
-    margin-left: 0 !important;
-  }
-  
-  /* Asegurar que el contenido esté pegado al sidebar */
-  [class*="css-"][class*="ofqig"] {
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-  
-  /* Forzar eliminación de márgenes en clases dinámicas */
-  div[class^="css-"]:has(> main) {
-    margin: 0 !important;
-  }
-  
-  /* Específico para el contenedor del MainLayout */
-  .main-layout-container {
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-  
-  /* Eliminar cualquier margin-left en el contenido principal */
-  main.MuiBox-root,
-  div.MuiBox-root > main {
-    margin-left: 0 !important;
-  }
-  
-  /* Forzar el contenido principal a estar pegado al drawer */
-  .MuiDrawer-docked + div,
-  .MuiDrawer-paper + div {
-    margin-left: 0 !important;
-  }
-  
-  /* Específico para el contenedor después del drawer */
-  .MuiDrawer-root ~ .MuiBox-root {
-    margin-left: 0 !important;
-  }
+  box-sizing: border-box;
+}
+
+/* Eliminar márgenes del body y root */
+body,
+html,
+#root {
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-x: hidden;
+}
+
+/* Asegurar que los contenedores MUI no tengan márgenes */
+.MuiContainer-root {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Eliminar márgenes de los Box principales */
+.MuiBox-root {
+  margin: 0;
+}
+
+/* Específicamente para el main content */
+main {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Eliminar espacios en el layout principal */
+.MuiDrawer-root + * {
+  margin-left: 0 !important;
+}
+
+/* Asegurar que el contenido esté pegado al sidebar */
+[class*="css-"][class*="ofqig"] {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Forzar eliminación de márgenes en clases dinámicas */
+div[class^="css-"]:has(> main) {
+  margin: 0 !important;
+}
+
+/* Específico para el contenedor del MainLayout */
+.main-layout-container {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Eliminar cualquier margin-left en el contenido principal */
+main.MuiBox-root,
+div.MuiBox-root > main {
+  margin-left: 0 !important;
+}
+
+/* Forzar el contenido principal a estar pegado al drawer */
+.MuiDrawer-docked + div,
+.MuiDrawer-paper + div {
+  margin-left: 0 !important;
+}
+
+/* Específico para el contenedor después del drawer */
+.MuiDrawer-root ~ .MuiBox-root {
+  margin-left: 0 !important;
+}

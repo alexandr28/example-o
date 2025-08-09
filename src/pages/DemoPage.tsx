@@ -49,6 +49,7 @@ import { useTheme as useCustomTheme } from '../context/ThemeContext';
 import { useSidebar } from '../context/SidebarContext';
 import { useAuthContext } from '../context/AuthContext';
 
+
 // Datos de ejemplo para las estadísticas
 const stats = [
   { 
@@ -126,7 +127,7 @@ const DemoPage: FC = memo(() => {
   return (
     <MainLayout title="Dashboard" disablePadding>
       <Box sx={{ 
-        bgcolor: '#F5F5F5',
+        bgcolor: '#F4F7FA',
         minHeight: 'calc(100vh - 64px)',
         p: 0
       }}>

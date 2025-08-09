@@ -25,18 +25,15 @@ const notifyListeners = () => {
   listeners.forEach(listener => listener());
 };
 
-// API de notificaciones
+// API de notificaciones para mostrar, eliminar y suscribirse a cambios
 export const NotificationService = {
   // Añadir una nueva notificación
   show: (message: string, type: NotificationType = 'info'): string => {
+    // Eliminar notificaciones duplicadas (mismo mensaje y tipo)
+    notifications = notifications.filter(n => !(n.message === message && n.type === type));
     const id = generateId();
     notifications.push({ id, message, type });
     notifyListeners();
-    
-    // Auto-eliminar después de 5 segundos
-    setTimeout(() => {
-      NotificationService.remove(id);
-    }, 5000);
     
     return id;
   },
@@ -61,7 +58,7 @@ export const NotificationService = {
     return NotificationService.show(message, 'warning');
   },
   
-  // Eliminar una notificación
+  // Eliminar una notificación por id
   remove: (id: string): void => {
     notifications = notifications.filter(n => n.id !== id);
     notifyListeners();
@@ -73,7 +70,7 @@ export const NotificationService = {
     notifyListeners();
   },
   
-  // Suscribirse a cambios
+  // Suscribirse a cambios en las notificaciones
   subscribe: (listener: () => void): () => void => {
     listeners.push(listener);
     return () => {
@@ -81,16 +78,37 @@ export const NotificationService = {
     };
   },
   
-  // Obtener todas las notificaciones
+  // Obtener todas las notificaciones actuales
   getAll: (): Notification[] => {
     return [...notifications];
   }
 };
 
-// Componente de notificación individual
+// Componente de notificación individual con barra de progreso
 const NotificationItem: React.FC<Notification & { onClose: (id: string) => void }> = ({ id, message, type, onClose }) => {
   const [isExiting, setIsExiting] = useState(false);
-  
+  const [progress, setProgress] = useState(100);
+
+  useEffect(() => {
+    // Duración total de la barra de progreso y de la notificación (ms)
+    const duration = 2000;
+    const intervalMs = 50;
+    let elapsed = 0;
+
+    const interval = setInterval(() => {
+      elapsed += intervalMs;
+      const percent = Math.max(0, 100 - (elapsed / duration) * 100);
+      setProgress(percent);
+      if (elapsed >= duration) {
+        clearInterval(interval);
+        handleClose();
+      }
+    }, intervalMs);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line
+  }, []);
+
   // Iniciar animación de salida antes de cerrar
   const handleClose = () => {
     setIsExiting(true);
@@ -98,18 +116,20 @@ const NotificationItem: React.FC<Notification & { onClose: (id: string) => void 
       onClose(id);
     }, 300); // Duración de la animación
   };
-  
+
   return (
     <div 
       className={`
-        flex items-center p-4 mb-2 rounded-md shadow-md transition-all duration-300
+        flex items-center p-4 mb-2 rounded-md shadow-md transition-all duration-300 relative
         ${isExiting ? 'opacity-0 transform translate-x-full' : 'opacity-100'}
         ${type === 'success' ? 'bg-green-100 border-l-4 border-green-500' : ''}
         ${type === 'error' ? 'bg-red-100 border-l-4 border-red-500' : ''}
         ${type === 'info' ? 'bg-blue-100 border-l-4 border-blue-500' : ''}
         ${type === 'warning' ? 'bg-yellow-100 border-l-4 border-yellow-500' : ''}
       `}
+      style={{ overflow: 'hidden' }}
     >
+      {/* Icono según el tipo de notificación */}
       <div className="mr-3">
         {type === 'success' && (
           <svg className="w-6 h-6 text-green-500" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
@@ -133,10 +153,12 @@ const NotificationItem: React.FC<Notification & { onClose: (id: string) => void 
         )}
       </div>
       
+      {/* Mensaje de la notificación */}
       <div className="flex-1 text-sm">
         {message}
       </div>
       
+      {/* Botón para cerrar la notificación */}
       <button 
         className="text-gray-500 hover:text-gray-700 focus:outline-none"
         onClick={handleClose}
@@ -145,11 +167,32 @@ const NotificationItem: React.FC<Notification & { onClose: (id: string) => void 
           <path d="M6 18L18 6M6 6l12 12"></path>
         </svg>
       </button>
+      {/* Barra de progreso */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          bottom: 0,
+          height: 4,
+          width: `${progress}%`,
+          background:
+            type === 'success'
+              ? '#22c55e'
+              : type === 'error'
+              ? '#ef4444'
+              : type === 'info'
+              ? '#3b82f6'
+              : type === 'warning'
+              ? '#eab308'
+              : '#6b7280',
+          transition: 'width 50ms linear',
+        }}
+      />
     </div>
   );
 };
 
-// Componente contenedor de notificaciones
+// Renderiza todas las notificaciones activas en la parte inferior derecha de la pantalla
 const NotificationContainer: React.FC = () => {
   const [localNotifications, setLocalNotifications] = useState<Notification[]>([]);
   
@@ -171,7 +214,18 @@ const NotificationContainer: React.FC = () => {
   }
   
   return ReactDOM.createPortal(
-    <div className="fixed top-4 right-4 z-50 w-80 max-w-full">
+    <div
+      className="fixed z-50 w-80 max-w-full"
+      style={{
+        right: 16,
+        bottom: 16,
+        top: 'auto',
+        left: 'auto',
+        display: 'flex',
+        flexDirection: 'column-reverse',
+        alignItems: 'flex-end'
+      }}
+    >
       {localNotifications.map(notification => (
         <NotificationItem
           key={notification.id}

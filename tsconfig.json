@@ -9,10 +9,8 @@
     
     // Modo Bundler
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "moduleDetection": "force",
-    "noEmit": true,
     "jsx": "react-jsx",
     
     // Configuración de rutas y resolución
@@ -37,7 +35,6 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true,
     
     // Opciones adicionales útiles
     "esModuleInterop": true,
@@ -63,19 +60,17 @@
     
     // Manejo de importaciones
     "importsNotUsedAsValues": "remove",
-    "preserveValueImports": false,
-    
-    // Información de compilación
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tsbuildinfo"
+    "preserveValueImports": false
   },
   
   // Archivos a incluir
   "include": [
-    "src/**/*",
-    "src/**/*.tsx",
+    "src",
     "src/**/*.ts",
-    "src/**/*.jsx",
+    "src/**/*.tsx",
     "src/**/*.js",
+    "src/**/*.jsx",
+    "src/**/*.d.ts",
     "vite.config.ts"
   ],
   
@@ -89,12 +84,5 @@
     "**/*.test.ts",
     "**/*.spec.tsx",
     "**/*.test.tsx"
-  ],
-  
-  // Opciones de compilación específicas para TypeScript
-  "ts-node": {
-    "compilerOptions": {
-      "module": "commonjs"
-    }
-  }
+  ]
 }

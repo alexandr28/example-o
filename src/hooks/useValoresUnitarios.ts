@@ -8,7 +8,7 @@ import {
   LetraValorUnitario,
   SUBCATEGORIAS_POR_CATEGORIA
 } from '../models';
-import { valorUnitarioService } from '../services';
+import { valorUnitarioService } from '../services/valorUnitarioService';
 import { NotificationService } from '../components/utils/Notification';
 
 // Generar rangos de años

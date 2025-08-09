@@ -1,211 +1,370 @@
-// src/services/personaService.ts
-import { apiGet, apiPost, API_BASE_URL } from '../components/utils/apiRequest';
+/**
+ * Cliente HTTP mejorado para hacer peticiones a la API con token de autenticación
+ * Incluye manejo de errores de conectividad, renovación automática de token
+ * y sistema de cola para peticiones fallidas por token expirado
+ */
 
-// Interfaces
-export interface PersonaData {
-  codPersona: number;
-  codTipopersona?: string | null;
-  codTipoDocumento?: string | null;
-  numerodocumento: string;
-  nombres?: string | null;
-  apellidomaterno?: string | null;
-  apellidopaterno?: string | null;
-  direccion?: string | null;
-  fechanacimiento?: number | null;
-  codestadocivil?: string | null;
-  codsexo?: string | null;
-  telefono?: string | null;
-  codDireccion?: number | null;
-  lote?: string | null;
-  otros?: string | null;
-  parametroBusqueda?: string | null;
-  codUsuario?: number | null;
-  nombrePersona: string;
-}
+import { useAuthContext } from '../context/AuthContext';
+import { apiGet, apiPost, API_BASE_URL } from '../utils/api';
 
-export interface PersonaApiResponse {
-  success: boolean;
-  message: string;
-  data: PersonaData[];
-  pagina?: number | null;
-  limite?: number | null;
-  totalPaginas?: number | null;
-  totalRegistros?: number | null;
-}
-
-export interface BusquedaPersonaParams {
-  codTipoPersona?: string;
-  parametroBusqueda?: string;
-}
-
-// Constantes para tipos de persona
-export const TIPO_PERSONA_CODES = {
-  PERSONA_NATURAL: '0301',
-  PERSONA_JURIDICA: '0302'
-} as const;
+// Variables para control de renovación de token
+let isRefreshing = false;
+let failedQueue: { resolve: (value: string | null) => void; reject: (reason?: any) => void }[] = [];
 
 /**
- * Servicio para manejar las operaciones de personas
- * Este servicio NO requiere autenticación para los métodos GET
+ * Procesa la cola de peticiones pendientes después de renovar el token
  */
-export class PersonaService {
-  private static instance: PersonaService;
-  private readonly API_ENDPOINT = '/api/persona';
-  
-  private constructor() {
-    console.log('🔧 [PersonaService] Inicializado');
-    console.log('🌐 [PersonaService] API Base URL:', API_BASE_URL);
-    console.log('📍 [PersonaService] Endpoint:', this.API_ENDPOINT);
-  }
-  
-  /**
-   * Obtiene la instancia singleton del servicio
-   */
-  static getInstance(): PersonaService {
-    if (!PersonaService.instance) {
-      PersonaService.instance = new PersonaService();
-    }
-    return PersonaService.instance;
-  }
-  
-  /**
-   * Lista personas por tipo y nombre/razón social
-   * NO requiere autenticación
-   */
-  async listarPorTipoYNombre(params: BusquedaPersonaParams): Promise<PersonaData[]> {
-    try {
-      console.log('🔍 [PersonaService] Buscando personas con parámetros:', params);
-      
-      const queryParams = new URLSearchParams();
-      
-      // Agregar parámetros si existen
-      if (params.codTipoPersona) {
-        queryParams.append('codTipoPersona', params.codTipoPersona);
-      }
-      if (params.parametroBusqueda) {
-        queryParams.append('parametroBusqueda', params.parametroBusqueda);
-      } else {
-        // Valor por defecto para obtener resultados
-        queryParams.append('parametroBusqueda', 'a');
-      }
-      
-      const endpoint = `${this.API_ENDPOINT}/listarPersonaPorTipoPersonaNombreRazon?${queryParams}`;
-      
-      console.log('📡 [PersonaService] GET:', endpoint);
-      
-      // NO incluir headers de autenticación para este endpoint
-      const response = await apiGet(endpoint);
-      
-      console.log('📥 [PersonaService] Respuesta:', response);
-      
-      if (response && Array.isArray(response)) {
-        console.log(`✅ [PersonaService] ${response.length} personas encontradas`);
-        return response;
-      }
-      
-      return [];
-      
-    } catch (error: any) {
-      console.error('❌ [PersonaService] Error en búsqueda:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Obtiene todas las personas sin filtros
-   * NO requiere autenticación
-   */
-  async obtenerTodas(): Promise<PersonaData[]> {
-    try {
-      console.log('🔍 [PersonaService] Obteniendo todas las personas');
-      
-      const endpoint = `${this.API_ENDPOINT}/obtenerPersonasBasicas`;
-      
-      console.log('📡 [PersonaService] GET:', endpoint);
-      
-      // NO incluir headers de autenticación
-      const response = await apiGet(endpoint);
-      
-      console.log('📥 [PersonaService] Respuesta:', response);
-      
-      if (response && Array.isArray(response)) {
-        console.log(`✅ [PersonaService] ${response.length} personas obtenidas`);
-        return response;
-      }
-      
-      return [];
-      
-    } catch (error: any) {
-      console.error('❌ [PersonaService] Error al obtener personas:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Obtiene los datos básicos de una persona por su código
-   */
-  async obtenerPorCodigo(codPersona: number): Promise<PersonaData | null> {
-    try {
-      console.log(`🔍 [PersonaService] Buscando persona con código: ${codPersona}`);
-      
-      // Primero obtenemos todas las personas
-      const todasLasPersonas = await this.obtenerTodas();
-      
-      // Buscamos por código
-      const persona = todasLasPersonas.find(p => p.codPersona === codPersona);
-      
-      if (persona) {
-        console.log('✅ [PersonaService] Persona encontrada:', persona.nombrePersona);
-        return persona;
-      }
-      
-      console.warn('⚠️ [PersonaService] Persona no encontrada');
-      return null;
-      
-    } catch (error: any) {
-      console.error(`❌ [PersonaService] Error al obtener persona ${codPersona}:`, error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Convierte PersonaData a formato compatible con ContribuyenteData
-   */
-  convertirAContribuyente(persona: PersonaData): any {
-    // Separar el nombre completo si es necesario
-    const partesNombre = persona.nombrePersona.split(' ');
-    let apellidoPaterno = '';
-    let apellidoMaterno = '';
-    let nombres = '';
-    
-    if (partesNombre.length >= 3) {
-      apellidoPaterno = partesNombre[0];
-      apellidoMaterno = partesNombre[1];
-      nombres = partesNombre.slice(2).join(' ');
-    } else if (partesNombre.length === 2) {
-      apellidoPaterno = partesNombre[0];
-      nombres = partesNombre[1];
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
     } else {
-      nombres = persona.nombrePersona;
+      prom.resolve(token);
+    }
+  });
+  
+  failedQueue = [];
+};
+
+/**
+ * Redirige al usuario a la página de login
+ */
+export const redirectToLogin = () => {
+  // Limpiar datos de autenticación
+  localStorage.removeItem('auth_user');
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_token_expiry');
+  
+  // Redirigir a la página de login
+  window.location.href = '/login';
+};
+
+/**
+ * Obtiene el token de autenticación del localStorage
+ */
+export const getAuthToken = (): string | null => {
+  return localStorage.getItem('auth_token');
+};
+
+/**
+ * Verifica si el token ha expirado
+ */
+export const isTokenExpired = (): boolean => {
+  const tokenExpiry = localStorage.getItem('auth_token_expiry');
+  
+  if (!tokenExpiry) {
+    return true;
+  }
+  
+  return new Date(tokenExpiry) < new Date();
+};
+
+/**
+ * Intenta renovar el token de autenticación
+ */
+export const attemptTokenRenewal = async (): Promise<string | null> => {
+  // Si ya hay un proceso de renovación en curso, esperar a que termine
+  if (isRefreshing) {
+    return new Promise((resolve, reject) => {
+      failedQueue.push({ resolve, reject });
+    });
+  }
+  
+  // Marcar que estamos renovando el token
+  isRefreshing = true;
+  
+  try {
+    const auth = useAuthContext();
+    if (auth && auth.renewToken) {
+      const success = await auth.renewToken();
+      
+      if (success) {
+        // Obtener el nuevo token
+        const newToken = localStorage.getItem('auth_token');
+        
+        // Resolver todas las peticiones en cola
+        processQueue(null, newToken);
+        
+        isRefreshing = false;
+        return newToken;
+      } else {
+        // Si no se pudo renovar, notificar a las peticiones en cola
+        processQueue(new Error('No se pudo renovar el token'));
+        
+        // Redirigir al login
+        redirectToLogin();
+        
+        isRefreshing = false;
+        return null;
+      }
     }
     
-    return {
-      codigoPersona: persona.codPersona,
-      nombre: persona.nombrePersona,
-      numeroDocumento: persona.numerodocumento,
-      tipoDocumento: persona.codTipoDocumento,
-      direccion: persona.direccion === 'null' ? '' : persona.direccion,
-      telefono: persona.telefono || '',
-      nombres: persona.nombres || nombres,
-      apellidoPaterno: persona.apellidopaterno || apellidoPaterno,
-      apellidoMaterno: persona.apellidomaterno || apellidoMaterno,
-      fechaNacimiento: persona.fechanacimiento,
-      estadoCivil: persona.codestadocivil,
-      sexo: persona.codsexo,
-      lote: persona.lote
-    };
+    isRefreshing = false;
+    return null;
+  } catch (error) {
+    console.error("Error al renovar token:", error);
+    
+    // Notificar a las peticiones en cola
+    processQueue(error);
+    
+    isRefreshing = false;
+    return null;
   }
-}
+};
 
-// Exportar instancia singleton
-export const personaService = PersonaService.getInstance();
+/**
+ * Manejador de errores para peticiones fallidas
+ */
+const handleFetchError = (error: any, url: string, method: string) => {
+  console.error(`Error ${method} ${url}:`, error);
+  
+  // Verificar si es un error de red
+  if (!window.navigator.onLine || error.message.includes('fetch') || error.message.includes('network') || error.name === 'TypeError') {
+    console.log('Error de red detectado, trabajando en modo offline');
+    
+    // Lanzar un error específico para que sea manejado por el hook
+    error.isOfflineError = true;
+    throw error;
+  }
+  
+  // Si no podemos manejar el error, lo reenviamos
+  throw error;
+};
+
+/**
+ * Manejador para errores 401 (Unauthorized)
+ */
+const handle401Error = async (url: string, options: RequestInit): Promise<Response> => {
+  // Intentar renovar el token
+  const newToken = await attemptTokenRenewal();
+  
+  if (newToken) {
+    // Actualizar el token en las cabeceras
+    const updatedOptions = {
+      ...options,
+      headers: {
+        ...options.headers,
+        'Authorization': `Bearer ${newToken}`
+      }
+    };
+    
+    // Reintentar la petición con el nuevo token
+    return fetch(url, updatedOptions);
+  } else {
+    throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
+  }
+};
+
+/**
+ * Realiza una petición HTTP con el token de autenticación
+ */
+export const authenticatedFetch = async (url: string, options: RequestInit): Promise<Response> => {
+  // Obtener el token actual
+  const token = getAuthToken();
+  
+  // Log para depuración
+  console.log(`Realizando petición autenticada a ${url}`);
+  console.log(`Token disponible: ${token ? 'Sí' : 'No'}`);
+  
+  // Si no hay token y la URL requiere autenticación, intentar renovar
+  if (!token && !url.includes('/auth/login')) {
+    console.log('No hay token disponible, redirigiendo a login');
+    redirectToLogin();
+    throw new Error('No hay token de autenticación disponible');
+  }
+  
+  // Verificar si el token ha expirado y renovarlo si es necesario
+  if (token && isTokenExpired() && !isRefreshing && !url.includes('/auth/refresh')) {
+    try {
+      console.log('Token expirado, intentando renovar');
+      const newToken = await attemptTokenRenewal();
+      
+      if (!newToken) {
+        console.log('No se pudo renovar el token, redirigiendo a login');
+        redirectToLogin();
+        throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
+      }
+      
+      console.log('Token renovado exitosamente');
+    } catch (error) {
+      console.error('Error al renovar token:', error);
+      redirectToLogin();
+      throw error;
+    }
+  }
+// Obtener el token actualizado
+  const currentToken = getAuthToken();
+  
+  // Preparar las opciones con el token de autenticación
+  const authOptions = {
+    ...options,
+    headers: {
+      ...options.headers,
+      'Authorization': currentToken ? `Bearer ${currentToken}` : ''
+    }
+  };
+  
+  console.log('Cabeceras de la petición:', JSON.stringify(authOptions.headers, null, 2));
+  
+  // Realizar la petición
+  try {
+    const response = await fetch(url, authOptions);
+    
+    // Log detallado de la respuesta
+    console.log(`Respuesta de ${url}: ${response.status} ${response.statusText}`);
+    
+    // Manejar errores de autenticación
+    if (response.status === 401 || response.status === 403) {
+      console.log(`Error de autenticación: ${response.status}`);
+      
+      // Solo intentar renovar para 401, el 403 generalmente significa permisos insuficientes
+      if (response.status === 401) {
+        return handle401Error(url, authOptions);
+      } else {
+        console.error('Error 403: Permiso denegado');
+      }
+    }
+    
+    return response;
+  } catch (error) {
+    console.error(`Error en la petición a ${url}:`, error);
+    throw error;
+  }
+};
+/**
+ * Realiza una petición GET autenticada
+ */
+export const authGet = async (url: string): Promise<any> => {
+  try {
+    console.log(`Realizando petición GET a: ${url}`);
+    
+    const response = await authenticatedFetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error en la petición: ${response.statusText}`);
+    }
+    
+    return response.json();
+  } catch (error) {
+    return handleFetchError(error, url, 'GET');
+  }
+};
+
+/**
+ * Realiza una petición POST autenticada
+ */
+export const authPost = async (url: string, data: any): Promise<any> => {
+  try {
+    const response = await authenticatedFetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error en la petición: ${response.statusText}`);
+    }
+    
+    return response.json();
+  } catch (error) {
+    return handleFetchError(error, url, 'POST');
+  }
+};
+
+/**
+ * Realiza una petición PUT autenticada
+ */
+export const authPut = async (url: string, data: any): Promise<any> => {
+  try {
+    const response = await authenticatedFetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error en la petición: ${response.statusText}`);
+    }
+    
+    return response.json();
+  } catch (error) {
+    return handleFetchError(error, url, 'PUT');
+  }
+};
+
+/**
+ * Realiza una petición DELETE autenticada
+ */
+export const authDelete = async (url: string): Promise<any> => {
+  try {
+    const response = await authenticatedFetch(url, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error en la petición: ${response.statusText}`);
+    }
+    
+    return response.json();
+  } catch (error) {
+    return handleFetchError(error, url, 'DELETE');
+  }
+};
+
+/**
+ * Realiza una petición PATCH autenticada
+ */
+export const authPatch = async (url: string, data: any): Promise<any> => {
+  try {
+    const response = await authenticatedFetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error en la petición: ${response.statusText}`);
+    }
+    
+    return response.json();
+  } catch (error) {
+    return handleFetchError(error, url, 'PATCH');
+  }
+};
+
+/**
+ * Verifica si el usuario está autenticado
+ */
+export const isAuthenticated = (): boolean => {
+  const token = getAuthToken();
+  return !!token && !isTokenExpired();
+};
+
+/**
+ * Verifica el estado de la sesión y renueva el token si es necesario
+ */
+export const checkSession = async (): Promise<boolean> => {
+  if (!getAuthToken()) {
+    return false;
+  }
+  
+  if (isTokenExpired()) {
+    return !!await attemptTokenRenewal();
+  }
+  
+  return true;
+};

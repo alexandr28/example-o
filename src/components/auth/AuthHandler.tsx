@@ -117,7 +117,7 @@ const AuthHandler: React.FC = () => {
     };
     
     // Verificar cada minuto
-    const interval = setInterval(checkTokenValidity, 60 * 1000);
+    const interval = setInterval(checkTokenValidity, 60 * 15000);
     
     return () => clearInterval(interval);
   }, [auth]);

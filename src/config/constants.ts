@@ -1,6 +1,6 @@
 // src/config/constants.ts
 // URL base de la API - mantenemos por compatibilidad con código existente
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.20.160:8080';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://26.161.18.122:8080';
 export const API_PREFIX = '';
 
 // Definir explícitamente AUTH_ENDPOINTS
@@ -27,13 +27,13 @@ export const API_ENDPOINTS = {
       listarPorTipoVia: `api/direccion/listarDireccionPorTipoVia?parametrosBusqueda=a&codUsuario=1`,
     },
   CONTRIBUYENTE: `/api/contribuyente`,
- persona: {
+  persona: {
       base: '/api/persona',
       listarPorTipoYNombre: '/api/persona/listarPersonaPorTipoPersonaNombreRazon',
       listarPorContribuyente: '/api/persona/listarPersonaPorTipoPersonaNombreRazonContribuyente',
       listarPorTipoVia: '/api/persona/listarPersonaPorTipoPersonaNombreVia'
     },
-   ARANCEL: `/api/arancel`,
+  ARANCEL: `/api/arancel`,
   VALOR_UNITARIO: `/api/valoresunitarios`,
   UIT: `/api/uitEpa`,
   ALCABALA: `/api/alcabala`,

@@ -5,7 +5,7 @@ import { NotificationService } from '../components/utils/Notification';
 const AUTH_CONFIG = {
   TOKEN_EXPIRY_HOURS: 6, // 6 horas de duración del token
   TOKEN_RENEWAL_THRESHOLD_MINUTES: 30, // Renovar cuando falten 30 minutos
-  API_BASE_URL: 'http://192.168.20.160:8080',
+  API_BASE_URL: 'http://26.161.18.122:8080',
   ENDPOINTS: {
     LOGIN: '/auth/login',
     REFRESH: '/auth/refresh',

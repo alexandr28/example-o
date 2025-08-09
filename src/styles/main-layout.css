@@ -1,0 +1,58 @@
+/* src/styles/main-layout.css - Estilos para MainLayout */
+
+/* Fondo principal de la aplicación */
+body {
+  background-color: #F4F7FA !important;
+}
+
+/* Contenedor principal */
+.main-content-area {
+  background-color: #F4F7FA;
+  min-height: 100vh;
+}
+
+/* Papers y cards */
+.MuiPaper-root {
+  background-color: #FFFFFF;
+}
+
+/* Asegurar que el contenido tenga el fondo correcto */
+main {
+  background-color: #F4F7FA;
+}
+
+/* Estilos para el contenedor cuando no usa Paper */
+.content-without-paper {
+  background-color: transparent;
+}
+
+/* Ajustes para diferentes componentes */
+.MuiCard-root {
+  background-color: #FFFFFF;
+  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Tablas */
+.MuiTableContainer-root {
+  background-color: #FFFFFF;
+}
+
+/* Diálogos y modales */
+.MuiDialog-paper {
+  background-color: #FFFFFF;
+}
+
+/* Formularios */
+.MuiTextField-root .MuiOutlinedInput-root {
+  background-color: #FFFFFF;
+}
+
+/* Listas */
+.MuiList-root {
+  background-color: #FFFFFF;
+}
+
+/* Ajuste para modo oscuro si lo necesitas en el futuro */
+@media (prefers-color-scheme: dark) {
+  /* Puedes agregar estilos para modo oscuro aquí si lo necesitas */
+}

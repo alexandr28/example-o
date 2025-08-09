@@ -1,9 +1,9 @@
-// src/components/generic/EntityForm.tsx
+// src/components/EntityForm.tsx - CORREGIDO PARA MANEJAR VALORES NULL
 import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ZodSchema } from 'zod';
-import {Button} from './';
+import { Button } from './';
 
 interface EntityFormProps<T> {
   title: string;
@@ -53,36 +53,95 @@ export function EntityForm<T extends Record<string, any>>({
 
   const { errors, isDirty, isValid } = formState;
 
-  // Actualizar formulario cuando cambia el elemento seleccionado
+  // 🔥 FUNCIÓN HELPER PARA ASIGNAR VALORES DE FORMA SEGURA
+  const safeSetValue = (key: string, value: any) => {
+    try {
+      if (value !== null && value !== undefined) {
+        setValue(key as any, value);
+        console.log(`✅ [EntityForm] Valor asignado - ${key}:`, value);
+      } else {
+        console.log(`⚠️ [EntityForm] Valor null/undefined para ${key}, manteniendo valor por defecto`);
+      }
+    } catch (error) {
+      console.error(`❌ [EntityForm] Error al asignar valor ${key}:`, error);
+    }
+  };
+
+  // 🔥 ACTUALIZAR FORMULARIO CON VALIDACIÓN MEJORADA
   useEffect(() => {
-    if (selectedItem) {
+    console.log('🔄 [EntityForm] Actualizando formulario:', { selectedItem, isEditMode });
+    
+    if (selectedItem && typeof selectedItem === 'object') {
+      console.log('📝 [EntityForm] selectedItem recibido:', selectedItem);
+      
+      // Iterar sobre las claves de defaultValues para mantener la estructura
       Object.keys(defaultValues).forEach(key => {
-        if (selectedItem[key] !== undefined) {
-          setValue(key as any, selectedItem[key]);
+        if (selectedItem.hasOwnProperty(key)) {
+          const value = selectedItem[key];
+          console.log(`🔍 [EntityForm] Procesando ${key}:`, value, typeof value);
+          
+          // Validar que el valor no sea null antes de asignarlo
+          if (value !== null && value !== undefined) {
+            safeSetValue(key, value);
+          } else {
+            console.log(`⚠️ [EntityForm] Valor null para ${key}, usando valor por defecto`);
+            safeSetValue(key, defaultValues[key as keyof T]);
+          }
+        } else {
+          console.log(`⚠️ [EntityForm] Clave ${key} no encontrada en selectedItem`);
+          // Asignar valor por defecto si la clave no existe
+          safeSetValue(key, defaultValues[key as keyof T]);
         }
       });
+    } else if (!selectedItem) {
+      console.log('🧹 [EntityForm] Reseteando formulario con valores por defecto');
+      reset(defaultValues);
     } else {
+      console.warn('⚠️ [EntityForm] selectedItem no es un objeto válido:', selectedItem);
       reset(defaultValues);
     }
-  }, [selectedItem, setValue, defaultValues, reset]);
+  }, [selectedItem, setValue, defaultValues, reset, isEditMode]);
 
+  // 🔥 SUBMIT CON MEJOR MANEJO DE ERRORES
   const onSubmit = async (data: T) => {
     try {
+      console.log('💾 [EntityForm] Enviando datos:', data);
       await onSave(data);
+      
+      // Solo resetear si no estamos en modo edición
       if (!isEditMode) {
+        console.log('🧹 [EntityForm] Reseteando formulario después de guardar');
         reset(defaultValues);
       }
     } catch (error) {
-      console.error('Error al guardar:', error);
+      console.error('❌ [EntityForm] Error al guardar:', error);
+      // Aquí podrías mostrar una notificación de error
     }
   };
 
   const handleNew = () => {
+    console.log('🆕 [EntityForm] Nuevo elemento');
     reset(defaultValues);
     onNew();
   };
 
+  // 🔥 VERIFICAR ESTADO DE FORMULARIO DE FORMA SEGURA
   const isFormDisabled = loading || (selectedItem && !isEditMode);
+  const canSubmit = !loading && isDirty && isValid && (isEditMode || !selectedItem);
+
+  // 🔥 LOGGING PARA DEBUG
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔧 [EntityForm] Estado actual:', {
+      title,
+      selectedItem: selectedItem ? 'presente' : 'null',
+      isEditMode,
+      loading,
+      isDirty,
+      isValid,
+      canSubmit,
+      errorsCount: Object.keys(errors).length
+    });
+  }
 
   return (
     <div className="bg-white rounded-md shadow-sm overflow-hidden">
@@ -92,6 +151,11 @@ export function EntityForm<T extends Record<string, any>>({
           {selectedItem && !isEditMode && (
             <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-md">
               Modo vista
+            </span>
+          )}
+          {isEditMode && (
+            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-md">
+              Modo edición
             </span>
           )}
         </div>
@@ -105,7 +169,7 @@ export function EntityForm<T extends Record<string, any>>({
               Modo sin conexión
             </span>
           )}
-          {selectedItem && (
+          {selectedItem && selectedItem.id && (
             <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-md">
               ID: {selectedItem.id}
             </span>
@@ -124,7 +188,7 @@ export function EntityForm<T extends Record<string, any>>({
               <Button 
                 type="submit" 
                 variant="primary"
-                disabled={loading || !isDirty || !isValid}
+                disabled={!canSubmit}
               >
                 {loading ? (
                   <div className="flex items-center">
@@ -170,6 +234,28 @@ export function EntityForm<T extends Record<string, any>>({
             Nuevo
           </Button>
         </div>
+        
+        {/* 🔥 INFORMACIÓN DE DEBUG EN DESARROLLO */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 p-3 bg-gray-100 rounded text-xs">
+            <details>
+              <summary className="cursor-pointer font-medium">🔧 Debug EntityForm</summary>
+              <div className="mt-2 space-y-1">
+                <div>✅ canSubmit: {canSubmit ? 'true' : 'false'}</div>
+                <div>📝 isDirty: {isDirty ? 'true' : 'false'}</div>
+                <div>✔️ isValid: {isValid ? 'true' : 'false'}</div>
+                <div>🔒 isFormDisabled: {isFormDisabled ? 'true' : 'false'}</div>
+                <div>📊 selectedItem: {selectedItem ? 'presente' : 'null'}</div>
+                <div>✏️ isEditMode: {isEditMode ? 'true' : 'false'}</div>
+                {Object.keys(errors).length > 0 && (
+                  <div className="text-red-600">
+                    ❌ Errores: {Object.keys(errors).join(', ')}
+                  </div>
+                )}
+              </div>
+            </details>
+          </div>
+        )}
         
         {isOfflineMode && (
           <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
