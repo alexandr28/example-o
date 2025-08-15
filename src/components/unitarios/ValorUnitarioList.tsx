@@ -1,5 +1,5 @@
 // src/components/unitarios/ValorUnitarioList.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Paper,
   Box,
@@ -15,31 +15,92 @@ import {
   useTheme,
   alpha,
   Skeleton,
-  Alert
+  Alert,
+  Autocomplete,
+  TextField,
+  InputAdornment,
+  CircularProgress,
+  Tooltip
 } from '@mui/material';
 import {
   CalendarToday as CalendarIcon,
-  TableChart as TableIcon
+  TableChart as TableIcon,
+  Category as CategoryIcon,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon
 } from '@mui/icons-material';
-import SearchableSelect from '../ui/SearchableSelect';
 import { LetraValorUnitario, SubcategoriaValorUnitario } from '../../models';
+import { valorUnitarioService } from '../../services/valorUnitarioService';
+import { API_CONFIG } from '../../config/api.unified.config';
+import { useValoresUnitarios } from '../../hooks/useValoresUnitarios';
 
 interface ValorUnitarioListProps {
   años: { value: string, label: string }[];
-  añoTabla: number | null;
-  valoresPorCategoria: Record<string, Record<string, number>>;
-  loading: boolean;
-  onAñoTablaChange: (año: number | null) => void;
 }
 
 const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
-  años,
-  añoTabla,
-  valoresPorCategoria,
-  loading,
-  onAñoTablaChange
+  años
 }) => {
   const theme = useTheme();
+  
+  // Estados locales - Inicializar con el año actual
+  const currentYear = new Date().getFullYear();
+  const [añoTabla, setAñoTabla] = useState<number | null>(currentYear);
+  const [valoresPorCategoria, setValoresPorCategoria] = useState<Record<string, Record<string, number>>>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  console.log('🚀 [ValorUnitarioList] Inicializando con año actual:', currentYear);
+
+  // Cargar valores unitarios cuando cambia el año usando GET API con query params
+  useEffect(() => {
+    const cargarValoresUnitarios = async () => {
+      if (!añoTabla) {
+        setValoresPorCategoria({});
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log(`🔍 [ValorUnitarioList] Cargando valores para año ${añoTabla} usando API GET con query params`);
+        console.log(`📊 [ValorUnitarioList] Verificación del valor añoTabla:`, añoTabla, typeof añoTabla);
+        
+        // Verificar que añoTabla no sea null o undefined
+        if (!añoTabla) {
+          console.log('❌ [ValorUnitarioList] añoTabla es null o undefined, cancelando petición');
+          setValoresPorCategoria({});
+          return;
+        }
+        
+        // USAR EL HOOK useValoresUnitarios QUE YA ESTÁ IMPLEMENTADO
+        console.log(`🔧 [ValorUnitarioList] Usando obtenerValoresUnitariosPorCategoria con año: ${añoTabla}`);
+        
+        // Usar el hook que ya maneja todo el procesamiento
+        const { obtenerValoresUnitariosPorCategoria } = useValoresUnitarios();
+        const resultado = await obtenerValoresUnitariosPorCategoria(añoTabla);
+        
+        console.log(`✅ [ValorUnitarioList] Resultado del hook:`, resultado);
+        setValoresPorCategoria(resultado);
+        
+      } catch (err: any) {
+        console.error('❌ [ValorUnitarioList] Error cargando valores:', err);
+        setError(err.message || 'Error al cargar los valores unitarios');
+        setValoresPorCategoria({});
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarValoresUnitarios();
+  }, [añoTabla]);
+
+  // Handler para cambio de año
+  const handleAñoTablaChange = (año: number | null) => {
+    console.log(`🎯 [ValorUnitarioList] Año seleccionado: ${año}`);
+    setAñoTabla(año);
+  };
 
   // Convertir años al formato de SearchableSelect
   const añoOptions = años.map(año => ({
@@ -72,54 +133,94 @@ const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
 
   return (
     <Paper 
-      elevation={1}
+      elevation={3}
       sx={{ 
         mt: 3,
-        overflow: 'hidden',
-        border: `1px solid ${theme.palette.divider}`
+        borderRadius: 2,
+        background: 'linear-gradient(to bottom, #ffffff, #fafafa)',
+        border: '1px solid',
+        borderColor: 'divider'
       }}
     >
       <Box sx={{ p: 3 }}>
         <Stack spacing={3}>
-          {/* Header con selector de año */}
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <TableIcon color="primary" />
-              <Typography variant="h6" fontWeight={500}>
+          {/* Header mejorado con selector de año */}
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between',
+            pb: 2,
+            borderBottom: '2px solid',
+            borderColor: 'primary.main'
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{
+                p: 1,
+                borderRadius: 1,
+                backgroundColor: 'primary.main',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <TableIcon />
+              </Box>
+              <Typography variant="h6" fontWeight={600}>
                 Tabla de Valores por Categoría
               </Typography>
-            </Stack>
+            </Box>
             
-            <Box sx={{ width: 250 }}>
-              <SearchableSelect
-                label="Año de consulta"
-                options={añoOptions}
-                value={añoTabla ? añoOptions.find(opt => opt.value === añoTabla) || null : null}
-                onChange={(option) => onAñoTablaChange(option ? option.value : null)}
-                placeholder="Seleccione el año"
+            <Box sx={{ width: 280 }}>
+              <Autocomplete
+                options={años}
+                getOptionLabel={(option) => option.label}
+                value={años.find(a => parseInt(a.value) === añoTabla) || null}
+                onChange={(_, newValue) => {
+                  handleAñoTablaChange(newValue ? parseInt(newValue.value) : null);
+                }}
+                loading={loading}
                 disabled={loading}
-                size="small"
-                renderOption={(props, option) => (
-                  <Box component="li" {...props}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <CalendarIcon fontSize="small" color="action" />
-                      <Box>
-                        <Typography variant="body2">{option.label}</Typography>
-                        {option.description && (
-                          <Typography variant="caption" color="text.secondary">
-                            {option.description}
-                          </Typography>
-                        )}
-                      </Box>
-                    </Stack>
-                  </Box>
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Año de consulta"
+                    size="small"
+                    placeholder="Seleccione año"
+                    InputProps={{
+                      ...params.InputProps,
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <CalendarIcon sx={{ fontSize: 20 }} />
+                        </InputAdornment>
+                      ),
+                      endAdornment: (
+                        <>
+                          {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                          {params.InputProps.endAdornment}
+                        </>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiInputBase-root': {
+                        height: 40,
+                        backgroundColor: 'white'
+                      }
+                    }}
+                  />
                 )}
               />
             </Box>
-          </Stack>
+          </Box>
+
+          {/* Mensaje de error */}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
 
           {/* Mensaje si no hay año seleccionado */}
-          {!añoTabla && (
+          {!añoTabla && !error && (
             <Alert severity="info" icon={<CalendarIcon />}>
               Seleccione un año para visualizar la tabla de valores unitarios
             </Alert>

@@ -8,8 +8,25 @@ import {
   LetraValorUnitario,
   SUBCATEGORIAS_POR_CATEGORIA
 } from '../models';
-import { valorUnitarioService } from '../services/valorUnitarioService';
+import { valorUnitarioService, ValorUnitarioData } from '../services/valorUnitarioService';
 import { NotificationService } from '../components/utils/Notification';
+
+// Función para convertir ValorUnitarioData a ValorUnitario
+const convertirValorUnitarioData = (data: ValorUnitarioData): ValorUnitario => {
+  return {
+    id: data.id,
+    año: data.año,
+    categoria: data.categoria as CategoriaValorUnitario,
+    subcategoria: data.subcategoria as SubcategoriaValorUnitario,
+    letra: data.letra as LetraValorUnitario,
+    costo: data.costo,
+    estado: data.estado === 'ACTIVO',
+    fechaCreacion: data.fechaRegistro ? new Date(data.fechaRegistro) : undefined,
+    fechaModificacion: data.fechaModificacion ? new Date(data.fechaModificacion) : undefined,
+    usuarioCreacion: data.codUsuario?.toString(),
+    usuarioModificacion: data.codUsuario?.toString()
+  };
+};
 
 // Generar rangos de años
 const generarRangoAnos = (inicio: number, fin: number) => {
@@ -17,7 +34,7 @@ const generarRangoAnos = (inicio: number, fin: number) => {
 };
 
 // Años disponibles para el selector
-const años = generarRangoAnos(1991, 2030).map(año => ({
+const años = generarRangoAnos(1991, 2025).map(año => ({
   value: año.toString(),
   label: año.toString()
 }));
@@ -71,16 +88,25 @@ export const useValoresUnitarios = () => {
     }
   }, [categoriaSeleccionada, subcategoriaSeleccionada]);
 
-  // Cargar valores unitarios desde la API
-  const cargarValoresUnitarios = useCallback(async () => {
+  // Cargar valores unitarios desde la API usando el nuevo método con query params
+  const cargarValoresUnitarios = useCallback(async (params?: {
+    año?: number;
+    categoria?: string;
+    subcategoria?: string;
+    letra?: string;
+    estado?: string;
+  }) => {
     try {
       setLoading(true);
       setError(null);
       
-      const valores = await valorUnitarioService.obtenerTodos();
-      setValoresUnitarios(valores);
+      console.log('🔍 [useValoresUnitarios] Cargando con parámetros:', params);
       
-      console.log(`✅ [useValoresUnitarios] ${valores.length} valores cargados`);
+      // Usar el nuevo método que consulta con query params sin autenticación
+      const valores = await valorUnitarioService.consultarValoresUnitarios(params || {});
+      setValoresUnitarios(valores.map(convertirValorUnitarioData));
+      
+      console.log(`✅ [useValoresUnitarios] ${valores.length} valores cargados usando nuevo API`);
     } catch (err: any) {
       const mensaje = err.message || 'Error al cargar los valores unitarios';
       setError(mensaje);
@@ -130,8 +156,8 @@ export const useValoresUnitarios = () => {
       }
       
       // Crear en la API
-      const nuevoValor = await valorUnitarioService.crear({
-        anio: data.año,
+      const nuevoValor = await valorUnitarioService.crearValorUnitario({
+        año: data.año,
         categoria: data.categoria,
         subcategoria: data.subcategoria,
         letra: data.letra,
@@ -139,7 +165,7 @@ export const useValoresUnitarios = () => {
       });
       
       // Actualizar estado local
-      setValoresUnitarios(prev => [...prev, nuevoValor]);
+      setValoresUnitarios(prev => [...prev, convertirValorUnitarioData(nuevoValor)]);
       
       // Limpiar selecciones (manteniendo año y categoría)
       setSubcategoriaSeleccionada(null);
@@ -164,7 +190,7 @@ export const useValoresUnitarios = () => {
       setError(null);
       
       // Eliminar en la API
-      await valorUnitarioService.eliminar(id);
+      await valorUnitarioService.eliminarValorUnitario(id);
       
       // Actualizar estado local
       setValoresUnitarios(prev => prev.filter(vu => vu.id !== id));
@@ -187,7 +213,7 @@ export const useValoresUnitarios = () => {
       setLoading(true);
       setError(null);
       
-      await valorUnitarioService.eliminarPorAnio(anio);
+      await valorUnitarioService.eliminarPorAño(anio);
       
       // Actualizar estado local
       setValoresUnitarios(prev => prev.filter(vu => vu.año !== anio));
@@ -204,12 +230,60 @@ export const useValoresUnitarios = () => {
     }
   }, []);
 
-  // Obtener valores unitarios por categoría (para la tabla)
+  // Buscar valores unitarios con filtros específicos (usando nueva API)
+  const buscarValoresUnitarios = useCallback(async (filtros: {
+    año?: number;
+    categoria?: string;
+    subcategoria?: string;
+    letra?: string;
+    estado?: string;
+  }) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('🔍 [useValoresUnitarios] Buscando con filtros:', filtros);
+      
+      const valores = await valorUnitarioService.consultarValoresUnitarios(filtros);
+      
+      console.log(`✅ [useValoresUnitarios] ${valores.length} valores encontrados`);
+      return valores;
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al buscar valores unitarios';
+      setError(mensaje);
+      console.error('❌ [useValoresUnitarios] Error:', err);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Obtener valores unitarios por categoría (para la tabla) - usando nuevo API
   const obtenerValoresUnitariosPorCategoria = useCallback(async (año: number) => {
     try {
       setLoading(true);
-      const valores = await valorUnitarioService.obtenerValoresPorCategoria(año);
-      return valores;
+      
+      console.log(`🔍 [useValoresUnitarios] Obteniendo valores para año ${año} usando nuevo API`);
+      
+      // Usar el nuevo método con query params
+      const valores = await valorUnitarioService.consultarValoresUnitarios({ año });
+      
+      console.log(`📊 [useValoresUnitarios] Recibidos ${valores.length} valores para el año ${año}`);
+      
+      // Agrupar por subcategoría y letra (para la tabla)
+      const resultado: Record<string, Record<string, number>> = {};
+      
+      valores.forEach(valor => {
+        console.log(`🔍 [useValoresUnitarios] Procesando valor:`, valor);
+        
+        if (!resultado[valor.subcategoria]) {
+          resultado[valor.subcategoria] = {};
+        }
+        resultado[valor.subcategoria][valor.letra] = valor.costo;
+      });
+      
+      console.log(`✅ [useValoresUnitarios] Resultado agrupado para tabla:`, resultado);
+      return resultado;
     } catch (err) {
       console.error('❌ [useValoresUnitarios] Error al obtener valores por categoría:', err);
       return {};
@@ -224,8 +298,8 @@ export const useValoresUnitarios = () => {
       setLoading(true);
       setError(null);
       
-      const valorActualizado = await valorUnitarioService.actualizar(id, {
-        anio: data.año,
+      const valorActualizado = await valorUnitarioService.actualizarValorUnitario(id, {
+        año: data.año,
         categoria: data.categoria,
         subcategoria: data.subcategoria,
         letra: data.letra,
@@ -234,7 +308,7 @@ export const useValoresUnitarios = () => {
       
       // Actualizar estado local
       setValoresUnitarios(prev => 
-        prev.map(vu => vu.id === id ? valorActualizado : vu)
+        prev.map(vu => vu.id === id ? convertirValorUnitarioData(valorActualizado) : vu)
       );
       
       console.log('✅ [useValoresUnitarios] Valor unitario actualizado');
@@ -265,6 +339,7 @@ export const useValoresUnitarios = () => {
     
     // Métodos
     cargarValoresUnitarios,
+    buscarValoresUnitarios,
     registrarValorUnitario,
     eliminarValorUnitario,
     eliminarValoresPorAnio,

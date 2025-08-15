@@ -1,6 +1,6 @@
 // src/services/valorUnitarioService.ts
 import BaseApiService from './BaseApiService';
-import { API_CONFIG } from '../config/api.unified.config';
+import { API_CONFIG, buildApiUrl } from '../config/api.unified.config';
 
 /**
  * Interfaces para Valor Unitario
@@ -31,6 +31,7 @@ export interface CreateValorUnitarioDTO {
 
 export interface UpdateValorUnitarioDTO extends Partial<CreateValorUnitarioDTO> {
   estado?: string;
+  fechaModificacion?: string;
 }
 
 export interface BusquedaValorUnitarioParams {
@@ -165,12 +166,15 @@ class ValorUnitarioService extends BaseApiService<ValorUnitarioData, CreateValor
    */
   private static obtenerDescripcionSubcategoria(subcategoria: string): string {
     const descripciones: Record<string, string> = {
+      'MUROS Y COLUMNAS': 'Muros y Columnas',
       'MUROS_Y_COLUMNAS': 'Muros y Columnas',
       'TECHOS': 'Techos',
       'PISOS': 'Pisos',
+      'PUERTAS Y VENTANAS': 'Puertas y Ventanas',
       'PUERTAS_Y_VENTANAS': 'Puertas y Ventanas',
       'REVESTIMIENTOS': 'Revestimientos',
       'BANOS': 'Baños',
+      'INSTALACIONES ELECTRICAS Y SANITARIAS': 'Instalaciones Eléctricas y Sanitarias',
       'INSTALACIONES_ELECTRICAS_Y_SANITARIAS': 'Instalaciones Eléctricas y Sanitarias'
     };
     return descripciones[subcategoria] || subcategoria;
@@ -194,6 +198,129 @@ class ValorUnitarioService extends BaseApiService<ValorUnitarioData, CreateValor
       
     } catch (error: any) {
       console.error('❌ [ValorUnitarioService] Error listando valores unitarios:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Consulta valores unitarios usando el API específico con GET y query params
+   * URL: GET http://26.161.18.122:8080/api/valoresunitarios?param1=value1&param2=value2
+   * NO requiere autenticación
+   */
+  async consultarValoresUnitarios(params: {
+    año?: number;
+    categoria?: string;
+    subcategoria?: string;
+    letra?: string;
+    estado?: string;
+  }): Promise<ValorUnitarioData[]> {
+    try {
+      console.log('🔍 [ValorUnitarioService] Consultando valores unitarios con parámetros:', params);
+      
+      // Construir URL con query params - API específico: GET http://26.161.18.122:8080/api/valoresunitarios?anio=2024
+      let url = `${API_CONFIG.baseURL}/api/valoresunitarios`;
+      
+      // Construir parámetros de consulta
+      const queryParams = new URLSearchParams();
+      if (params.año) {
+        queryParams.set('anio', params.año.toString()); // Usar 'anio' no 'año'
+        console.log('📋 [ValorUnitarioService] Añadido parámetro anio:', params.año);
+      }
+    
+      // Solo añadir query params si hay alguno
+      if (queryParams.toString()) {
+        url += `?${queryParams.toString()}`;
+      }
+      
+      console.log('📡 [ValorUnitarioService] URL final construida:', url);
+      console.log('📡 [ValorUnitarioService] Query params string:', queryParams.toString());
+      
+      // Petición directa sin headers de autenticación para evitar 403
+      const response = await fetch(url, {
+        method: 'GET',
+        // NO incluir mode, cache, ni headers para evitar problemas de CORS/403
+      });
+      
+      console.log('📡 [ValorUnitarioService] Response Status:', response.status);
+      console.log('📡 [ValorUnitarioService] Response URL:', response.url);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [ValorUnitarioService] Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: errorText,
+          requestURL: url
+        });
+        
+        // Mensaje específico para error 403
+        if (response.status === 403) {
+          throw new Error(`Acceso denegado (403). El API rechazó la petición. Verifique que no se requiera autenticación o parámetros adicionales.`);
+        }
+        
+        throw new Error(`Error HTTP ${response.status}: ${response.statusText || errorText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('✅ [ValorUnitarioService] Raw API response:', responseData);
+      
+      // El API devuelve un array directamente según tu JSON de ejemplo
+      let items = [];
+      if (Array.isArray(responseData)) {
+        items = responseData;
+      } else if (responseData && typeof responseData === 'object') {
+        // Verificar diferentes estructuras de respuesta
+        if (responseData.data && Array.isArray(responseData.data)) {
+          items = responseData.data;
+        } else if (responseData.success !== undefined) {
+          // Respuesta con estructura de éxito/error
+          items = responseData.data ? (Array.isArray(responseData.data) ? responseData.data : [responseData.data]) : [];
+        } else {
+          // Es un solo objeto, convertir a array
+          items = [responseData];
+        }
+      }
+      
+      console.log('📊 [ValorUnitarioService] Items a normalizar:', items.length, 'elementos');
+      
+      // Normalizar según la estructura real del API
+      const valoresFormateados = items.map((item: any, index: number) => {
+        console.log(`🔍 [ValorUnitarioService] Procesando item ${index + 1}:`, item);
+        
+        const valorFormateado = {
+          id: item.codigoValorUnitario || item.codValorUnitario || item.id || `temp_${index + 1}`,
+          año: item.anio || item.año || new Date().getFullYear(),
+          categoria: item.codCategoria || item.categoria || '',
+          subcategoria: item.codSubcategoria || item.subcategoria || '',
+          letra: item.codLetra || item.letra || 'A',
+          costo: parseFloat(item.costo?.toString() || '0'),
+          descripcionCategoria: item.descripcionCategoria || 
+            ValorUnitarioService.obtenerDescripcionCategoria(item.codCategoria || item.categoria),
+          descripcionSubcategoria: item.descripcionSubcategoria || 
+            ValorUnitarioService.obtenerDescripcionSubcategoria(item.codSubcategoria || item.subcategoria),
+          estado: item.estado || 'ACTIVO',
+          fechaRegistro: item.fechaRegistro,
+          fechaModificacion: item.fechaModificacion,
+          codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario
+        };
+        
+        console.log(`✅ [ValorUnitarioService] Item ${index + 1} formateado:`, valorFormateado);
+        return valorFormateado;
+      });
+      
+      console.log(`✅ [ValorUnitarioService] ${valoresFormateados.length} valores unitarios procesados correctamente`);
+      return valoresFormateados;
+      
+    } catch (error: any) {
+      console.error('❌ [ValorUnitarioService] Error completo:', error);
+      console.error('❌ [ValorUnitarioService] Stack trace:', error.stack);
+      
+      // Re-throw con mejor información de error
+      if (error.message.includes('403')) {
+        throw new Error('Error 403: El servidor rechazó la petición. Verifique la configuración del API y los parámetros requeridos.');
+      }
+      
       throw error;
     }
   }
@@ -288,7 +415,7 @@ class ValorUnitarioService extends BaseApiService<ValorUnitarioData, CreateValor
       });
       
       // Poblar con datos reales
-      valores.forEach(valor => {
+      valores.forEach(valor => {  
         if (resultado[valor.categoria] && 
             resultado[valor.categoria][valor.subcategoria]) {
           resultado[valor.categoria][valor.subcategoria][valor.letra] = valor.costo;
