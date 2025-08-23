@@ -1,5 +1,5 @@
 // src/components/modal/SelectorDirecciones.tsx
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -118,7 +118,7 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [busqueda, direcciones]);
+  }, [busqueda, direcciones, aplicarFiltroBusqueda]);
 
   // Inicializar direcciones filtradas cuando cambien las direcciones
   useEffect(() => {
@@ -127,7 +127,7 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
 
 
   // Aplicar filtro de búsqueda
-  const aplicarFiltroBusqueda = (termino: string) => {
+  const aplicarFiltroBusqueda = useCallback((termino: string) => {
     const terminoLower = termino.toLowerCase();
     const filtradas = direcciones.filter(dir => 
       dir.nombreVia?.toLowerCase().includes(terminoLower) ||
@@ -139,7 +139,7 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
     );
     setDireccionesFiltradas(filtradas);
     setPage(0);
-  };
+  }, [direcciones]);
 
   // Manejar selección
   const handleSelect = () => {

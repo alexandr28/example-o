@@ -1,5 +1,5 @@
 // src/components/barrio/BarrioList.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Barrio } from '../../models/Barrio';
 import { Sector } from '../../models/Sector';
 
@@ -15,7 +15,6 @@ import {
   IconButton,
   Box,
   Typography,
-  CircularProgress,
   Tooltip,
   Paper,
   TextField,
@@ -34,8 +33,7 @@ import {
   LocationOn as LocationIcon,
   Search as SearchIcon,
   Clear as ClearIcon,
-  Home as HomeIcon,
-  Business as BusinessIcon
+  Home as HomeIcon
 } from '@mui/icons-material';
 
 interface BarrioListProps {
@@ -71,8 +69,6 @@ const BarrioList: React.FC<BarrioListProps> = ({
   barrios = [],
   sectores = [],
   onEdit,
-  onDelete,
-  onView,
   onSelect,
   loading = false,
   searchTerm = '',
@@ -99,11 +95,11 @@ const BarrioList: React.FC<BarrioListProps> = ({
   }, [sectores]);
 
   // Obtener el nombre del sector
-  const getNombreSector = (codSector: number | undefined): string => {
+  const getNombreSector = useCallback((codSector: number | undefined): string => {
     if (!codSector) return 'Sin sector';
     const sector = sectoresMap.get(codSector);
     return sector?.nombre || `Sector ${codSector}`;
-  };
+  }, [sectoresMap]);
 
   // Manejar ordenamiento
   const handleRequestSort = (property: string) => {
@@ -129,7 +125,7 @@ const BarrioList: React.FC<BarrioListProps> = ({
   };
 
   // Manejar cambio de página
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
   };
 
@@ -190,7 +186,7 @@ const BarrioList: React.FC<BarrioListProps> = ({
     });
 
     return filteredData;
-  }, [barrios, order, orderBy, localSearchTerm, onSearch, sectoresMap]);
+  }, [barrios, order, orderBy, localSearchTerm, onSearch, sectoresMap, getNombreSector]);
 
   // Calcular barrios paginados
   const paginatedBarrios = sortedAndFilteredBarrios.slice(

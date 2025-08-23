@@ -1,5 +1,5 @@
 // src/components/predio/pisos/RegistrosPisos.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Controller, UseFormReturn } from 'react-hook-form';
 import {
   Box,
@@ -445,17 +445,17 @@ const RegistrosPisos: React.FC = () => {
   };
 
   // Calcular suma total de valores unitarios
-  const calcularSumaValores = (): number => {
+  const calcularSumaValores = useCallback((): number => {
     const suma = categoriasSeleccionadas.reduce((total, categoria) => total + categoria.valor, 0);
     console.log('🔢 [RegistrosPisos] Suma total de valores:', suma);
     return suma;
-  };
+  }, [categoriasSeleccionadas]);
 
   // Actualizar el campo "Otras instalaciones" con la suma
   useEffect(() => {
     const sumaTotal = calcularSumaValores();
     setFormData(prev => ({ ...prev, otrasInstalaciones: sumaTotal.toFixed(2) }));
-  }, [categoriasSeleccionadas]);
+  }, [categoriasSeleccionadas, calcularSumaValores]);
 
   // Manejar cambios en el formulario
   const handleInputChange = (field: keyof PisoFormData, value: any) => {

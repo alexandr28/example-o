@@ -45,7 +45,7 @@ export const AsignacionArancelForm: React.FC = () => {
   const [codArancelActual, setCodArancelActual] = useState<number | null>(null);
 
   // Hooks
-  const { crearArancel, crearArancelSinAuth, actualizarArancel, obtenerPorAnioYDireccion, loading } = useAranceles();
+  const { crearArancelSinAuth, actualizarArancel, loading } = useAranceles();
 
   // Hook para obtener arancel existente cuando se selecciona año y dirección
   const { arancel: arancelExistente } = useArancel(

@@ -34,7 +34,7 @@ export interface CrearArancelApiDTO {
   codUsuario: number;
 }
 
-export interface UpdateArancelDTO extends Partial<CreateArancelDTO> {}
+export type UpdateArancelDTO = Partial<CreateArancelDTO>;
 
 export interface ArancelResponse {
   success: boolean;

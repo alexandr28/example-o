@@ -8,19 +8,10 @@ import {
   TextField,
   Button,
   Paper,
-  Stack,
   Typography,
   CircularProgress,
-  useTheme,
-  alpha,
   Alert,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  FormHelperText,
-  Autocomplete,
-  Divider
+  Autocomplete
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -29,7 +20,6 @@ import {
 } from '@mui/icons-material';
 // import SearchableSelect from '../ui/SearchableSelect';
 import { CalleFormData } from '../../models/Calle';
-import { CreateCalleDTO } from '../../services/calleApiService';
 import { useSectores } from '../../hooks/useSectores';
 import { useBarrios } from '../../hooks/useBarrios';
 import { buildApiUrl } from '../../config/api.unified.config';
@@ -79,13 +69,11 @@ interface TipoViaOption {
 
 const CalleForm: React.FC<CalleFormProps> = ({
   onSubmit,
-  onCancel,
   onNew,
   onEdit,
   initialData,
   isSubmitting = false
 }) => {
-  const theme = useTheme();
   const [tiposVia, setTiposVia] = useState<TipoViaOption[]>([]);
   const [loadingTiposVia, setLoadingTiposVia] = useState(false);
   const [errorTiposVia, setErrorTiposVia] = useState<string | null>(null);
@@ -104,7 +92,6 @@ const CalleForm: React.FC<CalleFormProps> = ({
     handleSubmit,
     watch,
     reset,
-    setValue,
     formState: { errors }
   } = useForm<CalleFormData>({
     resolver: yupResolver(schema),
@@ -234,21 +221,20 @@ const CalleForm: React.FC<CalleFormProps> = ({
     onNew?.();
   };
 
-  // Preparar opciones para SearchableSelect
-  const tipoViaOptions = tiposVia.map(tipo => ({
-    value: tipo.codConstante,
-    label: tipo.nombre
-  }));
-
-  const sectorOptions = (sectores || []).map(sector => ({
-    value: sector.id,
-    label: sector.nombre || 'Sin nombre'
-  }));
-
-  const barrioOptions = (todosLosBarrios || []).map(barrio => ({
-    value: barrio.id,
-    label: barrio.nombre || 'Sin nombre'
-  }));
+  // Opciones preparadas para SearchableSelect (actualmente no usado)
+  // Se mantienen comentadas por si se necesitan en el futuro
+  // const tipoViaOptions = tiposVia.map(tipo => ({
+  //   value: tipo.codConstante,
+  //   label: tipo.nombre
+  // }));
+  // const sectorOptions = (sectores || []).map(sector => ({
+  //   value: sector.id,
+  //   label: sector.nombre || 'Sin nombre'
+  // }));
+  // const barrioOptions = (todosLosBarrios || []).map(barrio => ({
+  //   value: barrio.id,
+  //   label: barrio.nombre || 'Sin nombre'
+  // }));
 
   // Mostrar errores si hay alguno
   const hasErrors = errorTiposVia || errorSectores || errorBarrios;

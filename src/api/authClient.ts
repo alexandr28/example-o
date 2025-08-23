@@ -8,30 +8,19 @@
 
 // Variables para control de renovación de token
 const isRefreshing = false;
-let failedQueue: { resolve: (value: string | null) => void; reject: (reason?: any) => void }[] = [];
+// failedQueue - comentado porque no se usa actualmente
+// Se mantiene por si se habilita autenticación en el futuro
 
 // Handler inyectable para renovar token, registrado desde el AuthProvider
 type RenewTokenHandler = () => Promise<boolean>;
-let renewTokenHandler: RenewTokenHandler | null = null;
 
-export const registerRenewTokenHandler = (handler: RenewTokenHandler) => {
-  renewTokenHandler = handler;
+export const registerRenewTokenHandler = (_handler: RenewTokenHandler) => {
+  // renewTokenHandler = handler;
+  // Deshabilitado - las APIs no requieren autenticación
 };
 
-/**
- * Procesa la cola de peticiones pendientes después de renovar el token
- */
-const processQueue = (error: any, token: string | null = null) => {
-  failedQueue.forEach(prom => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
-    }
-  });
-  
-  failedQueue = [];
-};
+// processQueue - comentado porque no se usa actualmente
+// Se mantiene por si se habilita autenticación en el futuro
 
 /**
  * Redirige al usuario a la página de login
@@ -148,7 +137,7 @@ const handleFetchError = (error: any, url: string, method: string) => {
  * Manejador para errores 401 (Unauthorized)
  * DESHABILITADO: Las APIs no requieren autenticación
  */
-const handle401Error = async (url: string, options: RequestInit): Promise<Response> => {
+const handle401Error = async (_url: string, _options: RequestInit): Promise<Response> => {
   // DESHABILITADO: Las APIs no requieren autenticación y causa errores CORS
   console.log('⚠️ [AuthClient] Manejo de error 401 deshabilitado - las APIs no requieren autenticación');
   throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');

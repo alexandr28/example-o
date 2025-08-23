@@ -69,7 +69,7 @@ const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
       console.log('🔄 [ValorUnitarioList] Cambiando año de', añoTabla, 'a', añoSeleccionado);
       setAñoTabla(añoSeleccionado);
     }
-  }, [añoSeleccionado]);
+  }, [añoSeleccionado, añoTabla]);
 
   // Cargar valores unitarios cuando cambia el año usando GET API con query params
   useEffect(() => {

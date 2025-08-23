@@ -114,7 +114,7 @@ const SelectorContribuyente: React.FC<SelectorContribuyenteProps> = ({
     if (!isOpen) {
       hasLoadedRef.current = false;
     }
-  }, [isOpen]); // Solo depender de isOpen, no de cargarContribuyentes
+  }, [isOpen, cargarContribuyentes, contribuyentes.length, loading]); // Incluir todas las dependencias
 
   // Resetear estados cuando se cierra el modal
   useEffect(() => {

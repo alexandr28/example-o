@@ -1,5 +1,5 @@
 // src/components/calles/CalleListMUI.tsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Paper,
   Table,
@@ -138,11 +138,11 @@ const CalleListMUI: React.FC<CalleListProps> = ({
   };
 
   // Obtener ubicación completa
-  const getUbicacion = (calle: Calle) => {
+  const getUbicacion = useCallback((calle: Calle) => {
     const codigoBarrio = calle.codBarrio || calle.codigoBarrio;
     const nombreBarrio = calle.nombreBarrio || (obtenerNombreBarrio ? obtenerNombreBarrio(codigoBarrio || 0) : `Barrio ${codigoBarrio}`);
     return nombreBarrio || 'Sin ubicación';
-  };
+  }, [obtenerNombreBarrio]);
 
   // Ordenar y filtrar datos
   const sortedAndFilteredCalles = useMemo(() => {
@@ -194,7 +194,7 @@ const CalleListMUI: React.FC<CalleListProps> = ({
     });
 
     return filteredData;
-  }, [calles, order, orderBy, localSearchTerm, onSearch]);
+  }, [calles, order, orderBy, localSearchTerm, onSearch, getUbicacion]);
 
   // Calcular datos paginados
   const paginatedCalles = sortedAndFilteredCalles.slice(

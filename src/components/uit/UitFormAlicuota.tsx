@@ -95,7 +95,7 @@ const UitFormAlicuota: React.FC<UitFormAlicuotaProps> = ({
       console.log('🔄 [UitFormAlicuota] Cargando para año:', anioSeleccionado);
       cargarUITs(anioSeleccionado);
     }
-  }, [anioSeleccionado]); // Removemos cargarUITs de las dependencias para evitar loops
+  }, [anioSeleccionado, cargarUITs]);
 
   // Efecto para cargar datos cuando se selecciona una UIT
   useEffect(() => {

@@ -307,33 +307,26 @@ class AlcabalaService extends BaseApiService<AlcabalaData, CreateAlcabalaDTO, Up
    * Calcula el impuesto de alcabala
    * NO requiere autenticación (cálculo local)
    */
-  calcularImpuesto(valorVenta: number, anio: number = new Date().getFullYear()): Promise<{
+  async calcularImpuesto(valorVenta: number, anio: number = new Date().getFullYear()): Promise<{
     valorVenta: number;
     tasa: number;
     impuesto: number;
     anio: number;
   }> {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const alcabala = await this.obtenerAlcabalaPorAnio(anio);
-        
-        if (!alcabala) {
-          throw new Error(`No se encontró tasa de alcabala para el año ${anio}`);
-        }
-        
-        const impuesto = (valorVenta * alcabala.tasa) / 100;
-        
-        resolve({
-          valorVenta,
-          tasa: alcabala.tasa,
-          impuesto: Math.round(impuesto * 100) / 100, // Redondear a 2 decimales
-          anio
-        });
-        
-      } catch (error) {
-        reject(error);
-      }
-    });
+    const alcabala = await this.obtenerAlcabalaPorAnio(anio);
+    
+    if (!alcabala) {
+      throw new Error(`No se encontró tasa de alcabala para el año ${anio}`);
+    }
+    
+    const impuesto = (valorVenta * alcabala.tasa) / 100;
+    
+    return {
+      valorVenta,
+      tasa: alcabala.tasa,
+      impuesto: Math.round(impuesto * 100) / 100, // Redondear a 2 decimales
+      anio
+    };
   }
   
   /**

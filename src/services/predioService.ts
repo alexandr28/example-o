@@ -65,7 +65,7 @@ export interface CreatePredioDTO {
   codUsuario: number;
 }
 
-export interface UpdatePredioDTO extends Partial<CreatePredioDTO> {}
+export type UpdatePredioDTO = Partial<CreatePredioDTO>;
 
 export interface BusquedaPredioParams {
   codPredio?: string;
