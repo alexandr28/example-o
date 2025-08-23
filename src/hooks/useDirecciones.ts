@@ -15,10 +15,13 @@ interface DireccionData {
   codigoSector: number;
   codigoBarrio: number;
   codigoCalle: number;
+  codigoTipoVia?: number;
+  codigoBarrioVia?: number;
   nombreSector?: string;
   nombreBarrio?: string;
   nombreCalle?: string;
   nombreVia?: string;
+  nombreTipoVia?: string;
   cuadra?: string;
   lado?: string;
   loteInicial?: number;
@@ -168,6 +171,7 @@ export const useDirecciones = () => {
           nombreCalle: 'Av. Principal',
           nombreVia: 'Principal',
           nombreTipoVia: 'AVENIDA',
+          codigoTipoVia: 3801,
           cuadra: '12',
           lado: 'Derecho',
           loteInicial: 1,
@@ -186,22 +190,29 @@ export const useDirecciones = () => {
     }
   }, []);
 
-  // Crear dirección - Mejorado para incluir nombres
+  // Crear dirección usando el servicio
   const crearDireccion = useCallback(async (datos: CreateDireccionDTO): Promise<boolean> => {
     try {
       setLoading(true);
       
-      // TODO: Implementar cuando el servicio esté disponible
-      console.log('➕ Creando dirección:', datos);
+      console.log('➕ [useDirecciones] Creando dirección:', datos);
       
-      // Obtener nombres de las entidades relacionadas
+      // Importar el servicio de direcciones
+      const direccionService = (await import('../services/direccionService')).default;
+      
+      // Llamar al servicio para crear la dirección
+      const nuevaDireccionCreada = await direccionService.crearDireccion(datos);
+      
+      console.log('✅ [useDirecciones] Dirección creada:', nuevaDireccionCreada);
+      
+      // Obtener nombres de las entidades relacionadas para actualizar la lista local
       const sector = sectores.find(s => s.codigo === datos.codigoSector);
       const barrio = barrios.find(b => b.codigo === datos.codigoBarrio);
       const calle = calles.find(c => c.codigo === datos.codigoCalle);
       
-      // Simular creación con datos completos
+      // Agregar la nueva dirección con datos completos
       const nuevaDireccion: DireccionData = {
-        id: Date.now(),
+        id: nuevaDireccionCreada.id || Date.now(),
         codigo: Date.now(),
         ...datos,
         nombreSector: sector?.nombre || '',

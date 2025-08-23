@@ -222,8 +222,16 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
 
   return (
     <>
-      <Paper sx={{ p: 3 }}>
-        <form onSubmit={handleSubmit}>
+      <Paper 
+        sx={{ 
+          p: 3,
+          width: '100%',
+          height: '100%',
+          overflow: 'auto',
+          maxHeight: 'calc(100vh - 100px)' // Ajustar según la altura del header/navbar
+        }}
+      >
+        <form onSubmit={handleSubmit} style={{ width: '100%' }}>
           {/* Header con tipo de contribuyente */}
           <Box sx={{ mb: 3 }}>
             <Typography variant="h5" component="h2" gutterBottom>
@@ -255,10 +263,10 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
 
           <Divider sx={{ mb: 3 }} />
 
-          {/* Contenedor principal con ancho limitado */}
-          <Box sx={{ maxWidth: '600px' }}>
+          {/* Contenedor principal con ancho completo */}
+          <Box sx={{ width: '100%' }}>
             {/* Datos principales */}
-            <FormSectionMUI title="Datos del Contribuyente" icon={<BadgeIcon />}>
+           
               <PersonaFormMUI
                 form={principalForm}
                 isJuridica={esPersonaJuridica}
@@ -267,10 +275,11 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
                 getDireccionTextoCompleto={getDireccionTextoCompleto}
                 disablePersonaFields={loading}
               />
-            </FormSectionMUI>
+         
 
-            {/* Botón para agregar cónyuge/representante */}
-            <Box sx={{ my: 3 }}>
+            {/* Botón para agregar cónyuge/representante y Botones de acción */}
+            <Box sx={{ my: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {/* Botón para agregar cónyuge/representante - Lado izquierdo */}
               <Button
                 variant={showConyugeRepresentante ? 'outlined' : 'contained'}
                 onClick={toggleConyugeForm}
@@ -281,7 +290,9 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
                   '&:hover': {
                     backgroundColor: showConyugeRepresentante ? 
                       alpha(theme.palette.primary.main, 0.08) : theme.palette.primary.dark
-                  }
+                  },
+                  minWidth: '200px',
+                  height: '36px'
                 }}
               >
                 {showConyugeRepresentante 
@@ -290,6 +301,61 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
                     ? 'Agregar datos del representante legal' 
                     : 'Agregar datos del cónyuge'}
               </Button>
+
+              {/* Botones de acción - Lado derecho */}
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Button
+                  variant="outlined"
+                  onClick={handleNuevo}
+                  disabled={loading}
+                  startIcon={<AddIcon />}
+                  sx={{
+                    minWidth: '120px',
+                    height: '36px',
+                    padding: '6px 16px',
+                    margin: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  Nuevo
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={handleEditar}
+                  disabled={loading}
+                  startIcon={<EditIcon />}
+                  sx={{
+                    minWidth: '120px',
+                    height: '36px',
+                    padding: '6px 16px',
+                    margin: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  Editar
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={loading}
+                  startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
+                  sx={{
+                    minWidth: '120px',
+                    height: '36px',
+                    padding: '6px 16px',
+                    margin: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  {loading ? 'Guardando...' : 'Guardar'}
+                </Button>
+              </Stack>
             </Box>
 
             {/* Formulario de cónyuge/representante */}
@@ -313,35 +379,6 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
               </FormSectionMUI>
             </Collapse>
 
-            <Divider sx={{ my: 3 }} />
-
-            {/* Botones de acción - AJUSTADOS AL ANCHO DEL FORMULARIO */}
-            <Stack direction="row" spacing={2} justifyContent="flex-end">
-              <Button
-                variant="outlined"
-                onClick={handleNuevo}
-                disabled={loading}
-                startIcon={<ClearIcon />}
-              >
-                Nuevo
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={handleEditar}
-                disabled={loading}
-                startIcon={<EditIcon />}
-              >
-                Editar
-              </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={loading}
-                startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
-              >
-                {loading ? 'Guardando...' : 'Guardar'}
-              </Button>
-            </Stack>
           </Box>
         </form>
       </Paper>

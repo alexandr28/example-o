@@ -8,9 +8,14 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.claude
 dist
 dist-ssr
 *.local
+
+# Compiled TypeScript files (should not be in src)
+src/**/*.js
+src/**/*.js.map
 
 # Editor directories and files
 .vscode/*

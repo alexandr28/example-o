@@ -3,13 +3,20 @@
  * Incluye manejo de errores de conectividad, renovación automática de token
  * y sistema de cola para peticiones fallidas por token expirado
  */
-
-import { useAuthContext } from '../context/AuthContext';
-import { apiGet, apiPost, API_BASE_URL } from '../utils/api';
+ 
+// Nota: No usar hooks de React aquí. Este módulo es de infraestructura.
 
 // Variables para control de renovación de token
-let isRefreshing = false;
+const isRefreshing = false;
 let failedQueue: { resolve: (value: string | null) => void; reject: (reason?: any) => void }[] = [];
+
+// Handler inyectable para renovar token, registrado desde el AuthProvider
+type RenewTokenHandler = () => Promise<boolean>;
+let renewTokenHandler: RenewTokenHandler | null = null;
+
+export const registerRenewTokenHandler = (handler: RenewTokenHandler) => {
+  renewTokenHandler = handler;
+};
 
 /**
  * Procesa la cola de peticiones pendientes después de renovar el token
@@ -61,8 +68,14 @@ export const isTokenExpired = (): boolean => {
 
 /**
  * Intenta renovar el token de autenticación
+ * DESHABILITADO: Las APIs no requieren autenticación y causa errores CORS
  */
 export const attemptTokenRenewal = async (): Promise<string | null> => {
+  // DESHABILITADO: Causa errores CORS y las APIs no requieren autenticación
+  console.log('⚠️ [AuthClient] Renovación de token deshabilitada - las APIs no requieren autenticación');
+  return null;
+  
+  /* Código original comentado para evitar CORS
   // Si ya hay un proceso de renovación en curso, esperar a que termine
   if (isRefreshing) {
     return new Promise((resolve, reject) => {
@@ -74,9 +87,8 @@ export const attemptTokenRenewal = async (): Promise<string | null> => {
   isRefreshing = true;
   
   try {
-    const auth = useAuthContext();
-    if (auth && auth.renewToken) {
-      const success = await auth.renewToken();
+    if (renewTokenHandler) {
+      const success = await renewTokenHandler();
       
       if (success) {
         // Obtener el nuevo token
@@ -110,6 +122,7 @@ export const attemptTokenRenewal = async (): Promise<string | null> => {
     isRefreshing = false;
     return null;
   }
+  */
 };
 
 /**
@@ -133,8 +146,14 @@ const handleFetchError = (error: any, url: string, method: string) => {
 
 /**
  * Manejador para errores 401 (Unauthorized)
+ * DESHABILITADO: Las APIs no requieren autenticación
  */
 const handle401Error = async (url: string, options: RequestInit): Promise<Response> => {
+  // DESHABILITADO: Las APIs no requieren autenticación y causa errores CORS
+  console.log('⚠️ [AuthClient] Manejo de error 401 deshabilitado - las APIs no requieren autenticación');
+  throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
+  
+  /* Código original comentado para evitar CORS
   // Intentar renovar el token
   const newToken = await attemptTokenRenewal();
   
@@ -153,6 +172,7 @@ const handle401Error = async (url: string, options: RequestInit): Promise<Respon
   } else {
     throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
   }
+  */
 };
 
 /**
@@ -174,6 +194,13 @@ export const authenticatedFetch = async (url: string, options: RequestInit): Pro
   }
   
   // Verificar si el token ha expirado y renovarlo si es necesario
+  // DESHABILITADO: Las APIs no requieren autenticación y causa errores CORS
+  if (token && isTokenExpired() && !isRefreshing && !url.includes('/auth/refresh')) {
+    console.log('⚠️ [AuthClient] Token expirado pero renovación deshabilitada - las APIs no requieren autenticación');
+    // No intentar renovar para evitar errores CORS
+  }
+  
+  /* Código original comentado para evitar CORS
   if (token && isTokenExpired() && !isRefreshing && !url.includes('/auth/refresh')) {
     try {
       console.log('Token expirado, intentando renovar');
@@ -192,6 +219,7 @@ export const authenticatedFetch = async (url: string, options: RequestInit): Pro
       throw error;
     }
   }
+  */
 // Obtener el token actualizado
   const currentToken = getAuthToken();
   
@@ -356,8 +384,14 @@ export const isAuthenticated = (): boolean => {
 
 /**
  * Verifica el estado de la sesión y renueva el token si es necesario
+ * DESHABILITADO: Las APIs no requieren autenticación
  */
 export const checkSession = async (): Promise<boolean> => {
+  // DESHABILITADO: Las APIs no requieren autenticación y causa errores CORS
+  console.log('⚠️ [AuthClient] Verificación de sesión deshabilitada - las APIs no requieren autenticación');
+  return true; // Siempre retornar true para evitar problemas
+  
+  /* Código original comentado para evitar CORS
   if (!getAuthToken()) {
     return false;
   }
@@ -367,4 +401,5 @@ export const checkSession = async (): Promise<boolean> => {
   }
   
   return true;
+  */
 };

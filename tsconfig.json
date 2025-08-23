@@ -57,6 +57,7 @@
     "preserveConstEnums": true,
     "declaration": false,
     "declarationMap": false,
+    "noEmit": true,
     
     // Manejo de importaciones
     "importsNotUsedAsValues": "remove",

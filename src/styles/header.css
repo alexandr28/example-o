@@ -1,0 +1,152 @@
+/* Header Component Styles */
+
+/* AppBar principal */
+.header-appbar {
+  position: fixed !important;
+  background-color: #2d3748 !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12) !important;
+  min-height: 63px !important;
+  height: 63px !important;
+}
+
+/* Sobrescribir estilos de MUI AppBar */
+.header-appbar.MuiAppBar-root {
+  height: 63px !important;
+}
+
+/* Toolbar con altura fija */
+.header-toolbar {
+  min-height: 63px !important;
+  height: 63px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+/* Sobrescribir estilos de MUI Toolbar */
+.header-toolbar.MuiToolbar-root {
+  min-height: 63px !important;
+  height: 63px !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 !important;
+}
+
+/* Título del header */
+.header-title {
+  flex-grow: 1 !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+  margin: 0 !important;
+  line-height: 63px !important;
+  padding-left: 16px !important;
+}
+
+/* Contenedor del usuario logueado */
+.header-user-container {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-right: 12px !important;
+  padding: 8px 12px !important;
+  border-radius: 4px !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  gap: 6px !important;
+  height: auto !important;
+  align-self: center !important;
+}
+
+/* Nombre de usuario */
+.header-username {
+  font-size: 0.813rem !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 150px !important;
+  line-height: 1.2 !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Badge del usuario */
+.header-user-badge {
+  flex-shrink: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.header-user-badge .MuiBadge-badge {
+  font-size: 0.625rem !important;
+  height: 16px !important;
+  min-width: 35px !important;
+  right: -6px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+}
+
+/* Contenedor de botones de acción */
+.header-actions-container {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 100% !important;
+  padding-right: 16px !important;
+}
+
+/* Botones de acción */
+.header-action-button {
+  padding: 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.header-action-button.MuiIconButton-root {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Avatar del usuario */
+.header-user-avatar {
+  width: 30px !important;
+  height: 30px !important;
+  background-color: #10b981 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.header-user-avatar.MuiAvatar-root {
+  width: 30px !important;
+  height: 30px !important;
+}
+
+/* Menu desplegable */
+.header-user-menu {
+  margin-top: 8px !important;
+  min-width: 150px !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+}
+
+/* Item del menú */
+.header-menu-item {
+  font-size: 0.813rem !important;
+}
+
+/* Ícono del menú */
+.header-menu-icon {
+  min-width: 36px !important;
+}
+
+/* Transiciones dinámicas para el ancho del header */
+.header-appbar-dynamic {
+  transition: margin 225ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, width 225ms cubic-bezier(0.4, 0, 0.6, 1) 0ms !important;
+}

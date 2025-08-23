@@ -49,8 +49,8 @@ const FormSectionMUI: React.FC<FormSectionMUIProps> = ({
         sx={{
           bgcolor: alpha(theme.palette.primary.main, 0.04),
           borderBottom: `1px solid ${theme.palette.divider}`,
-          px: 3,
-          py: 2
+          px: 2,
+          py: 1
         }}
       >
         <Stack direction="row" alignItems="center" justifyContent="space-between">
@@ -60,7 +60,7 @@ const FormSectionMUI: React.FC<FormSectionMUIProps> = ({
                 {icon}
               </Box>
             )}
-            <Typography variant="h6" component="h3" sx={{ fontWeight: 500 }}>
+            <Typography variant="subtitle1" component="h3" sx={{ fontWeight: 500, fontSize: '0.875rem' }}>
               {title}
             </Typography>
           </Stack>

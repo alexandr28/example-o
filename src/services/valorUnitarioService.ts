@@ -29,6 +29,17 @@ export interface CreateValorUnitarioDTO {
   codUsuario?: number;
 }
 
+// DTO específico para la API POST sin autenticación
+export interface CrearValorUnitarioApiDTO {
+  codigoValorUnitario: null; // Se asigna por SQL
+  codigoValorUnitarioAnterior: null;
+  anio: number;
+  codLetra: string;
+  codCategoria: string;
+  codSubcategoria: string;
+  costo: number;
+}
+
 export interface UpdateValorUnitarioDTO extends Partial<CreateValorUnitarioDTO> {
   estado?: string;
   fechaModificacion?: string;
@@ -74,14 +85,14 @@ export enum LetraValorUnitario {
   I = 'I'
 }
 
-// Mapeo de subcategorías por categoría
+// Mapeo de subcategorías por categoría - CORREGIDO según especificación del usuario
 export const SUBCATEGORIAS_POR_CATEGORIA = {
   [CategoriaValorUnitario.ESTRUCTURAS]: [
     SubcategoriaValorUnitario.MUROS_Y_COLUMNAS,
-    SubcategoriaValorUnitario.TECHOS,
-    SubcategoriaValorUnitario.PISOS
+    SubcategoriaValorUnitario.TECHOS
   ],
   [CategoriaValorUnitario.ACABADOS]: [
+    SubcategoriaValorUnitario.PISOS,              // Movido a ACABADOS según especificación
     SubcategoriaValorUnitario.PUERTAS_Y_VENTANAS,
     SubcategoriaValorUnitario.REVESTIMIENTOS,
     SubcategoriaValorUnitario.BANOS
@@ -209,36 +220,39 @@ class ValorUnitarioService extends BaseApiService<ValorUnitarioData, CreateValor
    */
   async consultarValoresUnitarios(params: {
     año?: number;
-    categoria?: string;
-    subcategoria?: string;
-    letra?: string;
-    estado?: string;
+    
   }): Promise<ValorUnitarioData[]> {
     try {
       console.log('🔍 [ValorUnitarioService] Consultando valores unitarios con parámetros:', params);
-      
-      // Construir URL con query params - API específico: GET http://26.161.18.122:8080/api/valoresunitarios?anio=2024
-      let url = `${API_CONFIG.baseURL}/api/valoresunitarios`;
+      console.log('🔍 [ValorUnitarioService] Tipo de params.año:', typeof params.año, 'Valor:', params.año);
       
       // Construir parámetros de consulta
       const queryParams = new URLSearchParams();
-      if (params.año) {
-        queryParams.set('anio', params.año.toString()); // Usar 'anio' no 'año'
-        console.log('📋 [ValorUnitarioService] Añadido parámetro anio:', params.año);
-      }
-    
-      // Solo añadir query params si hay alguno
-      if (queryParams.toString()) {
-        url += `?${queryParams.toString()}`;
-      }
+      
+      // IMPORTANTE: Usar año actual por defecto si no se proporciona o es inválido
+      const añoFinal = (params.año != null && params.año !== undefined && params.año > 0) 
+        ? params.año 
+        : new Date().getFullYear();
+      
+      queryParams.append('anio', String(añoFinal));
+      console.log('📋 [ValorUnitarioService] Usando año:', añoFinal, '(original:', params.año, ')');
+      
+      // IMPORTANTE: Usar URL completa con API_CONFIG.baseURL como en direccionService
+      // Solo añadir ? si hay query params
+      const queryString = queryParams.toString();
+      const url = `${API_CONFIG.baseURL}${this.endpoint}${queryString ? `?${queryString}` : ''}`;
       
       console.log('📡 [ValorUnitarioService] URL final construida:', url);
       console.log('📡 [ValorUnitarioService] Query params string:', queryParams.toString());
       
-      // Petición directa sin headers de autenticación para evitar 403
+      // Petición directa sin autenticación (igual que direccionService)
       const response = await fetch(url, {
         method: 'GET',
-        // NO incluir mode, cache, ni headers para evitar problemas de CORS/403
+        headers: {
+          'Accept': 'application/json'
+          // NO incluir Authorization como en direccionService
+          // NO incluir Content-Type en GET
+        }
       });
       
       console.log('📡 [ValorUnitarioService] Response Status:', response.status);
@@ -509,6 +523,143 @@ class ValorUnitarioService extends BaseApiService<ValorUnitarioData, CreateValor
       console.error('❌ [ValorUnitarioService] Error creando valor unitario:', error);
       throw error;
     }
+  }
+
+  /**
+   * Crea un nuevo valor unitario usando POST sin autenticación
+   * URL: POST http://26.161.18.122:8080/api/valoresunitarios
+   * NO requiere autenticación
+   */
+  async crearValorUnitarioSinAuth(datos: CrearValorUnitarioApiDTO): Promise<ValorUnitarioData> {
+    try {
+      console.log('➕ [ValorUnitarioService] Creando valor unitario sin autenticación:', datos);
+      
+      // Validar que los datos requeridos estén presentes
+      if (!datos.anio || !datos.codLetra || !datos.codCategoria || !datos.codSubcategoria || datos.costo === undefined) {
+        throw new Error('Faltan datos requeridos para crear el valor unitario');
+      }
+
+      // IMPORTANTE: Asegurar que los códigos automáticos siempre sean null
+      const datosParaEnviar = {
+        codigoValorUnitario: null, // FORZAR a null - SQL lo asigna automáticamente
+        codigoValorUnitarioAnterior: null, // FORZAR a null - SQL lo asigna automáticamente
+        anio: Number(datos.anio), // Asegurar que sea número
+        codLetra: String(datos.codLetra), // Asegurar que sea string
+        codCategoria: String(datos.codCategoria), // Asegurar que sea string
+        codSubcategoria: String(datos.codSubcategoria), // Asegurar que sea string
+        costo: Number(datos.costo) // Asegurar que sea número
+      };
+
+      // Ejemplo de datos válidos para comparar con Postman:
+      console.log('📋 [ValorUnitarioService] Ejemplo válido para Postman:');
+      console.log(`{
+  "codigoValorUnitario": null,
+  "codigoValorUnitarioAnterior": null,
+  "anio": ${datosParaEnviar.anio},
+  "codLetra": "${datosParaEnviar.codLetra}",
+  "codCategoria": "${datosParaEnviar.codCategoria}",
+  "codSubcategoria": "${datosParaEnviar.codSubcategoria}",
+  "costo": ${datosParaEnviar.costo}
+}`);
+      
+      // Construir URL completa
+      const url = `${API_CONFIG.baseURL}${this.endpoint}`;
+      
+      console.log('📡 [ValorUnitarioService] URL para crear:', url);
+      console.log('📡 [ValorUnitarioService] Datos a enviar (con códigos null):', datosParaEnviar);
+      console.log('📡 [ValorUnitarioService] JSON stringificado a enviar:', JSON.stringify(datosParaEnviar, null, 2));
+      
+      // Petición POST sin autenticación usando JSON
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+          // NO incluir Authorization - sin autenticación
+        },
+        body: JSON.stringify(datosParaEnviar)
+      });
+      
+      console.log('📡 [ValorUnitarioService] Response Status:', response.status);
+      console.log('📡 [ValorUnitarioService] Response URL:', response.url);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [ValorUnitarioService] Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: errorText,
+          requestURL: url
+        });
+        
+        throw new Error(`Error HTTP ${response.status}: ${response.statusText || errorText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('✅ [ValorUnitarioService] Valor unitario creado exitosamente:', responseData);
+      
+      // Normalizar la respuesta según la estructura esperada
+      const valorCreado: ValorUnitarioData = {
+        id: responseData.codigoValorUnitario || responseData.id || 0,
+        año: responseData.anio || datos.anio,
+        categoria: responseData.codCategoria || datos.codCategoria,
+        subcategoria: responseData.codSubcategoria || datos.codSubcategoria,
+        letra: responseData.codLetra || datos.codLetra,
+        costo: responseData.costo || datos.costo,
+        descripcionCategoria: ValorUnitarioService.obtenerDescripcionCategoria(responseData.codCategoria || datos.codCategoria),
+        descripcionSubcategoria: ValorUnitarioService.obtenerDescripcionSubcategoria(responseData.codSubcategoria || datos.codSubcategoria),
+        estado: responseData.estado || 'ACTIVO',
+        fechaRegistro: responseData.fechaRegistro || new Date().toISOString(),
+        fechaModificacion: responseData.fechaModificacion,
+        codUsuario: responseData.codUsuario || 1
+      };
+      
+      console.log('✅ [ValorUnitarioService] Valor unitario normalizado:', valorCreado);
+      return valorCreado;
+      
+    } catch (error: any) {
+      console.error('❌ [ValorUnitarioService] Error creando valor unitario sin auth:', error);
+      console.error('❌ [ValorUnitarioService] Stack trace:', error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Helper para crear un valor unitario con valores por defecto
+   * Facilita la creación proporcionando valores comunes sin autenticación
+   * 
+   * @example
+   * // Ejemplo de uso:
+   * valorUnitarioService.crearValorUnitarioConDefaults({
+   *   anio: 2018,
+   *   codLetra: "1101",      // A
+   *   codCategoria: "1001",   // ESTRUCTURAS
+   *   codSubcategoria: "100101", // MUROS Y COLUMNAS
+   *   costo: 15.3
+   * });
+   */
+  crearValorUnitarioConDefaults(datos: {
+    anio: number;
+    codLetra: string;
+    codCategoria: string;
+    codSubcategoria: string;
+    costo: number;
+  }): Promise<ValorUnitarioData> {
+    // IMPORTANTE: codigoValorUnitario y codigoValorUnitarioAnterior
+    // SIEMPRE deben ser null - SQL los asigna automáticamente
+    const valorCompleto: CrearValorUnitarioApiDTO = {
+      codigoValorUnitario: null, // SIEMPRE null - asignado por SQL
+      codigoValorUnitarioAnterior: null, // SIEMPRE null - asignado por SQL
+      anio: datos.anio,
+      codLetra: datos.codLetra,
+      codCategoria: datos.codCategoria,
+      codSubcategoria: datos.codSubcategoria,
+      costo: datos.costo
+    };
+
+    console.log('🔨 [ValorUnitarioService] Helper - Creando con valores por defecto:', valorCompleto);
+    return this.crearValorUnitarioSinAuth(valorCompleto);
   }
   
   /**

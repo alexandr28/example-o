@@ -12,7 +12,6 @@ import {
   TableRow,
   Stack,
   Chip,
-  CircularProgress,
   Pagination,
   useTheme,
   alpha,
@@ -62,7 +61,7 @@ const AlcabalaList: React.FC<AlcabalaListProps> = ({
   };
 
   // Manejar cambio de página
-  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
+  const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
     onCambiarPagina(value);
   };
 

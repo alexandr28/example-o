@@ -62,7 +62,7 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
     loading, 
     error,
     cargarPredios,
-    obtenerPrediosPorContribuyente
+    buscarPrediosConFormData
   } = usePredios();
 
   // Estados locales
@@ -75,12 +75,14 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
   useEffect(() => {
     if (isOpen) {
       if (contribuyenteId) {
-        obtenerPrediosPorContribuyente(contribuyenteId);
+        // Usar el endpoint de búsqueda con Query Params como se especifica en la historia de usuario
+        // http://26.161.18.122:8080/api/predio?codPredio=20231&anio=2023&direccion=1
+        buscarPrediosConFormData('20231', 2023, 1);
       } else {
         cargarPredios();
       }
     }
-  }, [isOpen, contribuyenteId, cargarPredios, obtenerPrediosPorContribuyente]);
+  }, [isOpen, contribuyenteId, cargarPredios, buscarPrediosConFormData]);
 
   // Filtrar predios por búsqueda
   const filteredPredios = useMemo(() => {

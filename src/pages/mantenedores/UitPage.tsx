@@ -16,7 +16,9 @@ import {
   CircularProgress,
   Divider,
   Fade,
-  Container
+  Container,
+  Tabs,
+  Tab
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -25,13 +27,18 @@ import {
   TrendingUp as TrendingUpIcon,
   AttachMoney as MoneyIcon,
   Info as InfoIcon,
-  CalendarToday as CalendarIcon
+  CalendarToday as CalendarIcon,
+  List as ListIcon,
+  Assignment as AssignmentIcon
 } from '@mui/icons-material';
 import { MainLayout } from '../../layout';
-import { Breadcrumb, UIT, NotificationContainer } from '../../components';
+import { Breadcrumb, NotificationContainer } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useUIT } from '../../hooks/useUIT';
 import { NotificationService } from '../../components/utils/Notification';
+import UitFormAlicuota from '../../components/uit/UitFormAlicuota';
+import UitList from '../../components/uit/UitList';
+import { UITData } from '../../services/uitService';
 
 /**
  * Página principal para gestión de UIT-EPA con Material-UI
@@ -44,15 +51,25 @@ const UitPage: React.FC = () => {
   // Usar el hook personalizado para acceder a toda la lógica de UIT
   const {
     uits,
+    uitSeleccionada,
     uitVigente,
     loading,
     error,
     cargarUITs,
-    obtenerEstadisticas
+    crearUIT,
+    actualizarUIT,
+    eliminarUIT,
+    seleccionarUIT,
+    calcularMontoUIT,
+    obtenerEstadisticas,
+    anioSeleccionado,
+    setAnioSeleccionado
   } = useUIT();
 
   const [estadisticas, setEstadisticas] = useState<any>(null);
   const [loadingStats, setLoadingStats] = useState(false);
+  const [modoEdicion, setModoEdicion] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
 
   // Migas de pan para la navegación
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -117,6 +134,85 @@ const UitPage: React.FC = () => {
     }).format(value);
   };
 
+  // Manejar guardado
+  const handleGuardar = async (datos: any) => {
+    try {
+      if (modoEdicion && uitSeleccionada) {
+        await actualizarUIT(uitSeleccionada.id, datos);
+      } else {
+        await crearUIT(datos);
+      }
+      
+      setModoEdicion(false);
+      seleccionarUIT(null);
+      
+      // Recargar estadísticas
+      const stats = await obtenerEstadisticas();
+      setEstadisticas(stats);
+      NotificationService.success(modoEdicion ? 'UIT actualizada correctamente' : 'UIT creada correctamente');
+    } catch (error) {
+      console.error('Error al guardar:', error);
+      NotificationService.error('Error al guardar la UIT');
+    }
+  };
+
+  // Manejar edición
+  const handleEditar = (uit: UITData) => {
+    seleccionarUIT(uit);
+    setModoEdicion(true);
+  };
+
+  // Manejar eliminación - Funcionalidad disponible pero no expuesta en la UI de lista
+  // const handleEliminar = async (id: number) => {
+  //   if (window.confirm('¿Está seguro de eliminar este valor UIT?')) {
+  //     try {
+  //       await eliminarUIT(id);
+  //       NotificationService.success('UIT eliminada correctamente');
+  //     } catch (error) {
+  //       console.error('Error al eliminar:', error);
+  //       NotificationService.error('Error al eliminar la UIT');
+  //     }
+  //   }
+  // };
+
+  // Manejar nuevo
+  const handleNuevo = () => {
+    seleccionarUIT(null);
+    setModoEdicion(false);
+  };
+
+  // Manejar cambio de tab
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+  };
+
+  // Componente TabPanel
+  interface TabPanelProps {
+    children?: React.ReactNode;
+    index: number;
+    value: number;
+  }
+
+  function TabPanel(props: TabPanelProps) {
+    const { children, value, index, ...other } = props;
+
+    return (
+      <div
+        role="tabpanel"
+        hidden={value !== index}
+        id={`uit-tabpanel-${index}`}
+        aria-labelledby={`uit-tab-${index}`}
+        {...other}
+      >
+        {value === index && (
+          <Box sx={{ py: 3 }}>
+            {children}
+          </Box>
+        )}
+      </div>
+    );
+  }
+
   // Si está cargando la página inicial, mostrar skeleton
   if (!isInitialized) {
     return (
@@ -159,166 +255,78 @@ const UitPage: React.FC = () => {
               </Box>
             </Stack>
             
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={handleRefresh}
-              disabled={loading}
-            >
-              Actualizar
-            </Button>
           </Stack>
 
-          {/* Alerta informativa */}
-          <Fade in={showInfo}>
-            <Alert 
-              severity="info" 
-              sx={{ mb: 3 }}
-              onClose={() => setShowInfo(false)}
-              icon={<InfoIcon />}
-            >
-              <Typography variant="body2">
-                La UIT es el valor de referencia utilizado en las normas tributarias para determinar 
-                las bases imponibles, deducciones, límites de afectación y demás aspectos tributarios.
-              </Typography>
-            </Alert>
-          </Fade>
-
-          {/* Mostrar errores si hay */}
-          {error && !loading && (
-            <Alert severity="warning" sx={{ mb: 3 }}>
-              Mostrando datos de demostración. {error}
-            </Alert>
-          )}
-
-          {/* Cards de estadísticas */}
-          <Grid container spacing={3} sx={{ mb: 4 }}>
-            {/* UIT Vigente */}
-            <Grid item xs={12} sm={6} md={3}>
-              <Card elevation={2}>
-                <CardContent>
-                  <Stack spacing={1}>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">
-                        UIT Vigente
-                      </Typography>
-                      <MoneyIcon color="primary" />
-                    </Stack>
-                    {loadingStats ? (
-                      <CircularProgress size={24} />
-                    ) : (
-                      <>
-                        <Typography variant="h5" fontWeight={600} color="primary">
-                          {uitVigente ? formatCurrency(uitVigente.valor) : 'S/ 5,350.00'}
-                        </Typography>
-                        <Chip 
-                          label={`Año ${new Date().getFullYear()}`}
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                        />
-                      </>
-                    )}
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Total de registros */}
-            <Grid item xs={12} sm={6} md={3}>
-              <Card elevation={2}>
-                <CardContent>
-                  <Stack spacing={1}>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">
-                        Total Registros
-                      </Typography>
-                      <CalculateIcon color="action" />
-                    </Stack>
-                    {loadingStats ? (
-                      <CircularProgress size={24} />
-                    ) : (
-                      <>
-                        <Typography variant="h5" fontWeight={600}>
-                          {estadisticas?.totalRegistros || uits.length || 6}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Histórico completo
-                        </Typography>
-                      </>
-                    )}
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Variación anual */}
-            <Grid item xs={12} sm={6} md={3}>
-              <Card elevation={2}>
-                <CardContent>
-                  <Stack spacing={1}>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">
-                        Variación Anual
-                      </Typography>
-                      <TrendingUpIcon color="success" />
-                    </Stack>
-                    {loadingStats ? (
-                      <CircularProgress size={24} />
-                    ) : (
-                      <>
-                        <Typography variant="h5" fontWeight={600} color="success.main">
-                          {estadisticas?.variacionAnual || '3.9'}%
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Respecto al año anterior
-                        </Typography>
-                      </>
-                    )}
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Años disponibles */}
-            <Grid item xs={12} sm={6} md={3}>
-              <Card elevation={2}>
-                <CardContent>
-                  <Stack spacing={1}>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">
-                        Años Registrados
-                      </Typography>
-                      <CalendarIcon color="action" />
-                    </Stack>
-                    {loadingStats ? (
-                      <CircularProgress size={24} />
-                    ) : (
-                      <>
-                        <Typography variant="h5" fontWeight={600}>
-                          {estadisticas?.aniosDisponibles || '6'}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Desde {estadisticas?.anioMinimo || '2020'} hasta {estadisticas?.anioMaximo || '2025'}
-                        </Typography>
-                      </>
-                    )}
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-
-          {/* Componente principal UIT */}
+       
+          {/* Sistema de Tabs */}
           <Paper 
-            elevation={0} 
+            elevation={2}
             sx={{ 
-              p: 3,
-              bgcolor: alpha(theme.palette.grey[100], 0.5),
+              borderRadius: 2,
+              overflow: 'hidden',
               border: `1px solid ${theme.palette.divider}`
             }}
           >
-            <UIT />
+            {/* Tabs Header */}
+            <Box sx={{ 
+              borderBottom: 1, 
+              borderColor: 'divider',
+              bgcolor: alpha(theme.palette.primary.main, 0.04)
+            }}>
+              <Tabs 
+                value={activeTab} 
+                onChange={handleTabChange} 
+                aria-label="UIT tabs"
+                sx={{
+                  '& .MuiTab-root': {
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    fontSize: '0.95rem',
+                    minHeight: 48,
+                    px: 3
+                  }
+                }}
+              >
+                <Tab 
+                  icon={<CalculateIcon />} 
+                  iconPosition="start"
+                  label="UIT-EPA" 
+                  id="uit-tab-0"
+                  aria-controls="uit-tabpanel-0"
+                />
+                <Tab 
+                  icon={<ListIcon />} 
+                  iconPosition="start"
+                  label="Listar UIT" 
+                  id="uit-tab-1"
+                  aria-controls="uit-tabpanel-1"
+                />
+              </Tabs>
+            </Box>
+
+            {/* Tab Content */}
+            <TabPanel value={activeTab} index={0}>
+              {/* UIT-EPA: Formulario y Alícuotas */}
+              <UitFormAlicuota
+                uitSeleccionada={uitSeleccionada}
+                onGuardar={handleGuardar}
+                onNuevo={handleNuevo}
+                modoEdicion={modoEdicion}
+                loading={loading}
+                anioSeleccionado={anioSeleccionado || new Date().getFullYear()}
+                onAnioChange={setAnioSeleccionado}
+              />
+            </TabPanel>
+
+            <TabPanel value={activeTab} index={1}>
+              {/* Listar UIT: Lista de UITs */}
+              <UitList
+                uits={uits}
+                onEditar={handleEditar}
+                loading={loading}
+                uitSeleccionada={uitSeleccionada}
+              />
+            </TabPanel>
           </Paper>
 
           {/* Contenedor de notificaciones */}

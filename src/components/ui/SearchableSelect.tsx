@@ -10,12 +10,15 @@ export interface SelectOption {
 interface SearchableSelectProps {
   id?: string;
   name?: string;
+  label?: string;
   value?: string | number;
   onChange?: (value: string | number) => void;
   onBlur?: () => void;
   options: SelectOption[];
   placeholder?: string;
   error?: string;
+  helperText?: string;
+  loading?: boolean;
   disabled?: boolean;
   required?: boolean;
   className?: string;
@@ -25,12 +28,15 @@ const SearchableSelect = React.forwardRef<HTMLInputElement, SearchableSelectProp
   ({
     id,
     name,
+    label,
     value,
     onChange,
     onBlur,
     options,
     placeholder = 'Seleccione una opción',
     error,
+    helperText,
+    loading = false,
     disabled = false,
     required = false,
     className
@@ -114,8 +120,9 @@ const SearchableSelect = React.forwardRef<HTMLInputElement, SearchableSelectProp
     };
 
     const inputClasses = clsx(
-      'w-full px-3 py-2 border rounded-md',
+      'w-full px-2.5 border rounded',
       'focus:outline-none focus:ring-2',
+      'text-xs h-[30px]', // Altura de 30px para coincidir con TextField y fuente pequeña
       {
         'border-red-500 focus:ring-red-500 focus:border-red-500': error,
         'border-gray-300 focus:ring-blue-500 focus:border-blue-500': !error,
@@ -126,7 +133,21 @@ const SearchableSelect = React.forwardRef<HTMLInputElement, SearchableSelectProp
     );
 
     return (
-      <div ref={containerRef} className="relative w-full">
+      <div ref={containerRef} className="relative w-full searchable-select-container">
+        {/* Label */}
+        {label && (
+          <label 
+            htmlFor={id}
+            className={clsx(
+              'block text-xs font-medium mb-0.5',
+              error ? 'text-red-700' : 'text-gray-700'
+            )}
+          >
+            {label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+        )}
+        
         {/* Input de búsqueda / Display */}
         <div className="relative">
           <input
@@ -141,42 +162,50 @@ const SearchableSelect = React.forwardRef<HTMLInputElement, SearchableSelectProp
             onBlur={onBlur}
             onKeyDown={handleKeyDown}
             placeholder={!selectedOption ? placeholder : undefined}
-            disabled={disabled}
+            disabled={disabled || loading}
             required={required}
             autoComplete="off"
             aria-invalid={!!error}
             aria-describedby={error ? `${id}-error` : undefined}
           />
           
-          {/* Icono de flecha */}
+          {/* Icono de flecha o loading */}
           <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-            <svg
-              className={clsx(
-                'h-5 w-5 text-gray-400 transition-transform',
-                isOpen && 'transform rotate-180'
-              )}
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
+            {loading ? (
+              <div className="animate-spin h-3 w-3 border-2 border-gray-300 border-t-blue-600 rounded-full"></div>
+            ) : (
+              <svg
+                className={clsx(
+                  'h-4 w-4 text-gray-400 transition-transform',
+                  isOpen && 'transform rotate-180'
+                )}
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            )}
           </div>
         </div>
 
         {/* Dropdown de opciones */}
-        {isOpen && !disabled && (
-          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-            {filteredOptions.length > 0 ? (
+        {isOpen && !disabled && !loading && (
+          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-auto">
+            {loading ? (
+              <div className="px-2.5 py-1.5 text-gray-500 text-center text-xs">
+                Cargando opciones...
+              </div>
+            ) : filteredOptions.length > 0 ? (
               filteredOptions.map((option, index) => (
                 <div
                   key={option.value}
                   className={clsx(
-                    'px-3 py-2 cursor-pointer',
+                    'px-2.5 py-1.5 cursor-pointer text-xs',
                     {
                       'bg-blue-500 text-white': index === highlightedIndex,
                       'hover:bg-gray-100': index !== highlightedIndex,
@@ -190,17 +219,23 @@ const SearchableSelect = React.forwardRef<HTMLInputElement, SearchableSelectProp
                 </div>
               ))
             ) : (
-              <div className="px-3 py-2 text-gray-500 text-center">
+              <div className="px-2.5 py-1.5 text-gray-500 text-center text-xs">
                 No se encontraron opciones
               </div>
             )}
           </div>
         )}
 
-        {/* Mensaje de error */}
-        {error && (
-          <p id={`${id}-error`} className="mt-1 text-sm text-red-600">
-            {error}
+        {/* Mensaje de error o helper */}
+        {(error || helperText) && (
+          <p 
+            id={`${id}-${error ? 'error' : 'helper'}`} 
+            className={clsx(
+              'mt-0.5 text-xs',
+              error ? 'text-red-600' : 'text-gray-500'
+            )}
+          >
+            {error || helperText}
           </p>
         )}
 

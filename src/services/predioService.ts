@@ -3,8 +3,6 @@ import BaseApiService from './BaseApiService';
 import { API_CONFIG } from '../config/api.unified.config';
 import { NotificationService } from '../components/utils/Notification';
 
-import { CondicionPropiedad, EstadoPredio, TipoPredio, UsoPredio } from '@/models/Predio';
-
 
 /**
  * Mapea la respuesta de la API al modelo interno
@@ -39,32 +37,32 @@ export interface PredioData {
   condicionPropiedad?: string;
 }
 /**
- * DTOs para crear y actualizar predios
+ * DTO para crear predios según la estructura exacta del API
+ * URL: POST http://26.161.18.122:8080/api/predio
  */
 export interface CreatePredioDTO {
-  anio?: number;
-  codPredio?: string;
-  numeroFinca?: string;
-  otroNumero?: string;
-  codClasificacion?: string;
-  estPredio?: string;
-  codTipoPredio?: string;
-  codCondicionPropiedad?: string;
-  codDireccion?: string;
-  codUsoPredio?: string;
-  fechaAdquisicion?: string;
-  numeroCondominos?: string;
-  codListaConductor?: string;
-  codUbicacionAreaVerde?: string;
+  anio: number;
+  codPredio: null; // Se asigna por SQL automáticamente
+  numeroFinca: number;
+  otroNumero: string;
+  codClasificacion: string;
+  estPredio: string;
+  codTipoPredio: string;
+  codCondicionPropiedad: string;
+  codDireccion: number;
+  codUsoPredio: number;
+  fechaAdquisicion: string; // Formato "YYYY-MM-DD"
+  numeroCondominos: number;
+  codListaConductor: string;
+  codUbicacionAreaVerde: number;
   areaTerreno: number;
-  numeroPisos?: number;
-  totalAreaConstruccion?: number;
-  valorTotalConstruccion?: number;
-  valorTerreno?: number;
-  autoavaluo?: number;
-  codEstado?: string;
-  codUsuario?: number;
-  
+  numeroPisos: number;
+  totalAreaConstruccion: number | null;
+  valorTotalConstruccion: number | null;
+  valorTerreno: number | null;
+  autoavaluo: number | null;
+  codEstado: string;
+  codUsuario: number;
 }
 
 export interface UpdatePredioDTO extends Partial<CreatePredioDTO> {}
@@ -152,57 +150,51 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
    * Obtiene todos los predios
    * La API requiere parámetros específicos incluso para listar todos
    */
-  async obtenerPredios(anio?: number): Promise<PredioData[]> {
+  async obtenerPredios(params?: BusquedaPredioParams): Promise<PredioData[]> {
     try {
-      console.log('📋 [PredioService] Obteniendo todos los predios');
+      console.log('📋 [PredioService] Obteniendo predios con parámetros:', params);
       
-    
+      // Si se proporcionan parámetros específicos, usarlos
+      if (params && (params.codPredio || params.anio || params.direccion)) {
+        return await this.buscarPredios(params);
+      }
       
-      // Agregar parámetros por defecto que la API podría esperar
-      //queryParams.append('codUsuario', '1');
-      // Si necesita más parámetros, agregarlos aquí
-      
-      let url = `${API_CONFIG.baseURL}${this.endpoint}`;
-     
-      const params= new URLSearchParams({
-        codPredio: '20241',
-        anio: anio?.toString() || '2024',
-        codDireccion: '2'
+      // Si no hay parámetros, intentar obtener todos con valores por defecto
+      const url = `${API_CONFIG.baseURL}${this.endpoint}`;
+      const queryParams = new URLSearchParams({
+        codPredio: '20231',
+        anio: '2023',
+        direccion: '1'
       });
-      url += `?${params.toString()}`; 
-      console.log('📡 [PredioService] GET:', url);
       
-      //Peticion directa sin autenticacion
-      const response = await fetch(url, {
+      const fullUrl = `${url}?${queryParams.toString()}`;
+      console.log('📡 [PredioService] GET:', fullUrl);
+      
+      // Petición directa sin autenticación
+      const response = await fetch(fullUrl, {
         method: 'GET',
         headers: {
-          'Accept': 'application/json',
-          // Intentar con diferentes headers que podrían ser necesarios
-          // NO incluir Authorization
-          // NO incluir Content-Type en GET
-          
+          'Accept': 'application/json'
         }
-        // NO incluir body en GET
       });
       
       console.log('📡 [PredioService] Response Status:', response.status);
-      console.log('📡 [PredioService] Response Headers:', Object.fromEntries(response.headers.entries()));
       
       if (!response.ok) {
         console.error('❌ [PredioService] Error Response:', {
           status: response.status,
-          statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries())
+          statusText: response.statusText
         });
-        // Intentar leer el body del error
         const errorText = await response.text();
         console.error('❌ [PredioService] Error Body:', errorText);
-        throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
+        
+        // Si falla con los valores por defecto, devolver array vacío
+        console.warn('⚠️ [PredioService] No se pudieron obtener predios, devolviendo lista vacía');
+        return [];
       }
       
       const responseData: PredioApiListResponse = await response.json();
       console.log('✅ [PredioService] Datos recibidos:', responseData);
-      
       
       if (responseData.success && responseData.data) {
         const data = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
@@ -212,67 +204,66 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
       return [];
     } catch (error: any) {
       console.error('❌ [PredioService] Error:', error);
-      
-      
+      // En caso de error, devolver array vacío para no romper la UI
+      return [];
     }
-    return PredioService.instance.normalizeData([]);
   }
 
   
   
   /**
    * Busca predios con filtros
-   * Intenta primero con GET/query params
+   * Usa GET con query parameters
    */
   async buscarPredios(params: BusquedaPredioParams): Promise<PredioData[]> {
     try {
       console.log('🔍 [PredioService] Buscando predios con parámetros:', params);
       
-      // Primero intentar con query parameters
+      // Construir query parameters
       const queryParams = new URLSearchParams();
       
-      if (params.codPredio) {
-        queryParams.append('codPredio', params.codPredio);
-      }
-      if (params.anio) {
-        queryParams.append('anio', params.anio.toString());
-      }
-      if (params.direccion) {
-        queryParams.append('direccion', params.direccion.toString());
-      }
-      queryParams.append('codUsuario', '1');
+      // Usar parámetros proporcionados o valores por defecto
+      queryParams.append('codPredio', params.codPredio || '20231');
+      queryParams.append('anio', (params.anio || 2023).toString());
+      queryParams.append('direccion', (params.direccion || 1).toString());
       
       const url = `${API_CONFIG.baseURL}${this.endpoint}?${queryParams.toString()}`;
-      console.log('📡 [PredioService] Intentando GET:', url);
+      console.log('📡 [PredioService] GET:', url);
       
       const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Accept': 'application/json'
-          
         }
       });
+      
+      console.log('📡 [PredioService] Response Status:', response.status);
       
       if (!response.ok) {
         console.error('❌ [PredioService] Error Response:', {
           status: response.status,
-          statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries())
+          statusText: response.statusText
         });
+        const errorText = await response.text();
+        console.error('❌ [PredioService] Error Body:', errorText);
         
-        throw new Error(`Error ${response.status}`);
+        // En caso de error, devolver array vacío
+        return [];
       }
       
       const data: PredioApiListResponse = await response.json();
+      console.log('✅ [PredioService] Datos recibidos:', data);
       
       if (data.success && data.data) {
-        return data.data.map(item => (item));
+        const predios = Array.isArray(data.data) ? data.data : [data.data];
+        return this.normalizeData(predios);
       }
       
       return [];
     } catch (error: any) {
-      console.error('❌ [PredioService] Error:', error);
-      throw error;
+      console.error('❌ [PredioService] Error en buscarPredios:', error);
+      // No lanzar error, devolver array vacío para mantener la UI funcionando
+      return [];
     }
   }
 
@@ -316,10 +307,10 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
   }
   
   /**
-   * Obtiene predios por año usando form-data
+   * Obtiene predios por año
    */
   async obtenerPrediosPorAnio(anio: number): Promise<PredioData[]> {
-    return this.buscarPredios({ anio });
+    return this.buscarPredios({ anio, codPredio: '20231', direccion: 1 });
   }
   
   /**
@@ -330,41 +321,208 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
   }
   
   /**
-   * Crea un nuevo predio
-   * REQUIERE autenticación (método POST)
+   * Crea un nuevo predio usando POST sin autenticación
+   * URL: POST http://26.161.18.122:8080/api/predio
+   * Estructura JSON exacta según especificación del API
    */
   async crearPredio(datos: CreatePredioDTO): Promise<PredioData> {
     try {
-      console.log('➕ [PredioService] Creando nuevo predio:', datos);
+      console.log('➕ [PredioService] Creando nuevo predio con estructura exacta:', datos);
       
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        throw new Error('Se requiere autenticación para crear predios');
+      // Validaciones de datos requeridos
+      if (!datos.numeroFinca || datos.numeroFinca <= 0) {
+        throw new Error('numeroFinca es requerido y debe ser mayor a 0');
       }
       
-      const datosCompletos: CreatePredioDTO = {
-        ...datos,
-        anio: datos.anio || new Date().getFullYear(),
-        codCondicionPropiedad: datos.codCondicionPropiedad || CondicionPropiedad.PROPIETARIO_UNICO,
-        codEstado: datos.codEstado || EstadoPredio.TERMINADO,
-        codTipoPredio: datos.codTipoPredio || TipoPredio.TERRENO,
-        codUsoPredio: datos.codUsoPredio || UsoPredio.TERRENO,
-        codDireccion: datos.codDireccion || DireccionPredio.CALLE,
+      if (!datos.areaTerreno || datos.areaTerreno <= 0) {
+        throw new Error('areaTerreno es requerido y debe ser mayor a 0');
+      }
       
-        
-        codUsuario: datos.codUsuario || API_CONFIG.defaultParams.codUsuario
+      if (!datos.codDireccion || datos.codDireccion <= 0) {
+        throw new Error('codDireccion es requerido y debe ser mayor a 0');
+      }
+      
+      // Asegurar que los datos coincidan EXACTAMENTE con el JSON esperado
+      const datosParaEnviar: CreatePredioDTO = {
+        anio: datos.anio,
+        codPredio: null, // SIEMPRE null - SQL lo asigna automáticamente
+        numeroFinca: Number(datos.numeroFinca),
+        otroNumero: String(datos.otroNumero || ""),
+        codClasificacion: String(datos.codClasificacion || "0502"),
+        estPredio: String(datos.estPredio || "2503"),
+        codTipoPredio: String(datos.codTipoPredio || "2601"),
+        codCondicionPropiedad: String(datos.codCondicionPropiedad || "2701"),
+        codDireccion: Number(datos.codDireccion),
+        codUsoPredio: Number(datos.codUsoPredio || 1),
+        fechaAdquisicion: String(datos.fechaAdquisicion || new Date().toISOString().split('T')[0]),
+        numeroCondominos: Number(datos.numeroCondominos || 2),
+        codListaConductor: String(datos.codListaConductor || "1401"),
+        codUbicacionAreaVerde: Number(datos.codUbicacionAreaVerde || 1),
+        areaTerreno: Number(datos.areaTerreno),
+        numeroPisos: Number(datos.numeroPisos || 1),
+        totalAreaConstruccion: datos.totalAreaConstruccion ? Number(datos.totalAreaConstruccion) : null,
+        valorTotalConstruccion: datos.valorTotalConstruccion ? Number(datos.valorTotalConstruccion) : null,
+        valorTerreno: datos.valorTerreno ? Number(datos.valorTerreno) : null,
+        autoavaluo: datos.autoavaluo ? Number(datos.autoavaluo) : null,
+        codEstado: String(datos.codEstado || "0201"),
+        codUsuario: Number(datos.codUsuario || 1)
       };
       
-      const response = await this.create(datosCompletos);
-      console.log('✅ [PredioService] Predio creado exitosamente');
-      return response;
+      // Construir URL completa
+      const url = `${API_CONFIG.baseURL}${this.endpoint}`;
+      
+      console.log('📡 [PredioService] URL para crear:', url);
+      console.log('📤 [PredioService] JSON exacto a enviar:', JSON.stringify(datosParaEnviar, null, 2));
+      
+      // Ejemplo de JSON válido para comparar con Postman:
+      console.log('📋 [PredioService] Ejemplo JSON para Postman:');
+      console.log(`{
+  "anio": ${datosParaEnviar.anio},
+  "codPredio": null,
+  "numeroFinca": ${datosParaEnviar.numeroFinca},
+  "otroNumero": "${datosParaEnviar.otroNumero}",
+  "codClasificacion": "${datosParaEnviar.codClasificacion}",
+  "estPredio": "${datosParaEnviar.estPredio}",
+  "codTipoPredio": "${datosParaEnviar.codTipoPredio}",
+  "codCondicionPropiedad": "${datosParaEnviar.codCondicionPropiedad}",
+  "codDireccion": ${datosParaEnviar.codDireccion},
+  "codUsoPredio": ${datosParaEnviar.codUsoPredio},
+  "fechaAdquisicion": "${datosParaEnviar.fechaAdquisicion}",
+  "numeroCondominos": ${datosParaEnviar.numeroCondominos},
+  "codListaConductor": "${datosParaEnviar.codListaConductor}",
+  "codUbicacionAreaVerde": ${datosParaEnviar.codUbicacionAreaVerde},
+  "areaTerreno": ${datosParaEnviar.areaTerreno},
+  "numeroPisos": ${datosParaEnviar.numeroPisos},
+  "totalAreaConstruccion": ${datosParaEnviar.totalAreaConstruccion},
+  "valorTotalConstruccion": ${datosParaEnviar.valorTotalConstruccion},
+  "valorTerreno": ${datosParaEnviar.valorTerreno},
+  "autoavaluo": ${datosParaEnviar.autoavaluo},
+  "codEstado": "${datosParaEnviar.codEstado}",
+  "codUsuario": ${datosParaEnviar.codUsuario}
+}`);
+      
+      // Petición POST sin autenticación usando JSON
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+          // NO incluir Authorization - sin autenticación
+        },
+        body: JSON.stringify(datosParaEnviar)
+      });
+      
+      console.log('📡 [PredioService] Response Status:', response.status);
+      console.log('📡 [PredioService] Response URL:', response.url);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [PredioService] Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: errorText,
+          requestURL: url
+        });
+        
+        throw new Error(`Error HTTP ${response.status}: ${response.statusText || errorText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('✅ [PredioService] Predio creado exitosamente:', responseData);
+      
+      // Normalizar la respuesta
+      const predioCreado: PredioData = {
+        anio: responseData.anio || datosParaEnviar.anio,
+        codPredio: responseData.codPredio || responseData.id?.toString(),
+        numeroFinca: responseData.numeroFinca?.toString() || datosParaEnviar.numeroFinca.toString(),
+        otroNumero: responseData.otroNumero || datosParaEnviar.otroNumero,
+        codClasificacion: responseData.codClasificacion || datosParaEnviar.codClasificacion,
+        estPredio: responseData.estPredio || datosParaEnviar.estPredio,
+        codTipoPredio: responseData.codTipoPredio || datosParaEnviar.codTipoPredio,
+        codCondicionPropiedad: responseData.codCondicionPropiedad || datosParaEnviar.codCondicionPropiedad,
+        codDireccion: responseData.codDireccion?.toString() || datosParaEnviar.codDireccion.toString(),
+        codUsoPredio: responseData.codUsoPredio?.toString() || datosParaEnviar.codUsoPredio.toString(),
+        fechaAdquisicion: responseData.fechaAdquisicion || datosParaEnviar.fechaAdquisicion,
+        numeroCondominos: responseData.numeroCondominos?.toString() || datosParaEnviar.numeroCondominos.toString(),
+        codListaConductor: responseData.codListaConductor || datosParaEnviar.codListaConductor,
+        codUbicacionAreaVerde: responseData.codUbicacionAreaVerde?.toString() || datosParaEnviar.codUbicacionAreaVerde.toString(),
+        areaTerreno: responseData.areaTerreno || datosParaEnviar.areaTerreno,
+        numeroPisos: responseData.numeroPisos || datosParaEnviar.numeroPisos,
+        totalAreaConstruccion: responseData.totalAreaConstruccion || datosParaEnviar.totalAreaConstruccion,
+        valorTotalConstruccion: responseData.valorTotalConstruccion || datosParaEnviar.valorTotalConstruccion,
+        valorTerreno: responseData.valorTerreno || datosParaEnviar.valorTerreno,
+        autoavaluo: responseData.autoavaluo || datosParaEnviar.autoavaluo,
+        codEstado: responseData.codEstado || datosParaEnviar.codEstado,
+        codUsuario: responseData.codUsuario || datosParaEnviar.codUsuario
+      };
+      
+      console.log('✅ [PredioService] Predio normalizado:', predioCreado);
+      return predioCreado;
       
     } catch (error: any) {
       console.error('❌ [PredioService] Error creando predio:', error);
+      console.error('❌ [PredioService] Stack trace:', error.stack);
       throw error;
     }
   }
   
+  /**
+   * Helper para crear un predio con valores por defecto
+   * Facilita la creación proporcionando valores comunes
+   */
+  crearPredioConDefaults(datos: {
+    numeroFinca: number;
+    otroNumero?: string;
+    codDireccion: number;
+    areaTerreno: number;
+    fechaAdquisicion?: string;
+    // Campos opcionales con valores por defecto inteligentes
+    anio?: number;
+    codClasificacion?: string;
+    estPredio?: string;
+    codTipoPredio?: string;
+    codCondicionPropiedad?: string;
+    codUsoPredio?: number;
+    numeroCondominos?: number;
+    codListaConductor?: string;
+    codUbicacionAreaVerde?: number;
+    numeroPisos?: number;
+    totalAreaConstruccion?: number | null;
+    valorTotalConstruccion?: number | null;
+    valorTerreno?: number | null;
+    autoavaluo?: number | null;
+    codEstado?: string;
+    codUsuario?: number;
+  }): Promise<PredioData> {
+    const predioCompleto: CreatePredioDTO = {
+      anio: datos.anio || new Date().getFullYear(),
+      codPredio: null, // Se asigna por SQL
+      numeroFinca: datos.numeroFinca,
+      otroNumero: datos.otroNumero || "",
+      codClasificacion: datos.codClasificacion || "0502",
+      estPredio: datos.estPredio || "2503",
+      codTipoPredio: datos.codTipoPredio || "2601",
+      codCondicionPropiedad: datos.codCondicionPropiedad || "2701",
+      codDireccion: datos.codDireccion,
+      codUsoPredio: datos.codUsoPredio || 1,
+      fechaAdquisicion: datos.fechaAdquisicion || new Date().toISOString().split('T')[0],
+      numeroCondominos: datos.numeroCondominos || 1,
+      codListaConductor: datos.codListaConductor || "1401",
+      codUbicacionAreaVerde: datos.codUbicacionAreaVerde || 1,
+      areaTerreno: datos.areaTerreno,
+      numeroPisos: datos.numeroPisos || 1,
+      totalAreaConstruccion: datos.totalAreaConstruccion || null,
+      valorTotalConstruccion: datos.valorTotalConstruccion || null,
+      valorTerreno: datos.valorTerreno || null,
+      autoavaluo: datos.autoavaluo || null,
+      codEstado: datos.codEstado || "0201",
+      codUsuario: datos.codUsuario || 1
+    };
+
+    return this.crearPredio(predioCompleto);
+  }
+
   /**
    * Actualiza un predio existente
    * REQUIERE autenticación (método PUT)

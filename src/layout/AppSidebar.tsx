@@ -26,7 +26,7 @@ import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon
 } from '@mui/icons-material';
-import SidebarWidget from './SidebarWiget';
+import SidebarWidget from './SidebarWidget';
 import { useSidebar } from '../context/SidebarContext';
 
 // Interfaces
@@ -68,7 +68,8 @@ const SidebarContainer = styled(Box)(({ theme }) => ({
   zIndex: theme.zIndex.drawer,
   opacity: 1,
   borderRadius: 0,
-  boxShadow: '2px 0 5px rgba(0,0,0,0.1)',
+  boxShadow: theme.shadows[8],
+  borderRight: `1px solid ${alpha('#000', 0.12)}`,
   '& *': {
     opacity: 1,
   }
@@ -79,19 +80,29 @@ const LogoContainer = styled(Box)(({ theme }) => ({
   alignItems: 'center',
   justifyContent: 'center',
   padding: theme.spacing(2),
-  backgroundColor: '#3d4451',
-  borderBottom: `1px solid rgba(255, 255, 255, 0.1)`,
+  background: 'linear-gradient(135deg, #3d4451 0%, #4a5568 100%)',
+  borderBottom: `2px solid ${alpha('#60a5fa', 0.2)}`,
   position: 'relative',
   minHeight: 64,
+  boxShadow: `0 2px 4px ${alpha('#000', 0.1)}`,
 }));
 
 const MenuSection = styled(Typography)(({ theme }) => ({
   fontSize: '0.75rem',
-  fontWeight: 600,
-  color: 'rgba(255, 255, 255, 0.7)',
+  fontWeight: 700,
+  color: alpha('#60a5fa', 0.8),
   textTransform: 'uppercase',
   padding: theme.spacing(2, 2, 1),
-  letterSpacing: '0.5px',
+  letterSpacing: '1px',
+  display: 'flex',
+  alignItems: 'center',
+  '&::after': {
+    content: '""',
+    flex: 1,
+    height: 1,
+    backgroundColor: alpha('#60a5fa', 0.2),
+    marginLeft: theme.spacing(1),
+  },
 }));
 
 const ScrollableContent = styled(Box)({
@@ -120,12 +131,17 @@ const ToggleButton = styled(IconButton)(({ theme }) => ({
   right: theme.spacing(1),
   top: '50%',
   transform: 'translateY(-50%)',
-  color: alpha('#ffffff', 0.7),
+  color: alpha('#60a5fa', 0.9),
   padding: theme.spacing(0.5),
-  borderRadius: 0,
+  borderRadius: theme.shape.borderRadius,
+  backgroundColor: alpha('#000', 0.1),
+  border: `1px solid ${alpha('#60a5fa', 0.2)}`,
+  transition: theme.transitions.create(['all']),
   '&:hover': {
-    backgroundColor: alpha('#ffffff', 0.1),
-    color: '#ffffff',
+    backgroundColor: alpha('#60a5fa', 0.1),
+    color: '#60a5fa',
+    transform: 'translateY(-50%) scale(1.1)',
+    borderColor: alpha('#60a5fa', 0.4),
   },
 }));
 
@@ -429,18 +445,46 @@ const AppSidebar: FC<AppSidebarProps> = memo(() => {
     >
       {/* Logo y botón de toggle */}
       <LogoContainer>
-        <Typography
-          variant="h6"
-          sx={{
-            fontWeight: 600,
-            color: '#ffffff',
-            letterSpacing: isExpanded ? 1 : 0.5,
-            fontSize: isExpanded ? '1.25rem' : '0.875rem',
-            transition: theme.transitions.create(['font-size', 'letter-spacing']),
-          }}
-        >
-          {isExpanded ? 'SIS. Rentas' : 'SR'}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: 1,
+              background: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: `0 4px 8px ${alpha('#60a5fa', 0.3)}`,
+            }}
+          >
+            <Box
+              component="img"
+              src="/escudoMDE.png"
+              alt="Escudo MDE"
+              sx={{
+                width: 24,
+                height: 24,
+                objectFit: 'contain',
+                //filter: 'brightness(0) invert(1)', // Convierte la imagen a blanco
+              }}
+            />
+          </Box>
+          {isExpanded && (
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 600,
+                color: '#ffffff',
+                letterSpacing: 0.5,
+                fontSize: '1.1rem',
+                transition: theme.transitions.create(['opacity']),
+              }}
+            >
+              SIS. Rentas
+            </Typography>
+          )}
+        </Box>
         <ToggleButton
           onClick={handleToggleSidebar}
           size="small"

@@ -1,5 +1,6 @@
 // src/context/AuthContext.tsx
-import  { createContext, useContext, ReactNode, useState, useEffect } from 'react';
+import  { createContext, useContext, ReactNode, useState, useEffect, useCallback } from 'react';
+import { registerRenewTokenHandler } from '../api/authClient';
 import { AuthUser, AuthCredentials, AuthResult } from '../models/Auth';
 import useAuth from '../hooks/useAuth';
 
@@ -36,6 +37,7 @@ interface AuthProviderProps {
 // Componente proveedor de autenticación
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const auth = useAuth();
+  const { authToken, renewToken } = auth;
   // Ya no necesitamos este estado aquí, está en useAuth
   // const [authToken, setAuthToken] = useState<string | null>(null);
   // Estado para indicar si hemos verificado la sesión
@@ -52,11 +54,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     });
   }, [auth.isAuthenticated, auth.user, auth.loading, auth.authToken]);
 
-  // Función para verificar la sesión
-  const checkSession = async (): Promise<boolean> => {
+  // Registrar el handler de renovación para uso fuera de React (authClient)
+  useEffect(() => {
+    registerRenewTokenHandler(renewToken);
+    return () => registerRenewTokenHandler(async () => false);
+  }, [renewToken]);
+
+  // Función para verificar la sesión (memoizada)
+  const checkSession = useCallback(async (): Promise<boolean> => {
     try {
       // Si no hay token, no hay sesión
-      if (!auth.authToken && !localStorage.getItem('auth_token')) {
+      if (!authToken && !localStorage.getItem('auth_token')) {
         return false;
       }
       
@@ -64,7 +72,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const tokenExpiry = localStorage.getItem('auth_token_expiry');
       if (tokenExpiry && new Date(tokenExpiry) < new Date()) {
         // Intentar renovar el token
-        const renewed = await auth.renewToken();
+        const renewed = await renewToken();
         if (renewed) {
           return true;
         } else {
@@ -79,14 +87,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setSessionChecked(true);
     }
-  };
+  }, [authToken, renewToken]);
   
   // Verificar la sesión al iniciar
-  useEffect(() => {
-    if (!sessionChecked) {
-      checkSession();
-    }
-  }, [sessionChecked]);
+  // DESHABILITADO: Las APIs no requieren autenticación y causa errores CORS
+  // useEffect(() => {
+  //   if (!sessionChecked) {
+  //     checkSession();
+  //   }
+  // }, [sessionChecked, checkSession]);
 
   // Función mejorada para login
   const login = async (credentials: AuthCredentials): Promise<AuthResult> => {

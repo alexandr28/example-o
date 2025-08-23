@@ -2,22 +2,27 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Card,
-  CardContent,
   Typography,
   TextField,
   Button,
-  Stack,
   InputAdornment,
   Alert,
   CircularProgress,
-  FormControl,
-  FormHelperText
+  FormHelperText,
+  Autocomplete,
+  Paper,
+  useTheme,
+  alpha
 } from '@mui/material';
-import { Save as SaveIcon, Edit as EditIcon, Add as AddIcon } from '@mui/icons-material';
-import SearchableSelect from '../ui/SearchableSelect';
+import { 
+  Save as SaveIcon, 
+  Add as AddIcon,
+  CalendarToday as CalendarIcon,
+  AttachMoney as MoneyIcon,
+  LocationOn as LocationIcon,
+  Assignment as AssignmentIcon
+} from '@mui/icons-material';
 import { useAranceles, useArancel } from '../../hooks/useAranceles';
-import { NotificationService } from '../utils/Notification';
 import SelectorDirecciones from '../modal/SelectorDirecciones';
 
 interface ArancelFormData {
@@ -40,7 +45,7 @@ export const AsignacionArancelForm: React.FC = () => {
   const [codArancelActual, setCodArancelActual] = useState<number | null>(null);
 
   // Hooks
-  const { crearArancel, actualizarArancel, obtenerPorAnioYDireccion, loading } = useAranceles();
+  const { crearArancel, crearArancelSinAuth, actualizarArancel, obtenerPorAnioYDireccion, loading } = useAranceles();
 
   // Hook para obtener arancel existente cuando se selecciona año y dirección
   const { arancel: arancelExistente } = useArancel(
@@ -112,16 +117,21 @@ export const AsignacionArancelForm: React.FC = () => {
 
     try {
       if (isEditMode && codArancelActual) {
+        // Para actualización, usar el método original
         await actualizarArancel(codArancelActual, {
           anio: formData.anio!,
           codDireccion: formData.codDireccion!,
           costoArancel: formData.costoArancel
         });
       } else {
-        await crearArancel({
+        // Para creación, usar el nuevo método sin autenticación con JSON
+        console.log('📝 [AsignacionArancelForm] Creando arancel sin autenticación');
+        await crearArancelSinAuth({
+          codArancel: null, // SIEMPRE null - asignado por SQL
           anio: formData.anio!,
           codDireccion: formData.codDireccion!,
-          costoArancel: formData.costoArancel
+          costo: formData.costoArancel, // Usar 'costo' según el DTO
+          codUsuario: 1 // Usuario por defecto
         });
       }
 
@@ -163,123 +173,213 @@ export const AsignacionArancelForm: React.FC = () => {
     return partes.join(' + ');
   };
 
+  const theme = useTheme();
+
   return (
-    <Card sx={{ maxWidth: 800, mx: 'auto' }}>
-      <CardContent>
-        <Typography variant="h5" gutterBottom>
+    <>
+    <Paper 
+      elevation={3}
+      sx={{ 
+        p: 3,
+        borderRadius: 2,
+        background: 'linear-gradient(to bottom, #ffffff, #fafafa)',
+        border: '1px solid',
+        borderColor: 'divider'
+      }}
+    >
+      {/* Header */}
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: 2, 
+        mb: 3,
+        pb: 2,
+        borderBottom: '2px solid',
+        borderColor: 'primary.main'
+      }}>
+        <Box sx={{
+          p: 1,
+          borderRadius: 1,
+          backgroundColor: 'primary.main',
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <AssignmentIcon />
+        </Box>
+        <Typography variant="h6" fontWeight={600}>
           {isEditMode ? 'Editar Arancel' : 'Asignación de Aranceles'}
         </Typography>
-        
-        <Box component="form" noValidate sx={{ mt: 3 }}>
-          {/* Fila 1: Año y Costo */}
-          <Box sx={{ maxWidth: '50%', mb: 3 }}>
-            <Stack direction="row" spacing={2}>
-              <FormControl sx={{ flex: 1 }} error={!!errors.anio}>
-                <SearchableSelect
-                  id="anio-select"
-                  name="anio"
-                  value={formData.anio || ''}
-                  onChange={handleAnioChange}
-                  options={yearOptions}
-                  placeholder="Seleccione un año"
-                  error={errors.anio}
-                  required
-                  disabled={loading}
-                />
-                {errors.anio && (
-                  <FormHelperText error>{errors.anio}</FormHelperText>
-                )}
-              </FormControl>
-              
-              <Box sx={{ flex: 1 }}>
-                <TextField
-                  label="Costo Arancel"
-                  type="number"
-                  value={formData.costoArancel}
-                  onChange={handleCostoChange}
-                  error={!!errors.costoArancel}
-                  helperText={errors.costoArancel}
-                  fullWidth
-                  InputProps={{
-                    startAdornment: <InputAdornment position="start">S/</InputAdornment>,
-                    inputProps: { min: 0, step: 0.01 }
-                  }}
-                />
-              </Box>
-            </Stack>
-          </Box>
+      </Box>
 
-          {/* Fila 2: Dirección */}
-          <Box>
-            <Typography variant="subtitle2" gutterBottom>
-              Vía
-            </Typography>
-            <Box 
-              display="flex" 
-              alignItems="center" 
-              gap={2}
-              sx={{
-                p: 2,
-                border: 1,
-                borderColor: errors.direccion ? 'error.main' : 'divider',
-                borderRadius: 1,
-                bgcolor: 'grey.50',
-                cursor: 'pointer',
-                '&:hover': {
-                  bgcolor: 'grey.100'
-                }
-              }}
-              onClick={() => setModalDireccionOpen(true)}
-            >
-              <Button
-                variant="contained"
-                color="primary"
+      {/* Mostrar estado de edición */}
+      {isEditMode && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          Ya existe un arancel para esta dirección y año. Puede modificar el costo.
+        </Alert>
+      )}
+
+      {/* Formulario en una sola fila */}
+      <Box sx={{ 
+        display: 'flex', 
+        flexWrap: 'wrap', 
+        gap: 2,
+        alignItems: 'center',
+        mb: 2
+      }}>
+        {/* Año */}
+        <Box sx={{ flex: '1 1 150px', minWidth: '150px' }}>
+          <Autocomplete
+            options={yearOptions}
+            getOptionLabel={(option) => option.label}
+            value={yearOptions.find(y => y.value === formData.anio) || null}
+            onChange={(_, newValue) => {
+              handleAnioChange(newValue ? newValue.value : '');
+            }}
+            loading={loading}
+            disabled={loading}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Año *"
                 size="small"
-              >
-                Seleccionar dirección
-              </Button>
-              
-              <Typography variant="body1" color="text.secondary" sx={{ flexGrow: 1 }}>
-                {formatearDireccion(direccionSeleccionada)}
-              </Typography>
-            </Box>
-            {errors.direccion && (
-              <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
-                {errors.direccion}
-              </Typography>
+                placeholder="Seleccione año"
+                error={!!errors.anio}
+                helperText={errors.anio}
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <CalendarIcon sx={{ fontSize: 16 }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <>
+                      {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                  sx: { height: 40 }
+                }}
+              />
             )}
-          </Box>
-
-          {/* Mostrar estado de edición */}
-          {isEditMode && (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              Ya existe un arancel para esta dirección y año. Puede modificar el costo.
-            </Alert>
-          )}
-
-          {/* Botones de acción */}
-          <Box sx={{ mt: 4, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-            <Button
-              variant="contained"
-              color="success"
-              startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
-              onClick={handleSubmit}
-              disabled={loading}
-            >
-              {isEditMode ? 'Actualizar' : 'Guardar'}
-            </Button>
-            <Button
-              variant="contained"
-              color="secondary"
-              startIcon={<AddIcon />}
-              onClick={handleNuevo}
-              disabled={loading}
-            >
-              Nuevo
-            </Button>
-          </Box>
+          />
         </Box>
-      </CardContent>
+
+        {/* Costo Arancel */}
+        <Box sx={{ flex: '1 1 150px', minWidth: '150px' }}>
+          <TextField
+            label="Costo Arancel *"
+            type="number"
+            size="small"
+            value={formData.costoArancel}
+            onChange={handleCostoChange}
+            error={!!errors.costoArancel}
+            helperText={errors.costoArancel}
+            disabled={loading}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <MoneyIcon sx={{ fontSize: 16 }} />
+                </InputAdornment>
+              ),
+              endAdornment: <InputAdornment position="end">S/</InputAdornment>,
+              sx: { height: 40 },
+              inputProps: { min: 0, step: 0.01 }
+            }}
+            fullWidth
+          />
+        </Box>
+
+        {/* Seleccionar Dirección */}
+        <Box sx={{ flex: '1 1 200px', minWidth: '200px' }}>
+          <Button
+            variant="outlined"
+            color="primary"
+            startIcon={<LocationIcon />}
+            onClick={() => setModalDireccionOpen(true)}
+            disabled={loading}
+            sx={{ 
+              height: 40,
+              textTransform: 'none',
+              fontWeight: 500,
+              borderRadius: 1,
+              width: '100%',
+              justifyContent: 'flex-start'
+            }}
+          >
+            Seleccionar Dirección
+          </Button>
+          {errors.direccion && (
+            <FormHelperText error sx={{ ml: 1 }}>
+              {errors.direccion}
+            </FormHelperText>
+          )}
+        </Box>
+
+        {/* Botones en la misma fila */}
+        <Box sx={{ 
+          display: 'flex', 
+          gap: 1,
+          flex: '0 0 auto'
+        }}>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+            onClick={handleSubmit}
+            disabled={loading}
+            sx={{ 
+              minWidth: 100,
+              height: 40,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600
+            }}
+          >
+            {isEditMode ? 'Actualizar' : 'Guardar'}
+          </Button>
+          
+          <Button
+            variant="outlined"
+            color="secondary"
+            startIcon={<AddIcon />}
+            onClick={handleNuevo}
+            disabled={loading}
+            sx={{ 
+              minWidth: 90,
+              height: 40,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600
+            }}
+          >
+            Nuevo
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Dirección seleccionada */}
+      {direccionSeleccionada && (
+        <Box sx={{
+          p: 2,
+          mt: 2,
+          borderRadius: 1,
+          bgcolor: alpha(theme.palette.primary.main, 0.05),
+          border: '1px solid',
+          borderColor: alpha(theme.palette.primary.main, 0.2)
+        }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            <LocationIcon sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
+            Dirección seleccionada:
+          </Typography>
+          <Typography variant="body2" fontWeight={500}>
+            {formatearDireccion(direccionSeleccionada)}
+          </Typography>
+        </Box>
+      )}
+    </Paper>
 
       {/* Modal de selección de dirección */}
       <SelectorDirecciones
@@ -288,6 +388,6 @@ export const AsignacionArancelForm: React.FC = () => {
         onSelectDireccion={handleSelectDireccion}
         direccionSeleccionada={direccionSeleccionada}
       />
-    </Card>
+    </>
   );
 };

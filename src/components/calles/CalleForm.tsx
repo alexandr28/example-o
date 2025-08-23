@@ -18,14 +18,16 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  FormHelperText
+  FormHelperText,
+  Autocomplete,
+  Divider
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Save as SaveIcon
 } from '@mui/icons-material';
-import SearchableSelect from '../ui/SearchableSelect';
+// import SearchableSelect from '../ui/SearchableSelect';
 import { CalleFormData } from '../../models/Calle';
 import { CreateCalleDTO } from '../../services/calleApiService';
 import { useSectores } from '../../hooks/useSectores';
@@ -35,20 +37,23 @@ import { buildApiUrl } from '../../config/api.unified.config';
 // Esquema de validación
 const schema = yup.object().shape({
   tipoVia: yup
-    .mixed()
+    .number()
+    .transform((value) => (isNaN(value) || value === '' ? undefined : value))
     .required('El tipo de vía es requerido')
-    .test('is-valid', 'Debe seleccionar un tipo de vía válido', 
-      value => value && Number(value) > 0),
+    .positive('Debe seleccionar un tipo de vía válido')
+    .integer(),
   codSector: yup
-    .mixed()
+    .number()
+    .transform((value) => (isNaN(value) || value === '' ? undefined : value))
     .required('El sector es requerido')
-    .test('is-valid', 'Debe seleccionar un sector válido', 
-      value => value && Number(value) > 0),
+    .positive('Debe seleccionar un sector válido')
+    .integer(),
   codBarrio: yup
-    .mixed()
+    .number()
+    .transform((value) => (isNaN(value) || value === '' ? undefined : value))
     .required('El barrio es requerido')
-    .test('is-valid', 'Debe seleccionar un barrio válido', 
-      value => value && Number(value) > 0),
+    .positive('Debe seleccionar un barrio válido')
+    .integer(),
   nombreCalle: yup
     .string()
     .trim()
@@ -104,9 +109,9 @@ const CalleForm: React.FC<CalleFormProps> = ({
   } = useForm<CalleFormData>({
     resolver: yupResolver(schema),
     defaultValues: {
-      tipoVia: initialData?.tipoVia || '',
-      codSector: initialData?.codSector || '',
-      codBarrio: initialData?.codBarrio || '',
+      tipoVia: initialData?.tipoVia || 0,
+      codSector: initialData?.codSector || 0,
+      codBarrio: initialData?.codBarrio || 0,
       nombreCalle: initialData?.nombreCalle || '',
     }
   });
@@ -221,9 +226,9 @@ const CalleForm: React.FC<CalleFormProps> = ({
 
   const handleNew = () => {
     reset({
-      tipoVia: '',
-      codSector: '',
-      codBarrio: '',
+      tipoVia: 0,
+      codSector: 0,
+      codBarrio: 0,
       nombreCalle: ''
     });
     onNew?.();
@@ -249,14 +254,14 @@ const CalleForm: React.FC<CalleFormProps> = ({
   const hasErrors = errorTiposVia || errorSectores || errorBarrios;
 
   return (
-    <Paper
-      elevation={1}
-      sx={{
+    <Paper 
+      elevation={3} 
+      sx={{ 
         p: 3,
-        backgroundColor: theme.palette.background.paper,
         borderRadius: 2,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-        border: `1px solid ${alpha(theme.palette.divider, 0.12)}`
+        background: 'linear-gradient(to bottom, #ffffff, #fafafa)',
+        border: '1px solid',
+        borderColor: 'divider'
       }}
     >
       {hasErrors && (
@@ -265,99 +270,161 @@ const CalleForm: React.FC<CalleFormProps> = ({
         </Alert>
       )}
       
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: 2, 
+        mb: 2,
+        pb: 2,
+        borderBottom: '2px solid',
+        borderColor: 'primary.main'
+      }}>
+        <Box sx={{
+          p: 1,
+          borderRadius: 1,
+          backgroundColor: 'primary.main',
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <AddIcon />
+        </Box>
+        <Typography variant="h6" fontWeight={600}>
+          Formulario de Calle
+        </Typography>
+      </Box>
+      
       <form onSubmit={handleSubmit(handleFormSubmit)}>
-        <Stack spacing={2.5}>
+        {/* Primera fila: Todos los campos del formulario en horizontal */}
+        <Box sx={{ 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          gap: 2,
+          mb: 3
+        }}>
           {/* Tipo de Vía */}
-          <Box>
-            <Typography variant="caption" color="text.secondary" gutterBottom>
-              Tipo de Vía *
-            </Typography>
+          <Box sx={{ flex: '1 1 100px', minWidth: '100px' }}>
             <Controller
               name="tipoVia"
               control={control}
               render={({ field }) => (
-                <SearchableSelect
-                  value={field.value}
-                  options={tipoViaOptions}
-                  placeholder="Buscar tipo de vía..."
-                  error={errors.tipoVia?.message}
+                <Autocomplete
+                  options={tiposVia}
+                  getOptionLabel={(option) => option.nombre || ''}
+                  value={tiposVia.find(t => t.codConstante === field.value) || null}
+                  onChange={(_, newValue) => {
+                    field.onChange(newValue?.codConstante || 0);
+                  }}
+                  loading={loadingTiposVia}
                   disabled={loadingTiposVia || isSubmitting}
-                  onChange={field.onChange}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Tipo de Vía *"
+                      error={!!errors.tipoVia}
+                      helperText={errors.tipoVia?.message}
+                      size="small"
+                      placeholder="Buscar tipo de vía..."
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            {loadingTiposVia ? <CircularProgress color="inherit" size={20} /> : null}
+                            {params.InputProps.endAdornment}
+                          </>
+                        ),
+                      }}
+                    />
+                  )}
                 />
               )}
             />
           </Box>
 
           {/* Sector */}
-          <Box>
-            <Typography variant="caption" color="text.secondary" gutterBottom>
-              Sector *
-            </Typography>
+          <Box sx={{ flex: '1 1 120px', minWidth: '120px' }}>
             <Controller
               name="codSector"
               control={control}
               render={({ field }) => (
-                <SearchableSelect
-                  value={field.value}
-                  options={sectorOptions}
-                  placeholder="Seleccione un sector"
-                  error={errors.codSector?.message}
+                <Autocomplete
+                  options={sectores || []}
+                  getOptionLabel={(option) => option.nombre || 'Sin nombre'}
+                  value={sectores?.find(s => s.id === field.value) || null}
+                  onChange={(_, newValue) => {
+                    field.onChange(newValue?.id || 0);
+                  }}
+                  loading={loadingSectores}
                   disabled={loadingSectores || isSubmitting}
-                  onChange={field.onChange}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Sector *"
+                      error={!!errors.codSector}
+                      helperText={errors.codSector?.message}
+                      size="small"
+                      placeholder="Seleccione un sector"
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            {loadingSectores ? <CircularProgress color="inherit" size={20} /> : null}
+                            {params.InputProps.endAdornment}
+                          </>
+                        ),
+                      }}
+                    />
+                  )}
                 />
               )}
             />
           </Box>
 
-          {/* Barrio - Usando Select de MUI */}
-          <Box>
+          {/* Barrio */}
+          <Box sx={{ flex: '1 1 110px', minWidth: '110px' }}>
             <Controller
               name="codBarrio"
               control={control}
               render={({ field }) => (
-                <FormControl 
-                  fullWidth 
-                  size="small" 
-                  error={!!errors.codBarrio}
-                >
-                  <InputLabel>Barrio *</InputLabel>
-                  <Select
-                    {...field}
-                    label="Barrio *"
-                    value={field.value || ''}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      console.log('📝 [CalleForm] Barrio seleccionado:', value, 'tipo:', typeof value);
-                      field.onChange(value ? Number(value) : '');
-                    }}
-                  >
-                    <MenuItem value="">
-                      <em>Seleccione un barrio</em>
-                    </MenuItem>
-                    {barrioOptions.map((barrio) => (
-                      <MenuItem key={barrio.value} value={barrio.value}>
-                        {barrio.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                  {errors.codBarrio && (
-                    <FormHelperText error>{errors.codBarrio.message}</FormHelperText>
+                <Autocomplete
+                  options={todosLosBarrios || []}
+                  getOptionLabel={(option) => option.nombre || 'Sin nombre'}
+                  value={todosLosBarrios?.find(b => b.id === field.value) || null}
+                  onChange={(_, newValue) => {
+                    field.onChange(newValue?.id || 0);
+                  }}
+                  loading={loadingBarrios}
+                  disabled={loadingBarrios || isSubmitting}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Barrio *"
+                      error={!!errors.codBarrio}
+                      helperText={errors.codBarrio?.message}
+                      size="small"
+                      placeholder="Seleccione un barrio"
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            {loadingBarrios ? <CircularProgress color="inherit" size={20} /> : null}
+                            {params.InputProps.endAdornment}
+                          </>
+                        ),
+                      }}
+                    />
                   )}
-                  <FormHelperText>
-                    {barrioOptions.length} barrios disponibles | Seleccionado: {field.value || 'ninguno'}
-                  </FormHelperText>
-                </FormControl>
+                />
               )}
             />
           </Box>
 
           {/* Nombre de la Calle */}
-          <Box>
-            <Typography variant="caption" color="text.secondary" gutterBottom>
-              Nombre de la Calle *
-            </Typography>
+          <Box sx={{ flex: '1 1 200px', minWidth: '200px' }}>
             <TextField
               {...register('nombreCalle')}
+              label="Nombre de la Calle *"
               placeholder="Ingrese el nombre de la calle"
               fullWidth
               size="small"
@@ -367,55 +434,71 @@ const CalleForm: React.FC<CalleFormProps> = ({
               inputProps={{ maxLength: 100 }}
             />
           </Box>
-
-          {/* Botones de acción */}
-          <Stack 
-            direction="row" 
-            spacing={1.5} 
-            justifyContent="space-between"
-            sx={{ pt: 1 }}
+          <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: 2, 
+          
+        
+        }}>
+          <Button
+            type="button"
+            variant="contained"
+            color="secondary"
+            startIcon={<AddIcon />}
+            onClick={handleNew}
+            disabled={isSubmitting}
+            sx={{ 
+              minWidth: 80,
+              height: 40,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600
+            }}
           >
-            <Button
-              type="button"
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleNew}
-              disabled={isSubmitting}
-              size="small"
-              sx={{ minWidth: 100 }}
-            >
-              Nuevo
-            </Button>
-            
-            <Stack direction="row" spacing={1}>
-              <Button
-                type="button"
-                variant="outlined"
-                startIcon={<EditIcon />}
-                onClick={onEdit}
-                disabled={isSubmitting}
-                size="small"
-              >
-                Editar
-              </Button>
-              
-              <Button
-                type="submit"
-                variant="contained"
-                startIcon={<SaveIcon />}
-                disabled={isSubmitting}
-                size="small"
-                sx={{ minWidth: 100 }}
-              >
-                {isSubmitting ? (
-                  <CircularProgress size={20} color="inherit" />
-                ) : (
-                  'Guardar'
-                )}
-              </Button>
-            </Stack>
-          </Stack>
-        </Stack>
+            Nuevo
+          </Button>
+          
+          <Button
+            type="button"
+            variant="outlined"
+            color="primary"
+            startIcon={<EditIcon />}
+            onClick={onEdit}
+            disabled={isSubmitting}
+            sx={{ 
+              minWidth: 80,
+              height: 40,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600
+            }}
+          >
+            Editar
+          </Button>
+          
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+            disabled={isSubmitting}
+            sx={{ 
+              minWidth: 80,
+              height: 40,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600
+            }}
+          >
+            {isSubmitting ? 'Guardando...' : 'Guardar'}
+          </Button>
+        </Box>
+        </Box>
+
+        {/* Segunda fila: Botones de acción */}
+        
       </form>
     </Paper>
   );

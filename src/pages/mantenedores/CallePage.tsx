@@ -1,27 +1,55 @@
-// src/pages/mantenedores/CallesPage.tsx - Versión con Material-UI
+// src/pages/mantenedores/CallesPage.tsx - Versión con Material-UI y Tabs
 import React, { useState, useMemo } from 'react';
 import {
   Box,
   Paper,
-  Grid,
   Alert,
   AlertTitle,
   Typography,
   LinearProgress,
   Collapse,
-  Button
+  Button,
+  Tabs,
+  Tab,
+  useTheme,
+  alpha
 } from '@mui/material';
 import {
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  Add as AddIcon,
+  List as ListIcon
 } from '@mui/icons-material';
 import { MainLayout } from '../../layout';
 import { Breadcrumb } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useCalles } from '../../hooks/useCalles';
+import { CalleFormData } from '../../models/Calle';
+import { CreateCalleDTO } from '../../services/calleApiService';
 import CalleFormMUI from '../../components/calles/CalleForm';
 import CalleListMUI from '../../components/calles/CalleList';
 
+// Interface para TabPanel
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`calle-tabpanel-${index}`}
+      aria-labelledby={`calle-tab-${index}`}
+    >
+      {value === index && <Box>{children}</Box>}
+    </div>
+  );
+};
+
 const CallePage: React.FC = () => {
+  const theme = useTheme();
   const {
     // Estados principales
     calles,
@@ -60,6 +88,7 @@ const CallePage: React.FC = () => {
 
   // Estados locales
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [tabValue, setTabValue] = useState(0);
 
   // Migas de pan
   const breadcrumbItems: BreadcrumbItem[] = useMemo(() => [
@@ -75,42 +104,57 @@ const CallePage: React.FC = () => {
     setTimeout(() => setSuccessMessage(null), duration);
   };
 
+  // Manejar cambio de tabs
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
   // Manejo de edición
   const handleEditar = () => {
     if (calleSeleccionada) {
       setModoEdicion(true);
+      setTabValue(0); // Cambiar al tab de formulario al editar
     } else {
       showMessage("⚠️ Por favor, seleccione una calle para editar");
     }
   };
 
   // Manejo de guardado
-  const handleGuardar = async (data: { sectorId: number; barrioId: number; tipoVia: string; nombre: string }) => {
+  const handleGuardar = async (data: CalleFormData) => {
     try {
       console.log('💾 [CallesPage] Iniciando guardado:', data);
       
       // Validaciones
-      if (!data.sectorId || data.sectorId <= 0) {
+      if (!data.codSector || data.codSector <= 0) {
         throw new Error('Debe seleccionar un sector válido');
       }
       
-      if (!data.barrioId || data.barrioId <= 0) {
+      if (!data.codBarrio || data.codBarrio <= 0) {
         throw new Error('Debe seleccionar un barrio válido');
       }
       
-      if (!data.tipoVia || data.tipoVia.trim() === '') {
+      if (!data.tipoVia || data.tipoVia <= 0) {
         throw new Error('Debe seleccionar un tipo de vía');
       }
       
-      if (!data.nombre || data.nombre.trim().length < 2) {
+      if (!data.nombreCalle || data.nombreCalle.trim().length < 2) {
         throw new Error('El nombre de la calle debe tener al menos 2 caracteres');
       }
       
-      await guardarCalle(data);
+      // Convertir CalleFormData al formato esperado por guardarCalle (CreateCalleDTO)
+      const calleData = {
+        codTipoVia: data.tipoVia,
+        nombreVia: data.nombreCalle.trim(),
+        codSector: data.codSector,
+        codBarrio: data.codBarrio
+      };
+      
+      await guardarCalle(calleData);
       showMessage(modoEdicion 
         ? "✅ Calle actualizada correctamente" 
         : "✅ Calle creada correctamente");
       
+      setTabValue(1); // Cambiar al tab de lista después de guardar
       await cargarCalles();
     } catch (error: any) {
       console.error('❌ [CallesPage] Error al guardar:', error);
@@ -240,42 +284,92 @@ const CallePage: React.FC = () => {
           </Alert>
         )}
 
-        {/* Layout principal */}
-        <Grid container spacing={3}>
-          {/* Formulario */}
-          <Grid item xs={12} md={4}>
-            <CalleFormMUI
-              calleSeleccionada={calleSeleccionada}
-              sectores={sectores}
-              barrios={barrios}
-              barriosFiltrados={barriosFiltrados}
-              tiposVia={tiposVia}
-              onSubmit={handleGuardar}
-              onNuevo={limpiarSeleccion}
-              onEditar={handleEditar}
-              onSectorChange={filtrarBarriosPorSector}
-              loading={loading}
-              loadingSectores={loadingSectores}
-              loadingBarrios={loadingBarrios}
-              loadingTiposVia={loadingTiposVia}
-              isEditMode={modoEdicion}
-            />
-          </Grid>
+        {/* Contenedor principal con tabs */}
+        <Paper 
+          elevation={2}
+          sx={{ 
+            borderRadius: 2,
+            overflow: 'hidden',
+            border: `1px solid ${theme.palette.divider}`,
+          }}
+        >
+          {/* Header con tabs */}
+          <Box sx={{ 
+            bgcolor: alpha(theme.palette.primary.main, 0.04),
+            borderBottom: `1px solid ${theme.palette.divider}`
+          }}>
+            <Tabs
+              value={tabValue}
+              onChange={handleTabChange}
+              aria-label="calle tabs"
+              sx={{
+                '& .MuiTab-root': {
+                  minHeight: 64,
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  fontSize: '0.95rem',
+                  '&.Mui-selected': {
+                    fontWeight: 600,
+                  }
+                },
+                '& .MuiTabs-indicator': {
+                  height: 3,
+                  borderRadius: '3px 3px 0 0'
+                }
+              }}
+            >
+              <Tab 
+                icon={<AddIcon />} 
+                iconPosition="start"
+                label={modoEdicion ? 'Editar Calle' : 'Nueva Calle'}
+                id="calle-tab-0"
+                aria-controls="calle-tabpanel-0"
+              />
+              <Tab 
+                icon={<ListIcon />} 
+                iconPosition="start"
+                label="Lista de Calles" 
+                id="calle-tab-1"
+                aria-controls="calle-tabpanel-1"
+              />
+            </Tabs>
+          </Box>
 
-          {/* Lista */}
-          <Grid item xs={12} md={8}>
-            <CalleListMUI
-              calles={calles}
-              onSelectCalle={seleccionarCalle}
-              onEliminar={handleEliminar}
-              loading={loading}
-              onSearch={buscarCalles}
-              searchTerm={searchTerm}
-              obtenerNombreSector={obtenerNombreSector}
-              obtenerNombreBarrio={obtenerNombreBarrio}
-            />
-          </Grid>
-        </Grid>
+          {/* Panel de Formulario */}
+          <TabPanel value={tabValue} index={0}>
+            <Box sx={{ p: 3 }}>
+              <CalleFormMUI
+                onSubmit={handleGuardar}
+                onCancel={limpiarSeleccion}
+                onNew={limpiarSeleccion}
+                onEdit={handleEditar}
+                initialData={calleSeleccionada ? {
+                  tipoVia: Number(calleSeleccionada.codTipoVia) || 0,
+                  codSector: 0, // El sector no viene en CalleData, se manejará por separado
+                  codBarrio: calleSeleccionada.codBarrio || 0,
+                  nombreCalle: calleSeleccionada.nombreVia || ''
+                } : undefined}
+                isSubmitting={loading}
+              />
+            </Box>
+          </TabPanel>
+
+          {/* Panel de Lista */}
+          <TabPanel value={tabValue} index={1}>
+            <Box sx={{ p: 3 }}>
+              <CalleListMUI
+                calles={calles}
+                onSelectCalle={seleccionarCalle}
+                onEliminar={handleEliminar}
+                loading={loading}
+                onSearch={buscarCalles}
+                searchTerm={searchTerm}
+                obtenerNombreSector={obtenerNombreSector}
+                obtenerNombreBarrio={obtenerNombreBarrio}
+              />
+            </Box>
+          </TabPanel>
+        </Paper>
 
       </Box>
     </MainLayout>

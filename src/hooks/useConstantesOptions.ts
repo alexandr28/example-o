@@ -1,6 +1,6 @@
 // src/hooks/useConstantesOptions.ts
 import { useState, useEffect } from 'react';
-import constanteService, { ConstanteData } from '../services/constanteService';
+import { constanteService, type ConstanteData } from '../services';
 
 /**
  * Interface para las opciones formateadas
@@ -218,27 +218,441 @@ export const useEstadoConservacionOptions = () => {
 
 /**
  * Hook específico para años
+ * No usa el servicio porque los códigos del API no corresponden a años reales
  */
 export const useAnioOptions = (startYear: number = 2020, endYear?: number) => {
   const currentYear = endYear || new Date().getFullYear();
-  const defaultOptions: OptionFormat[] = [];
+  const options: OptionFormat[] = [];
   
+  // Generar años desde el año actual hacia atrás hasta startYear
   for (let year = currentYear; year >= startYear; year--) {
-    defaultOptions.push({
-      value: year.toString(),
+    options.push({
+      value: year, // Usar el número del año directamente
       label: year.toString(),
-      id: year.toString()
+      id: year.toString(),
+      description: year === currentYear ? 'Año actual' : undefined
     });
   }
 
+  // Retornar directamente las opciones generadas, sin usar el servicio
+  return {
+    options,
+    loading: false,
+    error: null
+  };
+};
+
+/**
+ * Hook específico para categorías de valores unitarios (padre)
+ * Ahora retorna las categorías PADRE reales: 1001, 1002, 1003
+ */
+export const useCategoriasValoresUnitariosOptions = () => {
+  const [options, setOptions] = useState<OptionFormat[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadOptions = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log('🔍 [useCategoriasValoresUnitariosOptions] Obteniendo categorías PADRE reales...');
+        
+        // Usar el método que ahora retorna las categorías padre reales (1001, 1002, 1003)
+        const data = await constanteService.obtenerCategoriasValoresUnitariosHijos();
+        
+        if (!mounted) return;
+        
+        console.log('📡 [useCategoriasValoresUnitariosOptions] Categorías padre obtenidas:', data);
+        
+        if (data && data.length > 0) {
+          const formattedOptions = data.map(item => ({
+            value: item.codConstante,
+            label: item.nombreCategoria,
+            id: item.codConstante
+          }));
+          
+          console.log('✅ [useCategoriasValoresUnitariosOptions] Opciones PADRE formateadas:', formattedOptions);
+          setOptions(formattedOptions);
+        } else {
+          console.log('⚠️ [useCategoriasValoresUnitariosOptions] No se obtuvieron categorías padre');
+          // Fallback con las categorías conocidas
+          const fallbackOptions: OptionFormat[] = [
+            { value: '1001', label: 'Estructuras', id: '1001' },
+            { value: '1002', label: 'Acabados', id: '1002' },
+            { value: '1003', label: 'Instalaciones Eléctricas y Sanitarias', id: '1003' }
+          ];
+          setOptions(fallbackOptions);
+        }
+        
+      } catch (err) {
+        if (!mounted) return;
+        
+        const errorMessage = err instanceof Error ? err.message : 'Error al cargar las opciones padre';
+        console.error('❌ [useCategoriasValoresUnitariosOptions] Error:', err);
+        setError(errorMessage);
+        
+        // Usar opciones por defecto en caso de error
+        console.log('🔄 [useCategoriasValoresUnitariosOptions] Usando opciones por defecto debido al error');
+        const fallbackOptions: OptionFormat[] = [
+          { value: '1001', label: 'Estructuras', id: '1001' },
+          { value: '1002', label: 'Acabados', id: '1002' },
+          { value: '1003', label: 'Instalaciones Eléctricas y Sanitarias', id: '1003' }
+        ];
+        setOptions(fallbackOptions);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadOptions();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return { options, loading, error };
+};
+
+/**
+ * Hook específico para categorías hijas de valores unitarios
+ * Ahora carga los HIJOS REALES según el padre seleccionado:
+ * - 1001 (Estructuras) → 100101, 100102
+ * - 1002 (Acabados) → 100201, 100202, 100203, 100204  
+ * - 1003 (Instalaciones) → 100301
+ */
+export const useCategoriasValoresUnitariosHijosOptions = (codigoPadreSeleccionado?: string) => {
+  const [options, setOptions] = useState<OptionFormat[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    
+    const loadOptions = async () => {
+      console.log(`🎯 [useCategoriasValoresUnitariosHijosOptions] Hook ejecutado con padre: "${codigoPadreSeleccionado}"`);
+      
+      // Si no hay padre seleccionado, limpiar opciones
+      if (!codigoPadreSeleccionado) {
+        console.log('⚠️ [useCategoriasValoresUnitariosHijosOptions] No hay padre, limpiando hijos');
+        setOptions([]);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+
+      // Normalizar el código del padre
+      const codigoPadre = String(codigoPadreSeleccionado).trim();
+      console.log(`🔍 [useCategoriasValoresUnitariosHijosOptions] Código normalizado: "${codigoPadre}"`);
+      
+      // Verificar que el código padre es válido (1001, 1002, 1003)
+      const padresValidos = ['1001', '1002', '1003'];
+      if (!padresValidos.includes(codigoPadre)) {
+        console.log(`⚠️ [useCategoriasValoresUnitariosHijosOptions] Código padre no válido: ${codigoPadre}`);
+        setOptions([]);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        console.log(`📡 [useCategoriasValoresUnitariosHijosOptions] Obteniendo hijos REALES para padre ${codigoPadre}...`);
+        
+        // Llamar al nuevo método que obtiene hijos reales
+        const hijosReales = await constanteService.obtenerHijosRealesPorPadre(codigoPadre);
+        
+        if (!mounted) return;
+        
+        console.log(`📡 [useCategoriasValoresUnitariosHijosOptions] Respuesta hijos reales:`, hijosReales);
+        
+        if (hijosReales && hijosReales.length > 0) {
+          const formattedOptions = hijosReales.map(item => ({
+            value: item.codConstante,
+            label: item.nombreCategoria,
+            id: item.codConstante
+          }));
+          
+          console.log(`✅ [useCategoriasValoresUnitariosHijosOptions] ${hijosReales.length} hijos reales formateados:`, formattedOptions);
+          setOptions(formattedOptions);
+        } else {
+          console.log('⚠️ [useCategoriasValoresUnitariosHijosOptions] No se obtuvieron hijos reales');
+          setOptions([]);
+        }
+        
+      } catch (err) {
+        if (!mounted) return;
+        
+        console.error('❌ [useCategoriasValoresUnitariosHijosOptions] Error al cargar hijos reales:', err);
+        setError(err instanceof Error ? err.message : 'Error al cargar hijos');
+        setOptions([]);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+    
+    loadOptions();
+    
+    return () => {
+      mounted = false;
+    };
+  }, [codigoPadreSeleccionado]); // Solo reaccionar cuando cambie el padre
+
+  console.log(`📊 [useCategoriasValoresUnitariosHijosOptions] Estado actual - opciones: ${options.length}`);
+  
+  return { options, loading, error };
+};
+
+/**
+ * Hook para obtener un único valor unitario específico
+ */
+export const useValorUnitarioEspecifico = (tipo: 'estructuras' | 'acabados' | 'instalaciones') => {
+  const [data, setData] = useState<ConstanteData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        let result: ConstanteData | null = null;
+        
+        switch(tipo) {
+          case 'estructuras':
+            result = await constanteService.obtenerValoresUnitariosMurosColumnas();
+            break;
+          case 'acabados':
+            result = await constanteService.obtenerValoresUnitariosTechos();
+            break;
+          case 'instalaciones':
+            result = await constanteService.obtenerValoresUnitariosPisos();
+            break;
+        }
+        
+        if (!mounted) return;
+        
+        setData(result);
+        
+      } catch (err) {
+        if (!mounted) return;
+        
+        const errorMessage = err instanceof Error ? err.message : 'Error al cargar el valor unitario';
+        console.error('Error cargando valor unitario:', err);
+        setError(errorMessage);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      mounted = false;
+    };
+  }, [tipo]);
+
+  return { data, loading, error };
+};
+
+/**
+ * Hook específico para lista de conductores
+ */
+export const useListaConductorOptions = () => {
+  const defaultOptions: OptionFormat[] = [
+    { value: '1401', label: 'Privado', id: '1401' },
+    { value: '1402', label: 'Estatal', id: '1402' },
+ 
+  ];
+
   return useConstantesOptions(
-    () => constanteService.obtenerTiposAnio(), // Sin la 's' final
-    (data) => ({
-      value: data.codConstante,
-      label: data.nombreCategoria,
-      id: data.codConstante,
-      description: data.codConstante === currentYear.toString() ? 'Año actual' : undefined
-    }),
+    () => constanteService.obtenerTiposListaConductor(),
+    undefined,
     defaultOptions
   );
 };
+
+/**
+ * Hook específico para lista de usos
+ */
+export const useListaUsosOptions = () => {
+  const defaultOptions: OptionFormat[] = [
+    { value: '1501', label: 'Casa Habitación', id: '1501' },
+    { value: '1502', label: 'Comercio', id: '1502' },
+    { value: '1503', label: 'Industria', id: '1503' },
+    { value: '1504', label: 'Servicio', id: '1504' }
+  ];
+
+  return useConstantesOptions(
+    () => constanteService.obtenerTiposListaUso(),
+    undefined,
+    defaultOptions
+  );
+};
+
+/**
+ * Hook específico para estados de predio
+ */
+export const useEstadoPredioOptions = () => {
+  const defaultOptions: OptionFormat[] = [
+    { value: '2501', label: 'Terminado', id: '2501' },
+    { value: '2502', label: 'En Construcción', id: '2502' },
+    { value: '2503', label: 'En Ruinas', id: '2503' },
+    { value: '2504', label: 'Paralizado', id: '2504' }
+  ];
+
+  return useConstantesOptions(
+    () => constanteService.obtenerTiposEstadoPredio(),
+    undefined,
+    defaultOptions
+  );
+};
+
+/**
+ * Hook específico para clasificación
+ */
+export const useClasificacionOptions = () => {
+  const defaultOptions: OptionFormat[] = [
+    { value: '3201', label: 'Urbano', id: '3201' },
+    { value: '3202', label: 'Rural', id: '3202' }
+  ];
+
+  return useConstantesOptions(
+    () => constanteService.obtenerTiposClasificacion(),
+    undefined,
+    defaultOptions
+  );
+};
+
+export const useClasificacionPredio =()=> {
+  const defaultOptions : OptionFormat[] = [
+    {value: '0501', label:'CASAS HABITACION Y DEPARTAMENTO PARA CASAS' , id:'0501'},
+    {value: '0502', label:'TIENDAS,DEPOSITOS,CENTROS DE RECREACION O ESPARCIMIENTO,CLUBS SOCIALES O INSTITUCIONES' , id:'0502'},
+    {value: '0503', label:'EDIFICIOS - OFICINAS' , id:'0503'},
+    {value: '0504', label:'CLINICAS,HOSPITALES,CINES,INDUSTRIAS,COLEGIOS,TALLERES' , id:'0504'},
+    {value: '0505', label:'COMERCIO' , id:'0505'},
+  ]
+  return useConstantesOptions(
+    () => constanteService.obtenerTiposCasa(),
+    undefined,
+    defaultOptions
+
+  );
+}
+
+export const useTipoNivelAntiguedad = () =>{
+  return useConstantesOptions(
+    () => constanteService.obtenerTiposNivelAntiguedad(),
+    undefined,
+  );
+}
+
+export const useMaterialPredominante = () => {
+  return useConstantesOptions(
+    () => constanteService.obtenerTiposMaterialEstructuralPredominante(),
+    undefined,
+  );
+}
+
+/**
+ * Hook específico para estados generales (Activo/Inactivo)
+ */
+export const useEstadoOptions = () => {
+  const defaultOptions: OptionFormat[] = [
+    { value: 'Activo', label: 'Activo', id: 'activo' },
+    { value: 'Inactivo', label: 'Inactivo', id: 'inactivo' }
+  ];
+
+  return useConstantesOptions(
+    () => constanteService.obtenerTiposEstado(),
+    undefined,
+    defaultOptions
+  );
+};
+
+export const useLetraValoresUnitariosOptions = () => {
+  const defaultOptions: OptionFormat[] = [
+    { value: 'A', label: 'A', id: 'A' },
+    { value: 'B', label: 'B', id: 'B' },
+    { value: 'C', label: 'C', id: 'C' },
+    { value: 'D', label: 'D', id: 'D' },
+    { value: 'E', label: 'E', id: 'E' },
+    { value: 'F', label: 'F', id: 'F' },
+    { value: 'G', label: 'G', id: 'G' },
+    { value: 'H', label: 'H', id: 'H' },
+    { value: 'I', label: 'I', id: 'I' },
+  ];
+
+  const [options, setOptions] = useState<OptionFormat[]>(defaultOptions);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadOptions = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log('🔍 [useLetraValoresUnitariosOptions] Intentando obtener letras...');
+        
+        const data = await constanteService.obtenerTiposLetrasValoresUnitarios();
+        
+        if (!mounted) return;
+        
+        if (data && data.length > 0) {
+          const formattedOptions = data.map(item => ({
+            value: item.nombreCategoria, // Usar la letra como valor
+            label: item.nombreCategoria, // Y también como label
+            id: item.codConstante
+          }));
+          
+          console.log('✅ [useLetraValoresUnitariosOptions] Datos API obtenidos:', formattedOptions);
+          setOptions(formattedOptions);
+        } else {
+          console.log('⚠️ [useLetraValoresUnitariosOptions] API no devolvió datos, usando defaults');
+          setOptions(defaultOptions);
+        }
+        
+      } catch (err) {
+        if (!mounted) return;
+        
+        const errorMessage = err instanceof Error ? err.message : 'Error al cargar las letras';
+        console.error('❌ [useLetraValoresUnitariosOptions] Error:', err);
+        setError(errorMessage);
+        
+        // Usar opciones por defecto en caso de error
+        console.log('🔄 [useLetraValoresUnitariosOptions] Usando opciones por defecto debido al error');
+        setOptions(defaultOptions);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadOptions();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return { options, loading, error };
+}

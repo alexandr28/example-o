@@ -2,7 +2,6 @@
 import React, { useEffect } from 'react';
 import {
   Box,
-  Grid,
   TextField,
   FormControl,
   InputLabel,
@@ -40,29 +39,36 @@ const direccionSchema = z.object({
   codigoSector: z.number({
     required_error: 'El sector es requerido',
     invalid_type_error: 'Seleccione un sector válido'
-  }).min(1, 'Seleccione un sector'),
+  }).nullable().refine((val) => val !== null && val > 0, {
+    message: 'Seleccione un sector'
+  }),
   
   codigoBarrio: z.number({
     required_error: 'El barrio es requerido',
     invalid_type_error: 'Seleccione un barrio válido'
-  }).min(1, 'Seleccione un barrio'),
+  }).nullable().refine((val) => val !== null && val > 0, {
+    message: 'Seleccione un barrio'
+  }),
   
   codigoCalle: z.number({
     required_error: 'La calle/Mz es requerida',
     invalid_type_error: 'Seleccione una calle válida'
-  }).min(1, 'Seleccione una calle/Mz'),
+  }).nullable().refine((val) => val !== null && val > 0, {
+    message: 'Seleccione una calle/Mz'
+  }),
   
   cuadra: z.string().optional(),
   
-  lado: z.string().default('Ninguno'),
+  lado: z.string(),
   
-  loteInicial: z.number()
-    .min(0, 'El lote inicial debe ser mayor o igual a 0')
-    .default(0),
+  loteInicial: z.coerce.number()
+    .min(0, 'El lote inicial debe ser mayor o igual a 0'),
   
-  loteFinal: z.number()
-    .min(0, 'El lote final debe ser mayor o igual a 0')
-    .default(0),
+  loteFinal: z.coerce.number()
+    .min(0, 'El lote final debe ser mayor o igual a 0'),
+}).refine((data) => data.loteFinal >= data.loteInicial, {
+  message: 'El lote final debe ser mayor o igual al lote inicial',
+  path: ['loteFinal'],
 });
 
 type DireccionFormData = z.infer<typeof direccionSchema>;
@@ -122,9 +128,9 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
   } = useForm<DireccionFormData>({
     resolver: zodResolver(direccionSchema),
     defaultValues: {
-      codigoSector: 0,
-      codigoBarrio: 0,
-      codigoCalle: 0,
+      codigoSector: null,
+      codigoBarrio: null,
+      codigoCalle: null,
       cuadra: '',
       lado: 'Ninguno',
       loteInicial: 0,
@@ -175,12 +181,25 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
 
   const handleFormSubmit = async (data: DireccionFormData) => {
     try {
-      await onSubmit(data as CreateDireccionDTO);
+      // Asegurar que los datos están en el formato correcto para el servicio
+      const direccionData: CreateDireccionDTO = {
+        codigoSector: data.codigoSector || 0,
+        codigoBarrio: data.codigoBarrio || 0,
+        codigoCalle: data.codigoCalle || 0,
+        cuadra: data.cuadra || '',
+        lado: data.lado || 'Ninguno',
+        loteInicial: data.loteInicial || 1,
+        loteFinal: data.loteFinal || 20
+      };
+      
+      console.log('📤 [DireccionForm] Enviando datos:', direccionData);
+      await onSubmit(direccionData);
+      
       if (!isEditMode) {
         reset();
       }
     } catch (error) {
-      console.error('Error al guardar dirección:', error);
+      console.error('❌ [DireccionForm] Error al guardar dirección:', error);
     }
   };
 
@@ -200,26 +219,60 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
   }, [loteInicialValue, loteFinalValue, setValue]);
 
   return (
-    <Paper elevation={3} sx={{ p: 3 }}>
+    <Paper 
+      elevation={3} 
+      sx={{ 
+        p: 3,
+        borderRadius: 2,
+        background: 'linear-gradient(to bottom, #ffffff, #fafafa)',
+        border: '1px solid',
+        borderColor: 'divider'
+      }}
+    >
       <Box component="form" onSubmit={handleSubmit(handleFormSubmit)}>
-        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <LocationIcon color="primary" />
-          Datos de la Dirección
-        </Typography>
-        
-        <Divider sx={{ mb: 3 }} />
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 2, 
+          mb: 2,
+          pb: 2,
+          borderBottom: '2px solid',
+          borderColor: 'primary.main'
+        }}>
+          <Box sx={{
+            p: 1,
+            borderRadius: 1,
+            backgroundColor: 'primary.main',
+            color: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <LocationIcon />
+          </Box>
+          <Typography variant="h6" fontWeight={600}>
+            Datos de la Dirección
+          </Typography>
+        </Box>
 
-        <Grid container spacing={3}>
-          {/* Primera fila: Sector, Barrio, Calle/Mz */}
-          <Grid item xs={12} md={4}>
-            <Controller
-              name="codigoSector"
+        {/* Fila única con todos los campos del formulario */}
+        <Box sx={{ 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          gap: 2,
+          mb: 3
+        }}>
+          {/* Sector */}
+          <Box sx={{ flex: '0 0 150px', minWidth: '150px' }}>
+              <Controller
+                name="codigoSector"
               control={control}
               render={({ field }) => (
                 <FormControl fullWidth error={!!errors.codigoSector}>
                   <Autocomplete
                     {...field}
                     options={sectores}
+                    getOptionKey={(option) => `sector-${option.codigo}`}
                     getOptionLabel={(option) => 
                       typeof option === 'number' 
                         ? sectores.find(s => s.codigo === option)?.nombre || ''
@@ -227,7 +280,7 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                     }
                     value={sectores.find(s => s.codigo === field.value) || null}
                     onChange={(_, newValue) => {
-                      field.onChange(newValue?.codigo || 0);
+                      field.onChange(newValue?.codigo || null);
                     }}
                     loading={loadingSectores}
                     disabled={loading || loadingSectores}
@@ -237,6 +290,11 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                         label="Sector"
                         error={!!errors.codigoSector}
                         helperText={errors.codigoSector?.message}
+                        sx={{
+                          '& .MuiInputBase-root':{
+                             height:'33px'
+                          }  
+                        }}
                         required
                         InputProps={{
                           ...params.InputProps,
@@ -249,13 +307,15 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                         }}
                       />
                     )}
+                    
                   />
                 </FormControl>
               )}
             />
-          </Grid>
+          </Box>
 
-          <Grid item xs={12} md={4}>
+          {/* Barrio */}
+          <Box sx={{ flex: '1 1 150px', minWidth: '150px' }}>
             <Controller
               name="codigoBarrio"
               control={control}
@@ -264,6 +324,7 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                   <Autocomplete
                     {...field}
                     options={barriosFiltrados}
+                    getOptionKey={(option) => `barrio-${option.codigo}`}
                     getOptionLabel={(option) => 
                       typeof option === 'number' 
                         ? barriosFiltrados.find(b => b.codigo === option)?.nombre || ''
@@ -271,7 +332,7 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                     }
                     value={barriosFiltrados.find(b => b.codigo === field.value) || null}
                     onChange={(_, newValue) => {
-                      field.onChange(newValue?.codigo || 0);
+                      field.onChange(newValue?.codigo || null);
                     }}
                     loading={loadingBarrios}
                     disabled={loading || loadingBarrios || !sectorValue}
@@ -281,6 +342,11 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                         label="Barrio"
                         error={!!errors.codigoBarrio}
                         helperText={errors.codigoBarrio?.message || (!sectorValue ? 'Seleccione primero un sector' : '')}
+                        sx={{
+                          '& .MuiInputBase-root':{
+                             height:'33px'
+                          }  
+                        }}
                         required
                         InputProps={{
                           ...params.InputProps,
@@ -297,9 +363,10 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                 </FormControl>
               )}
             />
-          </Grid>
+          </Box>
 
-          <Grid item xs={12} md={4}>
+          {/* Calle/Mz */}
+          <Box sx={{ flex: '1 1 150px', minWidth: '150px' }}>
             <Controller
               name="codigoCalle"
               control={control}
@@ -308,6 +375,7 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                   <Autocomplete
                     {...field}
                     options={callesFiltradas}
+                    getOptionKey={(option) => `calle-${option.codigo}`}
                     getOptionLabel={(option) => 
                       typeof option === 'number' 
                         ? callesFiltradas.find(c => c.codigo === option)?.nombre || ''
@@ -315,7 +383,7 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                     }
                     value={callesFiltradas.find(c => c.codigo === field.value) || null}
                     onChange={(_, newValue) => {
-                      field.onChange(newValue?.codigo || 0);
+                      field.onChange(newValue?.codigo || null);
                     }}
                     loading={loadingCalles}
                     disabled={loading || loadingCalles || !barrioValue}
@@ -325,6 +393,11 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                         label="Calle / Mz"
                         error={!!errors.codigoCalle}
                         helperText={errors.codigoCalle?.message || (!barrioValue ? 'Seleccione primero un barrio' : '')}
+                        sx={{
+                          '& .MuiInputBase-root':{
+                             height:'33px'
+                          }  
+                        }}
                         required
                         InputProps={{
                           ...params.InputProps,
@@ -341,10 +414,10 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                 </FormControl>
               )}
             />
-          </Grid>
-
-          {/* Segunda fila: Cuadra, Lado, Lotes */}
-          <Grid item xs={12} md={3}>
+          </Box>
+          
+          {/* Cuadra */}
+          <Box sx={{ flex: '0 0 100px', minWidth: '100px' }}>
             <Controller
               name="cuadra"
               control={control}
@@ -359,9 +432,10 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                 />
               )}
             />
-          </Grid>
+          </Box>
 
-          <Grid item xs={12} md={3}>
+          {/* Lado */}
+          <Box sx={{ flex: '0 0 120px', minWidth: '120px' }}>
             <Controller
               name="lado"
               control={control}
@@ -381,15 +455,20 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                 </FormControl>
               )}
             />
-          </Grid>
+          </Box>
 
-          <Grid item xs={12} md={3}>
+          {/* Lote Inicial */}
+          <Box sx={{ flex: '0 0 100px', minWidth: '100px' }}>
             <Controller
               name="loteInicial"
               control={control}
               render={({ field }) => (
                 <TextField
                   {...field}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    field.onChange(value === '' ? 0 : parseInt(value, 10) || 0);
+                  }}
                   fullWidth
                   type="number"
                   label="Lote Inicial"
@@ -401,15 +480,20 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                 />
               )}
             />
-          </Grid>
+          </Box>
 
-          <Grid item xs={12} md={3}>
+          {/* Lote Final */}
+          <Box sx={{ flex: '0 0 100px', minWidth: '100px' }}>
             <Controller
               name="loteFinal"
               control={control}
               render={({ field }) => (
                 <TextField
                   {...field}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    field.onChange(value === '' ? 0 : parseInt(value, 10) || 0);
+                  }}
                   fullWidth
                   type="number"
                   label="Lote Final"
@@ -421,11 +505,18 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                 />
               )}
             />
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
 
-        {/* Botones de acción */}
-        <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 3 }}>
+        {/* Segunda fila: Botones de acción */}
+        <Box sx={{ 
+          display: 'flex', 
+          gap: 2, 
+          justifyContent: 'flex-end',
+          pt: 2,
+          borderTop: '1px solid',
+          borderColor: 'divider'
+        }}>
           <Button
             variant="contained"
             color="primary"
@@ -456,7 +547,7 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
           >
             Nuevo
           </Button>
-        </Stack>
+        </Box>
       </Box>
     </Paper>
   );

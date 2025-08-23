@@ -7,10 +7,18 @@ import { API_CONFIG, buildApiUrl } from '../config/api.unified.config';
  * Interfaces para Calle/Via
  */
 export interface CalleData {
-  codigo: number;
-  nombre: string;
-  codigoVia?: number;
-  nombreVia?: string;
+  // Campos principales del API
+  codVia: number;
+  codTipoVia: number | string;
+  codBarrio: number;
+  nombreVia: string;
+  descTipoVia: string;
+  nombreBarrio: string;
+  
+  // Campos para compatibilidad
+  codigo?: number;
+  nombre?: string;
+  codigoVia?: number | string;
   codigoBarrio?: number;
   tipo?: string;
   descripcion?: string;
@@ -53,12 +61,20 @@ class CalleApiService extends BaseApiService<CalleData, CreateCalleDTO, UpdateCa
       '/api/via', // Endpoint base para CRUD
       {
         normalizeItem: (item: any) => ({
+          // Campos principales del API
+          codVia: item.codVia || 0,
+          codTipoVia: item.codTipoVia || '',
+          codBarrio: item.codBarrio || 0,
+          nombreVia: item.nombreVia || '',
+          descTipoVia: item.descTipoVia || '',
+          nombreBarrio: item.nombreBarrio || '',
+          
+          // Campos para compatibilidad
           codigo: item.codVia || item.codigo || 0,
           nombre: item.nombreVia || item.nombre || '',
           codigoVia: item.codTipoVia || item.codigoVia,
-          nombreVia: item.nombreVia || '',
           codigoBarrio: item.codBarrio || item.codigoBarrio,
-          tipo: item.tipoVia || item.tipo || 'CALLE',
+          tipo: item.descTipoVia || item.tipoVia || item.tipo || 'CALLE',
           descripcion: item.descripcion || '',
           estado: item.estado || 'ACTIVO',
           fechaRegistro: item.fechaRegistro,
@@ -105,9 +121,15 @@ class CalleApiService extends BaseApiService<CalleData, CreateCalleDTO, UpdateCa
       }
       
       const data = await response.json();
-      const items = Array.isArray(data) ? data : (data.data || []);
+      console.log('📋 [CalleApiService] Raw API response:', data);
       
-      return this.normalizeData(items);
+      const items = Array.isArray(data) ? data : (data.data || []);
+      console.log('📋 [CalleApiService] Items to normalize:', items);
+      
+      const normalized = this.normalizeData(items);
+      console.log('📋 [CalleApiService] Normalized data:', normalized);
+      
+      return normalized;
     } catch (error) {
       console.error('❌ [CalleApiService] Error obteniendo vías:', error);
       throw error;

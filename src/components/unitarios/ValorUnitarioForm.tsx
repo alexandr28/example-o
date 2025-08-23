@@ -9,16 +9,20 @@ import {
   Stack,
   useTheme,
   alpha,
-  Divider
+  Divider,
+  Autocomplete,
+  Button,
+  CircularProgress
 } from '@mui/material';
 import {
   AttachMoney as MoneyIcon,
   Category as CategoryIcon,
   CalendarToday as CalendarIcon,
   Title as TitleIcon,
-  Layers as LayersIcon
+  Layers as LayersIcon,
+  Save as SaveIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
-import SearchableSelect from '../ui/SearchableSelect';
 import { CategoriaValorUnitario, SubcategoriaValorUnitario, LetraValorUnitario } from '../../models';
 
 interface ValorUnitarioFormProps {
@@ -37,6 +41,9 @@ interface ValorUnitarioFormProps {
   onLetraChange: (letra: LetraValorUnitario | null) => void;
   onCostoChange: (costo: string) => void;
   costoValue: string;
+  onRegistrar?: () => void;
+  onEliminar?: () => void;
+  isSubmitting?: boolean;
 }
 
 const ValorUnitarioForm: React.FC<ValorUnitarioFormProps> = ({
@@ -54,37 +61,32 @@ const ValorUnitarioForm: React.FC<ValorUnitarioFormProps> = ({
   onSubcategoriaChange,
   onLetraChange,
   onCostoChange,
-  costoValue
+  costoValue,
+  onRegistrar,
+  onEliminar,
+  isSubmitting = false
 }) => {
   const theme = useTheme();
 
-  // Convertir las opciones al formato esperado por SearchableSelect
+  // Convertir las opciones al formato esperado por SearchableSelect (solo value y label)
   const añoOptions = años.map(año => ({
-    id: año.value,
     value: parseInt(año.value),
-    label: año.label,
-    description: año.value === new Date().getFullYear().toString() ? 'Año actual' : undefined
+    label: año.label
   }));
 
   const categoriaOptions = categorias.map(cat => ({
-    id: cat.value,
     value: cat.value,
-    label: cat.label,
-    description: getCategoriaDescription(cat.value)
+    label: cat.label
   }));
 
   const subcategoriaOptions = subcategoriasDisponibles.map(sub => ({
-    id: sub.value,
     value: sub.value,
-    label: sub.label,
-    description: getSubcategoriaDescription(sub.value)
+    label: sub.label
   }));
 
   const letraOptions = letras.map(letra => ({
-    id: letra.value,
     value: letra.value,
-    label: letra.label,
-    description: getLetraDescription(letra.value)
+    label: letra.label
   }));
 
   // Helpers para descripciones
@@ -127,167 +129,271 @@ const ValorUnitarioForm: React.FC<ValorUnitarioFormProps> = ({
 
   return (
     <Paper 
-      elevation={1}
+      elevation={3}
       sx={{ 
-        overflow: 'hidden',
-        border: `1px solid ${theme.palette.divider}`,
-        backgroundColor: theme.palette.background.paper
+        p: 3,
+        borderRadius: 2,
+        background: 'linear-gradient(to bottom, #ffffff, #fafafa)',
+        border: '1px solid',
+        borderColor: 'divider'
       }}
     >
-      <Box 
-        sx={{ 
-          px: 3, 
-          py: 2, 
-          bgcolor: alpha(theme.palette.primary.main, 0.04),
-          borderBottom: `1px solid ${theme.palette.divider}`
-        }}
-      >
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <CategoryIcon color="primary" fontSize="small" />
-          <Typography variant="h6" fontWeight={500}>
-            Valores Unitarios
-          </Typography>
-        </Stack>
+      {/* Header */}
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: 2, 
+        mb: 2,
+        pb: 2,
+        borderBottom: '2px solid',
+        borderColor: 'primary.main'
+      }}>
+        <Box sx={{
+          p: 1,
+          borderRadius: 1,
+          backgroundColor: 'primary.main',
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <CategoryIcon />
+        </Box>
+        <Typography variant="h6" fontWeight={600}>
+          Formulario de Valores Unitarios
+        </Typography>
       </Box>
-      
-      <Box sx={{ p: 3 }}>
-        <Stack spacing={3}>
-          {/* Primera fila: Año y Categoría */}
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-            <Box sx={{ flex: 1 }}>
-              <SearchableSelect
-                label="Año"
-                options={añoOptions}
-                value={añoSeleccionado ? añoOptions.find(opt => opt.value === añoSeleccionado) || null : null}
-                onChange={(option) => onAñoChange(option ? option.value : null)}
-                placeholder="Seleccione el año"
-                disabled={loading}
-                required
-                renderOption={(props, option) => (
-                  <Box component="li" {...props}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <CalendarIcon fontSize="small" color="action" />
-                      <Box>
-                        <Typography variant="body2">{option.label}</Typography>
-                        {option.description && (
-                          <Typography variant="caption" color="text.secondary">
-                            {option.description}
-                          </Typography>
-                        )}
-                      </Box>
-                    </Stack>
-                  </Box>
-                )}
+
+      {/* Fila única con todos los campos */}
+      <Box sx={{ 
+        display: 'flex', 
+        flexWrap: 'wrap', 
+        gap: 2,
+        mb: 3,
+        alignItems: 'center'
+      }}>
+        {/* Año */}
+        <Box sx={{ flex: '1 1 120px', minWidth: '120px' }}>
+          <Autocomplete
+            options={años}
+            getOptionLabel={(option) => option.label}
+            value={años.find(a => parseInt(a.value) === añoSeleccionado) || null}
+            onChange={(_, newValue) => {
+              onAñoChange(newValue ? parseInt(newValue.value) : null);
+            }}
+            loading={loading}
+            disabled={loading}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Año *"
+                size="small"
+                placeholder="Seleccione año"
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <CalendarIcon sx={{ fontSize: 16 }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <>
+                      {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                  sx: { height: 40 }
+                }}
               />
-            </Box>
-            
-            <Box sx={{ flex: 1 }}>
-              <SearchableSelect
-                label="Categoría"
-                options={categoriaOptions}
-                value={categoriaSeleccionada ? categoriaOptions.find(opt => opt.value === categoriaSeleccionada) || null : null}
-                onChange={(option) => onCategoriaChange(option ? option.value as CategoriaValorUnitario : null)}
-                placeholder="Seleccione la categoría"
-                disabled={loading || !añoSeleccionado}
-                required
-                renderOption={(props, option) => (
-                  <Box component="li" {...props}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <LayersIcon fontSize="small" color="action" />
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="body2">{option.label}</Typography>
-                        {option.description && (
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                            {option.description}
-                          </Typography>
-                        )}
-                      </Box>
-                    </Stack>
-                  </Box>
-                )}
+            )}
+          />
+        </Box>
+
+        {/* Categoría */}
+        <Box sx={{ flex: '1 1 150px', minWidth: '150px' }}>
+          <Autocomplete
+            options={categorias}
+            getOptionLabel={(option) => option.label}
+            value={categorias.find(c => c.value === categoriaSeleccionada) || null}
+            onChange={(_, newValue) => {
+              onCategoriaChange(newValue ? newValue.value as CategoriaValorUnitario : null);
+            }}
+            loading={loading}
+            disabled={loading || !añoSeleccionado}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Categoría *"
+                size="small"
+                placeholder="Seleccione categoría"
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <CategoryIcon sx={{ fontSize: 16 }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <>
+                      {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                  sx: { height: 40 }
+                }}
               />
-            </Box>
-          </Stack>
-          
-          {/* Segunda fila: Subcategoría y Letra */}
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-            <Box sx={{ flex: 1 }}>
-              <SearchableSelect
-                label="Subcategoría"
-                options={subcategoriaOptions}
-                value={subcategoriaSeleccionada ? subcategoriaOptions.find(opt => opt.value === subcategoriaSeleccionada) || null : null}
-                onChange={(option) => onSubcategoriaChange(option ? option.value as SubcategoriaValorUnitario : null)}
-                placeholder="Seleccione la subcategoría"
-                disabled={loading || !categoriaSeleccionada}
-                required
+            )}
+          />
+        </Box>
+
+        {/* Subcategoría */}
+        <Box sx={{ flex: '1 1 150px', minWidth: '150px' }}>
+          <Autocomplete
+            options={subcategoriasDisponibles}
+            getOptionLabel={(option) => option.label}
+            value={subcategoriasDisponibles.find(s => s.value === subcategoriaSeleccionada) || null}
+            onChange={(_, newValue) => {
+              onSubcategoriaChange(newValue ? newValue.value as SubcategoriaValorUnitario : null);
+            }}
+            loading={loading}
+            disabled={loading || !categoriaSeleccionada}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Subcategoría *"
+                size="small"
+                placeholder="Seleccione subcategoría"
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LayersIcon sx={{ fontSize: 16 }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <>
+                      {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                  sx: { height: 40 }
+                }}
               />
-            </Box>
-            
-            <Box sx={{ flex: 1 }}>
-              <SearchableSelect
-                label="Letra (Calidad)"
-                options={letraOptions}
-                value={letraSeleccionada ? letraOptions.find(opt => opt.value === letraSeleccionada) || null : null}
-                onChange={(option) => onLetraChange(option ? option.value as LetraValorUnitario : null)}
-                placeholder="Seleccione la letra"
-                disabled={loading || !subcategoriaSeleccionada}
-                required
-                renderOption={(props, option) => (
-                  <Box component="li" {...props}>
-                    <Stack direction="row" alignItems="center" spacing={2}>
-                      <Box
-                        sx={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 1,
-                          bgcolor: alpha(theme.palette.primary.main, 0.1),
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 'bold',
-                          color: theme.palette.primary.main
-                        }}
-                      >
-                        {option.label}
-                      </Box>
-                      <Typography variant="caption" color="text.secondary">
-                        {option.description}
-                      </Typography>
-                    </Stack>
-                  </Box>
-                )}
+            )}
+          />
+        </Box>
+
+        {/* Letra */}
+        <Box sx={{ flex: '1 1 120px', minWidth: '120px' }}>
+          <Autocomplete
+            options={letras}
+            getOptionLabel={(option) => `${option.value} - ${getLetraDescription(option.value)}`}
+            value={letras.find(l => l.value === letraSeleccionada) || null}
+            onChange={(_, newValue) => {
+              onLetraChange(newValue ? newValue.value as LetraValorUnitario : null);
+            }}
+            loading={loading}
+            disabled={loading || !subcategoriaSeleccionada}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Letra *"
+                size="small"
+                placeholder="Seleccione letra"
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <TitleIcon sx={{ fontSize: 16 }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <>
+                      {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                  sx: { height: 40 }
+                }}
               />
-            </Box>
-          </Stack>
-          
-          <Divider />
-          
-          {/* Tercera fila: Costo */}
-          <Box>
-            <TextField
-              fullWidth
-              label="Costo Unitario"
-              type="number"
-              value={costoValue}
-              onChange={(e) => onCostoChange(e.target.value)}
-              disabled={loading || !letraSeleccionada}
-              required
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <MoneyIcon color="action" />
-                  </InputAdornment>
-                ),
-                endAdornment: <InputAdornment position="end">S/</InputAdornment>
+            )}
+          />
+        </Box>
+
+        {/* Costo Unitario */}
+        <Box sx={{ flex: '1 1 150px', minWidth: '150px' }}>
+          <TextField
+            label="Costo Unitario *"
+            type="number"
+            size="small"
+            value={costoValue}
+            onChange={(e) => onCostoChange(e.target.value)}
+            disabled={loading || !letraSeleccionada}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <MoneyIcon sx={{ fontSize: 16 }} />
+                </InputAdornment>
+              ),
+              endAdornment: <InputAdornment position="end">S/</InputAdornment>,
+              sx: { height: 40 }
+            }}
+            inputProps={{
+              step: 0.01,
+              min: 0
+            }}
+            fullWidth
+          />
+        </Box>
+
+        {/* Botones en la misma fila */}
+        <Box sx={{ 
+          display: 'flex', 
+
+         
+          flex: '0 0 100px',
+          maxWidth: '100px',
+        }}>
+          {onRegistrar && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+              onClick={onRegistrar}
+              disabled={loading || isSubmitting || !letraSeleccionada || !costoValue}
+              sx={{ 
+         
+                maxWidth: 100,
+                height: 40,
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 600
               }}
-              inputProps={{
-                step: 0.01,
-                min: 0
+            >
+              {isSubmitting ? 'Registrando...' : 'Registrar'}
+            </Button>
+          )}
+          
+          {onEliminar && (
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={onEliminar}
+              disabled={loading || isSubmitting}
+              sx={{ 
+                minWidth: 70,
+                maxWidth: 90,
+                height: 40,
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 600
               }}
-              helperText={letraSeleccionada ? "Ingrese el costo unitario para la configuración seleccionada" : "Seleccione todos los campos anteriores"}
-            />
-          </Box>
-        </Stack>
+            >
+              Eliminar
+            </Button>
+          )}
+        </Box>
       </Box>
     </Paper>
   );

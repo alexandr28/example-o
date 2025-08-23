@@ -40,6 +40,7 @@ export const API_ENDPOINTS = {
   DEPRECIACION: `/api/depreciacion`,
   PREDIO: `/api/predio`,
   PISO: `/api/piso`,
+  ASIGNACION: `/api/asignacionpredio`,
   constante: {
       base: '/api/constante',
       listarPadre: '/api/constante/listarConstantePadre',

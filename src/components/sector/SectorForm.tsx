@@ -14,12 +14,15 @@ import {
   CircularProgress,
   IconButton,
   Tooltip,
+  Alert
 } from "@mui/material";
 import {
   Save as SaveIcon,
   Add as AddIcon,
   Clear as ClearIcon,
   CloudOff as CloudOffIcon,
+  Edit as EditIcon,
+  Business as BusinessIcon
 } from "@mui/icons-material";
 import { Sector } from "../../models/Sector";
 
@@ -39,7 +42,7 @@ interface SectorFormProps {
   sectorSeleccionado?: Sector | null;
   onGuardar: (data: { nombre: string }) => void | Promise<void>;
   onNuevo: () => void;
-  onEditar: () => void;
+  onEditar?: () => void;
   modoOffline?: boolean;
   loading?: boolean;
   isEditMode?: boolean;
@@ -49,6 +52,7 @@ const SectorForm: React.FC<SectorFormProps> = ({
   sectorSeleccionado,
   onGuardar,
   onNuevo,
+  onEditar,
   modoOffline = false,
   loading = false,
   isEditMode = false,
@@ -100,220 +104,177 @@ const SectorForm: React.FC<SectorFormProps> = ({
   const isFormDisabled = loading || (sectorSeleccionado && !isEditMode);
 
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        overflow: "hidden",
-        border: "none",
-        maxWidth: 600,
-        mx: "auto",
-        boxShadow:
-          "0 8px 32px 0 rgba(60,60,120,0.10), 0 1.5px 8px 0 rgba(60,60,120,0.07)", // Sombra bifuminada y suave
-        backdropFilter: "blur(0.1px)", //
+    <Paper 
+      elevation={3} 
+      sx={{ 
+        p: 3,
+        borderRadius: 2,
+        background: 'linear-gradient(to bottom, #ffffff, #fafafa)',
+        border: '1px solid',
+        borderColor: 'divider',
+        width: '100%'
       }}
     >
-      {/* Header */}
-      <Box
-        sx={{
-          px: 2,
-          py: 1.5,
-          bgcolor: "transparent",
-          borderBottom: "none",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Typography
-          variant="body1"
-          sx={{ fontWeight: 600, fontSize: "1rem", color: "#374151" }}
-        >
-          Datos del Sector
-        </Typography>
-
-        <Stack direction="row" spacing={1} alignItems="center">
+      <Box component="form" onSubmit={handleSubmit(onSubmit)}>
+        {/* Header */}
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 2, 
+          mb: 2,
+          pb: 2,
+          borderBottom: '2px solid',
+          borderColor: 'primary.main'
+        }}>
+          <Box sx={{
+            p: 1,
+            borderRadius: 1,
+            backgroundColor: 'primary.main',
+            color: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <BusinessIcon />
+          </Box>
+          <Typography variant="h6" fontWeight={600}>
+            Formulario de Sector
+          </Typography>
+          
+          {/* Chips informativos */}
+          <Box sx={{ flex: 1 }} />
           {modoOffline && (
             <Chip
-              icon={<CloudOffIcon sx={{ fontSize: "0.875rem" }} />}
+              icon={<CloudOffIcon />}
               label="Sin conexión"
               size="small"
               color="warning"
               variant="outlined"
-              sx={{ fontSize: "0.7rem", height: 24 }}
             />
           )}
-
           {sectorSeleccionado && (
             <Chip
               label={`ID: ${sectorSeleccionado.id}`}
               size="small"
               variant="outlined"
-              sx={{ fontSize: "0.7rem", height: 24 }}
+              color="primary"
             />
           )}
-        </Stack>
-      </Box>
+        </Box>
 
-      {/* Formulario */}
-      <Box
-        component="form"
-        onSubmit={handleSubmit(onSubmit)}
-        sx={{ px: 10, pb: 5 }}
-      >
-        <Stack spacing={2} sx={{ mt: 2 }}>
-          {/* Campo Nombre */}
-          <TextField
-            {...register("nombre")}
-            label="Nombre del Sector"
-            placeholder="Ingrese el nombre del sector"
-            fullWidth
-            size="small"
-            error={!!errors.nombre}
-            helperText={errors.nombre?.message}
-            disabled={!!isFormDisabled}
-            required
-            InputProps={{
-              endAdornment: nombreValue && !isFormDisabled && (
-                <Tooltip title="Limpiar">
-                  <IconButton
-                    size="small"
-                    onClick={() => setValue("nombre", "")}
-                    edge="end"
-                    sx={{ mr: -1 }}
-                  >
-                    <ClearIcon sx={{ fontSize: "0.9rem" }} />
-                  </IconButton>
-                </Tooltip>
-              ),
-              sx: { fontSize: "0.80rem", height: 36 },
-            }}
-            InputLabelProps={{
-              sx: { fontSize: "0.80rem" },
-              shrink: true,
-            }}
-            sx={{
-              "& .MuiInputBase-root": {
-                height: 36,
-                fontSize: "0.80rem",
-              },
-              "& .MuiInputBase-input": {
-                padding: "6px 10px",
-                fontSize: "0.80rem",
-              },
-              "& .MuiFormHelperText-root": {
-                fontSize: "0.70rem",
-                marginLeft: 1,
-                marginRight: 1,
-                marginTop: 0.5,
-              },
-              "& .MuiInputBase-input.Mui-disabled": {
-                color: "text.primary",
-                WebkitTextFillColor: "text.primary",
-              },
-            }}
-          />
+        {/* Fila única con todos los campos del formulario */}
+        <Box sx={{ 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          gap: 2,
+          mb: 3,
+          alignItems: 'center'
+        }}>
+          {/* Nombre del Sector */}
+          <Box sx={{ flex: '1 1 250px', minWidth: '250px' }}>
+            <TextField
+              {...register("nombre")}
+              label="Nombre del Sector *"
+              placeholder="Ingrese el nombre del sector"
+              fullWidth
+              size="small"
+              error={!!errors.nombre}
+              helperText={errors.nombre?.message}
+              disabled={isFormDisabled}
+              inputProps={{ maxLength: 100 }}
+              InputProps={{
+                endAdornment: nombreValue && !isFormDisabled && (
+                  <Tooltip title="Limpiar">
+                    <IconButton
+                      size="small"
+                      onClick={() => setValue("nombre", "")}
+                      edge="end"
+                    >
+                      <ClearIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                ),
+                sx: { height: 40 }
+              }}
+            />
+          </Box>
 
-          {/* Información adicional */}
-          {sectorSeleccionado && !isEditMode && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ px: 5, fontSize: "0.75rem" }}
-            ></Typography>
-          )}
-        </Stack>
-
-        {/* Botones de acción */}
-        <Stack
-          direction="row"
-          spacing={1.5}
-          justifyContent="center"
-          sx={{ mt: 2 }}
-        >
-          {!sectorSeleccionado || isEditMode ? (
-            <>
+          {/* Botones en la misma fila */}
+          <Box sx={{ 
+            display: 'flex', 
+            gap: 1,
+            alignItems: 'center',
+            flex: '0 0 auto'
+          }}>
+            <Button
+              type="button"
+              variant="contained"
+              color="secondary"
+              startIcon={<AddIcon />}
+              onClick={handleNew}
+              disabled={loading}
+              sx={{ 
+                minWidth: 80,
+                height: 40,
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 600
+              }}
+            >
+              Nuevo
+            </Button>
+            
+            {onEditar && (
               <Button
-                type="submit"
-                variant="contained"
-                startIcon={
-                  loading ? (
-                    <CircularProgress size={14} />
-                  ) : (
-                    <SaveIcon sx={{ fontSize: "0.9rem" }} />
-                  )
-                }
-                disabled={loading || !isDirty || !isValid}
-                size="small"
-                sx={{
-                  minWidth: 90,
-                  textTransform: "none",
-                  fontWeight: 500,
-                  fontSize: "0.80rem",
-                  py: 0.5,
-                  bgcolor: "#6B7280",
-                  "&:hover": {
-                    bgcolor: "#4B5563",
-                  },
-                }}
-              >
-                {loading
-                  ? isEditMode && sectorSeleccionado
-                    ? "Actualizando..."
-                    : "Guardando..."
-                  : isEditMode && sectorSeleccionado
-                  ? "Actualizar"
-                  : "Guardar"}
-              </Button>
-
-              {/* Boton Cancelar */}
-              <Button
+                type="button"
                 variant="outlined"
-                startIcon={<ClearIcon sx={{ fontSize: "0.9rem" }} />}
-                onClick={handleNew}
+                color="primary"
+                startIcon={<EditIcon />}
+                onClick={onEditar}
                 disabled={loading}
-                size="small"
-                sx={{
-                  minWidth: 90,
-                  textTransform: "none",
-                  fontWeight: 500,
-                  fontSize: "0.80rem",
-                  py: 0.5,
-                  color: "#10B981",
-                  borderColor: "#10B981",
-                  "&:hover": {
-                    borderColor: "#059669",
-                    bgcolor: "rgba(16, 185, 129, 0.04)",
-                  },
+                sx={{ 
+                  minWidth: 80,
+                  height: 40,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontWeight: 600
                 }}
               >
-                Cancelar
+                Editar
               </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon sx={{ fontSize: "0.9rem" }} />}
-                onClick={handleNew}
-                disabled={loading}
-                size="small"
-                sx={{
-                  minWidth: 90,
-                  textTransform: "none",
-                  fontWeight: 500,
-                  fontSize: "0.80rem",
-                  py: 0.5,
-                  bgcolor: "#10B981",
-                  "&:hover": {
-                    bgcolor: "#059669",
-                  },
-                }}
-              >
-                Nuevo
-              </Button>
-            </>
-          )}
-        </Stack>
+            )}
+            
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+              disabled={loading || !isDirty || !isValid}
+              sx={{ 
+                minWidth: 100,
+                height: 40,
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 600
+              }}
+            >
+              {loading
+                ? isEditMode && sectorSeleccionado
+                  ? "Actualizando..."
+                  : "Guardando..."
+                : isEditMode && sectorSeleccionado
+                ? "Actualizar"
+                : "Guardar"}
+            </Button>
+          </Box>
+        </Box>
+
+        {/* Alertas */}
+        {modoOffline && (
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            Modo sin conexión. Los cambios se sincronizarán cuando se restablezca la conexión.
+          </Alert>
+        )}
       </Box>
     </Paper>
   );

@@ -41,7 +41,7 @@ const customColors = {
   },
 };
 
-// Configuración base compartida
+// Configuración base compartida - TAMAÑOS REDUCIDOS Y MÁS COMPACTOS
 const baseThemeConfig: ThemeOptions = {
   typography: {
     fontFamily: [
@@ -54,64 +54,91 @@ const baseThemeConfig: ThemeOptions = {
       'Arial',
       'sans-serif',
     ].join(','),
+    // Reducir todos los tamaños de fuente
+    fontSize: 12, // Base font size reducida
     h1: {
-      fontSize: '2.5rem',
-      fontWeight: 700,
+      fontSize: '1.75rem', // De 2.5rem a 1.75rem
+      fontWeight: 600,
       lineHeight: 1.2,
     },
     h2: {
-      fontSize: '2rem',
+      fontSize: '1.5rem', // De 2rem a 1.5rem
       fontWeight: 600,
       lineHeight: 1.3,
     },
     h3: {
-      fontSize: '1.75rem',
+      fontSize: '1.25rem', // De 1.75rem a 1.25rem
       fontWeight: 600,
       lineHeight: 1.4,
     },
     h4: {
-      fontSize: '1.5rem',
+      fontSize: '1.125rem', // De 1.5rem a 1.125rem
       fontWeight: 600,
       lineHeight: 1.4,
     },
     h5: {
-      fontSize: '1.25rem',
+      fontSize: '1rem', // De 1.25rem a 1rem
       fontWeight: 600,
       lineHeight: 1.5,
     },
     h6: {
-      fontSize: '1.125rem',
+      fontSize: '0.875rem', // De 1.125rem a 0.875rem
       fontWeight: 600,
       lineHeight: 1.5,
     },
     body1: {
-      fontSize: '1rem',
-      lineHeight: 1.6,
+      fontSize: '0.813rem', // De 1rem a 0.813rem (13px)
+      lineHeight: 1.5,
     },
     body2: {
-      fontSize: '0.875rem',
-      lineHeight: 1.6,
+      fontSize: '0.75rem', // De 0.875rem a 0.75rem (12px)
+      lineHeight: 1.5,
+    },
+    caption: {
+      fontSize: '0.688rem', // 11px
+      lineHeight: 1.4,
     },
     button: {
       textTransform: 'none',
       fontWeight: 500,
+      fontSize: '0.813rem', // 13px
     },
   },
+  spacing: 6, // Reducir el espaciado base de 8px a 6px
   shape: {
-    borderRadius: 8,
+    borderRadius: 6, // Reducir border radius
   },
   components: {
     MuiButton: {
+      defaultProps: {
+        size: 'small', // Tamaño pequeño por defecto
+      },
       styleOverrides: {
         root: {
-          borderRadius: 8,
-          padding: '8px 16px',
-          fontSize: '0.875rem',
-          fontWeight: 400,
+          borderRadius: 6,
+          padding: '4px 12px', // Reducir padding
+          fontSize: '0.75rem', // Reducir tamaño de fuente
+          fontWeight: 500,
           boxShadow: 'none',
+          minHeight: '32px', // Altura mínima más pequeña
           '&:hover': {
             boxShadow: 'none',
           },
+        },
+        sizeSmall: {
+          padding: '3px 10px',
+          fontSize: '0.688rem',
+          minHeight: '28px',
+        },
+        sizeMedium: {
+          padding: '5px 14px',
+          fontSize: '0.75rem',
+          minHeight: '32px',
+        },
+        sizeLarge: {
+          padding: '6px 16px',
+          fontSize: '0.813rem',
+          minHeight: '36px',
         },
         contained: {
           '&:hover': {
@@ -147,29 +174,205 @@ const baseThemeConfig: ThemeOptions = {
       defaultProps: {
         variant: 'outlined',
         size: 'small',
+        margin: 'dense', // Márgenes más densos
       },
       styleOverrides: {
         root: {
           '& .MuiOutlinedInput-root': {
+            fontSize: '0.75rem', // Tamaño de fuente más pequeño
             '&:hover fieldset': {
               borderColor: customColors.primary.main,
             },
           },
+          '& .MuiInputLabel-root': {
+            fontSize: '0.75rem', // Labels más pequeños
+            transform: 'translate(14px, 8px) scale(1)', // Ajustar posición del label
+            '&.MuiInputLabel-shrink': {
+              transform: 'translate(14px, -9px) scale(0.75)',
+            },
+          },
+          '& .MuiInputBase-input': {
+            padding: '6px 10px', // Padding más pequeño
+            fontSize: '0.75rem',
+            height: 'auto',
+            minHeight: '20px',
+          },
+          '& .MuiOutlinedInput-input': {
+            padding: '6px 10px', // Consistente con el input base
+          },
+          '& .MuiInputBase-inputSizeSmall': {
+            padding: '4px 8px',
+            fontSize: '0.688rem',
+          },
+          '& .MuiFormHelperText-root': {
+            fontSize: '0.688rem', // Helper text más pequeño
+            marginTop: '2px',
+          },
+        },
+      },
+    },
+    MuiFormControl: {
+      defaultProps: {
+        margin: 'dense', // Márgenes más densos por defecto
+        size: 'small',
+      },
+      styleOverrides: {
+        root: {
+          marginBottom: '8px', // Espaciado consistente entre campos
+          marginTop: '8px',
+        },
+        marginDense: {
+          marginTop: '4px',
+          marginBottom: '4px',
+        },
+      },
+    },
+    MuiInputBase: {
+      styleOverrides: {
+        root: {
+          fontSize: '0.75rem',
+        },
+        input: {
+          fontSize: '0.75rem',
+          '&::placeholder': {
+            fontSize: '0.75rem',
+          },
+        },
+      },
+    },
+    MuiSelect: {
+      defaultProps: {
+        size: 'small',
+      },
+      styleOverrides: {
+        select: {
+          padding: '6px 10px',
+          fontSize: '0.75rem',
+          minHeight: '20px',
+        },
+        icon: {
+          fontSize: '1.125rem', // Icono más pequeño
+        },
+      },
+    },
+    MuiMenuItem: {
+      styleOverrides: {
+        root: {
+          fontSize: '0.75rem',
+          minHeight: '32px',
+          padding: '4px 12px',
+        },
+      },
+    },
+    MuiAutocomplete: {
+      defaultProps: {
+        size: 'small',
+      },
+      styleOverrides: {
+        input: {
+          fontSize: '0.75rem',
+          padding: '2px 4px !important',
+        },
+        option: {
+          fontSize: '0.75rem',
+          padding: '4px 8px',
+          minHeight: '32px',
         },
       },
     },
     MuiChip: {
+      defaultProps: {
+        size: 'small',
+      },
       styleOverrides: {
         root: {
           fontWeight: 500,
+          fontSize: '0.688rem',
+          height: '24px',
+        },
+        sizeSmall: {
+          fontSize: '0.625rem',
+          height: '20px',
         },
       },
     },
     MuiTooltip: {
       styleOverrides: {
         tooltip: {
-          fontSize: '0.75rem',
+          fontSize: '0.688rem', // Más pequeño
           backgroundColor: 'rgba(0, 0, 0, 0.87)',
+          padding: '4px 8px',
+        },
+      },
+    },
+    MuiTable: {
+      styleOverrides: {
+        root: {
+          fontSize: '0.75rem',
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          fontSize: '0.75rem',
+          padding: '6px 12px', // Reducir padding en celdas
+        },
+        sizeSmall: {
+          padding: '4px 8px',
+          fontSize: '0.688rem',
+        },
+        head: {
+          fontSize: '0.75rem',
+          fontWeight: 600,
+          padding: '8px 12px',
+        },
+      },
+    },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          borderRadius: 8,
+        },
+      },
+    },
+    MuiDialogTitle: {
+      styleOverrides: {
+        root: {
+          fontSize: '1.125rem',
+          padding: '12px 16px',
+        },
+      },
+    },
+    MuiDialogContent: {
+      styleOverrides: {
+        root: {
+          padding: '16px',
+          fontSize: '0.75rem',
+        },
+      },
+    },
+    MuiDialogActions: {
+      styleOverrides: {
+        root: {
+          padding: '8px 16px',
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+        },
+      },
+    },
+    MuiCardContent: {
+      styleOverrides: {
+        root: {
+          padding: '12px',
+          '&:last-child': {
+            paddingBottom: '12px',
+          },
         },
       },
     },

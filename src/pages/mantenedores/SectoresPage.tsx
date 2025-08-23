@@ -3,8 +3,42 @@ import { MainLayout } from "../../layout";
 import { SectorList, SectorForm, Breadcrumb } from "../../components";
 import { BreadcrumbItem } from "../../components/utils/Breadcrumb";
 import { useSectores } from "../../hooks";
+import {
+  Box,
+  Paper,
+  Tabs,
+  Tab,
+  useTheme,
+  alpha,
+  Typography
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  List as ListIcon
+} from '@mui/icons-material';
+
+// Interface para TabPanel
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`sector-tabpanel-${index}`}
+      aria-labelledby={`sector-tab-${index}`}
+    >
+      {value === index && <Box>{children}</Box>}
+    </div>
+  );
+};
 
 const SectoresPage: React.FC = () => {
+  const theme = useTheme();
   const {
     sectores,
     sectorSeleccionado,
@@ -23,6 +57,7 @@ const SectoresPage: React.FC = () => {
 
   // Estados locales
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [tabValue, setTabValue] = useState(0);
 
   // Migas de pan
   const breadcrumbItems: BreadcrumbItem[] = useMemo(
@@ -39,10 +74,16 @@ const SectoresPage: React.FC = () => {
     setTimeout(() => setSuccessMessage(null), duration);
   };
 
+  // Manejar cambio de tabs
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
   // Manejo de edición
   const handleEditar = () => {
     if (sectorSeleccionado) {
       setModoEdicion(true);
+      setTabValue(0); // Cambiar al tab de formulario al editar
     } else {
       showMessage("⚠️ Por favor, seleccione un sector para editar");
     }
@@ -52,11 +93,12 @@ const SectoresPage: React.FC = () => {
   const handleGuardar = async (data: { nombre: string }) => {
     try {
       await guardarSector(data);
-      // showMessage(
-      //   modoEdicion
-      //     ? "✅ Sector actualizado correctamente"
-      //     : "✅ Sector creado correctamente"
-      // );
+      showMessage(
+        modoEdicion
+          ? "✅ Sector actualizado correctamente"
+          : "✅ Sector creado correctamente"
+      );
+      setTabValue(1); // Cambiar al tab de lista después de guardar
     } catch (error: unknown) {
       let errorMessage = "Error al guardar sector";
       if (error instanceof Error) {
@@ -64,7 +106,7 @@ const SectoresPage: React.FC = () => {
       } else if (typeof error === "string") {
         errorMessage = error;
       }
-      showMessage(errorMessage, 3000); // Cambiado "error" por 3000
+      showMessage(errorMessage, 3000);
     }
   };
 
@@ -92,8 +134,7 @@ const SectoresPage: React.FC = () => {
 
   return (
     <MainLayout title="Mantenimiento de Sectores">
-      {/* Contenedor principal con padding fijo de 10px */}
-      <div style={{ padding: 20, boxSizing: 'border-box' }}>
+      <Box sx={{ p: 3 }}>
         {/* Toast flotante en la parte inferior derecha */}
         {successMessage && (
           <div
@@ -119,41 +160,95 @@ const SectoresPage: React.FC = () => {
             <span className="block sm:inline">{successMessage}</span>
           </div>
         )}
-        <div className="space-y-0">
-          {/* Header con botones de acciones */}
-          <div className="flex justify-between items-center">
-            <Breadcrumb items={breadcrumbItems} />
-          </div>
 
-          {/* Alerta de modo offline */}
-          {isOfflineMode && (
-            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded relative">
-              <div className="flex justify-between items-center">
-                <div>
-                  <span className="font-medium">⚠️ Modo sin conexión:</span>
-                  <span className="ml-1">Trabajando con datos locales.</span>
-                </div>
-                <button
-                  onClick={handleForceReload}
-                  className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300"
-                  disabled={loading}
-                >
-                  Reconectar
-                </button>
+        {/* Header con breadcrumb */}
+        <Box sx={{ mb: 2 }}>
+          <Breadcrumb items={breadcrumbItems} />
+          <Typography variant="h4" component="h1" sx={{ mt: 2 }}>
+            Gestión de Sectores
+          </Typography>
+        </Box>
+
+        {/* Alerta de modo offline */}
+        {isOfflineMode && (
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded relative mb-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="font-medium">⚠️ Modo sin conexión:</span>
+                <span className="ml-1">Trabajando con datos locales.</span>
               </div>
+              <button
+                onClick={handleForceReload}
+                className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300"
+                disabled={loading}
+              >
+                Reconectar
+              </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Mensajes de error */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
-              <span className="block sm:inline">{error}</span>
-            </div>
-          )}
+        {/* Mensajes de error */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative mb-4">
+            <span className="block sm:inline">{error}</span>
+          </div>
+        )}
 
-          {/* Layout en dos columnas: formulario a la izquierda, tabla a la derecha */}
-          <div className="flex flex-col md:flex-row gap-5">
-            <div className="w-full md:w-1/3">
+        {/* Contenedor principal con tabs */}
+        <Paper 
+          elevation={2}
+          sx={{ 
+            borderRadius: 2,
+            overflow: 'hidden',
+            border: `1px solid ${theme.palette.divider}`,
+          }}
+        >
+          {/* Header con tabs */}
+          <Box sx={{ 
+            bgcolor: alpha(theme.palette.primary.main, 0.04),
+            borderBottom: `1px solid ${theme.palette.divider}`
+          }}>
+            <Tabs
+              value={tabValue}
+              onChange={handleTabChange}
+              aria-label="sector tabs"
+              sx={{
+                '& .MuiTab-root': {
+                  minHeight: 64,
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  fontSize: '0.95rem',
+                  '&.Mui-selected': {
+                    fontWeight: 600,
+                  }
+                },
+                '& .MuiTabs-indicator': {
+                  height: 3,
+                  borderRadius: '3px 3px 0 0'
+                }
+              }}
+            >
+              <Tab 
+                icon={<AddIcon />} 
+                iconPosition="start"
+                label={modoEdicion ? 'Editar Sector' : 'Nuevo Sector'}
+                id="sector-tab-0"
+                aria-controls="sector-tabpanel-0"
+              />
+              <Tab 
+                icon={<ListIcon />} 
+                iconPosition="start"
+                label="Lista de Sectores" 
+                id="sector-tab-1"
+                aria-controls="sector-tabpanel-1"
+              />
+            </Tabs>
+          </Box>
+
+          {/* Panel de Formulario */}
+          <TabPanel value={tabValue} index={0}>
+            <Box sx={{ p: 3 }}>
               <SectorForm
                 sectorSeleccionado={sectorSeleccionado}
                 onGuardar={handleGuardar}
@@ -163,20 +258,26 @@ const SectoresPage: React.FC = () => {
                 loading={loading}
                 isEditMode={modoEdicion}
               />
-            </div>
-            <div className="w-full md:w-2/3">
+            </Box>
+          </TabPanel>
+
+          {/* Panel de Lista */}
+          <TabPanel value={tabValue} index={1}>
+            <Box sx={{ p: 3 }}>
               <SectorList
                 sectores={sectores}
                 onSelectSector={seleccionarSector}
+                onEdit={handleEditar}
                 isOfflineMode={isOfflineMode}
                 loading={loading}
                 onSearch={buscarSectores}
                 searchTerm={searchTerm}
+                selectedSector={sectorSeleccionado}
               />
-            </div>
-          </div>
-        </div>
-      </div>
+            </Box>
+          </TabPanel>
+        </Paper>
+      </Box>
     </MainLayout>
   );
 };

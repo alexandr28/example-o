@@ -10,6 +10,7 @@ type SidebarContextType = {
   openSubmenus: string[];
   toggleSidebar: () => void;
   toggleMobileSidebar: () => void;
+  expandSidebar: () => void;
   setIsHovered: (isHovered: boolean) => void;
   setActiveItem: (item: string | null) => void;
   toggleSubmenu: (item: string) => void;
@@ -60,6 +61,12 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsMobileOpen((prev) => !prev);
   };
 
+  const expandSidebar = () => {
+    if (!isExpanded) {
+      setIsExpanded(true);
+    }
+  };
+
   const toggleSubmenu = (item: string) => {
     // Si el submenú está abierto, cerrarlo
     if (openSubmenus.includes(item)) {
@@ -90,6 +97,7 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
         openSubmenus,
         toggleSidebar,
         toggleMobileSidebar,
+        expandSidebar,
         setIsHovered,
         setActiveItem,
         toggleSubmenu,

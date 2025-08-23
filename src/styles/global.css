@@ -1,0 +1,297 @@
+/* Estilos globales para hacer todo más compacto */
+
+/* Reset y configuración base */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 14px; /* Base font size reducida */
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 0.813rem; /* 13px */
+  line-height: 1.5;
+}
+
+/* Espaciado más compacto entre elementos de formulario */
+.MuiGrid-item {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+}
+
+.MuiGrid-container {
+  margin-top: -4px !important;
+  margin-bottom: -4px !important;
+}
+
+/* Hacer los campos de formulario más compactos */
+.MuiTextField-root {
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
+}
+
+.MuiFormControl-root {
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
+}
+
+/* Inputs más pequeños */
+.MuiInputBase-root {
+  font-size: 0.75rem !important;
+}
+
+.MuiInputBase-input {
+  padding: 6px 10px !important;
+  font-size: 0.75rem !important;
+  height: auto !important;
+  min-height: 20px !important;
+}
+
+.MuiOutlinedInput-input {
+  padding: 6px 10px !important;
+}
+
+/* Labels más pequeños */
+.MuiInputLabel-root {
+  font-size: 0.75rem !important;
+}
+
+.MuiFormLabel-root {
+  font-size: 0.75rem !important;
+}
+
+/* Selects más compactos */
+.MuiSelect-select {
+  padding: 6px 10px !important;
+  font-size: 0.75rem !important;
+  min-height: 20px !important;
+}
+
+/* Botones más pequeños */
+.MuiButton-root {
+  font-size: 0.75rem !important;
+  padding: 4px 12px !important;
+  min-height: 32px !important;
+}
+
+.MuiButton-sizeSmall {
+  font-size: 0.688rem !important;
+  padding: 3px 10px !important;
+  min-height: 28px !important;
+}
+
+/* Tablas más compactas */
+.MuiTableCell-root {
+  font-size: 0.75rem !important;
+  padding: 6px 12px !important;
+}
+
+.MuiTableCell-sizeSmall {
+  padding: 4px 8px !important;
+  font-size: 0.688rem !important;
+}
+
+/* Chips más pequeños */
+.MuiChip-root {
+  font-size: 0.688rem !important;
+  height: 24px !important;
+}
+
+.MuiChip-sizeSmall {
+  font-size: 0.625rem !important;
+  height: 20px !important;
+}
+
+/* Diálogos más compactos */
+.MuiDialogTitle-root {
+  font-size: 1rem !important;
+  padding: 12px 16px !important;
+}
+
+.MuiDialogContent-root {
+  padding: 12px !important;
+  font-size: 0.75rem !important;
+}
+
+.MuiDialogActions-root {
+  padding: 8px 12px !important;
+}
+
+/* Cards más compactos */
+.MuiCardContent-root {
+  padding: 12px !important;
+}
+
+.MuiCardContent-root:last-child {
+  padding-bottom: 12px !important;
+}
+
+/* Títulos más pequeños */
+h1 { font-size: 1.75rem !important; }
+h2 { font-size: 1.5rem !important; }
+h3 { font-size: 1.25rem !important; }
+h4 { font-size: 1.125rem !important; }
+h5 { font-size: 1rem !important; }
+h6 { font-size: 0.875rem !important; }
+
+/* Párrafos y texto */
+p {
+  font-size: 0.813rem !important;
+  line-height: 1.5 !important;
+  margin-bottom: 8px !important;
+}
+
+/* Listas más compactas */
+.MuiListItem-root {
+  padding: 4px 8px !important;
+}
+
+.MuiListItemButton-root {
+  padding: 6px 12px !important;
+}
+
+.MuiListItemText-primary {
+  font-size: 0.813rem !important;
+}
+
+.MuiListItemText-secondary {
+  font-size: 0.75rem !important;
+}
+
+/* Tooltips más pequeños */
+.MuiTooltip-tooltip {
+  font-size: 0.688rem !important;
+  padding: 4px 8px !important;
+}
+
+/* Ajustes para SearchableSelect personalizado */
+.SearchableSelect label {
+  font-size: 0.75rem !important;
+}
+
+.SearchableSelect input {
+  font-size: 0.75rem !important;
+  padding: 6px 10px !important;
+}
+
+/* Alineación de SearchableSelect con TextField */
+.SearchableSelect,
+.searchable-select-container {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  height: auto !important;
+}
+
+/* Asegurar que los inputs tengan el mismo tamaño */
+.SearchableSelect input,
+.searchable-select-input {
+  min-height: 30px !important;
+  height: 30px !important;
+  font-size: 0.75rem !important;
+  line-height: 1.2 !important;
+  border-radius: 4px !important;
+}
+
+/* Espaciado vertical consistente en formularios */
+.MuiStack-root > * + * {
+  margin-top: 8px !important;
+}
+
+/* Paper con padding más pequeño - Solo para elementos que lo necesiten */
+.MuiPaper-root:not(.header-appbar):not(.MuiAppBar-root):not(.MuiDrawer-paper) {
+  padding: 12px !important;
+}
+
+/* Dividers con menos margen */
+.MuiDivider-root {
+  margin: 8px 0 !important;
+}
+
+/* Alertas más compactas */
+.MuiAlert-root {
+  padding: 6px 12px !important;
+  font-size: 0.75rem !important;
+}
+
+.MuiAlert-icon {
+  font-size: 1.125rem !important;
+}
+
+/* Tabs más pequeños */
+.MuiTab-root {
+  font-size: 0.75rem !important;
+  min-height: 36px !important;
+  padding: 6px 12px !important;
+}
+
+/* Breadcrumbs más pequeños */
+.MuiBreadcrumbs-root {
+  font-size: 0.75rem !important;
+}
+
+.MuiBreadcrumbs-li {
+  font-size: 0.75rem !important;
+}
+
+/* Avatars más pequeños */
+.MuiAvatar-root {
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 0.875rem !important;
+}
+
+/* Badges más pequeños */
+.MuiBadge-badge {
+  font-size: 0.625rem !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  padding: 0 4px !important;
+}
+
+/* Steppers más compactos */
+.MuiStepLabel-label {
+  font-size: 0.75rem !important;
+}
+
+.MuiStepIcon-root {
+  font-size: 1.25rem !important;
+}
+
+/* Progress indicators más pequeños */
+.MuiLinearProgress-root {
+  height: 4px !important;
+}
+
+.MuiCircularProgress-root {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+/* Snackbars más pequeños */
+.MuiSnackbarContent-root {
+  font-size: 0.75rem !important;
+  min-width: 250px !important;
+}
+
+/* Ajustes para responsividad */
+@media (max-width: 768px) {
+  html {
+    font-size: 13px;
+  }
+  
+  .MuiInputBase-input {
+    font-size: 0.688rem !important;
+    padding: 4px 8px !important;
+  }
+  
+  .MuiButton-root {
+    font-size: 0.688rem !important;
+    padding: 3px 10px !important;
+    min-height: 28px !important;
+  }
+}

@@ -1,6 +1,6 @@
 // src/hooks/useAranceles.ts
 import { useState, useEffect, useCallback } from 'react';
-import arancelService, { ArancelData, CreateArancelDTO, UpdateArancelDTO } from '../services/arancelService';
+import arancelService, { ArancelData, CreateArancelDTO, UpdateArancelDTO, CrearArancelApiDTO } from '../services/arancelService';
 
 interface UseArancelesResult {
   aranceles: ArancelData[];
@@ -9,10 +9,12 @@ interface UseArancelesResult {
   
   // Operaciones
   crearArancel: (datos: CreateArancelDTO) => Promise<ArancelData>;
+  crearArancelSinAuth: (datos: CrearArancelApiDTO) => Promise<ArancelData>; // Nuevo método sin autenticación
   actualizarArancel: (codArancel: number, datos: UpdateArancelDTO) => Promise<ArancelData>;
   eliminarArancel: (codArancel: number) => Promise<void>;
   obtenerPorAnioYDireccion: (anio: number, codDireccion: number) => Promise<ArancelData | null>;
   recargar: () => Promise<void>;
+  cargarPorAnio: (anio: number) => Promise<void>;
 }
 
 /**
@@ -23,17 +25,37 @@ export const useAranceles = (anioInicial?: number): UseArancelesResult => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Cargar aranceles
-  const cargarAranceles = useCallback(async () => {
+  // Cargar aranceles con parámetros flexibles
+  const cargarAranceles = useCallback(async (params?: { 
+    anio?: number; 
+    codDireccion?: number 
+  }) => {
     try {
       setLoading(true);
       setError(null);
       
-      const data = await arancelService.listarAranceles(anioInicial);
+      // IMPORTANTE: El API requiere codDireccion para evitar error 403
+      const queryParams = {
+        anio: params?.anio || anioInicial,
+        codDireccion: params?.codDireccion || 1, // Valor por defecto para evitar 403
+        codUsuario: 1
+      };
+      
+      console.log('🔄 [useAranceles] Cargando aranceles con parámetros:', queryParams);
+      
+      // Solo hacer la petición si tenemos al menos el año
+      if (!queryParams.anio) {
+        console.log('⚠️ [useAranceles] No se proporcionó año, saltando petición');
+        setAranceles([]);
+        return;
+      }
+      
+      const data = await arancelService.listarAranceles(queryParams);
+      console.log('✅ [useAranceles] Datos recibidos:', data);
       setAranceles(data);
       
     } catch (error: any) {
-      console.error('Error cargando aranceles:', error);
+      console.error('❌ [useAranceles] Error cargando aranceles:', error);
       setError(error.message || 'Error al cargar aranceles');
       setAranceles([]);
     } finally {
@@ -46,7 +68,7 @@ export const useAranceles = (anioInicial?: number): UseArancelesResult => {
     cargarAranceles();
   }, [cargarAranceles]);
 
-  // Crear arancel
+  // Crear arancel (método original con FormData)
   const crearArancel = useCallback(async (datos: CreateArancelDTO): Promise<ArancelData> => {
     try {
       const nuevoArancel = await arancelService.crearArancel(datos);
@@ -57,6 +79,47 @@ export const useAranceles = (anioInicial?: number): UseArancelesResult => {
       return nuevoArancel;
     } catch (error: any) {
       console.error('Error creando arancel:', error);
+      throw error;
+    }
+  }, [cargarAranceles]);
+
+  // Crear arancel sin autenticación usando JSON POST
+  const crearArancelSinAuth = useCallback(async (datos: CrearArancelApiDTO): Promise<ArancelData> => {
+    try {
+      console.log('➕ [useAranceles] Creando arancel sin autenticación:', datos);
+      
+      // Validaciones básicas
+      if (!datos.anio) {
+        throw new Error('Debe proporcionar un año');
+      }
+      
+      if (!datos.codDireccion) {
+        throw new Error('Debe proporcionar un código de dirección');
+      }
+      
+      if (datos.costo === undefined || datos.costo < 0) {
+        throw new Error('Debe proporcionar un costo válido');
+      }
+      
+      const nuevoArancel = await arancelService.crearArancelSinAuth(datos);
+      
+      // Actualizar estado local inmediatamente
+      setAranceles(prev => [...prev, nuevoArancel]);
+      
+      // Recargar lista para asegurar sincronización
+      try {
+        console.log('🔄 [useAranceles] Recargando datos después del registro...');
+        await cargarAranceles({ anio: datos.anio });
+        console.log('✅ [useAranceles] Datos recargados exitosamente');
+      } catch (err) {
+        console.warn('⚠️ [useAranceles] Error recargando datos:', err);
+      }
+      
+      console.log('✅ [useAranceles] Arancel creado exitosamente usando API sin autenticación');
+      return nuevoArancel;
+      
+    } catch (error: any) {
+      console.error('❌ [useAranceles] Error creando arancel sin auth:', error);
       throw error;
     }
   }, [cargarAranceles]);
@@ -108,15 +171,22 @@ export const useAranceles = (anioInicial?: number): UseArancelesResult => {
     }
   }, []);
 
+  // Función específica para cargar por año (usado por ListaArancelesPorDireccion)
+  const cargarPorAnio = useCallback(async (anio: number) => {
+    await cargarAranceles({ anio, codDireccion: 1 });
+  }, [cargarAranceles]);
+
   return {
     aranceles,
     loading,
     error,
     crearArancel,
+    crearArancelSinAuth, // Nuevo método sin autenticación
     actualizarArancel,
     eliminarArancel,
     obtenerPorAnioYDireccion,
-    recargar: cargarAranceles
+    recargar: cargarAranceles,
+    cargarPorAnio
   };
 };
 

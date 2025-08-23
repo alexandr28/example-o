@@ -1,4 +1,4 @@
-// src/layout/MainLayout.tsx - Versión con FormContextDebug
+// src/layout/MainLayout.tsx 
 import React, { FC, ReactNode, memo, useEffect } from 'react';
 import {
   Box,
@@ -33,7 +33,7 @@ const LoadingOverlay = styled(Box)(({ theme }) => ({
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  backgroundColor: '#F5F5F5',
+  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
   zIndex: theme.zIndex.modal + 1,
 }));
 
@@ -61,37 +61,80 @@ const MainLayout: FC<MainLayoutProps> = memo(({
   if (loading) {
     return (
       <LoadingOverlay>
-        <CircularProgress 
-          size={60} 
-          thickness={4}
-          sx={{ 
-            color: theme.palette.primary.main,
-            mb: 3
-          }} 
-        />
-        <Typography 
-          variant="h6" 
-          color="text.secondary"
-          sx={{ 
-            fontWeight: 300,
-            letterSpacing: 1
-          }}
-        >
-          Cargando Sistema...
-        </Typography>
-        <Typography 
-          variant="caption" 
-          color="text.disabled"
-          sx={{ mt: 1 }}
-        >
-          Por favor espere un momento
-        </Typography>
+        <Box sx={{ 
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 3
+        }}>
+          <Box sx={{ position: 'relative' }}>
+            <CircularProgress 
+              size={80} 
+              thickness={2}
+              sx={{ 
+                color: '#ffffff',
+                opacity: 0.3,
+                position: 'absolute'
+              }} 
+            />
+            <CircularProgress 
+              size={80} 
+              thickness={2}
+              sx={{ 
+                color: '#ffffff',
+                animationDuration: '1.5s'
+              }} 
+            />
+            <Box sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: '1.5rem' }}>
+                R
+              </Typography>
+            </Box>
+          </Box>
+          
+          <Box sx={{ textAlign: 'center' }}>
+            <Typography 
+              variant="h5" 
+              sx={{ 
+                fontWeight: 600,
+                letterSpacing: 2,
+                color: '#ffffff',
+                mb: 1,
+                textShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              }}
+            >
+              SIS. RENTAS
+            </Typography>
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                color: 'rgba(255,255,255,0.8)',
+                letterSpacing: 1
+              }}
+            >
+              Iniciando sistema...
+            </Typography>
+          </Box>
+        </Box>
       </LoadingOverlay>
     );
   }
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ 
+      display: 'flex', 
+      minHeight: '100vh',
+      backgroundColor: theme.palette.grey[50]
+    }}>
       {/* Barra lateral */}
       <AppSidebar />
 
@@ -103,23 +146,45 @@ const MainLayout: FC<MainLayoutProps> = memo(({
         component="main"
         sx={{
           position: 'fixed',
-          top: 64, // Altura del header
+          top: 64, // Altura del header actualizada
           left: drawerWidth, // Dejar espacio para el sidebar
           right: 0,
           bottom: 0,
-          backgroundColor: '#F5F5F5',
+          background: `linear-gradient(180deg, ${theme.palette.grey[50]} 0%, ${theme.palette.background.default} 100%)`,
           overflow: 'auto',
           transition: theme.transitions.create(['left'], {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,
           }),
+          padding: theme.spacing(3),
+          '&::-webkit-scrollbar': {
+            width: 8,
+          },
+          '&::-webkit-scrollbar-track': {
+            backgroundColor: theme.palette.grey[200],
+            borderRadius: 4,
+          },
+          '&::-webkit-scrollbar-thumb': {
+            backgroundColor: theme.palette.grey[400],
+            borderRadius: 4,
+            '&:hover': {
+              backgroundColor: theme.palette.grey[500],
+            },
+          },
         }}
       >
-        {children}
+        <Box sx={{ 
+          maxWidth: maxWidth || '100%',
+          margin: '0 auto',
+          animation: 'fadeIn 0.3s ease-in',
+          '@keyframes fadeIn': {
+            from: { opacity: 0, transform: 'translateY(10px)' },
+            to: { opacity: 1, transform: 'translateY(0)' },
+          },
+        }}>
+          {children}
+        </Box>
       </Box>
-
-      {/* Debug del FormContext en desarrollo */}
- 
     </Box>
   );
 });

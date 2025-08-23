@@ -13,7 +13,6 @@ import {
   CircularProgress
 } from '@mui/material';
 import {
-  CalendarToday as CalendarIcon,
   Percent as PercentIcon,
   Save as SaveIcon,
   Receipt as ReceiptIcon
@@ -46,10 +45,8 @@ const Alcabala: React.FC<AlcabalaProps> = ({
 
   // Convertir opciones de años al formato de SearchableSelect
   const anioOptions = aniosDisponibles.map(anio => ({
-    id: anio.value,
     value: parseInt(anio.value),
-    label: anio.label,
-    description: anio.value === new Date().getFullYear().toString() ? 'Año actual' : undefined
+    label: anio.label
   }));
 
   // Manejar cambio de tasa
@@ -92,26 +89,11 @@ const Alcabala: React.FC<AlcabalaProps> = ({
             <SearchableSelect
               label="Año"
               options={anioOptions}
-              value={anioSeleccionado ? anioOptions.find(opt => opt.value === anioSeleccionado) || null : null}
-              onChange={(option) => onAnioChange(option ? option.value : null)}
+              value={anioSeleccionado ?? undefined}
+              onChange={(value) => onAnioChange(typeof value === 'number' ? value : null)}
               placeholder="Seleccione el año"
               disabled={loading}
               required
-              renderOption={(props, option) => (
-                <Box component="li" {...props}>
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <CalendarIcon fontSize="small" color="action" />
-                    <Box>
-                      <Typography variant="body2">{option.label}</Typography>
-                      {option.description && (
-                        <Typography variant="caption" color="text.secondary">
-                          {option.description}
-                        </Typography>
-                      )}
-                    </Box>
-                  </Stack>
-                </Box>
-              )}
             />
           </Box>
           

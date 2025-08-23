@@ -204,40 +204,73 @@ export const usePredios = (): UsePrediosReturn => {
   }, []);
 
   /**
-   * Crear nuevo predio
+   * Crear nuevo predio usando API POST sin autenticación
+   * URL: POST http://26.161.18.122:8080/api/predio
    */
   const crearPredio = useCallback(async (datos: PredioFormData): Promise<Predio | null> => {
     try {
       setLoading(true);
       setError(null);
       
-      // Preparar datos para la API
+      console.log('🏠 [usePredios] Iniciando creación de predio:', datos);
+      
+      // Validaciones básicas
+      if (!datos.numeroFinca) {
+        throw new Error('El número de finca es requerido');
+      }
+      
+      if (!datos.areaTerreno || datos.areaTerreno <= 0) {
+        throw new Error('El área del terreno debe ser mayor a 0');
+      }
+      
+      if (!datos.direccionId) {
+        throw new Error('Debe seleccionar una dirección');
+      }
+      
+      // Preparar datos según la estructura JSON exacta del API
       const datosApi = {
         anio: datos.anio || new Date().getFullYear(),
-        numeroFinca: datos.numeroFinca,
-        otroNumero: datos.otroNumero,
-        areaTerreno: datos.areaTerreno,
-        fechaAdquisicion: datos.fechaAdquisicion?.toString() || null,
-        condicionPropiedad: datos.condicionPropiedad,
-        conductor: datos.conductor,
-        estadoPredio: datos.estadoPredio,
-        numeroPisos: datos.numeroPisos,
-        totalAreaConstruccion: datos.totalAreaConstruccion,
-        valorTerreno: datos.valorTerreno,
-        valorTotalConstruccion: datos.valorTotalConstruccion,
-        autoavaluo: datos.autoavaluo,
-        codDireccion: datos.direccionId
+        codPredio: null, // SIEMPRE null - SQL lo asigna automáticamente
+        numeroFinca: Number(datos.numeroFinca),
+        otroNumero: String(datos.otroNumero || ""),
+        codClasificacion: String(datos.codClasificacion || "0502"), // Por defecto según el JSON ejemplo
+        estPredio: String(datos.estadoPredio || "2503"), // Por defecto según el JSON ejemplo
+        codTipoPredio: String(datos.codTipoPredio || "2601"), // Por defecto según el JSON ejemplo
+        codCondicionPropiedad: String(datos.codCondicionPropiedad || "2701"), // Por defecto según el JSON ejemplo
+        codDireccion: Number(datos.direccionId),
+        codUsoPredio: Number(datos.codUsoPredio || 1), // Por defecto según el JSON ejemplo
+        fechaAdquisicion: datos.fechaAdquisicion 
+          ? (datos.fechaAdquisicion instanceof Date 
+              ? datos.fechaAdquisicion.toISOString().split('T')[0]
+              : String(datos.fechaAdquisicion).split('T')[0])
+          : new Date().toISOString().split('T')[0],
+        numeroCondominos: Number(datos.numeroCondominos || 2), // Por defecto según el JSON ejemplo
+        codListaConductor: String(datos.codListaConductor || "1401"), // Por defecto según el JSON ejemplo
+        codUbicacionAreaVerde: Number(datos.codUbicacionAreaVerde || 1), // Por defecto según el JSON ejemplo
+        areaTerreno: Number(datos.areaTerreno),
+        numeroPisos: Number(datos.numeroPisos || 1),
+        totalAreaConstruccion: datos.totalAreaConstruccion ? Number(datos.totalAreaConstruccion) : null,
+        valorTotalConstruccion: datos.valorTotalConstruccion ? Number(datos.valorTotalConstruccion) : null,
+        valorTerreno: datos.valorTerreno ? Number(datos.valorTerreno) : null,
+        autoavaluo: datos.autoavaluo ? Number(datos.autoavaluo) : null,
+        codEstado: String(datos.codEstado || "0201"), // Por defecto según el JSON ejemplo
+        codUsuario: Number(datos.codUsuario || 1)
       };
+      
+      console.log('📤 [usePredios] Datos preparados para API POST:', datosApi);
       
       const nuevoPredio = await predioService.crearPredio(datosApi);
       
-      // Actualizar lista
+      console.log('✅ [usePredios] Predio creado exitosamente:', nuevoPredio);
+      
+      // Actualizar lista de predios
       await cargarPredios();
       
-      NotificationService.success('Predio creado exitosamente');
+      NotificationService.success(`Predio ${nuevoPredio.codPredio || 'nuevo'} creado exitosamente`);
       return nuevoPredio;
     } catch (err: any) {
       const mensaje = err.message || 'Error al crear predio';
+      console.error('❌ [usePredios] Error creando predio:', err);
       setError(mensaje);
       NotificationService.error(mensaje);
       return null;

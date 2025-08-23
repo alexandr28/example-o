@@ -21,5 +21,3 @@ export * from './pages';
 // Assets
 export * from './assets';
 
-// Icons
-export * from './icons';

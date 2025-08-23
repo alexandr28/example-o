@@ -1,5 +1,5 @@
 // src/components/modal/SelectorDirecciones.tsx
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -7,7 +7,6 @@ import {
   DialogActions,
   Button,
   TextField,
-  Box,
   Table,
   TableBody,
   TableCell,
@@ -26,9 +25,7 @@ import {
   TablePagination,
   useTheme,
   alpha,
-  Fade,
-  Tooltip,
-  Skeleton
+  Fade
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -37,159 +34,13 @@ import {
   Clear as ClearIcon,
   Refresh as RefreshIcon,
   Apartment as ApartmentIcon,
-  Map as MapIcon,
   CheckCircle as CheckCircleIcon,
-  FilterList as FilterIcon,
   Info as InfoIcon
 } from '@mui/icons-material';
-
-// Importaciones de servicios
-let NotificationService: any;
-let direccionService: any;
-
-try {
-  NotificationService = require('../utils/Notification').NotificationService;
-} catch (e) {
-  console.warn('NotificationService no disponible');
-  NotificationService = {
-    success: (msg: string) => console.log('Success:', msg),
-    error: (msg: string) => console.error('Error:', msg),
-    info: (msg: string) => console.info('Info:', msg),
-    warning: (msg: string) => console.warn('Warning:', msg)
-  };
-}
-
-try {
-  direccionService = require('../../services/direccionService').default;
-} catch (e) {
-  console.warn('direccionService no disponible, usando servicio temporal');
-  // Servicio temporal que hace la petición directamente
-  direccionService = {
-    obtenerTodos: async () => {
-      try {
-        console.log('🔄 Usando servicio temporal para cargar direcciones...');
-        const url = 'http://192.168.20.160:8080/api/direccion/listarDireccionPorNombreVia?parametrosBusqueda=a&codUsuario=1';
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const responseData = await response.json();
-        console.log('📊 Respuesta directa de la API:', responseData);
-        
-        if (responseData.success && responseData.data) {
-          const data = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
-          // Mapear los datos correctamente
-          return data.map((item: any) => ({
-            id: item.codDireccion || 0,
-            codigo: item.codDireccion,
-            codigoSector: item.codSector || 0,
-            codigoBarrio: item.codBarrio || 0,
-            codigoCalle: item.codVia || 0,
-            nombreSector: item.nombreSector || '',
-            nombreBarrio: item.nombreBarrio || '',
-            nombreVia: item.nombreVia || '',
-            nombreTipoVia: item.nombreTipoVia || 'CALLE',
-            cuadra: item.cuadra?.toString() || '',
-            lado: item.lado || 'D',
-            loteInicial: parseInt(item.loteInicial || '1'),
-            loteFinal: parseInt(item.loteFinal || '1'),
-            descripcion: `${item.nombreTipoVia || 'CALLE'} ${item.nombreVia || ''} ${item.cuadra ? `CUADRA ${item.cuadra}` : ''}`.trim(),
-            estado: item.estado || 'ACTIVO'
-          }));
-        }
-        
-        return [];
-      } catch (error) {
-        console.error('Error en servicio temporal:', error);
-        return [];
-      }
-    },
-    buscarPorNombreVia: async (nombreVia: string) => {
-      // Implementación similar a obtenerTodos pero con parámetro de búsqueda
-      return [];
-    }
-  };
-}
-
-// Función para generar datos de ejemplo
-const generarDatosEjemplo = () => {
-  return [
-    {
-      id: 1,
-      codigo: 1,
-      codigoSector: 1,
-      codigoBarrio: 1,
-      codigoCalle: 11,
-      nombreSector: 'Centro',
-      nombreBarrio: 'Los Jardines',
-      nombreVia: 'Secundaria',
-      nombreTipoVia: 'CALLE',
-      cuadra: '17',
-      lado: 'D',
-      loteInicial: 1,
-      loteFinal: 37,
-      descripcion: 'CALLE Secundaria CUADRA 17',
-      estado: 'ACTIVO'
-    },
-    {
-      id: 2,
-      codigo: 2,
-      codigoSector: 1,
-      codigoBarrio: 2,
-      codigoCalle: 14,
-      nombreSector: 'Centro',
-      nombreBarrio: 'Vista Hermosa',
-      nombreVia: 'San Martin',
-      nombreTipoVia: 'PROLONGACION',
-      cuadra: '14',
-      lado: 'D',
-      loteInicial: 1,
-      loteFinal: 27,
-      descripcion: 'PROLONGACION San Martin CUADRA 14',
-      estado: 'ACTIVO'
-    },
-    {
-      id: 3,
-      codigo: 3,
-      codigoSector: 2,
-      codigoBarrio: 3,
-      codigoCalle: 11,
-      nombreSector: 'Este',
-      nombreBarrio: 'El Porvenir',
-      nombreVia: 'Secundaria',
-      nombreTipoVia: 'CALLE',
-      cuadra: '11',
-      lado: 'D',
-      loteInicial: 1,
-      loteFinal: 22,
-      descripcion: 'CALLE Secundaria CUADRA 11',
-      estado: 'ACTIVO'
-    }
-  ];
-};
+import { useDirecciones } from '../../hooks/useDirecciones';
+import { NotificationService } from '../utils/Notification';
 
 // Interfaces
-interface DireccionData {
-  id: number;
-  codigo?: number;
-  codigoSector: number;
-  codigoBarrio: number;
-  codigoCalle: number;
-  nombreSector?: string;
-  nombreBarrio?: string;
-  nombreCalle?: string;
-  nombreVia?: string;
-  nombreTipoVia?: string;
-  cuadra?: string;
-  lado?: string;
-  loteInicial?: number;
-  loteFinal?: number;
-  descripcion?: string;
-  estado?: string;
-}
-
 interface Direccion {
   id: number;
   codigo: string;
@@ -202,6 +53,12 @@ interface Direccion {
   loteInicial: number;
   loteFinal: number;
   descripcion?: string;
+  // Campos adicionales opcionales
+  codigoSector?: number;
+  codigoBarrio?: number;
+  codigoCalle?: number;
+  codigoTipoVia?: number;
+  estado?: string;
 }
 
 interface SelectorDireccionesProps {
@@ -221,22 +78,26 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
 }) => {
   const theme = useTheme();
   const [busqueda, setBusqueda] = useState('');
-  const [direcciones, setDirecciones] = useState<DireccionData[]>([]);
-  const [direccionesFiltradas, setDireccionesFiltradas] = useState<DireccionData[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [direccionesFiltradas, setDireccionesFiltradas] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(direccionSeleccionada?.id || null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
-  const [usandoDatosLocales, setUsandoDatosLocales] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Usar el hook de direcciones
+  const {
+    direcciones,
+    loading,
+    error,
+    cargarDirecciones
+  } = useDirecciones();
 
   // Cargar direcciones al abrir el modal
   useEffect(() => {
-    if (open) {
+    if (open && direcciones.length === 0) {
       cargarDirecciones();
     }
-  }, [open]);
+  }, [open, cargarDirecciones, direcciones.length]);
 
   // Aplicar filtro cuando cambie la búsqueda
   useEffect(() => {
@@ -259,58 +120,11 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
     };
   }, [busqueda, direcciones]);
 
-  // Cargar direcciones desde el servicio
-  const cargarDirecciones = async () => {
-    setLoading(true);
-    setError(null);
-    setUsandoDatosLocales(false);
-    
-    try {
-      console.log('🔄 Cargando direcciones desde el servicio...');
-      
-      if (!direccionService) {
-        throw new Error('Servicio de direcciones no disponible');
-      }
-      
-      const data = await direccionService.obtenerTodos();
-      console.log('📊 Respuesta del servicio:', data);
-      
-      if (data && data.length > 0) {
-        console.log(`✅ ${data.length} direcciones cargadas desde la base de datos`);
-        setDirecciones(data);
-        setDireccionesFiltradas(data);
-        setUsandoDatosLocales(false);
-      } else {
-        console.log('⚠️ No se encontraron direcciones en la base de datos');
-        // Intentar con una búsqueda más amplia
-        const dataAmplia = await direccionService.buscarPorNombreVia('');
-        if (dataAmplia && dataAmplia.length > 0) {
-          console.log(`✅ ${dataAmplia.length} direcciones encontradas con búsqueda amplia`);
-          setDirecciones(dataAmplia);
-          setDireccionesFiltradas(dataAmplia);
-          setUsandoDatosLocales(false);
-        } else {
-          console.log('📌 Usando datos de ejemplo como fallback');
-          cargarDatosDeEjemplo();
-        }
-      }
-    } catch (error: any) {
-      console.error('❌ Error al cargar direcciones:', error);
-      setError('No se pudieron cargar las direcciones de la base de datos. Mostrando datos de ejemplo.');
-      cargarDatosDeEjemplo();
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Inicializar direcciones filtradas cuando cambien las direcciones
+  useEffect(() => {
+    setDireccionesFiltradas(direcciones);
+  }, [direcciones]);
 
-  // Cargar datos de ejemplo
-  const cargarDatosDeEjemplo = () => {
-    console.log('📌 Cargando datos de ejemplo...');
-    setUsandoDatosLocales(true);
-    const datosEjemplo = generarDatosEjemplo();
-    setDirecciones(datosEjemplo);
-    setDireccionesFiltradas(datosEjemplo);
-  };
 
   // Aplicar filtro de búsqueda
   const aplicarFiltroBusqueda = (termino: string) => {
@@ -331,22 +145,40 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
   const handleSelect = () => {
     const direccionSeleccionada = direccionesFiltradas.find(d => d.id === selectedId);
     if (direccionSeleccionada) {
+      // Construir descripción completa si no existe
+      const descripcionCompleta = direccionSeleccionada.descripcion || 
+        `CALLE ${direccionSeleccionada.nombreVia || ''} ${direccionSeleccionada.cuadra ? `CUADRA ${direccionSeleccionada.cuadra}` : ''}`.trim();
+      
       const direccionFormateada: Direccion = {
         id: direccionSeleccionada.id,
         codigo: direccionSeleccionada.codigo?.toString() || direccionSeleccionada.id.toString(),
         sector: direccionSeleccionada.nombreSector || '',
         barrio: direccionSeleccionada.nombreBarrio || '',
         tipoVia: direccionSeleccionada.nombreTipoVia || 'CALLE',
-        nombreVia: direccionSeleccionada.nombreVia || '',
+        nombreVia: direccionSeleccionada.nombreVia || direccionSeleccionada.nombreCalle || '',
         cuadra: direccionSeleccionada.cuadra || '',
         lado: direccionSeleccionada.lado || 'D',
         loteInicial: direccionSeleccionada.loteInicial || 1,
         loteFinal: direccionSeleccionada.loteFinal || 1,
-        descripcion: direccionSeleccionada.descripcion
+        descripcion: descripcionCompleta,
+        // Agregar campos adicionales que puedan ser útiles
+        codigoSector: direccionSeleccionada.codigoSector,
+        codigoBarrio: direccionSeleccionada.codigoBarrio,
+        codigoCalle: direccionSeleccionada.codigoCalle,
+        codigoTipoVia: direccionSeleccionada.codigoTipoVia,
+        estado: direccionSeleccionada.estado
       };
+      
+      console.log('📍 Dirección seleccionada completa:', direccionFormateada);
       onSelectDireccion(direccionFormateada);
       onClose();
     }
+  };
+
+  // Manejar recarga de direcciones
+  const handleReload = () => {
+    cargarDirecciones();
+    NotificationService.info('Recargando direcciones...');
   };
 
   // Paginación
@@ -414,14 +246,14 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
 
           {/* Alertas */}
           {error && (
-            <Alert severity="warning" onClose={() => setError(null)}>
-              {error}
+            <Alert severity="warning">
+              {typeof error === 'string' ? error : 'Error al cargar direcciones'}
             </Alert>
           )}
 
-          {usandoDatosLocales && (
+          {direcciones.length === 0 && !loading && (
             <Alert severity="info" icon={<InfoIcon />}>
-              Mostrando datos de ejemplo. La conexión con el servidor no está disponible.
+              No se encontraron direcciones. Intente recargar los datos.
             </Alert>
           )}
 
@@ -457,9 +289,9 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  direccionesPaginadas.map((direccion) => (
+                  direccionesPaginadas.map((direccion, index) => (
                     <TableRow 
-                      key={direccion.id}
+                      key={`direccion-${direccion.id || index}-${index}`}
                       hover
                       onClick={() => setSelectedId(direccion.id)}
                       selected={selectedId === direccion.id}
@@ -535,7 +367,7 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
           Cancelar
         </Button>
         <Button
-          onClick={cargarDirecciones}
+          onClick={handleReload}
           startIcon={<RefreshIcon />}
           disabled={loading}
         >

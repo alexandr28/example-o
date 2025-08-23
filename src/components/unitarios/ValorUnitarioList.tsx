@@ -36,26 +36,48 @@ import { useValoresUnitarios } from '../../hooks/useValoresUnitarios';
 
 interface ValorUnitarioListProps {
   años: { value: string, label: string }[];
+  añoSeleccionado?: number | null;
+  onValorSeleccionado?: (datos: {
+    año: number;
+    categoria: string;
+    subcategoria: string;
+    letra: string;
+    costo: number;
+  }) => void;
 }
 
 const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
-  años
+  años,
+  añoSeleccionado,
+  onValorSeleccionado
 }) => {
   const theme = useTheme();
   
-  // Estados locales - Inicializar con el año actual
+  // IMPORTANTE: El hook debe estar en el nivel superior del componente
+  const { obtenerValoresUnitariosPorCategoria } = useValoresUnitarios();
+  
+  // Estados locales - Usar año seleccionado del formulario o año actual como fallback
   const currentYear = new Date().getFullYear();
-  const [añoTabla, setAñoTabla] = useState<number | null>(currentYear);
+  const [añoTabla, setAñoTabla] = useState<number | null>(añoSeleccionado || currentYear);
   const [valoresPorCategoria, setValoresPorCategoria] = useState<Record<string, Record<string, number>>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  console.log('🚀 [ValorUnitarioList] Inicializando con año actual:', currentYear);
+  // Sincronizar añoTabla con añoSeleccionado cuando cambie
+  useEffect(() => {
+    if (añoSeleccionado !== null && añoSeleccionado !== undefined && añoSeleccionado !== añoTabla) {
+      console.log('🔄 [ValorUnitarioList] Cambiando año de', añoTabla, 'a', añoSeleccionado);
+      setAñoTabla(añoSeleccionado);
+    }
+  }, [añoSeleccionado]);
 
   // Cargar valores unitarios cuando cambia el año usando GET API con query params
   useEffect(() => {
+    console.log(`🔄 [ValorUnitarioList] useEffect disparado con añoTabla: ${añoTabla}`);
+    
     const cargarValoresUnitarios = async () => {
       if (!añoTabla) {
+        console.log(`⚠️ [ValorUnitarioList] No hay año seleccionado, limpiando datos`);
         setValoresPorCategoria({});
         return;
       }
@@ -74,14 +96,56 @@ const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
           return;
         }
         
-        // USAR EL HOOK useValoresUnitarios QUE YA ESTÁ IMPLEMENTADO
+        // USAR LA FUNCIÓN DEL HOOK QUE YA ESTÁ DECLARADA
         console.log(`🔧 [ValorUnitarioList] Usando obtenerValoresUnitariosPorCategoria con año: ${añoTabla}`);
+        console.log(`🔧 [ValorUnitarioList] Tipo de añoTabla:`, typeof añoTabla, 'Valor real:', añoTabla);
         
-        // Usar el hook que ya maneja todo el procesamiento
-        const { obtenerValoresUnitariosPorCategoria } = useValoresUnitarios();
-        const resultado = await obtenerValoresUnitariosPorCategoria(añoTabla);
+        // VALIDACIÓN EXPLÍCITA antes de llamar al hook
+        if (typeof añoTabla !== 'number' || añoTabla <= 0) {
+          console.error('❌ [ValorUnitarioList] añoTabla no es un número válido:', añoTabla);
+          throw new Error(`Año inválido: ${añoTabla}`);
+        }
         
-        console.log(`✅ [ValorUnitarioList] Resultado del hook:`, resultado);
+        console.log(`📤 [ValorUnitarioList] Cargando valores para año ${añoTabla}`);
+        // LLAMADA DIRECTA AL SERVICIO
+        const valores = await valorUnitarioService.consultarValoresUnitarios({ año: añoTabla });
+        
+        // Agrupar por subcategoría y letra (para la tabla)
+        const resultado: Record<string, Record<string, number>> = {};
+        
+        // Función para normalizar nombres de subcategorías
+        const normalizarSubcategoria = (subcategoria: string): string => {
+          // Mapeo para diferentes variaciones del nombre que pueden venir del API
+          const normalizacionMap: Record<string, string> = {
+            'MUROS Y COLUMNAS': 'MUROS Y COLUMNAS',
+            'MUROS_Y_COLUMNAS': 'MUROS Y COLUMNAS',
+            'TECHOS': 'TECHOS',
+            'PISOS': 'PISOS',
+            'PUERTAS Y VENTANAS': 'PUERTAS Y VENTANAS',
+            'PUERTAS_Y_VENTANAS': 'PUERTAS Y VENTANAS',
+            'REVESTIMIENTOS': 'REVESTIMIENTOS',
+            'BAÑOS': 'BAÑOS',
+            'BANOS': 'BAÑOS',
+            'INSTALACIONES ELECTRICAS Y SANITARIAS': 'INSTALACIONES ELECTRICAS Y SANITARIAS',
+            'INSTALACIONES_ELECTRICAS_Y_SANITARIAS': 'INSTALACIONES ELECTRICAS Y SANITARIAS'
+          };
+          
+          return normalizacionMap[subcategoria] || subcategoria;
+        };
+        
+        valores.forEach((valor) => {
+          const subcategoriaNormalizada = normalizarSubcategoria(valor.subcategoria);
+          
+          if (!resultado[subcategoriaNormalizada]) {
+            resultado[subcategoriaNormalizada] = {};
+          }
+          resultado[subcategoriaNormalizada][valor.letra] = valor.costo;
+          
+          console.log(`📊 [ValorUnitarioList] Valor agregado: ${subcategoriaNormalizada}/${valor.letra} = ${valor.costo}`);
+        });
+        
+        console.log(`✅ [ValorUnitarioList] Cargados ${valores.length} valores para ${Object.keys(resultado).length} subcategorías`);
+        
         setValoresPorCategoria(resultado);
         
       } catch (err: any) {
@@ -94,12 +158,27 @@ const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
     };
 
     cargarValoresUnitarios();
-  }, [añoTabla]);
+  }, [añoTabla, obtenerValoresUnitariosPorCategoria]);
 
   // Handler para cambio de año
   const handleAñoTablaChange = (año: number | null) => {
-    console.log(`🎯 [ValorUnitarioList] Año seleccionado: ${año}`);
+    console.log(`🔄 [ValorUnitarioList] Cambiando año a: ${año}`);
     setAñoTabla(año);
+  };
+
+  // Handler para clic en celda de valor
+  const handleCeldaClick = (subcategoria: string, letra: string, costo: number) => {
+    if (!onValorSeleccionado || !añoTabla || costo <= 0) return;
+    
+    console.log(`🎯 [ValorUnitarioList] Valor seleccionado:`, { subcategoria, letra, costo });
+    
+    onValorSeleccionado({
+      año: añoTabla,
+      categoria: 'CATEGORIA_GENERAL', // Podríamos mapear esto si es necesario
+      subcategoria: subcategoria,
+      letra: letra,
+      costo: costo
+    });
   };
 
   // Convertir años al formato de SearchableSelect
@@ -110,14 +189,23 @@ const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
     description: año.value === new Date().getFullYear().toString() ? 'Año actual' : undefined
   }));
 
-  // Subcategorías para la tabla con íconos y colores
+  // Subcategorías para la tabla - ORDENADAS por categoría según especificación del usuario
+  // ESTRUCTURAS: Muros y Columnas, Techos
+  // ACABADOS: Pisos, Puertas y Ventanas, Revestimientos, Baños
+  // INSTALACIONES: Instalaciones Eléctricas y Sanitarias
   const subcategoriasTabla = [
-    { value: SubcategoriaValorUnitario.MUROS_Y_COLUMNAS, label: 'Muros y Columnas', color: '#1976d2' },
-    { value: SubcategoriaValorUnitario.TECHOS, label: 'Techo', color: '#388e3c' },
-    { value: SubcategoriaValorUnitario.PISOS, label: 'Pisos', color: '#d32f2f' },
-    { value: SubcategoriaValorUnitario.PUERTAS_Y_VENTANAS, label: 'Puertas y Ventanas', color: '#7b1fa2' },
-    { value: SubcategoriaValorUnitario.REVESTIMIENTOS, label: 'Revestimiento', color: '#f57c00' },
-    { value: SubcategoriaValorUnitario.INSTALACIONES_ELECTRICAS_Y_SANITARIAS, label: 'Instalaciones Eléctricas y Sanitarias', color: '#0288d1' }
+    // ESTRUCTURAS
+    { value: 'MUROS Y COLUMNAS', label: 'Muros y Columnas', color: '#1976d2', apiCode: '100101', categoria: 'ESTRUCTURAS' },
+    { value: 'TECHOS', label: 'Techos', color: '#388e3c', apiCode: '100102', categoria: 'ESTRUCTURAS' },
+    
+    // ACABADOS - CÓDIGOS CORREGIDOS
+    { value: 'PISOS', label: 'Pisos', color: '#d32f2f', apiCode: '100201', categoria: 'ACABADOS' },
+    { value: 'PUERTAS Y VENTANAS', label: 'Puertas y Ventanas', color: '#7b1fa2', apiCode: '100202', categoria: 'ACABADOS' },
+    { value: 'REVESTIMIENTOS', label: 'Revestimientos', color: '#f57c00', apiCode: '100203', categoria: 'ACABADOS' },
+    { value: 'BAÑOS', label: 'Baños', color: '#795548', apiCode: '100204', categoria: 'ACABADOS' },
+    
+    // INSTALACIONES
+    { value: 'INSTALACIONES ELECTRICAS Y SANITARIAS', label: 'Instalaciones Eléctricas y Sanitarias', color: '#0288d1', apiCode: '100301', categoria: 'INSTALACIONES' }
   ];
 
   // Letras para la tabla
@@ -176,10 +264,12 @@ const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
                 getOptionLabel={(option) => option.label}
                 value={años.find(a => parseInt(a.value) === añoTabla) || null}
                 onChange={(_, newValue) => {
-                  handleAñoTablaChange(newValue ? parseInt(newValue.value) : null);
+                  const nuevoAño = newValue ? parseInt(newValue.value) : null;
+                  handleAñoTablaChange(nuevoAño);
                 }}
                 loading={loading}
                 disabled={loading}
+                isOptionEqualToValue={(option, value) => option.value === value.value}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -323,19 +413,25 @@ const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
                             <TableCell 
                               key={`${letra}-${subcategoria.value}`} 
                               align="center"
+                              onClick={() => handleCeldaClick(subcategoria.value, letra, value)}
                               sx={{ 
                                 fontWeight: value > 0 ? 500 : 400,
                                 color: value > 0 ? theme.palette.text.primary : theme.palette.text.disabled,
                                 bgcolor: getCellColor(value),
                                 borderLeft: `1px solid ${theme.palette.divider}`,
                                 transition: 'all 0.2s ease',
+                                cursor: value > 0 ? 'pointer' : 'default',
                                 '&:hover': {
                                   bgcolor: value > 0 ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
                                   transform: value > 0 ? 'scale(1.05)' : 'none'
                                 }
                               }}
                             >
-                              {value > 0 ? value.toFixed(2) : '0.00'}
+                              <Tooltip title={value > 0 ? 'Hacer clic para editar este valor' : 'Sin valor'}>
+                                <Box component="span">
+                                  {value > 0 ? value.toFixed(2) : '0.00'}
+                                </Box>
+                              </Tooltip>
                             </TableCell>
                           );
                         })}

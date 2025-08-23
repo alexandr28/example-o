@@ -16,14 +16,14 @@ export enum SubcategoriaValorUnitario {
   INSTALACIONES_ELECTRICAS_Y_SANITARIAS = 'Instalaciones Eléctricas y Sanitarias'
 }
 
-// Mapeo de categorías a subcategorías
+// Mapeo de categorías a subcategorías - CORREGIDO según especificación del usuario
 export const SUBCATEGORIAS_POR_CATEGORIA = {
   [CategoriaValorUnitario.ESTRUCTURAS]: [
     SubcategoriaValorUnitario.MUROS_Y_COLUMNAS,
     SubcategoriaValorUnitario.TECHOS
   ],
   [CategoriaValorUnitario.ACABADOS]: [
-    SubcategoriaValorUnitario.PISOS,
+    SubcategoriaValorUnitario.PISOS,           // Movido de ESTRUCTURAS a ACABADOS
     SubcategoriaValorUnitario.PUERTAS_Y_VENTANAS,
     SubcategoriaValorUnitario.REVESTIMIENTOS,
     SubcategoriaValorUnitario.BANOS

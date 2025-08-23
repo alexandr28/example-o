@@ -79,6 +79,15 @@ export interface UpdateContribuyenteDTO extends Partial<CreateContribuyenteDTO> 
   codigo?: number;
 }
 
+export interface CreateContribuyenteAPIDTO {
+  codPersona: number;
+  codContribuyente?: null; // Opcional - omitido para que SQL genere el ID
+  codConyuge: number | null;
+  codRepresentanteLegal: number | null;
+  codestado: string;
+  codUsuario: number;
+}
+
 export interface BusquedaContribuyenteParams {
   tipoPersona?: string;
   numeroDocumento?: string;
@@ -338,8 +347,82 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
   }
   
   /**
+   * Crea un nuevo contribuyente usando el API directo
+   * NO requiere autenticación (método POST)
+   * URL: http://26.161.18.122:8080/api/contribuyente
+   */
+  async crearContribuyenteAPI(datos: CreateContribuyenteAPIDTO): Promise<ContribuyenteData> {
+    try {
+      console.log('➕ [ContribuyenteService] Creando contribuyente con API directa:', datos);
+      
+      const API_URL = 'http://26.161.18.122:8080/api/contribuyente';
+      
+      // Validar datos requeridos
+      if (!datos.codPersona || !datos.codestado) {
+        throw new Error('Código de persona y estado son requeridos');
+      }
+      
+      // Asegurar que codContribuyente no se envía en el request (omitirlo completamente)
+      const { codContribuyente, ...datosParaEnviar } = datos;
+      
+      console.log('📤 [ContribuyenteService] Enviando datos (codContribuyente omitido):', JSON.stringify(datosParaEnviar, null, 2));
+      
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(datosParaEnviar)
+      });
+      
+      console.log(`📥 [ContribuyenteService] Respuesta del servidor: ${response.status} ${response.statusText}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [ContribuyenteService] Error del servidor:', errorText);
+        throw new Error(`Error ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('✅ [ContribuyenteService] Contribuyente creado exitosamente:', responseData);
+      
+      // Normalizar los datos de respuesta
+      const contribuyenteNormalizado = {
+        codigo: responseData.codContribuyente || responseData.codigo,
+        codigoPersona: responseData.codPersona || responseData.codigoPersona,
+        tipoPersona: responseData.tipoPersona || responseData.codTipopersona || '',
+        tipoDocumento: responseData.tipoDocumento || responseData.codTipoDocumento || '',
+        numeroDocumento: responseData.numeroDocumento || responseData.numerodocumento || '',
+        nombres: responseData.nombres || '',
+        apellidoPaterno: responseData.apellidoPaterno || responseData.apellidopaterno || '',
+        apellidoMaterno: responseData.apellidoMaterno || responseData.apellidomaterno || '',
+        razonSocial: responseData.razonSocial || '',
+        nombreCompleto: responseData.nombreCompleto || responseData.nombrePersona || 
+          ContribuyenteService.construirNombreCompleto(responseData),
+        direccion: responseData.direccion === 'null' ? '' : (responseData.direccion || ''),
+        telefono: responseData.telefono || '',
+        email: responseData.email || '',
+        fechaNacimiento: responseData.fechaNacimiento || responseData.fechanacimiento,
+        estadoCivil: responseData.estadoCivil || responseData.codestadocivil,
+        sexo: responseData.sexo || responseData.codsexo,
+        lote: responseData.lote || '',
+        estado: responseData.estado || responseData.codestado || datos.codestado,
+        fechaRegistro: responseData.fechaRegistro || new Date().toISOString(),
+        codUsuario: responseData.codUsuario || datos.codUsuario
+      };
+      
+      return contribuyenteNormalizado;
+      
+    } catch (error: any) {
+      console.error('❌ [ContribuyenteService] Error al crear contribuyente:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Crea un nuevo contribuyente
-   * NO requiere autenticación
+   * NO requiere autenticación - Método original
    */
   async crearContribuyente(datos: CreateContribuyenteDTO): Promise<ContribuyenteData> {
     try {
@@ -383,6 +466,20 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
       console.error('❌ [ContribuyenteService] Error eliminando contribuyente:', error);
       throw error;
     }
+  }
+
+  /**
+   * Convierte datos del formulario al formato requerido por la API de contribuyente
+   */
+  convertirFormularioAContribuyenteDTO(personaCreada: any, datosFormulario: any): CreateContribuyenteAPIDTO {
+    return {
+      codPersona: personaCreada.codPersona || personaCreada.id,
+      // codContribuyente omitido completamente para que SQL genere el ID
+      codConyuge: datosFormulario.conyugeData?.codPersona || null,
+      codRepresentanteLegal: datosFormulario.representanteData?.codPersona || null,
+      codestado: "2156", // Estado por defecto
+      codUsuario: datosFormulario.codUsuario || 1
+    };
   }
 }
 

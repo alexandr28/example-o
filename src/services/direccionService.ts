@@ -11,6 +11,8 @@ export interface DireccionData {
   codigoSector: number;
   codigoBarrio: number;
   codigoCalle: number;
+  codigoTipoVia?: number;
+  codigoBarrioVia?: number;
   nombreSector?: string;
   nombreBarrio?: string;
   nombreCalle?: string;
@@ -71,6 +73,8 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
           codigoSector: item.codSector || item.codigoSector || 0,
           codigoBarrio: item.codBarrio || item.codigoBarrio || 0,
           codigoCalle: item.codVia || item.codigoCalle || 0,
+          codigoTipoVia: item.codTipoVia || undefined,
+          codigoBarrioVia: item.codBarrioVia || undefined,
           nombreSector: item.nombreSector || '',
           nombreBarrio: item.nombreBarrio || '',
           nombreCalle: item.nombreVia || item.nombreCalle || '',
@@ -78,8 +82,8 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
           nombreTipoVia: item.nombreTipoVia || 'CALLE',
           cuadra: item.cuadra?.toString() || '',
           lado: item.lado || 'D',
-          loteInicial: parseInt(item.loteInicial || '1'),
-          loteFinal: parseInt(item.loteFinal || '1'),
+          loteInicial: item.loteInicial ? parseInt(item.loteInicial) : undefined,
+          loteFinal: item.loteFinal ? parseInt(item.loteFinal) : undefined,
           descripcion: item.descripcion || 
             `${item.nombreTipoVia || 'CALLE'} ${item.nombreVia || ''} ${item.cuadra ? `CUADRA ${item.cuadra}` : ''}`.trim(),
           estado: item.estado || 'ACTIVO',
@@ -157,11 +161,13 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
         
         // Normalizar los datos según la estructura real de la API
         const direccionesNormalizadas = data.map((item: any) => ({
-          id: item.codDireccion || 0,
+          id: item.codDireccion || Date.now() + Math.random(), // Generar ID único si no existe
           codigo: item.codDireccion || 0,
           codigoSector: item.codSector || 0,
           codigoBarrio: item.codBarrio || 0,
           codigoCalle: item.codVia || 0,
+          codigoTipoVia: item.codTipoVia || undefined,
+          codigoBarrioVia: item.codBarrioVia || undefined,
           nombreSector: item.nombreSector || '',
           nombreBarrio: item.nombreBarrio || '',
           nombreCalle: item.nombreVia || '',
@@ -169,8 +175,8 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
           nombreTipoVia: item.nombreTipoVia || 'CALLE',
           cuadra: item.cuadra?.toString() || '',
           lado: item.lado || '-',
-          loteInicial: parseInt(item.loteInicial || '0'),
-          loteFinal: parseInt(item.loteFinal || '0'),
+          loteInicial: item.loteInicial ? parseInt(item.loteInicial) : undefined,
+          loteFinal: item.loteFinal ? parseInt(item.loteFinal) : undefined,
           descripcion: `${item.nombreTipoVia || 'CALLE'} ${item.nombreVia || ''} ${item.cuadra ? `CUADRA ${item.cuadra}` : ''}`.trim(),
           estado: 'ACTIVO'
         }));
@@ -278,9 +284,12 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
   
   /**
    * Crea una nueva dirección
+   * POST http://26.161.18.122:8080/api/direccion sin autenticación
    */
   async crearDireccion(datos: CreateDireccionDTO): Promise<DireccionData> {
     try {
+      console.log('🔍 [DireccionService] Creando dirección con datos:', datos);
+      
       // Validaciones
       if (!datos.codigoSector || !datos.codigoBarrio || !datos.codigoCalle) {
         throw new Error('Debe proporcionar sector, barrio y calle');
@@ -292,21 +301,31 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
         }
       }
       
-      // Usar FormData para POST
-      const formData = new FormData();
-      formData.append('codigoSector', datos.codigoSector.toString());
-      formData.append('codigoBarrio', datos.codigoBarrio.toString());
-      formData.append('codigoCalle', datos.codigoCalle.toString());
-      if (datos.cuadra) formData.append('cuadra', datos.cuadra);
-      if (datos.lado) formData.append('lado', datos.lado);
-      if (datos.loteInicial) formData.append('loteInicial', datos.loteInicial.toString());
-      if (datos.loteFinal) formData.append('loteFinal', datos.loteFinal.toString());
-      if (datos.descripcion) formData.append('descripcion', datos.descripcion);
-      formData.append('codUsuario', '1');
+      // Preparar datos en formato JSON según el ejemplo proporcionado
+      const requestData = {
+        codDireccion: null,
+        codBarrioVia: datos.codigoBarrio, // Usando el barrio seleccionado
+        cuadra: datos.cuadra ? parseInt(datos.cuadra) : 1,
+        codLado: datos.lado && datos.lado !== 'Ninguno' ? datos.lado.charAt(0).toUpperCase() : 'A',
+        loteInicial: datos.loteInicial || 1,
+        loteFinal: datos.loteFinal || 20,
+        codUsuario: 1,
+        codSector: datos.codigoSector,
+        codVia: datos.codigoCalle, // La calle seleccionada
+        codBarrio: datos.codigoBarrio,
+        parametroBusqueda: null
+      };
+      
+      console.log('📡 [DireccionService] Enviando POST a:', `${API_CONFIG.baseURL}${this.endpoint}`);
+      console.log('📡 [DireccionService] Datos a enviar:', requestData);
       
       const response = await fetch(`${API_CONFIG.baseURL}${this.endpoint}`, {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestData)
       });
       
       if (!response.ok) {

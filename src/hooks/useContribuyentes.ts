@@ -1,7 +1,11 @@
-// src/hooks/useContribuyentes.ts - VERSIÓN CORREGIDA SIN DEPENDENCIAS CIRCULARES
+// src/hooks/useContribuyentes.ts - VERSIÓN ACTUALIZADA CON API POST
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { NotificationService } from '../components/utils/Notification';
-import { contribuyenteService } from '../services/contribuyenteService';
+import { 
+  contribuyenteService, 
+  CreateContribuyenteAPIDTO,
+  ContribuyenteData 
+} from '../services/contribuyenteService';
 
 /**
  * Interface para el item de lista de contribuyente
@@ -257,6 +261,90 @@ export const useContribuyentes = () => {
       setLoading(false);
     }
   }, [cargarContribuyentes]);
+
+  /**
+   * Crear contribuyente usando API directa (NUEVO)
+   * NO requiere autenticación
+   */
+  const crearContribuyenteAPI = useCallback(async (datos: CreateContribuyenteAPIDTO): Promise<ContribuyenteData | null> => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('➕ [useContribuyentes] Creando contribuyente con API directa:', datos);
+      
+      // Validar datos requeridos
+      if (!datos.codPersona || !datos.codestado) {
+        throw new Error('Código de persona y estado son requeridos');
+      }
+      
+      const nuevoContribuyente = await contribuyenteService.crearContribuyenteAPI(datos);
+      
+      console.log('✅ [useContribuyentes] Contribuyente creado exitosamente:', nuevoContribuyente);
+      
+      NotificationService.success('Contribuyente creado correctamente');
+      
+      // Recargar lista para mostrar el nuevo contribuyente
+      await cargarContribuyentes();
+      
+      return nuevoContribuyente;
+      
+    } catch (error: any) {
+      console.error('❌ [useContribuyentes] Error al crear contribuyente:', error);
+      setError(error.message || 'Error al crear contribuyente');
+      NotificationService.error(error.message || 'Error al crear contribuyente');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [cargarContribuyentes]);
+
+  /**
+   * Crear contribuyente desde persona creada (NUEVO)
+   */
+  const crearContribuyenteDesdePersona = useCallback(async (
+    personaCreada: any, 
+    datosFormulario: any
+  ): Promise<ContribuyenteData | null> => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('➕ [useContribuyentes] Creando contribuyente desde persona:', personaCreada);
+      
+      if (!personaCreada || !personaCreada.codPersona) {
+        throw new Error('Persona válida es requerida para crear contribuyente');
+      }
+      
+      // Convertir datos del formulario al formato API
+      const datosAPI = contribuyenteService.convertirFormularioAContribuyenteDTO(personaCreada, datosFormulario);
+      
+      console.log('📋 [useContribuyentes] Datos convertidos para API:', datosAPI);
+      
+      return await crearContribuyenteAPI(datosAPI);
+      
+    } catch (error: any) {
+      console.error('❌ [useContribuyentes] Error al crear contribuyente desde persona:', error);
+      setError(error.message || 'Error al crear contribuyente');
+      NotificationService.error(error.message || 'Error al crear contribuyente');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [crearContribuyenteAPI]);
+
+  /**
+   * Verificar si ya existe un contribuyente para una persona (NUEVO)
+   */
+  const verificarContribuyenteExistente = useCallback(async (codPersona: number): Promise<boolean> => {
+    try {
+      const contribuyente = await contribuyenteService.obtenerPorCodigoPersona(codPersona);
+      return !!contribuyente;
+    } catch (error) {
+      console.error('Error verificando contribuyente existente:', error);
+      return false;
+    }
+  }, []);
   
   // Efecto para cargar contribuyentes al montar
   useEffect(() => {
@@ -274,6 +362,10 @@ export const useContribuyentes = () => {
     buscarContribuyentes,
     guardarContribuyente,
     obtenerContribuyente,
-    eliminarContribuyente
+    eliminarContribuyente,
+    // Nuevos métodos para API POST
+    crearContribuyenteAPI,
+    crearContribuyenteDesdePersona,
+    verificarContribuyenteExistente
   };
 };

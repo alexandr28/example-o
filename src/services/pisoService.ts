@@ -1,6 +1,6 @@
 // src/services/pisoService.ts
 import BaseApiService from './BaseApiService';
-import { API_CONFIG } from '../config/api.unified.config';
+import { API_CONFIG, buildApiUrl } from '../config/api.unified.config';
 
 /**
  * Interfaces para Piso
@@ -43,6 +43,34 @@ export interface CreatePisoDTO {
   codUsuario?: number;
 }
 
+/**
+ * DTO para crear pisos según la estructura exacta del API
+ * URL: POST http://26.161.18.122:8080/api/piso
+ */
+export interface CreatePisoApiDTO {
+  anio: number;
+  codPredio: string;
+  numeroPiso: number;
+  fechaConstruccion: string; // Formato "YYYY-MM-DD"
+  codLetraMurosColumnas: string;
+  murosColumnas: string;
+  codLetraTechos: string;
+  techos: string;
+  codLetraPisos: string;
+  pisos: string;
+  codLetraPuertasVentanas: string;
+  puertasVentanas: string;
+  codLetraRevestimiento: string;
+  revestimiento: string;
+  codLetraBanios: string;
+  banios: string;
+  codLetraInstalacionesElectricas: string;
+  instalacionesElectricas: string;
+  codEstadoConservacion: string;
+  codMaterialEstructural: string;
+  areaConstruida: number;
+}
+
 export interface UpdatePisoDTO extends Partial<CreatePisoDTO> {
   estado?: string;
 }
@@ -55,6 +83,13 @@ export interface BusquedaPisoParams {
   estadoConstruccion?: string;
   estado?: string;
   codUsuario?: number;
+}
+
+export interface ConsultaPisoParams {
+  codPiso: number;
+  anio: number;
+  codPredio: string;
+  numeroPiso: number;
 }
 
 // Clasificaciones de piso
@@ -153,6 +188,101 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
     return PisoService.instance;
   }
   
+  /**
+   * Consulta pisos usando el API específico con GET y query params
+   * URL: GET http://26.161.18.122:8080/api/piso?codPiso=1&anio=2023&codPredio=20231&numeroPiso=1
+   * NO requiere autenticación
+   */
+  async consultarPisos(params: {
+    codPiso?: number;
+    anio?: number;
+    codPredio?: string;
+    numeroPiso?: number;
+  }): Promise<PisoData[]> {
+    try {
+      console.log('🔍 [PisoService] Consultando pisos con parámetros:', params);
+      
+      // Construir URL con query params
+      const queryParams: Record<string, string> = {};
+      if (params.codPiso) queryParams.codPiso = params.codPiso.toString();
+      if (params.anio) queryParams.anio = params.anio.toString();
+      if (params.codPredio) queryParams.codPredio = params.codPredio;
+      if (params.numeroPiso) queryParams.numeroPiso = params.numeroPiso.toString();
+      
+      const url = buildApiUrl('/api/piso', queryParams);
+      console.log('📡 [PisoService] GET request:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('📡 [PisoService] Respuesta del API:', responseData);
+      
+      if (responseData.success && responseData.data) {
+        // Normalizar los datos del API
+        const pisosData = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+        
+        const pisosFormateados = pisosData.map((item: any, index: number) => {
+          console.log(`🔍 [PisoService] Procesando item ${index + 1}:`, item);
+          
+          const pisoFormateado = {
+            id: item.codPiso || item.id || index + 1,
+            item: index + 1,
+            descripcion: item.descripcion || `Piso ${item.numeroPiso || index + 1}`,
+            valorUnitario: parseFloat(item.valorUnitario?.toString() || '0'),
+            incremento: parseFloat(item.incremento?.toString() || '0'),
+            porcentajeDepreciacion: parseFloat(item.porcentajeDepreciacion?.toString() || '0'),
+            valorUnicoDepreciado: parseFloat(item.valorUnicoDepreciado?.toString() || '0'),
+            valorAreaConstruida: parseFloat(item.valorAreaConstruida?.toString() || '0'),
+            // Campos adicionales de la interface original
+            codigoPredio: parseInt(item.codPredio?.toString() || '0'),
+            numeroPiso: parseInt(item.numeroPiso?.toString() || '1'),
+            areaConstruida: parseFloat(item.areaConstruida?.toString() || '0'),
+            clasificacion: item.clasificacion,
+            materialEstructural: item.materialEstructural,
+            estadoConservacion: item.estadoConservacion,
+            estadoConstruccion: item.estadoConstruccion,
+            categoriaValorUnitario: item.categoriaValorUnitario,
+            añoConstruccion: parseInt(item.anioConstruccion?.toString() || item.añoConstruccion?.toString() || new Date().getFullYear().toString()),
+            mesTermino: parseInt(item.mesTermino?.toString() || '12'),
+            unidadesUso: parseInt(item.unidadesUso?.toString() || '1'),
+            porcentajeAreaComun: parseFloat(item.porcentajeAreaComun?.toString() || '0'),
+            observaciones: item.observaciones || '',
+            estado: item.estado || 'ACTIVO',
+            fechaRegistro: item.fechaRegistro,
+            fechaModificacion: item.fechaModificacion,
+            codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario
+          };
+          
+          console.log(`✅ [PisoService] Item ${index + 1} formateado:`, pisoFormateado);
+          return pisoFormateado;
+        });
+        
+        console.log('✅ [PisoService] Pisos formateados:', pisosFormateados);
+        return pisosFormateados;
+      } else {
+        console.log('⚠️ [PisoService] No se encontraron pisos en la respuesta');
+        return [];
+      }
+      
+    } catch (error: any) {
+      console.error('❌ [PisoService] Error consultando pisos:', error);
+      
+      // En caso de error, devolver array vacío para no romper la UI
+      console.log('🔄 [PisoService] Retornando array vacío debido al error');
+      return [];
+    }
+  }
+
   /**
    * Lista todos los pisos
    * NO requiere autenticación (método GET)
@@ -295,6 +425,147 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
     }
   }
   
+  /**
+   * Crea un nuevo piso usando POST sin autenticación
+   * URL: POST http://26.161.18.122:8080/api/piso
+   * Estructura JSON exacta según especificación del API
+   */
+  async crearPisoSinAuth(datos: CreatePisoApiDTO): Promise<PisoData> {
+    try {
+      console.log('➕ [PisoService] Creando piso sin autenticación:', datos);
+      
+      // Validaciones de datos requeridos
+      if (!datos.codPredio || !datos.codPredio.trim()) {
+        throw new Error('codPredio es requerido');
+      }
+      
+      if (!datos.numeroPiso || datos.numeroPiso <= 0) {
+        throw new Error('numeroPiso es requerido y debe ser mayor a 0');
+      }
+      
+      if (!datos.areaConstruida || datos.areaConstruida <= 0) {
+        throw new Error('areaConstruida es requerido y debe ser mayor a 0');
+      }
+      
+      // Asegurar que los datos coincidan EXACTAMENTE con el JSON esperado
+      const datosParaEnviar: CreatePisoApiDTO = {
+        anio: Number(datos.anio),
+        codPredio: String(datos.codPredio),
+        numeroPiso: Number(datos.numeroPiso),
+        fechaConstruccion: String(datos.fechaConstruccion || "1990-01-01"),
+        codLetraMurosColumnas: String(datos.codLetraMurosColumnas || "1101"),
+        murosColumnas: String(datos.murosColumnas || "100101"),
+        codLetraTechos: String(datos.codLetraTechos || "1101"),
+        techos: String(datos.techos || "100102"),
+        codLetraPisos: String(datos.codLetraPisos || "1101"),
+        pisos: String(datos.pisos || "100201"),
+        codLetraPuertasVentanas: String(datos.codLetraPuertasVentanas || "1101"),
+        puertasVentanas: String(datos.puertasVentanas || "100202"),
+        codLetraRevestimiento: String(datos.codLetraRevestimiento || "1101"),
+        revestimiento: String(datos.revestimiento || "100203"),
+        codLetraBanios: String(datos.codLetraBanios || "1101"),
+        banios: String(datos.banios || "100204"),
+        codLetraInstalacionesElectricas: String(datos.codLetraInstalacionesElectricas || "1101"),
+        instalacionesElectricas: String(datos.instalacionesElectricas || "100301"),
+        codEstadoConservacion: String(datos.codEstadoConservacion || "9402"),
+        codMaterialEstructural: String(datos.codMaterialEstructural || "0703"),
+        areaConstruida: Number(datos.areaConstruida)
+      };
+      
+      // Construir URL completa
+      const url = `${API_CONFIG.baseURL}${this.endpoint}`;
+      
+      console.log('📡 [PisoService] URL para crear:', url);
+      console.log('📤 [PisoService] JSON exacto a enviar:', JSON.stringify(datosParaEnviar, null, 2));
+      
+      // Ejemplo de JSON válido para comparar con Postman:
+      console.log('📋 [PisoService] Ejemplo JSON para Postman:');
+      console.log(`{
+  "anio": ${datosParaEnviar.anio},
+  "codPredio": "${datosParaEnviar.codPredio}",
+  "numeroPiso": ${datosParaEnviar.numeroPiso},
+  "fechaConstruccion": "${datosParaEnviar.fechaConstruccion}",
+  "codLetraMurosColumnas": "${datosParaEnviar.codLetraMurosColumnas}",
+  "murosColumnas": "${datosParaEnviar.murosColumnas}",
+  "codLetraTechos": "${datosParaEnviar.codLetraTechos}",
+  "techos": "${datosParaEnviar.techos}",
+  "codLetraPisos": "${datosParaEnviar.codLetraPisos}",
+  "pisos": "${datosParaEnviar.pisos}",
+  "codLetraPuertasVentanas": "${datosParaEnviar.codLetraPuertasVentanas}",
+  "puertasVentanas": "${datosParaEnviar.puertasVentanas}",
+  "codLetraRevestimiento": "${datosParaEnviar.codLetraRevestimiento}",
+  "revestimiento": "${datosParaEnviar.revestimiento}",
+  "codLetraBanios": "${datosParaEnviar.codLetraBanios}",
+  "banios": "${datosParaEnviar.banios}",
+  "codLetraInstalacionesElectricas": "${datosParaEnviar.codLetraInstalacionesElectricas}",
+  "instalacionesElectricas": "${datosParaEnviar.instalacionesElectricas}",
+  "codEstadoConservacion": "${datosParaEnviar.codEstadoConservacion}",
+  "codMaterialEstructural": "${datosParaEnviar.codMaterialEstructural}",
+  "areaConstruida": ${datosParaEnviar.areaConstruida}
+}`);
+      
+      // Petición POST sin autenticación usando JSON
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+          // NO incluir Authorization - sin autenticación
+        },
+        body: JSON.stringify(datosParaEnviar)
+      });
+      
+      console.log('📡 [PisoService] Response Status:', response.status);
+      console.log('📡 [PisoService] Response URL:', response.url);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [PisoService] Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: errorText,
+          requestURL: url
+        });
+        
+        throw new Error(`Error HTTP ${response.status}: ${response.statusText || errorText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('✅ [PisoService] Piso creado exitosamente:', responseData);
+      
+      // Normalizar la respuesta
+      const pisoCreado: PisoData = {
+        id: responseData.codPiso || responseData.id || 0,
+        codigoPredio: parseInt(datosParaEnviar.codPredio),
+        numeroPiso: datosParaEnviar.numeroPiso,
+        areaConstruida: datosParaEnviar.areaConstruida,
+        clasificacion: responseData.clasificacion || 'PRIMER_PISO',
+        materialEstructural: responseData.codMaterialEstructural || datosParaEnviar.codMaterialEstructural,
+        estadoConservacion: responseData.codEstadoConservacion || datosParaEnviar.codEstadoConservacion,
+        estadoConstruccion: responseData.estadoConstruccion || 'TERMINADO',
+        categoriaValorUnitario: responseData.categoriaValorUnitario || '',
+        añoConstruccion: responseData.anioConstruccion || parseInt(datosParaEnviar.fechaConstruccion.split('-')[0]),
+        mesTermino: responseData.mesTermino || 12,
+        unidadesUso: responseData.unidadesUso || 1,
+        porcentajeAreaComun: responseData.porcentajeAreaComun || 0,
+        observaciones: responseData.observaciones || '',
+        estado: responseData.estado || 'ACTIVO',
+        fechaRegistro: responseData.fechaRegistro || new Date().toISOString(),
+        fechaModificacion: responseData.fechaModificacion,
+        codUsuario: responseData.codUsuario || 1
+      };
+      
+      console.log('✅ [PisoService] Piso normalizado:', pisoCreado);
+      return pisoCreado;
+      
+    } catch (error: any) {
+      console.error('❌ [PisoService] Error creando piso sin auth:', error);
+      console.error('❌ [PisoService] Stack trace:', error.stack);
+      throw error;
+    }
+  }
+
   /**
    * Crea un nuevo piso
    * REQUIERE autenticación (método POST)

@@ -41,7 +41,7 @@ interface EndpointsConfig {
 export const API_CONFIG = {
   baseURL: API_BASE_URL,
   timeout: 30000,
-  retries: 3,
+  retries: 3, 
   
   // Headers por defecto SIN autenticación
   defaultHeaders: {
@@ -64,6 +64,7 @@ export const API_CONFIG = {
     depreciacion: '/api/depreciacion',
     predio: '/api/predio',
     piso: '/api/piso',
+    asignacion:'/api/asignacionpredio',
     direccion: {
       base: '/api/direccion',
       listarPorNombreVia: '/api/direccion/listarDireccionPorNombreVia',

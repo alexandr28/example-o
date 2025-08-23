@@ -94,6 +94,16 @@ export const CODIGO_CONSTANTE_PADRE = {
   
 } as const;
 
+// Códigos de constantes hijos
+export const CODIGO_CONSTANTE_HIJO = {
+  // Hijos de CATEGORIAS_VALORES_UNITARIOS (10)
+  CATEGORIAS_VALORES_UNITARIOS: {
+    ESTRUCTURAS: '1001',
+    ACABADOS: '1002',
+    INSTALACIONES_ELECTRICAS_SANITARIAS: '1003',
+  }
+} as const;
+
 /**
  * Servicio para gestión de constantes
  * NO requiere autenticación
@@ -143,8 +153,7 @@ class ConstanteService {
   
   /**
    * Lista las constantes hijas según el código del padre
-   * NOTA: El API usa un patrón inusual de GET con form-data
-   * Intentamos primero con POST, si falla usamos GET con query params
+   * USA GET con query params SIN autenticación
    */
   async listarConstantesPorPadre(codConstantePadre: string): Promise<ConstanteData[]> {
     try {
@@ -157,39 +166,23 @@ class ConstanteService {
       
       console.log(`🔍 [ConstanteService] Buscando constantes para padre: ${codConstantePadre}`);
       
-      // Crear FormData
-      const formData = new FormData();
-      formData.append('codConstante', codConstantePadre);
+      // Construir URL con query params
+      const url = buildApiUrl('/api/constante/listarConstantePadre', {
+        codConstante: codConstantePadre
+      });
       
-      // Construir URL
-      const url = buildApiUrl('/api/constante/listarConstantePadre');
+      console.log(`📤 [ConstanteService] GET request a: ${url}`);
       
-      let response: Response;
-      
-      try {
-        // Intentar primero con POST y form-data (más compatible con el patrón del API)
-        console.log('📤 [ConstanteService] Intentando con POST y form-data...');
-        response = await fetch(url, {
-          method: 'POST',
-          body: formData
-        });
-      } catch (postError) {
-        console.log('⚠️ [ConstanteService] POST falló, intentando con GET y query params...');
-        
-        // Si POST falla, intentar con GET y query params
-        const params = new URLSearchParams();
-        params.append('codConstante', codConstantePadre);
-        
-        response = await fetch(`${url}?${params.toString()}`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json'
-          }
-        });
-      }
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
       
       if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
+        throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
       }
       
       const responseData: ConstanteResponse = await response.json();
@@ -208,6 +201,60 @@ class ConstanteService {
       
     } catch (error: any) {
       console.error(`❌ [ConstanteService] Error al obtener constantes:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Lista las constantes hijas según el código hijo específico
+   * USA GET con query params SIN autenticación
+   */
+  async listarConstantesPorHijo(codConstanteHijo: string): Promise<ConstanteData[]> {
+    try {
+      // Verificar cache primero
+      const cacheKey = `constantes_hijo_${codConstanteHijo}`;
+      const cached = this.getCachedData(cacheKey);
+      if (cached) {
+        return cached;
+      }
+      
+      console.log(`🔍 [ConstanteService] Buscando constantes para hijo: ${codConstanteHijo}`);
+      
+      // Construir URL con query params
+      const url = buildApiUrl('/api/constante/listarConstanteHijo', {
+        codConstante: codConstanteHijo
+      });
+      
+      console.log(`📤 [ConstanteService] GET request a: ${url}`);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+      }
+      
+      const responseData: ConstanteResponse = await response.json();
+      console.log(`📡 [ConstanteService] Respuesta hijo recibida:`, responseData);
+      
+      // Validar respuesta
+      if (responseData.success && Array.isArray(responseData.data)) {
+        // Guardar en cache
+        this.setCachedData(cacheKey, responseData.data);
+        
+        console.log(`✅ [ConstanteService] ${responseData.data.length} constantes hijo obtenidas`);
+        return responseData.data;
+      }
+      
+      return [];
+      
+    } catch (error: any) {
+      console.error(`❌ [ConstanteService] Error al obtener constantes hijo:`, error);
       throw error;
     }
   }
@@ -572,6 +619,150 @@ class ConstanteService {
    */   
   async obtenerTiposLetrasValoresUnitarios(): Promise<ConstanteData[]> {
     return this.listarConstantesPorPadre(CODIGO_CONSTANTE_PADRE.LETRAS_DE_VALORES_UNITARIOS);
+  }
+  
+  /**
+   * Obtiene las categorías PADRE de valores unitarios (1001, 1002, 1003)
+   * Estas son realmente las opciones que van en el selector padre
+   */
+  async obtenerCategoriasValoresUnitariosHijos(): Promise<ConstanteData[]> {
+    console.log('🔍 [ConstanteService] obtenerCategoriasValoresUnitariosHijos() - RETORNANDO PADRES REALES');
+    
+    // Según el ejemplo de Postman, estas son las opciones PADRE reales:
+    const categoriasReal = [
+      { codConstante: '1001', nombreCategoria: 'Estructuras' },
+      { codConstante: '1002', nombreCategoria: 'Acabados' }, 
+      { codConstante: '1003', nombreCategoria: 'Instalaciones Eléctricas y Sanitarias' }
+    ];
+    
+    console.log('✅ [ConstanteService] Retornando categorías padre reales:', categoriasReal);
+    return categoriasReal;
+  }
+
+  /**
+   * Obtiene los hijos REALES de cada categoría padre según Postman
+   * codigoPadre: '1001' → hijos 100101, 100102
+   * codigoPadre: '1002' → hijos 100201, 100202, 100203, 100204
+   * codigoPadre: '1003' → hijo 100301
+   */
+  async obtenerHijosRealesPorPadre(codigoPadre: string): Promise<ConstanteData[]> {
+    console.log(`🔍 [ConstanteService] obtenerHijosRealesPorPadre(${codigoPadre})`);
+    
+    try {
+      // Llamar al endpoint listarConstanteHijo con el código del padre
+      const hijos = await this.listarConstantesPorHijo(codigoPadre);
+      
+      if (hijos && hijos.length > 0) {
+        console.log(`✅ [ConstanteService] ${hijos.length} hijos obtenidos del API para padre ${codigoPadre}:`, hijos);
+        return hijos;
+      }
+      
+      // Si el API no devuelve datos, usar fallbacks basados en el ejemplo de Postman
+      console.log(`⚠️ [ConstanteService] API sin datos para padre ${codigoPadre}, usando fallback`);
+      
+      switch (codigoPadre) {
+        case '1001': // Estructuras
+          return [
+            { codConstante: '100101', nombreCategoria: 'MUROS Y COLUMNAS' },
+            { codConstante: '100102', nombreCategoria: 'TECHOS' }
+          ];
+        case '1002': // Acabados
+          return [
+            { codConstante: '100201', nombreCategoria: 'PISOS' },
+            { codConstante: '100202', nombreCategoria: 'PUERTAS Y VENTANAS' },
+            { codConstante: '100203', nombreCategoria: 'REVESTIMIENTOS' },
+            { codConstante: '100204', nombreCategoria: 'BAÑOS' }
+          ];
+        case '1003': // Instalaciones
+          return [
+            { codConstante: '100301', nombreCategoria: 'INSTALACIONES ELECTRICAS Y SANITARIAS' }
+          ];
+        default:
+          console.log(`⚠️ [ConstanteService] Código padre desconocido: ${codigoPadre}`);
+          return [];
+      }
+    } catch (error) {
+      console.error(`❌ [ConstanteService] Error al obtener hijos para padre ${codigoPadre}:`, error);
+      return [];
+    }
+  }
+  
+  /**
+   * MÉTODO DE DEBUG: Verifica qué devuelve cada endpoint
+   */
+  async debugEndpoints(): Promise<void> {
+    console.log('🔍 === DEBUG DE ENDPOINTS DE CONSTANTES ===');
+    
+    try {
+      // Test 1: listarConstantePadre con código 10
+      console.log('\n📡 Test 1: listarConstantePadre?codConstante=10');
+      const padres10 = await this.listarConstantesPorPadre('10');
+      console.log('Resultado:', padres10);
+      
+      // Test 2: listarConstanteHijo con código 1001
+      console.log('\n📡 Test 2: listarConstanteHijo?codConstante=1001');
+      const hijo1001 = await this.listarConstantesPorHijo('1001');
+      console.log('Resultado:', hijo1001);
+      
+      // Test 3: listarConstanteHijo con código 1002
+      console.log('\n📡 Test 3: listarConstanteHijo?codConstante=1002');
+      const hijo1002 = await this.listarConstantesPorHijo('1002');
+      console.log('Resultado:', hijo1002);
+      
+      // Test 4: listarConstanteHijo con código 1003
+      console.log('\n📡 Test 4: listarConstanteHijo?codConstante=1003');
+      const hijo1003 = await this.listarConstantesPorHijo('1003');
+      console.log('Resultado:', hijo1003);
+      
+      console.log('\n✅ === FIN DEBUG ===');
+    } catch (error) {
+      console.error('❌ Error en debug:', error);
+    }
+  }
+  
+  /**
+   * Obtiene específicamente MUROS Y COLUMNAS (1001)
+   */
+  async obtenerValoresUnitariosMurosColumnas(): Promise<ConstanteData | null> {
+    try {
+      const categorias = await this.obtenerCategoriasValoresUnitariosHijos();
+      return categorias.find(c => 
+        c.codConstante === CODIGO_CONSTANTE_HIJO.CATEGORIAS_VALORES_UNITARIOS.ESTRUCTURAS
+      ) || null;
+    } catch (error) {
+      console.error('Error al obtener MUROS Y COLUMNAS:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Obtiene específicamente TECHOS (1002)
+   */
+  async obtenerValoresUnitariosTechos(): Promise<ConstanteData | null> {
+    try {
+      const categorias = await this.obtenerCategoriasValoresUnitariosHijos();
+      return categorias.find(c => 
+        c.codConstante === CODIGO_CONSTANTE_HIJO.CATEGORIAS_VALORES_UNITARIOS.ACABADOS
+      ) || null;
+    } catch (error) {
+      console.error('Error al obtener TECHOS:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Obtiene específicamente PISOS (1003)
+   */
+  async obtenerValoresUnitariosPisos(): Promise<ConstanteData | null> {
+    try {
+      const categorias = await this.obtenerCategoriasValoresUnitariosHijos();
+      return categorias.find(c => 
+        c.codConstante === CODIGO_CONSTANTE_HIJO.CATEGORIAS_VALORES_UNITARIOS.INSTALACIONES_ELECTRICAS_SANITARIAS
+      ) || null;
+    } catch (error) {
+      console.error('Error al obtener PISOS:', error);
+      return null;
+    }
   }
   /**
    * Obtiene los tipos de lista de conductores
@@ -1528,7 +1719,13 @@ class ConstanteService {
   }
 
    
-} 
+}
+
+// Crear y exportar la instancia
 const constanteService = ConstanteService.getInstance();
+
+// Exportación por defecto
 export default constanteService;
+
+// Exportaciones nombradas
 export { ConstanteService };

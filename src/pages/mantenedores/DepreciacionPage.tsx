@@ -15,7 +15,7 @@ import {
   Info as InfoIcon
 } from '@mui/icons-material';
 import { MainLayout } from '../../layout';
-import { DepreciacionForm, Breadcrumb } from '../../components';
+import { DepreciacionUnificado, Breadcrumb } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useDepreciacion } from '../../hooks/useDepreciacion';
 import { NotificationService } from '../../components/utils/Notification';
@@ -29,17 +29,20 @@ const DepreciacionPage: React.FC = () => {
   // Usar el hook personalizado para acceder a toda la lógica de depreciación
   const {
     depreciaciones,
-    aniosDisponibles,
-    tiposCasa,
+    todasLasDepreciaciones, // Para el panel de búsqueda
+    // tiposCasa, // ELIMINADO: ahora se carga en el componente con useClasificacionPredio
     anioSeleccionado,
     tipoCasaSeleccionado,
     paginacion,
     loading,
     error,
+    cargarDepreciaciones,
     handleAnioChange,
     handleTipoCasaChange,
     registrarDepreciacion,
     buscarDepreciaciones,
+    actualizarDepreciacion,
+    eliminarDepreciacion,
     cambiarPagina
   } = useDepreciacion();
 
@@ -52,12 +55,13 @@ const DepreciacionPage: React.FC = () => {
   ];
 
   // Handler para registrar con notificación
-  const handleRegistrar = async () => {
+  const handleRegistrar = async (datosFormulario?: any) => {
     try {
-      await registrarDepreciacion();
-      NotificationService.success('Depreciación registrada exitosamente');
+      await registrarDepreciacion(datosFormulario);
+      // Las notificaciones ya se manejan en el hook
     } catch (err) {
-      NotificationService.error('Error al registrar depreciación');
+      // El error ya se maneja en el hook
+      console.error('Error en página:', err);
     }
   };
 
@@ -65,9 +69,34 @@ const DepreciacionPage: React.FC = () => {
   const handleBuscar = async () => {
     try {
       await buscarDepreciaciones();
-      NotificationService.info('Búsqueda completada');
+      // Las notificaciones ya se manejan en el hook
     } catch (err) {
-      NotificationService.error('Error al buscar depreciaciones');
+      // El error ya se maneja en el hook
+      console.error('Error en página:', err);
+    }
+  };
+
+  // Handler para actualizar
+  const handleActualizar = async (id: number, datos: any) => {
+    try {
+      await actualizarDepreciacion(id, datos);
+      // Las notificaciones ya se manejan en el hook
+    } catch (err) {
+      // El error ya se maneja en el hook
+      console.error('Error en página:', err);
+    }
+  };
+
+  // Handler para eliminar
+  const handleEliminar = async (id: number) => {
+    if (window.confirm('¿Está seguro de eliminar esta depreciación?')) {
+      try {
+        await eliminarDepreciacion(id);
+        // Las notificaciones ya se manejan en el hook
+      } catch (err) {
+        // El error ya se maneja en el hook
+        console.error('Error en página:', err);
+      }
     }
   };
 
@@ -131,17 +160,17 @@ const DepreciacionPage: React.FC = () => {
           </Alert>
         )}
 
-        {/* Formulario de Depreciación */}
-        <DepreciacionForm
-          aniosDisponibles={aniosDisponibles}
-          tiposCasa={tiposCasa}
+        {/* Componente Unificado de Depreciación */}
+        <DepreciacionUnificado
           anioSeleccionado={anioSeleccionado}
           tipoCasaSeleccionado={tipoCasaSeleccionado}
-          depreciaciones={depreciaciones}
+          depreciaciones={todasLasDepreciaciones || depreciaciones} // Usar todas para búsqueda
           onAnioChange={handleAnioChange}
           onTipoCasaChange={handleTipoCasaChange}
           onRegistrar={handleRegistrar}
           onBuscar={handleBuscar}
+          onActualizar={handleActualizar}
+          onEliminar={handleEliminar}
           loading={loading}
         />
       </Box>

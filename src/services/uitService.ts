@@ -10,14 +10,14 @@ export interface UITApiResponse {
   codUit: number | null;
   anio: number;
   valor: number | null;
-  valorUit?: number;
+  valorUit: number;  // Campo específico del API que contiene el valor UIT cuando valor es null
   valQuinit?: number;
-  alicuota?: number;
-  rangoInicial?: number;
-  rangoFinal?: number;
-  impuestoParcial?: number;
-  impuestoAcumulado?: number | string;
-  codEpa?: number;
+  alicuota: number;  // Viene en decimal (ej: 0.2 para 20%)
+  rangoInicial: number;
+  rangoFinal: number;
+  impuestoParcial: number;
+  impuestoAcumulado: number;
+  codEpa: number;
   estado?: string;
   fechaVigenciaDesde?: string;
   fechaVigenciaHasta?: string;
@@ -35,6 +35,7 @@ export interface UITData {
   codUit?: number | null;
   anio: number;
   valor: number;
+  valorUit?: number;  // Campo adicional del API
   valQuinit?: number;
   alicuota?: number;
   rangoInicial?: number;
@@ -170,33 +171,35 @@ class UITService extends BaseApiService<UITData, CreateUITDTO, UpdateUITDTO> {
       '/api/uitEpa',
       {
         normalizeItem: (item: any): UITData => {
-          // Manejar impuestoAcumulado que puede venir como string
-          let impuestoAcumulado = 0;
-          if (item.impuestoAcumulado) {
-            if (typeof item.impuestoAcumulado === 'string') {
-              impuestoAcumulado = parseFloat(item.impuestoAcumulado) || 0;
-            } else {
-              impuestoAcumulado = item.impuestoAcumulado;
-            }
+
+          // IMPORTANTE: Usar valorUit si valor es null (según el JSON del API)
+          let valorFinal = 0;
+          if (item.valor !== null && item.valor !== undefined) {
+            valorFinal = parseFloat(item.valor.toString());
+          } else if (item.valorUit !== null && item.valorUit !== undefined) {
+            valorFinal = parseFloat(item.valorUit.toString());
           }
 
-          // IMPORTANTE: Usar valorUit si valor es null
-          const valorFinal = item.valor !== null 
-            ? parseFloat(item.valor.toString()) 
-            : (item.valorUit ? parseFloat(item.valorUit.toString()) : 0);
+          // Manejar rangoFinal: si es 0.0 significa infinito (último tramo)
+          let rangoFinal = undefined;
+          if (item.rangoFinal !== undefined && item.rangoFinal !== null) {
+            const rangoFinalNum = parseFloat(item.rangoFinal.toString());
+            rangoFinal = rangoFinalNum === 0 ? undefined : rangoFinalNum;
+          }
 
-          return {
-            id: item.codUit || 0,
+          const normalized = {
+            id: item.codEpa || item.codUit || Math.random() * 1000,
             codUit: item.codUit,
             anio: item.anio || new Date().getFullYear(),
             valor: valorFinal,
-            valQuinit: item.valQuinit ? parseFloat(item.valQuinit.toString()) : 0,
-            alicuota: item.alicuota ? parseFloat(item.alicuota.toString()) : 0,
-            rangoInicial: item.rangoInicial ? parseFloat(item.rangoInicial.toString()) : 0,
-            rangoFinal: item.rangoFinal ? parseFloat(item.rangoFinal.toString()) : 0,
-            impuestoParcial: item.impuestoParcial ? parseFloat(item.impuestoParcial.toString()) : 0,
-            impuestoAcumulado: impuestoAcumulado,
-            codEpa: item.codEpa || 0,
+            valorUit: item.valorUit ? parseFloat(item.valorUit.toString()) : undefined,
+            valQuinit: item.valQuinit ? parseFloat(item.valQuinit.toString()) : undefined,
+            alicuota: item.alicuota ? parseFloat(item.alicuota.toString()) : undefined,
+            rangoInicial: item.rangoInicial !== undefined ? parseFloat(item.rangoInicial.toString()) : undefined,
+            rangoFinal: rangoFinal,
+            impuestoParcial: item.impuestoParcial ? parseFloat(item.impuestoParcial.toString()) : undefined,
+            impuestoAcumulado: item.impuestoAcumulado ? parseFloat(item.impuestoAcumulado.toString()) : undefined,
+            codEpa: item.codEpa || undefined,
             estado: item.estado || 'ACTIVO',
             fechaVigenciaDesde: item.fechaVigenciaDesde,
             fechaVigenciaHasta: item.fechaVigenciaHasta,
@@ -205,13 +208,16 @@ class UITService extends BaseApiService<UITData, CreateUITDTO, UpdateUITDTO> {
             usuarioCreacion: item.usuarioCreacion,
             usuarioModificacion: item.usuarioModificacion
           };
+
+          return normalized;
         },
         
         validateItem: (item: UITData) => {
+          // Validar que tiene año válido y es del API (codEpa existe o tiene alícuota)
           return !!(
             item.anio > 1990 && 
             item.anio <= 2100 && 
-            item.valor >= 0
+            (item.codEpa || item.alicuota !== undefined)
           );
         }
       },
@@ -231,20 +237,19 @@ class UITService extends BaseApiService<UITData, CreateUITDTO, UpdateUITDTO> {
 
   /**
    * Lista todos los valores UIT por año
-   * Usa el API real con form-data
+   * IMPORTANTE: El API requiere obligatoriamente el parámetro anio
    */
   async listarUITs(anio?: number): Promise<UITData[]> {
     try {
-      console.log('🔍 [UITService] Listando UITs para año:', anio || 'todos');
+      // Si no se proporciona año, usar el año actual por defecto
+      const anioFinal = anio || new Date().getFullYear();
       
-      // Construir URL con query parameters
-      let url = `${API_CONFIG.baseURL}${this.endpoint}`;
+      console.log('🔍 [UITService] Listando UITs para año:', anioFinal);
       
-      if (anio) {
-        const params = new URLSearchParams();
-        params.append('anio', anio.toString());
-        url += `?${params.toString()}`;
-      }
+      // Construir URL con query parameters (OBLIGATORIO)
+      const params = new URLSearchParams();
+      params.append('anio', anioFinal.toString());
+      const url = `${API_CONFIG.baseURL}${this.endpoint}?${params.toString()}`;
       
       console.log('📡 [UITService] GET:', url);
       
@@ -260,14 +265,7 @@ class UITService extends BaseApiService<UITData, CreateUITDTO, UpdateUITDTO> {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ [UITService] Error:', errorText);
-        
-        // Si hay error, devolver datos demo como fallback
-        console.warn('⚠️ [UITService] Usando datos de respaldo');
-        if (anio) {
-          const uitsAnio = DEMO_UIT_DATA.filter(u => u.anio === anio);
-          return uitsAnio.length > 0 ? uitsAnio : [];
-        }
-        return DEMO_UIT_DATA;
+        throw new Error(`Error del API: ${response.status} - ${errorText}`);
       }
       
       // Parsear la respuesta
@@ -285,27 +283,21 @@ class UITService extends BaseApiService<UITData, CreateUITDTO, UpdateUITDTO> {
       }
       
       // Si no hay datos, devolver array vacío
-      console.warn('⚠️ [UITService] No se encontraron datos');
+      console.warn('⚠️ [UITService] No se encontraron datos para el año:', anioFinal);
       return [];
       
     } catch (error: any) {
       console.error('❌ [UITService] Error:', error);
-      
-      // En caso de error, devolver datos demo como fallback
-      console.warn('⚠️ [UITService] Usando datos de respaldo debido a error');
-      if (anio) {
-        const uitsAnio = DEMO_UIT_DATA.filter(u => u.anio === anio);
-        return uitsAnio.length > 0 ? uitsAnio : [];
-      }
-      return DEMO_UIT_DATA;
+      throw error; // Re-lanzar el error para manejarlo en el hook
     }
   }
 
   /**
    * Obtiene todos los valores UIT (wrapper para compatibilidad)
+   * Usa el año actual por defecto
    */
   async getAll(): Promise<UITData[]> {
-    return this.listarUITs();
+    return this.listarUITs(new Date().getFullYear());
   }
 
   /**
@@ -314,7 +306,7 @@ class UITService extends BaseApiService<UITData, CreateUITDTO, UpdateUITDTO> {
   async obtenerVigente(): Promise<UITData | null> {
     try {
       const anioActual = new Date().getFullYear();
-      const uits = await this.listarUITs();
+      const uits = await this.listarUITs(anioActual);
       
       // Buscar UIT del año actual que NO sea una alícuota (sin rangos)
       const uitActual = uits.find(u => 
@@ -396,15 +388,31 @@ class UITService extends BaseApiService<UITData, CreateUITDTO, UpdateUITDTO> {
 
   /**
    * Obtiene el historial de valores UIT
+   * Como el API requiere año específico, carga múltiples años individualmente
    */
   async obtenerHistorial(anioInicio?: number, anioFin?: number): Promise<UITData[]> {
     try {
       console.log('🔍 [UITService] Obteniendo historial de UITs');
       
-      let uits = await this.listarUITs();
+      // Definir rango de años
+      const inicio = anioInicio || new Date().getFullYear() - 5;
+      const fin = anioFin || new Date().getFullYear();
+      
+      let todosLosUits: UITData[] = [];
+      
+      // Cargar datos año por año (ya que el API requiere anio específico)
+      for (let anio = inicio; anio <= fin; anio++) {
+        try {
+          const uitsAnio = await this.listarUITs(anio);
+          todosLosUits = todosLosUits.concat(uitsAnio);
+        } catch (error) {
+          console.warn(`⚠️ [UITService] Error cargando año ${anio}:`, error);
+          // Continuar con el siguiente año
+        }
+      }
       
       // Filtrar solo UITs generales (sin rangos o con valor > 0)
-      uits = uits.filter(u => u.valor > 0);
+      const uits = todosLosUits.filter(u => u.valor > 0);
       
       // Agrupar por año y tomar solo uno por año (el que no tiene rangos)
       const uitsPorAnio = new Map<number, UITData>();
@@ -417,15 +425,7 @@ class UITService extends BaseApiService<UITData, CreateUITDTO, UpdateUITDTO> {
         }
       });
       
-      let resultado = Array.from(uitsPorAnio.values());
-      
-      // Filtrar por rango de años si se especifica
-      if (anioInicio) {
-        resultado = resultado.filter(u => u.anio >= anioInicio);
-      }
-      if (anioFin) {
-        resultado = resultado.filter(u => u.anio <= anioFin);
-      }
+      const resultado = Array.from(uitsPorAnio.values());
       
       // Ordenar por año descendente
       return resultado.sort((a, b) => b.anio - a.anio);
@@ -440,7 +440,8 @@ class UITService extends BaseApiService<UITData, CreateUITDTO, UpdateUITDTO> {
    */
   async obtenerEstadisticas(): Promise<any> {
     try {
-      const uits = await this.listarUITs();
+      // Obtener historial de los últimos 10 años para estadísticas
+      const uits = await this.obtenerHistorial(new Date().getFullYear() - 10, new Date().getFullYear());
       const uitsGenerales = uits.filter(u => 
         u.valor > 0 && 
         (!u.rangoInicial || u.rangoInicial === 0) && 

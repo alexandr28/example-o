@@ -2,7 +2,6 @@
 import React from 'react';
 import {
   Box,
-  Grid,
   Card,
   CardContent,
   Typography,
@@ -29,8 +28,7 @@ import {
 import {
   Save as SaveIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon,
-  Add as AddIcon
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 
 interface AlcabalaFormProps {
@@ -76,8 +74,16 @@ const AlcabalaForm: React.FC<AlcabalaFormProps> = ({
             Registrar Nueva Alcabala
           </Typography>
           
-          <Grid container spacing={2} alignItems="flex-end">
-            <Grid item xs={12} md={4}>
+          <Box sx={{ 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: 2, 
+            alignItems: 'flex-end' 
+          }}>
+            <Box sx={{ 
+              flex: { xs: '1 1 100%', md: '1 1 calc(33.33% - 12px)' },
+              minWidth: 0
+            }}>
               <FormControl fullWidth>
                 <InputLabel>Año</InputLabel>
                 <Select
@@ -95,9 +101,12 @@ const AlcabalaForm: React.FC<AlcabalaFormProps> = ({
                   ))}
                 </Select>
               </FormControl>
-            </Grid>
+            </Box>
             
-            <Grid item xs={12} md={4}>
+            <Box sx={{ 
+              flex: { xs: '1 1 100%', md: '1 1 calc(33.33% - 12px)' },
+              minWidth: 0
+            }}>
               <TextField
                 fullWidth
                 label="Tasa (%)"
@@ -113,9 +122,12 @@ const AlcabalaForm: React.FC<AlcabalaFormProps> = ({
                   }
                 }}
               />
-            </Grid>
+            </Box>
             
-            <Grid item xs={12} md={4}>
+            <Box sx={{ 
+              flex: { xs: '1 1 100%', md: '1 1 calc(33.33% - 12px)' },
+              minWidth: 0
+            }}>
               <Button
                 fullWidth
                 variant="contained"
@@ -126,8 +138,8 @@ const AlcabalaForm: React.FC<AlcabalaFormProps> = ({
               >
                 Registrar
               </Button>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
         </CardContent>
       </Card>
 

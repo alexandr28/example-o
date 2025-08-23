@@ -13,17 +13,22 @@ import {
   Home as HomeIcon,
   Domain as DomainIcon
 } from '@mui/icons-material';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import PredioForm from '../../components/predio/PredioForm';
 import NotificationContainer from '../../components/utils/Notification';
 import MainLayout from '../../layout/MainLayout';
+import { usePredios } from '../../hooks/usePredioAPI';
 
 /**
- * Página para registrar un nuevo predio
- * Ahora la selección de contribuyente está integrada dentro del PredioForm
+ * Página para registrar un nuevo predio usando API POST sin autenticación
+ * URL: POST http://26.161.18.122:8080/api/predio
  */
 const NuevoPredio: FC = memo(() => {
   const theme = useTheme();
+  const navigate = useNavigate();
+  
+  // Hook para gestión de predios con API integrada
+  const { crearPredio, loading } = usePredios();
 
   // Definir las migas de pan para la navegación
   const breadcrumbItems = [
@@ -33,10 +38,58 @@ const NuevoPredio: FC = memo(() => {
   ];
 
   // Handler para cuando se envía el formulario
-  const handleSubmitPredio = (data: any) => {
-    console.log('Datos del predio a registrar:', data);
-    // Aquí iría la lógica para enviar los datos al backend
-    // Por ejemplo: await predioService.crearPredio(data);
+  const handleSubmitPredio = async (data: any) => {
+    console.log('🏠 [NuevoPredio] Datos del formulario recibidos:', data);
+    
+    // Preparar datos según estructura exacta del JSON del API
+    const datosFormulario = {
+      // Datos requeridos
+      numeroFinca: data.numeroFinca || '',
+      areaTerreno: Number(data.areaTerreno) || 0,
+      direccionId: data.direccion?.id || data.direccionId,
+      
+      // Datos del formulario mapeados correctamente
+      anio: data.anio || new Date().getFullYear(),
+      otroNumero: data.otroNumero || '',
+      fechaAdquisicion: data.fechaAdquisicion,
+      
+      // Mapeo correcto de códigos del formulario
+      codClasificacion: data.clasificacionPredio, // Campo del form → campo del API
+      estadoPredio: data.estadoPredio, // Para usarlo como estPredio en el DTO
+      codTipoPredio: data.tipoPredio, // Campo del form → campo del API
+      codCondicionPropiedad: data.condicionPropiedad, // Campo del form → campo del API
+      codUsoPredio: data.usoPredio, // Campo del form → campo del API
+      codListaConductor: data.conductor, // Campo del form → campo del API
+      
+      // Datos numéricos
+      numeroPisos: Number(data.numeroPisos) || 1,
+      numeroCondominos: Number(data.numeroCondominos) || 2, // Por defecto 2 según JSON ejemplo
+      
+      // Datos opcionales (pueden ser null)
+      totalAreaConstruccion: data.totalAreaConstruccion ? Number(data.totalAreaConstruccion) : null,
+      valorTerreno: data.valorTerreno ? Number(data.valorTerreno) : null,
+      valorTotalConstruccion: data.valorTotalConstruccion ? Number(data.valorTotalConstruccion) : null,
+      autoavaluo: data.autoavaluo ? Number(data.autoavaluo) : null,
+      
+      // Valores por defecto según el JSON ejemplo
+      codUbicacionAreaVerde: 1,
+      codEstado: "0201",
+      codUsuario: 1
+    };
+    
+    console.log('📤 [NuevoPredio] Enviando datos al hook:', datosFormulario);
+    
+    // Llamar al hook que maneja la creación con la API
+    const predioCreado = await crearPredio(datosFormulario);
+    
+    if (predioCreado) {
+      console.log('✅ [NuevoPredio] Predio creado exitosamente:', predioCreado);
+      
+      // Opcionalmente redirigir después de un pequeño delay
+      setTimeout(() => {
+        navigate('/predio');
+      }, 2000);
+    }
   };
 
   return (
@@ -101,6 +154,7 @@ const NuevoPredio: FC = memo(() => {
           {/* Formulario de Predio con selector de contribuyente integrado */}
           <PredioForm 
             onSubmit={handleSubmitPredio}
+            loading={loading}
           />
         </Box>
       </Container>

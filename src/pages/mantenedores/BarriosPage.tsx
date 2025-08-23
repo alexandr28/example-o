@@ -15,14 +15,41 @@ import {
   Typography,
   TextField,
   InputAdornment,
-  Grid,
-  Alert
+  Alert,
+  Tabs,
+  Tab,
+  useTheme,
+  alpha
 } from '@mui/material';
 import {
-  Search as SearchIcon
+  Search as SearchIcon,
+  Add as AddIcon,
+  List as ListIcon
 } from '@mui/icons-material';
 
+// Interface para TabPanel
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`barrio-tabpanel-${index}`}
+      aria-labelledby={`barrio-tab-${index}`}
+    >
+      {value === index && <Box>{children}</Box>}
+    </div>
+  );
+};
+
 const BarrioPage: React.FC = () => {
+  const theme = useTheme();
+  
   // Hooks
   const {
     barrios,
@@ -36,14 +63,14 @@ const BarrioPage: React.FC = () => {
     limpiarSeleccion,
     guardarBarrio,
     eliminarBarrio,
-    estadisticas,
-    setError  // Agregar setError
+    estadisticas
   } = useBarrios();
 
   const { sectores } = useSectores();
 
   // Estados locales
   const [guardando, setGuardando] = useState(false);
+  const [tabValue, setTabValue] = useState(0);
 
   // Breadcrumb items
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -52,10 +79,16 @@ const BarrioPage: React.FC = () => {
     { label: 'Barrios', path: '/mantenedores/barrios', active: true }
   ];
 
+  // Manejar cambio de tabs
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
   // Abrir modal para editar
   const abrirModal = (barrio?: any) => {
     if (barrio) {
       seleccionarBarrio(barrio);
+      setTabValue(0); // Cambiar al tab de formulario al editar
     } else {
       limpiarSeleccion();
     }
@@ -68,6 +101,7 @@ const BarrioPage: React.FC = () => {
       const exito = await guardarBarrio(datos);
       if (exito) {
         limpiarSeleccion();
+        setTabValue(1); // Cambiar al tab de lista después de guardar
       }
     } finally {
       setGuardando(false);
@@ -90,125 +124,91 @@ const BarrioPage: React.FC = () => {
           <Typography variant="h4" component="h1" gutterBottom>
             Gestión de Barrios
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Administre los barrios del sistema
-          </Typography>
         </Box>
 
-        {/* Contenedor principal con dos columnas */}
-        <Grid container spacing={3}>
-          {/* Columna izquierda - Formulario */}
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3, height: '100%' }}>
-              <Typography variant="h6" gutterBottom>
-                {modoEdicion ? 'Editar Barrio' : 'Nuevo Barrio'}
-              </Typography>
-              
+        {/* Contenedor principal con tabs */}
+        <Paper 
+          elevation={2}
+          sx={{ 
+            borderRadius: 2,
+            overflow: 'hidden',
+            border: `1px solid ${theme.palette.divider}`,
+          }}
+        >
+          {/* Header con tabs */}
+          <Box sx={{ 
+            bgcolor: alpha(theme.palette.primary.main, 0.04),
+            borderBottom: `1px solid ${theme.palette.divider}`
+          }}>
+            <Tabs
+              value={tabValue}
+              onChange={handleTabChange}
+              aria-label="barrio tabs"
+              sx={{
+                '& .MuiTab-root': {
+                  minHeight: 64,
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  fontSize: '0.95rem',
+                  '&.Mui-selected': {
+                    fontWeight: 600,
+                  }
+                },
+                '& .MuiTabs-indicator': {
+                  height: 3,
+                  borderRadius: '3px 3px 0 0'
+                }
+              }}
+            >
+              <Tab 
+                icon={<AddIcon />} 
+                iconPosition="start"
+                label={modoEdicion ? 'Editar Barrio' : 'Nuevo Barrio'}
+                id="barrio-tab-0"
+                aria-controls="barrio-tabpanel-0"
+              />
+              <Tab 
+                icon={<ListIcon />} 
+                iconPosition="start"
+                label="Lista de Barrios" 
+                id="barrio-tab-1"
+                aria-controls="barrio-tabpanel-1"
+              />
+            </Tabs>
+          </Box>
+
+          {/* Panel de Formulario */}
+          <TabPanel value={tabValue} index={0}>
+            <Box sx={{ p: 3 }}>
               <BarrioForm
                 onSubmit={handleGuardar}
                 onCancel={limpiarSeleccion}
                 initialData={barrioSeleccionado || undefined}
                 isSubmitting={guardando}
               />
-            </Paper>
-          </Grid>
+            </Box>
+          </TabPanel>
 
-          {/* Columna derecha - Lista y búsqueda */}
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3, height: '100%' }}>
-              {/* Barra de búsqueda */}
-              <Box sx={{ mb: 2 }}>
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  placeholder="Buscar barrios..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon />
-                      </InputAdornment>
-                    ),
-                  }}
-                  size="small"
-                />
-              </Box>
-
-              {/* Estadísticas compactas */}
-              {estadisticas && (
-                <Grid container spacing={1} sx={{ mb: 2 }}>
-                  <Grid item xs={4}>
-                    <Box sx={{ 
-                      bgcolor: 'grey.100', 
-                      p: 1, 
-                      borderRadius: 1,
-                      textAlign: 'center' 
-                    }}>
-                      <Typography variant="caption" color="textSecondary">
-                        TOTAL
-                      </Typography>
-                      <Typography variant="h6" fontWeight="bold">
-                        {estadisticas.total}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={4}>
-                    <Box sx={{ 
-                      bgcolor: 'success.50', 
-                      p: 1, 
-                      borderRadius: 1,
-                      textAlign: 'center' 
-                    }}>
-                      <Typography variant="caption" color="textSecondary">
-                        ACTIVOS
-                      </Typography>
-                      <Typography variant="h6" color="success.main" fontWeight="bold">
-                        {estadisticas.activos}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={4}>
-                    <Box sx={{ 
-                      bgcolor: 'error.50', 
-                      p: 1, 
-                      borderRadius: 1,
-                      textAlign: 'center' 
-                    }}>
-                      <Typography variant="caption" color="textSecondary">
-                        INACTIVOS
-                      </Typography>
-                      <Typography variant="h6" color="error.main" fontWeight="bold">
-                        {estadisticas.inactivos}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-              )}
-
-              {/* Lista de barrios */}
-              <Box sx={{ 
-                border: '1px solid',
-                borderColor: 'divider',
-                borderRadius: 1
-              }}>
-                <BarrioList
-                  barrios={barrios || []}
-                  sectores={sectores || []}
-                  onEdit={abrirModal}
-                  onDelete={handleEliminar}
-                  loading={loading}
-                  searchTerm={searchTerm}
-                />
-              </Box>
-            </Paper>
-          </Grid>
-        </Grid>
+          {/* Panel de Lista */}
+          <TabPanel value={tabValue} index={1}>
+            <Box sx={{ p: 3 }}>
+              <BarrioList
+                barrios={barrios || []}
+                sectores={sectores || []}
+                onEdit={abrirModal}
+                onDelete={handleEliminar}
+                loading={loading}
+                searchTerm={searchTerm}
+                selectedBarrio={barrioSeleccionado}
+              />
+            </Box>
+          </TabPanel>
+        </Paper>
 
         {/* Mensaje de error global */}
         {error && (
           <Box sx={{ mt: 2 }}>
-            <Alert severity="error" onClose={() => setError(null)}>
+            <Alert severity="error">
               {error}
             </Alert>
           </Box>

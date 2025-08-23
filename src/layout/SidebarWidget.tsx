@@ -54,7 +54,7 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
   const theme = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
-  const { isExpanded, openSubmenus, setActiveItem, toggleSubmenu } = useSidebar();
+  const { isExpanded, openSubmenus, setActiveItem, toggleSubmenu, expandSidebar } = useSidebar();
   const [hovered, setHovered] = useState(false);
 
   // Determina si un elemento del menú está activo
@@ -87,6 +87,22 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
     
     if (!path) return;
     
+    // Si el sidebar está colapsado, primero expandirlo
+    if (!isExpanded) {
+      expandSidebar();
+      // Opcional: si quieres navegar inmediatamente después de expandir
+      // Puedes descomentar las líneas siguientes
+      /*
+      setTimeout(() => {
+        if (location.pathname !== path) {
+          setActiveItem(id);
+          navigate(path);
+        }
+      }, 200);
+      */
+      return;
+    }
+    
     // Si la ruta actual es la misma, no hacer nada
     if (location.pathname === path) {
       return;
@@ -104,10 +120,26 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
       setActiveItem(id);
       navigate(path);
     }
-  }, [path, location.pathname, setActiveItem, id, navigate]);
+  }, [path, location.pathname, setActiveItem, id, navigate, isExpanded, expandSidebar]);
 
   // Manejar clics para elementos sin ruta
   const handleClick = useCallback(() => {
+    // Si el sidebar está colapsado, primero expandirlo
+    if (!isExpanded) {
+      expandSidebar();
+      // Si tiene submenú, también abrirlo después de expandir
+      if (hasSubMenu) {
+        setTimeout(() => {
+          if (onCustomToggle) {
+            onCustomToggle(id);
+          } else {
+            toggleSubmenu(id);
+          }
+        }, 200); // Pequeño delay para que la animación de expansión se complete
+      }
+      return;
+    }
+
     if (hasSubMenu) {
       // Si tiene submenú, toggle el submenú
       if (onCustomToggle) {
@@ -120,7 +152,7 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
       // que por alguna razón no se manejó con handleNavigation
       setActiveItem(id);
     }
-  }, [hasSubMenu, path, id, onCustomToggle, toggleSubmenu, setActiveItem]);
+  }, [hasSubMenu, path, id, onCustomToggle, toggleSubmenu, setActiveItem, isExpanded, expandSidebar]);
 
   // Función recursiva para renderizar submenús
   const renderSubMenu = (items: SubMenuItem[], currentLevel: number) => {
@@ -147,19 +179,23 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
     justifyContent: isExpanded ? 'initial' : 'center',
     px: paddingLeft,
     py: 1,
-    borderRadius: 0, // Sin bordes redondeados
+    borderRadius: theme.shape.borderRadius,
     mx: 0.5,
     my: 0.25,
     position: 'relative',
     color: isMenuActive ? '#ffffff' : alpha('#ffffff', 0.7),
     backgroundColor: isMenuActive
-      ? 'rgba(255, 255, 255, 0.15)' // Fondo semi-transparente para items activos
+      ? alpha('#60a5fa', 0.15)
       : 'transparent',
+    backdropFilter: isMenuActive ? 'blur(10px)' : 'none',
+    border: `1px solid ${isMenuActive ? alpha('#60a5fa', 0.2) : 'transparent'}`,
     '&:hover': {
       backgroundColor: isMenuActive
-        ? 'rgba(255, 255, 255, 0.2)' // Hover más visible
-        : 'rgba(255, 255, 255, 0.1)',
+        ? alpha('#60a5fa', 0.25)
+        : alpha('#ffffff', 0.08),
       color: '#ffffff',
+      borderColor: alpha('#60a5fa', 0.3),
+      transform: 'translateX(2px)',
     },
     '&::before': isMenuActive && level === 0 ? {
       content: '""',
@@ -169,10 +205,11 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
       transform: 'translateY(-50%)',
       width: 3,
       height: '70%',
-      backgroundColor: '#60a5fa', // Azul claro para el indicador activo
-      borderRadius: 0, // Sin bordes redondeados
+      backgroundColor: '#60a5fa',
+      borderRadius: '0 3px 3px 0',
+      boxShadow: `2px 0 6px ${alpha('#60a5fa', 0.4)}`,
     } : {},
-    transition: theme.transitions.create(['background-color', 'color'], {
+    transition: theme.transitions.create(['all'], {
       duration: theme.transitions.duration.shorter,
     }),
   };
@@ -182,22 +219,25 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
     mr: isExpanded ? 1.5 : 'auto',
     justifyContent: 'center',
     color: isMenuActive
-      ? '#60a5fa' // Azul claro para íconos activos
+      ? '#60a5fa'
       : 'inherit',
     '& svg': {
       fontSize: level === 0 ? 20 : 16,
-      transition: theme.transitions.create('color'),
+      transition: theme.transitions.create(['color', 'transform']),
+      filter: isMenuActive ? `drop-shadow(0 0 3px ${alpha('#60a5fa', 0.5)})` : 'none',
     },
   };
 
   const textStyles = {
     opacity: isExpanded ? 1 : 0,
     fontSize: level === 0 ? '0.875rem' : '0.813rem',
-    fontWeight: isMenuActive ? 500 : 400,
+    fontWeight: isMenuActive ? 600 : 400,
     color: 'inherit',
+    letterSpacing: isMenuActive ? '0.5px' : 'normal',
     '& .MuiListItemText-primary': {
       fontSize: 'inherit',
       fontWeight: 'inherit',
+      letterSpacing: 'inherit',
     },
   };
 
@@ -222,6 +262,12 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
                 color: isMenuActive ? '#60a5fa' : alpha('#ffffff', 0.5),
                 transition: theme.transitions.create(['transform', 'color']),
                 transform: isSubMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                backgroundColor: alpha('#60a5fa', 0.1),
+                borderRadius: '50%',
+                padding: '2px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
               {isSubMenuOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}

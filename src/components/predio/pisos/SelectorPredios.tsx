@@ -31,15 +31,23 @@ import {
   Home as HomeIcon,
   CheckCircle as CheckIcon
 } from '@mui/icons-material';
-import { predioService } from '../../../services/predioService';
+import { buildApiUrl } from '../../../config/api.unified.config';
 
 interface Predio {
   id: number | string;
   codigoPredio: string;
-  tipoPredio: string;
+  tipoPredio?: string;
   direccion?: string;
   contribuyente?: string;
   areaTerreno: number;
+  // Campos adicionales del API
+  anio?: number;
+  numeroFinca?: string;
+  codTipoPredio?: string;
+  codCondicionPropiedad?: string;
+  condicionPropiedad?: string;
+  estadoPredio?: string;
+  conductor?: string;
 }
 
 interface SelectorPrediosProps {
@@ -68,39 +76,95 @@ const SelectorPredios: React.FC<SelectorPrediosProps> = ({
     }
   }, [open]);
 
-  // Cargar predios
+  // Cargar predios usando el API específico con GET y query params
   const cargarPredios = async () => {
     setLoading(true);
     try {
-      const data = await predioService.getAll();
-      setPredios(data);
+      console.log('🔍 [SelectorPredios] Cargando predios desde API...');
+      
+      // Construir URL con query params específicos según el ejemplo
+      const url = buildApiUrl('/api/predio', {
+        codPredio: '20231',
+        anio: '2023',
+        direccion: '1'
+      });
+      
+      console.log('📡 [SelectorPredios] GET request:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('📡 [SelectorPredios] Respuesta del API:', responseData);
+      
+      if (responseData.success && responseData.data) {
+        // Normalizar los datos del API
+        const prediosData = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+        
+        const prediosFormateados = prediosData.map((item: any, index: number) => ({
+          id: item.codPredio || `predio_${index}`,
+          codigoPredio: item.codPredio || 'Sin código',
+          tipoPredio: item.codTipoPredio || 'Sin especificar',
+          direccion: item.direccion || 'Sin dirección',
+          contribuyente: item.conductor || 'Sin asignar',
+          areaTerreno: parseFloat(item.areaTerreno?.toString() || '0'),
+          anio: item.anio,
+          numeroFinca: item.numeroFinca,
+          codTipoPredio: item.codTipoPredio,
+          codCondicionPropiedad: item.codCondicionPropiedad,
+          condicionPropiedad: item.condicionPropiedad,
+          estadoPredio: item.estadoPredio,
+          conductor: item.conductor
+        }));
+        
+        console.log('✅ [SelectorPredios] Predios formateados:', prediosFormateados);
+        setPredios(prediosFormateados);
+      } else {
+        console.log('⚠️ [SelectorPredios] No se encontraron predios en la respuesta');
+        setPredios([]);
+      }
+      
     } catch (error) {
-      console.error('Error al cargar predios:', error);
-      // Datos de ejemplo si falla la API
+      console.error('❌ [SelectorPredios] Error al cargar predios:', error);
+      
+      // En caso de error, mostrar datos de ejemplo para desarrollo
+      console.log('🔄 [SelectorPredios] Usando datos de ejemplo debido al error');
       setPredios([
         {
           id: 1,
-          codigoPredio: '1045',
+          codigoPredio: '20231',
           tipoPredio: 'Predio independiente',
           direccion: 'Av. Principal 123',
           contribuyente: 'Juan Pérez García',
-          areaTerreno: 250.00
+          areaTerreno: 250.00,
+          anio: 2023
         },
         {
           id: 2,
-          codigoPredio: '1022',
+          codigoPredio: '20232',
           tipoPredio: 'Departamento en edificio',
           direccion: 'Jr. Las Flores 456',
           contribuyente: 'María López Sánchez',
-          areaTerreno: 120.50
+          areaTerreno: 120.50,
+          anio: 2023
         },
         {
           id: 3,
-          codigoPredio: '1078',
+          codigoPredio: '20233',
           tipoPredio: 'Predio independiente',
           direccion: 'Calle Los Álamos 789',
           contribuyente: 'Carlos Rodríguez Díaz',
-          areaTerreno: 180.75
+          areaTerreno: 180.75,
+          anio: 2023
         }
       ]);
     } finally {
@@ -213,7 +277,7 @@ const SelectorPredios: React.FC<SelectorPrediosProps> = ({
               <TableRow sx={{ bgcolor: 'grey.100' }}>
                 <TableCell padding="checkbox"></TableCell>
                 <TableCell>Código</TableCell>
-                <TableCell>Tipo</TableCell>
+                <TableCell>Tipo Predio</TableCell>
                 <TableCell>Dirección</TableCell>
                 <TableCell>Contribuyente</TableCell>
                 <TableCell align="center">Área (m²)</TableCell>
@@ -252,7 +316,7 @@ const SelectorPredios: React.FC<SelectorPrediosProps> = ({
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">
-                        {predio.tipoPredio}
+                        {predio.tipoPredio || 'Sin especificar'}
                       </Typography>
                     </TableCell>
                     <TableCell>

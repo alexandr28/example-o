@@ -62,6 +62,25 @@ export interface CreatePersonaDTO {
   codUsuario?: number;
 }
 
+export interface CreatePersonaAPIDTO {
+  codPersona?: null; // Opcional - omitido para que SQL genere el ID
+  codTipopersona: string;
+  codTipoDocumento: number;
+  numerodocumento: string;
+  nombres: string;
+  apellidomaterno: string;
+  apellidopaterno: string;
+  fechanacimiento: string; // formato: "YYYY-MM-DD"
+  codestadocivil: number;
+  codsexo: number;
+  telefono: string;
+  codDireccion: number | null;
+  lote: string | null;
+  otros: string | null;
+  parametroBusqueda: null;
+  codUsuario: number;
+}
+
 export interface UpdatePersonaDTO extends Partial<CreatePersonaDTO> {
   codPersona?: number;
 }
@@ -272,8 +291,111 @@ class PersonaService extends BaseApiService<PersonaData, CreatePersonaDTO, Updat
   }
   
   /**
+   * Verifica si ya existe una persona con el mismo número de documento
+   */
+  async verificarPersonaExistente(numeroDocumento: string): Promise<PersonaData | null> {
+    try {
+      console.log('🔍 [PersonaService] Verificando si existe persona con documento:', numeroDocumento);
+      
+      const personasExistentes = await this.buscarPorDocumento(numeroDocumento);
+      return personasExistentes.length > 0 ? personasExistentes[0] : null;
+      
+    } catch (error: any) {
+      console.error('❌ [PersonaService] Error verificando persona existente:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Crea una nueva persona usando el API directo
+   * NO requiere autenticación (método POST)
+   * URL: http://26.161.18.122:8080/api/persona
+   */
+  async crearPersonaAPI(datos: CreatePersonaAPIDTO): Promise<PersonaData> {
+    try {
+      console.log('➕ [PersonaService] Creando nueva persona con API directa:', datos);
+      
+      const API_URL = 'http://26.161.18.122:8080/api/persona';
+      
+      // Validar datos requeridos
+      if (!datos.numerodocumento || !datos.nombres) {
+        throw new Error('Número de documento y nombres son requeridos');
+      }
+
+      // Verificación de duplicados deshabilitada temporalmente para debugging
+      // TODO: Reactivar cuando se confirme que el error de PK está resuelto
+      /*
+      console.log('🔍 [PersonaService] Verificando persona existente con documento:', datos.numerodocumento);
+      const personaExistente = await this.verificarPersonaExistente(datos.numerodocumento);
+      
+      if (personaExistente) {
+        console.log('⚠️ [PersonaService] Ya existe una persona con el documento:', datos.numerodocumento);
+        throw new Error(`Ya existe una persona registrada con el documento ${datos.numerodocumento}`);
+      }
+      */
+      
+      // Asegurar que codPersona no se envía en el request (omitirlo completamente)
+      const { codPersona, ...datosParaEnviar } = datos;
+      
+      console.log('📤 [PersonaService] Enviando datos (codPersona omitido):', JSON.stringify(datosParaEnviar, null, 2));
+      
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(datosParaEnviar)
+      });
+      
+      console.log(`📥 [PersonaService] Respuesta del servidor: ${response.status} ${response.statusText}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [PersonaService] Error del servidor:', errorText);
+        throw new Error(`Error ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('✅ [PersonaService] Persona creada exitosamente:', responseData);
+      
+      // Normalizar los datos de respuesta usando la función del constructor
+      const personaNormalizada = {
+        codPersona: responseData.codPersona,
+        codTipopersona: responseData.codTipopersona,
+        codTipoDocumento: responseData.codTipoDocumento,
+        numerodocumento: responseData.numerodocumento || '',
+        nombres: responseData.nombres,
+        apellidomaterno: responseData.apellidomaterno,
+        apellidopaterno: responseData.apellidopaterno,
+        razonSocial: responseData.razonSocial,
+        direccion: responseData.direccion === 'null' ? null : responseData.direccion,
+        fechanacimiento: responseData.fechanacimiento,
+        codestadocivil: responseData.codestadocivil,
+        codsexo: responseData.codsexo,
+        telefono: responseData.telefono,
+        email: responseData.email,
+        codDireccion: responseData.codDireccion,
+        lote: responseData.lote,
+        otros: responseData.otros,
+        parametroBusqueda: responseData.parametroBusqueda,
+        codUsuario: responseData.codUsuario,
+        nombrePersona: responseData.nombrePersona || this.construirNombreCompleto(responseData),
+        estado: responseData.estado || 'ACTIVO',
+        fechaRegistro: responseData.fechaRegistro
+      };
+      
+      return personaNormalizada;
+      
+    } catch (error: any) {
+      console.error('❌ [PersonaService] Error al crear persona:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Crea una nueva persona
-   * REQUIERE autenticación (método POST)
+   * REQUIERE autenticación (método POST) - Método original
    */
   async crearPersona(datos: CreatePersonaDTO): Promise<PersonaData> {
     try {
@@ -339,6 +461,88 @@ class PersonaService extends BaseApiService<PersonaData, CreatePersonaDTO, Updat
     }
   }
   
+  /**
+   * Convierte datos del formulario al formato requerido por la API
+   */
+  convertirFormularioAApiDTO(datosFormulario: any): CreatePersonaAPIDTO {
+    // Convertir fecha de nacimiento al formato YYYY-MM-DD
+    let fechaNacimiento = '1980-01-01'; // Valor por defecto
+    if (datosFormulario.fechaNacimiento) {
+      if (datosFormulario.fechaNacimiento instanceof Date) {
+        fechaNacimiento = datosFormulario.fechaNacimiento.toISOString().split('T')[0];
+      } else if (typeof datosFormulario.fechaNacimiento === 'string') {
+        // Si viene como string, asumimos que está en formato correcto
+        fechaNacimiento = datosFormulario.fechaNacimiento.split('T')[0];
+      }
+    }
+
+    // Limpiar y validar datos antes de enviar
+    const tipoDocumento = datosFormulario.tipoDocumento;
+    let codTipoDocumento = 1; // Valor por defecto
+    
+    // Convertir tipo de documento correctamente
+    if (tipoDocumento === '4101' || tipoDocumento === 'DNI') {
+      codTipoDocumento = 1;
+    } else if (tipoDocumento === '4102' || tipoDocumento === 'RUC') {
+      codTipoDocumento = 2;
+    } else if (typeof tipoDocumento === 'string' && !isNaN(parseInt(tipoDocumento))) {
+      codTipoDocumento = parseInt(tipoDocumento);
+    }
+
+    // Obtener código de dirección, puede ser null
+    let codDireccion: number | null = null;
+    if (datosFormulario.direccion) {
+      codDireccion = datosFormulario.direccion.id || 
+                     datosFormulario.direccion.codigo || 
+                     datosFormulario.direccion.codigoSector || 
+                     null;
+    }
+
+    // Convertir valores de estado civil y sexo
+    let codEstadoCivil = 1; // Soltero por defecto
+    if (datosFormulario.estadoCivil) {
+      const estadoCivil = datosFormulario.estadoCivil;
+      if (typeof estadoCivil === 'number') {
+        codEstadoCivil = estadoCivil;
+      } else if (typeof estadoCivil === 'string' && !isNaN(parseInt(estadoCivil))) {
+        codEstadoCivil = parseInt(estadoCivil);
+      }
+    }
+
+    let codSexo = 1; // Masculino por defecto
+    if (datosFormulario.sexo) {
+      const sexo = datosFormulario.sexo;
+      if (typeof sexo === 'number') {
+        codSexo = sexo;
+      } else if (typeof sexo === 'string' && !isNaN(parseInt(sexo))) {
+        codSexo = parseInt(sexo);
+      }
+    }
+
+    const datosAPI: CreatePersonaAPIDTO = {
+      // codPersona omitido completamente para que SQL genere el ID automáticamente
+      codTipopersona: datosFormulario.tipoPersona || (datosFormulario.isJuridica ? "0302" : "0301"),
+      codTipoDocumento: codTipoDocumento,
+      numerodocumento: datosFormulario.numeroDocumento?.toString() || '',
+      nombres: datosFormulario.nombres || datosFormulario.razonSocial || '',
+      apellidomaterno: datosFormulario.apellidoMaterno || '',
+      apellidopaterno: datosFormulario.apellidoPaterno || '',
+      fechanacimiento: fechaNacimiento,
+      codestadocivil: codEstadoCivil,
+      codsexo: codSexo,
+      telefono: datosFormulario.telefono?.toString() || '',
+      codDireccion: codDireccion,
+      lote: datosFormulario.nFinca?.toString() || null,
+      otros: datosFormulario.otroNumero?.toString() || null,
+      parametroBusqueda: null,
+      codUsuario: datosFormulario.codUsuario || 1
+    };
+
+    console.log('📋 [PersonaService] Datos API generados (codPersona omitido):', datosAPI);
+    
+    return datosAPI;
+  }
+
   /**
    * Convierte PersonaData a formato compatible con ContribuyenteData
    */

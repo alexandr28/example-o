@@ -13,6 +13,9 @@ import '@fontsource/inter/700.css';
 // En main.tsx
 import './styles/sidebar-mui.css';
 
+// Estilos globales compactos - IMPORTANTE: Cargar después del tema
+import './styles/global.css';
+
 // Estilos globales
 import './index.css';
 

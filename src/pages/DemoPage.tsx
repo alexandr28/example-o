@@ -1,9 +1,8 @@
-// src/pages/DemoPage.tsx - Versión mejorada con Material-UI
+// src/pages/DemoPage.tsx - Versión mejorada con Material-UI y Flexbox
 import React, { FC, memo } from 'react';
 import {
   Box,
   Typography,
-  Grid,
   Card,
   CardContent,
   Button,
@@ -132,48 +131,23 @@ const DemoPage: FC = memo(() => {
         p: 0
       }}>
         <Box sx={{ p: 3 }}>
-          {/* Header con bienvenida */}
-          <Box sx={{ mb: 4 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" spacing={2}>
-            <Box>
-              <Typography variant="h4" sx={{ fontWeight: 700, color: '#1F2937', mb: 1 }}>
-                Bienvenido, {user?.nombreCompleto || user?.username || 'Usuario'} 👋
-              </Typography>
-              <Typography variant="body1" sx={{ color: '#6B7280' }}>
-                Este es tu panel de control del Sistema de Gestión Tributaria
-              </Typography>
-            </Box>
-            <Stack direction="row" spacing={2}>
-              <Tooltip title={`Cambiar a modo ${theme === 'dark' ? 'claro' : 'oscuro'}`}>
-                <IconButton 
-                  onClick={toggleTheme}
-                  sx={{ 
-                    bgcolor: 'rgba(0, 0, 0, 0.04)',
-                    '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.08)' }
-                  }}
-                >
-                  {theme === 'dark' ? <Brightness7 /> : <Brightness4 />}
-                </IconButton>
-              </Tooltip>
-              <Tooltip title={isExpanded ? 'Colapsar menú' : 'Expandir menú'}>
-                <IconButton 
-                  onClick={toggleSidebar}
-                  sx={{ 
-                    bgcolor: 'rgba(0, 0, 0, 0.04)',
-                    '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.08)' }
-                  }}
-                >
-                  {isExpanded ? <MenuOpen /> : <MenuIcon />}
-                </IconButton>
-              </Tooltip>
-            </Stack>
-          </Stack>
-        </Box>
+          
 
         {/* Estadísticas principales */}
-        <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Box sx={{ 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          gap: 3, 
+          mb: 4 
+        }}>
           {stats.map((stat) => (
-            <Grid item xs={12} sm={6} md={3} key={stat.title}>
+            <Box 
+              key={stat.title}
+              sx={{ 
+                flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 12px)', md: '1 1 calc(25% - 18px)' },
+                minWidth: 0
+              }}
+            >
               <Card 
                 elevation={0}
                 sx={{ 
@@ -221,13 +195,20 @@ const DemoPage: FC = memo(() => {
                   </Stack>
                 </CardContent>
               </Card>
-            </Grid>
+            </Box>
           ))}
-        </Grid>
+        </Box>
 
-        <Grid container spacing={3}>
+        <Box sx={{ 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          gap: 3 
+        }}>
           {/* Accesos rápidos */}
-          <Grid item xs={12} md={8}>
+          <Box sx={{ 
+            flex: { xs: '1 1 100%', md: '1 1 calc(66.66% - 12px)' },
+            minWidth: 0
+          }}>
             <Paper
               elevation={0}
               sx={{
@@ -241,9 +222,19 @@ const DemoPage: FC = memo(() => {
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
                 Accesos Rápidos
               </Typography>
-              <Grid container spacing={2}>
+              <Box sx={{ 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                gap: 2 
+              }}>
                 {quickActions.map((action) => (
-                  <Grid item xs={12} sm={6} key={action.title}>
+                  <Box 
+                    key={action.title}
+                    sx={{ 
+                      flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)' },
+                      minWidth: 0
+                    }}
+                  >
                     <Button
                       fullWidth
                       variant="outlined"
@@ -261,55 +252,74 @@ const DemoPage: FC = memo(() => {
                     >
                       {action.title}
                     </Button>
-                  </Grid>
+                  </Box>
                 ))}
-              </Grid>
+              </Box>
 
               {/* Información del sistema */}
               <Box sx={{ mt: 4, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
                   Información del Sistema
                 </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={6}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  flexWrap: 'wrap', 
+                  gap: 2 
+                }}>
+                  <Box sx={{ 
+                    flex: '1 1 calc(50% - 8px)',
+                    minWidth: 0
+                  }}>
                     <Typography variant="caption" color="text.secondary">
                       Tema actual
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
                       {theme === 'dark' ? 'Oscuro' : 'Claro'}
                     </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
+                  </Box>
+                  <Box sx={{ 
+                    flex: '1 1 calc(50% - 8px)',
+                    minWidth: 0
+                  }}>
                     <Typography variant="caption" color="text.secondary">
                       Menú lateral
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
                       {isExpanded ? 'Expandido' : 'Colapsado'}
                     </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
+                  </Box>
+                  <Box sx={{ 
+                    flex: '1 1 calc(50% - 8px)',
+                    minWidth: 0
+                  }}>
                     <Typography variant="caption" color="text.secondary">
                       Usuario
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
                       {user?.username || 'No identificado'}
                     </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
+                  </Box>
+                  <Box sx={{ 
+                    flex: '1 1 calc(50% - 8px)',
+                    minWidth: 0
+                  }}>
                     <Typography variant="caption" color="text.secondary">
                       Roles
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
                       {user?.roles?.join(', ') || 'Sin roles'}
                     </Typography>
-                  </Grid>
-                </Grid>
+                  </Box>
+                </Box>
               </Box>
             </Paper>
-          </Grid>
+          </Box>
 
           {/* Actividad reciente */}
-          <Grid item xs={12} md={4}>
+          <Box sx={{ 
+            flex: { xs: '1 1 100%', md: '1 1 calc(33.33% - 12px)' },
+            minWidth: 0
+          }}>
             <Paper
               elevation={0}
               sx={{
@@ -370,8 +380,8 @@ const DemoPage: FC = memo(() => {
                 Ver toda la actividad
               </Button>
             </Paper>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
 
         {/* Progreso del período */}
         <Paper
@@ -387,8 +397,15 @@ const DemoPage: FC = memo(() => {
           <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
             Progreso del Período Actual
           </Typography>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
+          <Box sx={{ 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: 3 
+          }}>
+            <Box sx={{ 
+              flex: { xs: '1 1 100%', md: '1 1 calc(33.33% - 16px)' },
+              minWidth: 0
+            }}>
               <Box>
                 <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
                   <Typography variant="body2" color="text.secondary">
@@ -411,8 +428,11 @@ const DemoPage: FC = memo(() => {
                   }}
                 />
               </Box>
-            </Grid>
-            <Grid item xs={12} md={4}>
+            </Box>
+            <Box sx={{ 
+              flex: { xs: '1 1 100%', md: '1 1 calc(33.33% - 16px)' },
+              minWidth: 0
+            }}>
               <Box>
                 <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
                   <Typography variant="body2" color="text.secondary">
@@ -435,8 +455,11 @@ const DemoPage: FC = memo(() => {
                   }}
                 />
               </Box>
-            </Grid>
-            <Grid item xs={12} md={4}>
+            </Box>
+            <Box sx={{ 
+              flex: { xs: '1 1 100%', md: '1 1 calc(33.33% - 16px)' },
+              minWidth: 0
+            }}>
               <Box>
                 <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
                   <Typography variant="body2" color="text.secondary">
@@ -459,8 +482,8 @@ const DemoPage: FC = memo(() => {
                   }}
                 />
               </Box>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
         </Paper>
         </Box>
       </Box>

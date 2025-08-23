@@ -200,6 +200,8 @@ export const useUIT = (): UseUITResult => {
       setError(null);
       
       const data = await uitService.listarUITs(anio);
+      console.log('✅ [useUIT] Cargados', data.length, 'elementos del API para año', anio);
+      
       setUits(data);
       
       // Si no hay año específico, actualizar UIT vigente
@@ -209,24 +211,13 @@ export const useUIT = (): UseUITResult => {
       }
       
     } catch (error: any) {
-      console.error('Error cargando UITs:', error);
-      
-      if (handleAuthError(error)) {
-        const demoData = generarDatosDemo(anio);
-        setUits(demoData);
-        
-        if (!anio) {
-          const vigentDemo = demoData.find(u => u.anio === new Date().getFullYear());
-          setUitVigente(vigentDemo || null);
-        }
-        setError(null);
-      } else {
-        setError(error.message || 'Error al cargar los valores UIT');
-      }
+      console.error('❌ [useUIT] Error cargando UITs:', error);
+      setError(error.message || 'Error al cargar los valores UIT');
+      setUits([]); // Limpiar datos en caso de error
     } finally {
       setLoading(false);
     }
-  }, [handleAuthError, generarDatosDemo]);
+  }, [handleAuthError, generarDatosDemo, generarAlicuotasDemo]);
 
   // Cargar alícuotas por año
   const cargarAlicuotas = useCallback(async (anio: number) => {
@@ -267,7 +258,7 @@ export const useUIT = (): UseUITResult => {
     }
   }, [handleAuthError, generarHistorialDemo]);
 
-  // Cargar datos iniciales
+  // Cargar datos iniciales - simplificado para evitar conflictos
   useEffect(() => {
     let mounted = true;
 
@@ -275,17 +266,10 @@ export const useUIT = (): UseUITResult => {
       if (!mounted) return;
       
       try {
-        // Cargar UIT del año actual primero
+        // Solo cargar datos del año seleccionado (incluye UITs y alícuotas)
         await cargarUITs(anioSeleccionado);
-        
-        // Luego cargar el historial
-        const anioActual = new Date().getFullYear();
-        await cargarHistorial(anioActual - 5, anioActual);
-        
-        // Cargar alícuotas del año actual
-        await cargarAlicuotas(anioActual);
       } catch (error) {
-        console.error('Error en carga inicial:', error);
+        console.error('❌ [useUIT] Error en carga inicial:', error);
       }
     };
     

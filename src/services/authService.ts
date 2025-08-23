@@ -178,8 +178,14 @@ export class AuthService {
   
   /**
    * Renueva el token antes de que expire
+   * DESHABILITADO: Las APIs no requieren autenticación y causa errores CORS
    */
   async refreshToken(): Promise<boolean> {
+    // DESHABILITADO: Causa errores CORS y las APIs no requieren autenticación
+    console.log('⚠️ [AuthService] Renovación de token deshabilitada - las APIs no requieren autenticación');
+    return false;
+    
+    /* Código original comentado para evitar CORS
     try {
       const currentToken = localStorage.getItem('auth_token');
       if (!currentToken) {
@@ -227,6 +233,7 @@ export class AuthService {
       console.error('❌ [AuthService] Error al renovar token:', error);
       return false;
     }
+    */
   }
   
   /**

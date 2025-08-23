@@ -11,4 +11,6 @@ export * from './UIT';
 export * from './Alcabala';
 export * from './Depreciacion';
 export * from './Auth';
+export * from './Predio';
+export * from './Predio';
 

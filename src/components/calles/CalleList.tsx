@@ -26,7 +26,7 @@ import {
 } from '@mui/material';
 import {
   Search as SearchIcon,
-  Delete as DeleteIcon,
+  Edit as EditIcon,
   LocationCity as LocationCityIcon,
   Home as HomeIcon,
   Route as RouteIcon,
@@ -58,9 +58,8 @@ interface HeadCell {
 }
 
 const headCells: HeadCell[] = [
-  { id: 'nombre', label: 'Calle', sortable: true },
+  { id: 'nombreVia', label: 'N°', sortable: true },
   { id: 'ubicacion', label: 'Ubicación', sortable: true },
-  { id: 'estado', label: 'Estado', align: 'center', sortable: true },
   { id: 'acciones', label: 'Acciones', align: 'center' }
 ];
 
@@ -78,7 +77,7 @@ const CalleListMUI: React.FC<CalleListProps> = ({
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [order, setOrder] = useState<Order>('asc');
-  const [orderBy, setOrderBy] = useState<string>('nombre');
+  const [orderBy, setOrderBy] = useState<string>('nombreVia');
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
@@ -127,26 +126,33 @@ const CalleListMUI: React.FC<CalleListProps> = ({
 
   // Selección de calle
   const handleSelectCalle = (calle: Calle) => {
-    setSelectedId(calle.id);
+    setSelectedId(calle.codVia ?? calle.id ?? 0);
     onSelectCalle(calle);
   };
 
   // Obtener nombre completo de la calle
   const getNombreCompleto = (calle: Calle) => {
-    const tipoDesc = calle.tipoVia || '';
-    return `${tipoDesc} ${calle.nombre}`.trim();
+    const tipoDesc = calle.descTipoVia || calle.nombreTipoVia || '';
+    const nombre = calle.nombreVia || calle.nombreCalle || '';
+    return `${tipoDesc} ${nombre}`.trim();
   };
 
   // Obtener ubicación completa
   const getUbicacion = (calle: Calle) => {
-    const sector = obtenerNombreSector ? obtenerNombreSector(calle.sectorId) : `Sector ${calle.sectorId}`;
-    const barrio = obtenerNombreBarrio ? obtenerNombreBarrio(calle.barrioId) : `Barrio ${calle.barrioId}`;
-    return `${sector} - ${barrio}`;
+    const codigoBarrio = calle.codBarrio || calle.codigoBarrio;
+    const nombreBarrio = calle.nombreBarrio || (obtenerNombreBarrio ? obtenerNombreBarrio(codigoBarrio || 0) : `Barrio ${codigoBarrio}`);
+    return nombreBarrio || 'Sin ubicación';
   };
 
   // Ordenar y filtrar datos
   const sortedAndFilteredCalles = useMemo(() => {
     let filteredData = [...calles];
+    
+    // Debug: Log datos de calles para verificar nombreBarrio
+    if (filteredData.length > 0) {
+      console.log('🔍 [CalleList] Primera calle:', filteredData[0]);
+      console.log('🔍 [CalleList] nombreBarrio en primera calle:', filteredData[0].nombreBarrio);
+    }
 
     // Aplicar filtro de búsqueda local si no hay función de búsqueda externa
     if (!onSearch && localSearchTerm) {
@@ -202,41 +208,78 @@ const CalleListMUI: React.FC<CalleListProps> = ({
       <TableRow key={`skeleton-${index}`}>
         <TableCell><Skeleton /></TableCell>
         <TableCell><Skeleton /></TableCell>
-        <TableCell align="center"><Skeleton width={80} /></TableCell>
         <TableCell align="center"><Skeleton width={40} /></TableCell>
       </TableRow>
     ));
   };
 
   // Obtener icono según tipo de vía
-  const getTipoViaIcon = (tipoVia: string) => {
-    const tipo = tipoVia?.toUpperCase();
-    if (tipo === 'AV' || tipo === 'AVENIDA') return <RouteIcon sx={{ fontSize: 16 }} />;
-    if (tipo === 'JR' || tipo === 'JIRON') return <MapIcon sx={{ fontSize: 16 }} />;
-    return <MapIcon sx={{ fontSize: 16 }} />;
+  const getTipoViaIcon = (tipoVia?: number | string) => {
+    const tipo = typeof tipoVia === 'string' ? tipoVia?.toUpperCase() : String(tipoVia || '');
+    if (tipo === 'AV' || tipo === 'AVENIDA') return <RouteIcon sx={{ fontSize: 16, color: 'primary.main' }} />;
+    if (tipo === 'JR' || tipo === 'JIRON') return <HomeIcon sx={{ fontSize: 16, color: 'info.main' }} />;
+    if (tipo === 'CALLE') return <MapIcon sx={{ fontSize: 16, color: 'success.main' }} />;
+    return <LocationCityIcon sx={{ fontSize: 16, color: 'text.secondary' }} />;
   };
 
   return (
-    <Paper sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-        <Stack spacing={2}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <MapIcon color="primary" />
-              <Typography variant="h6">
-                Lista de Calles
-              </Typography>
-              <Chip
-                label={sortedAndFilteredCalles.length}
-                size="small"
-                color="primary"
-                variant="outlined"
-              />
-            </Box>
+    <Paper 
+      elevation={3}
+      sx={{ 
+        width: '100%',
+        minWidth: '800px',
+        borderRadius: 2,
+        background: 'linear-gradient(to bottom, #ffffff, #fafafa)',
+        border: '1px solid',
+        borderColor: 'divider'
+      }}
+    >
+      <Stack spacing={2} sx={{ p: 2 }}>
+        {/* Header */}
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 2, 
+          pb: 2,
+          borderBottom: '2px solid',
+          borderColor: 'primary.main'
+        }}>
+          <Box sx={{
+            p: 1,
+            borderRadius: 1,
+            backgroundColor: 'primary.main',
+            color: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <MapIcon />
           </Box>
+          <Typography variant="h6" fontWeight={600}>
+            Lista de Calles
+          </Typography>
+          <Box sx={{ flex: 1 }} />
+          <Chip
+            label={`Total: ${calles.length}`}
+            color="primary"
+            variant="filled"
+            size="small"
+          />
+          <Chip
+            label={`Filtradas: ${sortedAndFilteredCalles.length}`}
+            color="secondary"
+            variant="outlined"
+            size="small"
+          />
+        </Box>
 
-          {/* Barra de búsqueda */}
+        {/* Barra de búsqueda expandida horizontalmente */}
+        <Box sx={{ 
+          display: 'flex', 
+          gap: 2,
+          alignItems: 'center',
+          width: '100%'
+        }}>
           <TextField
             fullWidth
             variant="outlined"
@@ -247,7 +290,7 @@ const CalleListMUI: React.FC<CalleListProps> = ({
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon />
+                  <SearchIcon color="action" />
                 </InputAdornment>
               ),
               endAdornment: localSearchTerm && (
@@ -259,144 +302,285 @@ const CalleListMUI: React.FC<CalleListProps> = ({
                     <ClearIcon />
                   </IconButton>
                 </InputAdornment>
-              )
+              ),
+              sx: {
+                borderRadius: 2,
+                height: 40,
+                '&:hover': {
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'primary.main',
+                  },
+                },
+              }
             }}
+            sx={{ maxWidth: '400px' }}
           />
-        </Stack>
-      </Box>
+        </Box>
 
-      {/* Tabla */}
-      <TableContainer sx={{ flexGrow: 1 }}>
-        <Table stickyHeader size="small">
-          <TableHead>
-            <TableRow>
-              {headCells.map((headCell) => (
-                <TableCell
-                  key={headCell.id}
-                  align={headCell.align || 'left'}
-                  sx={{ 
-                    fontWeight: 600,
-                    bgcolor: 'background.paper',
-                    borderBottom: 2,
-                    borderColor: 'divider'
-                  }}
-                >
-                  {headCell.sortable ? (
-                    <TableSortLabel
-                      active={orderBy === headCell.id}
-                      direction={orderBy === headCell.id ? order : 'asc'}
-                      onClick={() => handleRequestSort(headCell.id as string)}
-                    >
-                      {headCell.label}
-                    </TableSortLabel>
-                  ) : (
-                    headCell.label
-                  )}
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {loading ? (
-              renderSkeletonRows()
-            ) : paginatedCalles.length === 0 ? (
+        {/* Tabla con scroll interno */}
+        <TableContainer 
+          component={Paper}
+          elevation={2}
+          sx={{ 
+            width: '100%',
+            height: 400,
+            maxHeight: 400,
+            borderRadius: 2,
+            border: `1px solid ${theme.palette.divider}`,
+            overflow: 'auto',
+            position: 'relative',
+            '& .MuiTable-root': {
+              minWidth: 750
+            },
+            '&::-webkit-scrollbar': {
+              width: 8,
+              height: 8,
+            },
+            '&::-webkit-scrollbar-track': {
+              bgcolor: alpha(theme.palette.grey[200], 0.5),
+              borderRadius: 2,
+            },
+            '&::-webkit-scrollbar-thumb': {
+              bgcolor: alpha(theme.palette.primary.main, 0.3),
+              borderRadius: 2,
+              '&:hover': {
+                bgcolor: alpha(theme.palette.primary.main, 0.5),
+              }
+            }
+          }}
+        >
+          <Table stickyHeader size="medium">
+            <TableHead>
               <TableRow>
-                <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
-                  <Alert severity="info" sx={{ display: 'inline-flex' }}>
-                    {localSearchTerm 
-                      ? `No se encontraron calles con "${localSearchTerm}"`
-                      : 'No hay calles registradas'}
-                  </Alert>
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedCalles.map((calle) => (
-                <Fade in={true} key={calle.id}>
-                  <TableRow
-                    hover
-                    onClick={() => handleSelectCalle(calle)}
-                    selected={selectedId === calle.id}
+                {headCells.map((headCell) => (
+                  <TableCell
+                    key={headCell.id}
+                    align={headCell.align || 'left'}
                     sx={{ 
-                      cursor: 'pointer',
-                      '&.Mui-selected': {
-                        bgcolor: alpha(theme.palette.primary.main, 0.08)
-                      }
+                      fontWeight: 700,
+                      fontSize: '0.875rem',
+                      bgcolor: alpha(theme.palette.primary.main, 0.08),
+                      color: theme.palette.primary.main,
+                      borderBottom: `2px solid ${theme.palette.primary.main}`,
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5,
+                      py: 2,
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 1
                     }}
                   >
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {getTipoViaIcon(calle.tipoVia)}
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {getNombreCompleto(calle)}
-                          </Typography>
-                          {process.env.NODE_ENV === 'development' && (
-                            <Typography variant="caption" color="text.secondary">
-                              ID: {calle.id} | Código: {calle.codCalle || 'N/A'}
-                            </Typography>
-                          )}
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <LocationCityIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                        <Typography variant="body2" color="text.secondary">
-                          {obtenerNombreSector ? obtenerNombreSector(calle.sectorId) : `Sector ${calle.sectorId}`}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">•</Typography>
-                        <HomeIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                        <Typography variant="body2" color="text.secondary">
-                          {obtenerNombreBarrio ? obtenerNombreBarrio(calle.barrioId) : `Barrio ${calle.barrioId}`}
-                        </Typography>
-                      </Stack>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip
-                        icon={calle.estado === false ? <CancelIcon /> : <CheckCircleIcon />}
-                        label={calle.estado === false ? 'Inactivo' : 'Activo'}
-                        size="small"
-                        color={calle.estado === false ? 'error' : 'success'}
+                    {headCell.sortable ? (
+                      <TableSortLabel
+                        active={orderBy === headCell.id}
+                        direction={orderBy === headCell.id ? order : 'asc'}
+                        onClick={() => handleRequestSort(headCell.id as string)}
+                        sx={{
+                          color: 'inherit !important',
+                          '&.Mui-active': {
+                            color: `${theme.palette.primary.main} !important`,
+                            '& .MuiTableSortLabel-icon': {
+                              color: `${theme.palette.primary.main} !important`,
+                            }
+                          },
+                          '&:hover': {
+                            color: `${theme.palette.primary.dark} !important`,
+                          }
+                        }}
+                      >
+                        {headCell.label}
+                      </TableSortLabel>
+                    ) : (
+                      headCell.label
+                    )}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                renderSkeletonRows()
+              ) : paginatedCalles.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={3} align="center" sx={{ py: 6 }}>
+                    <Box sx={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      alignItems: 'center',
+                      gap: 2 
+                    }}>
+                      <MapIcon sx={{ 
+                        fontSize: 48, 
+                        color: 'text.disabled' 
+                      }} />
+                      <Alert 
+                        severity="info" 
                         variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      {onEliminar && (
-                        <Tooltip title="Eliminar calle">
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onEliminar(calle.id);
+                        sx={{ 
+                          borderRadius: 2,
+                          '& .MuiAlert-message': {
+                            fontSize: '0.875rem'
+                          }
+                        }}
+                      >
+                        {localSearchTerm 
+                          ? `No se encontraron calles con "${localSearchTerm}"`
+                          : 'No hay calles registradas'}
+                      </Alert>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedCalles.map((calle, index) => (
+                  <Fade in={true} key={calle.id} timeout={300 + (index * 100)}>
+                    <TableRow
+                      hover
+                      onClick={() => handleSelectCalle(calle)}
+                      selected={selectedId === calle.id}
+                      sx={{ 
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          bgcolor: alpha(theme.palette.primary.main, 0.04),
+                          transform: 'translateY(-1px)',
+                          boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.15)}`,
+                        },
+                        '&.Mui-selected': {
+                          bgcolor: alpha(theme.palette.primary.main, 0.12),
+                          borderLeft: `4px solid ${theme.palette.primary.main}`,
+                          '&:hover': {
+                            bgcolor: alpha(theme.palette.primary.main, 0.16),
+                          }
+                        },
+                        '&:nth-of-type(even):not(.Mui-selected)': {
+                          bgcolor: alpha(theme.palette.grey[100], 0.3),
+                        }
+                      }}
+                    >
+                      <TableCell sx={{ py: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}>
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 1.5
+                        }}>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: 40,
+                              height: 40,
+                              borderRadius: 2,
+                              bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                              color: theme.palette.secondary.main,
                             }}
                           >
-                            <DeleteIcon fontSize="small" />
+                            {getTipoViaIcon(calle.descTipoVia || calle.nombreTipoVia)}
+                          </Box>
+                          <Box>
+                            <Typography 
+                              variant="body1" 
+                              sx={{ 
+                                fontWeight: 500,
+                                color: theme.palette.text.primary,
+                                mb: 0.5
+                              }}
+                            >
+                              {getNombreCompleto(calle)}
+                            </Typography>
+                            <Typography 
+                              variant="caption" 
+                              sx={{ 
+                                color: theme.palette.text.secondary,
+                                fontSize: '0.75rem'
+                              }}
+                            >
+                              Calle #{calle.codVia || calle.id}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ py: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}>
+                        <Stack direction="column" spacing={0.5}>
+                          <Chip
+                            icon={<LocationCityIcon fontSize="small" />}
+                            label={obtenerNombreSector && calle.codSector ? obtenerNombreSector(calle.codSector) : `Sector ${calle.codSector ?? 'N/A'}`}
+                            size="small"
+                            variant="outlined"
+                            sx={{
+                              bgcolor: alpha(theme.palette.info.main, 0.08),
+                              color: theme.palette.info.dark,
+                              borderColor: alpha(theme.palette.info.main, 0.3),
+                              fontWeight: 500,
+                              '& .MuiChip-icon': {
+                                color: theme.palette.info.main
+                              }
+                            }}
+                          />
+                          <Chip
+                            icon={<HomeIcon fontSize="small" />}
+                            label={calle.nombreBarrio || (obtenerNombreBarrio ? obtenerNombreBarrio(calle.codBarrio || calle.codigoBarrio || 0) : `Barrio ${calle.codBarrio || calle.codigoBarrio || 'N/A'}`)}
+                            size="small"
+                            variant="outlined"
+                            sx={{
+                              bgcolor: alpha(theme.palette.success.main, 0.08),
+                              color: theme.palette.success.dark,
+                              borderColor: alpha(theme.palette.success.main, 0.3),
+                              fontWeight: 500,
+                              '& .MuiChip-icon': {
+                                color: theme.palette.success.main
+                              }
+                            }}
+                          />
+                        </Stack>
+                      </TableCell>
+                      <TableCell 
+                        align="center"
+                        sx={{ py: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}
+                      >
+                        <Tooltip title="Editar calle" arrow>
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectCalle(calle);
+                            }}
+                            sx={{
+                              bgcolor: alpha(theme.palette.primary.main, 0.08),
+                              '&:hover': {
+                                bgcolor: alpha(theme.palette.primary.main, 0.16),
+                                transform: 'scale(1.1)',
+                              },
+                              transition: 'all 0.2s ease-in-out'
+                            }}
+                          >
+                            <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                </Fade>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                      </TableCell>
+                    </TableRow>
+                  </Fade>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
 
-      {/* Paginación */}
-      <TablePagination
-        component="div"
-        count={sortedAndFilteredCalles.length}
-        page={page}
-        onPageChange={handleChangePage}
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
-        labelRowsPerPage="Filas por página:"
-        labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
-        rowsPerPageOptions={[5, 10, 25, 50]}
-        sx={{ borderTop: 1, borderColor: 'divider' }}
-      />
+        {/* Paginación */}
+        <TablePagination
+          component="div"
+          count={sortedAndFilteredCalles.length}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          labelRowsPerPage="Filas por página:"
+          labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+          rowsPerPageOptions={[5, 10, 25, 50]}
+          sx={{ borderTop: 1, borderColor: 'divider' }}
+        />
+      </Stack>
     </Paper>
   );
 };

@@ -14,10 +14,7 @@ export { useAlcabala } from './useAlcabala';
 export { useDepreciacion } from './useDepreciacion';
 export { useAuth } from './useAuth';
 export { usePredios } from './usePredioAPI';
-
-// Hooks de conectividad
-export { 
-  useConnectivity, 
-  useApiConnectivity, 
-  useConnectivityNotifications 
-} from './useConnectivity';
+export { usePisos } from './usePisos';
+export { useConstantesOptions } from './useConstantesOptions';
+export { useCrudEntity } from './useCrudEntity';
+export { useAsignacion } from './useAsignacion';

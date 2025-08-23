@@ -2,7 +2,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
   Box,
-  Grid,
   Alert,
   AlertTitle,
   Typography,
@@ -11,13 +10,18 @@ import {
   Button,
   Stack,
   Paper,
-  Chip
+  Chip,
+  Tabs,
+  Tab,
+  useTheme,
+  alpha
 } from '@mui/material';
 import {
   LocationOn as LocationIcon,
   Refresh as RefreshIcon,
   Add as AddIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  List as ListIcon
 } from '@mui/icons-material';
 import { MainLayout } from '../../layout';
 import { Breadcrumb, NotificationContainer } from '../../components';
@@ -27,7 +31,28 @@ import DireccionFormMUI from '../../components/direcciones/DireccionForm';
 import DireccionListMUI from '../../components/direcciones/DireccionList';
 import { NotificationService } from '../../components/utils/Notification';
 
+// Interface para TabPanel
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`direccion-tabpanel-${index}`}
+      aria-labelledby={`direccion-tab-${index}`}
+    >
+      {value === index && <Box>{children}</Box>}
+    </div>
+  );
+};
+
 const DireccionesPage: React.FC = () => {
+  const theme = useTheme();
   const {
     // Estados principales
     direcciones,
@@ -65,6 +90,7 @@ const DireccionesPage: React.FC = () => {
   // Estados locales
   const [modoEdicion, setModoEdicion] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [tabValue, setTabValue] = useState(0);
 
   // Migas de pan
   const breadcrumbItems: BreadcrumbItem[] = useMemo(() => [
@@ -85,10 +111,16 @@ const DireccionesPage: React.FC = () => {
     setTimeout(() => setSuccessMessage(null), duration);
   }, []);
 
+  // Manejar cambio de tabs
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
   // Manejo de edición
   const handleEditar = useCallback(() => {
     if (direccionSeleccionada) {
       setModoEdicion(true);
+      setTabValue(0); // Cambiar al tab de formulario al editar
       showMessage('Modo edición activado', 'success');
     }
   }, [direccionSeleccionada, showMessage]);
@@ -112,6 +144,7 @@ const DireccionesPage: React.FC = () => {
       }
       
       setModoEdicion(false);
+      setTabValue(1); // Cambiar al tab de lista después de guardar
       await cargarDirecciones();
     } catch (error: any) {
       console.error('❌ [DireccionesPage] Error al guardar:', error);
@@ -150,6 +183,12 @@ const DireccionesPage: React.FC = () => {
     }
   }, [cargarDirecciones]);
 
+  // Wrapper síncrono para la búsqueda del componente
+  const handleBuscarSync = useCallback((searchTerm: string) => {
+    // Ejecutar búsqueda de forma asíncrona sin bloquear
+    handleBuscar(searchTerm).catch(console.error);
+  }, [handleBuscar]);
+
   // Recargar datos
   const handleRecargar = useCallback(async () => {
     setSuccessMessage(null);
@@ -166,6 +205,7 @@ const DireccionesPage: React.FC = () => {
   const handleSeleccionarDireccion = useCallback((direccion: any) => {
     setDireccionSeleccionada(direccion);
     setModoEdicion(true);
+    setTabValue(0); // Cambiar al tab de formulario al seleccionar
   }, [setDireccionSeleccionada]);
 
   return (
@@ -233,42 +273,96 @@ const DireccionesPage: React.FC = () => {
           </Alert>
         </Collapse>
 
-        {/* Grid principal */}
-        <Grid container spacing={3}>
-          {/* Formulario */}
-          <Grid item xs={12} lg={5}>
-            <DireccionFormMUI
-              direccionSeleccionada={direccionSeleccionada}
-              sectores={sectores}
-              barrios={barrios}
-              calles={calles}
-              barriosFiltrados={barriosFiltrados}
-              callesFiltradas={callesFiltradas}
-              onSubmit={handleGuardar}
-              onNuevo={handleNuevo}
-              onEditar={handleEditar}
-              onSectorChange={handleSectorChange}
-              onBarrioChange={handleBarrioChange}
-              loading={loading}
-              loadingSectores={loadingSectores}
-              loadingBarrios={loadingBarrios}
-              loadingCalles={loadingCalles}
-              isEditMode={modoEdicion}
-            />
-          </Grid>
+        {/* Contenedor principal con tabs */}
+        <Paper 
+          elevation={2}
+          sx={{ 
+            borderRadius: 2,
+            overflow: 'hidden',
+            border: `1px solid ${theme.palette.divider}`,
+          }}
+        >
+          {/* Header con tabs */}
+          <Box sx={{ 
+            bgcolor: alpha(theme.palette.primary.main, 0.04),
+            borderBottom: `1px solid ${theme.palette.divider}`
+          }}>
+            <Tabs
+              value={tabValue}
+              onChange={handleTabChange}
+              aria-label="direccion tabs"
+              sx={{
+                '& .MuiTab-root': {
+                  minHeight: 64,
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  fontSize: '0.95rem',
+                  '&.Mui-selected': {
+                    fontWeight: 600,
+                  }
+                },
+                '& .MuiTabs-indicator': {
+                  height: 3,
+                  borderRadius: '3px 3px 0 0'
+                }
+              }}
+            >
+              <Tab 
+                icon={<AddIcon />} 
+                iconPosition="start"
+                label={modoEdicion ? 'Editar Dirección' : 'Nueva Dirección'}
+                id="direccion-tab-0"
+                aria-controls="direccion-tabpanel-0"
+              />
+              <Tab 
+                icon={<ListIcon />} 
+                iconPosition="start"
+                label="Lista de Direcciones" 
+                id="direccion-tab-1"
+                aria-controls="direccion-tabpanel-1"
+              />
+            </Tabs>
+          </Box>
 
-          {/* Lista */}
-          <Grid item xs={12} lg={7}>
-            <DireccionListMUI
-              direcciones={direcciones}
-              onSeleccionar={handleSeleccionarDireccion}
-              onEliminar={handleEliminar}
-              onBuscar={handleBuscar}
-              loading={loading}
-              direccionSeleccionada={direccionSeleccionada}
-            />
-          </Grid>
-        </Grid>
+          {/* Panel de Formulario */}
+          <TabPanel value={tabValue} index={0}>
+            <Box sx={{ p: 3 }}>
+              <DireccionFormMUI
+                direccionSeleccionada={direccionSeleccionada}
+                sectores={sectores}
+                barrios={barrios}
+                calles={calles}
+                barriosFiltrados={barriosFiltrados}
+                callesFiltradas={callesFiltradas}
+                onSubmit={handleGuardar}
+                onNuevo={handleNuevo}
+                onEditar={handleEditar}
+                onSectorChange={handleSectorChange}
+                onBarrioChange={handleBarrioChange}
+                loading={loading}
+                loadingSectores={loadingSectores}
+                loadingBarrios={loadingBarrios}
+                loadingCalles={loadingCalles}
+                isEditMode={modoEdicion}
+              />
+            </Box>
+          </TabPanel>
+
+          {/* Panel de Lista */}
+          <TabPanel value={tabValue} index={1}>
+            <Box sx={{ p: 3 }}>
+              <DireccionListMUI
+                direcciones={direcciones}
+                direccionSeleccionada={direccionSeleccionada}
+                onSelectDireccion={handleSeleccionarDireccion}
+                onEditDireccion={handleSeleccionarDireccion}
+                onDeleteDireccion={handleEliminar}
+                loading={loading}
+                onSearch={handleBuscarSync}
+              />
+            </Box>
+          </TabPanel>
+        </Paper>
 
         {/* Contenedor de notificaciones */}
         <NotificationContainer />

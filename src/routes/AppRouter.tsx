@@ -34,7 +34,7 @@ import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import { SidebarProvider } from '../context/SidebarContext';
 import MuiThemeProviderWrapper from '../providers/MuiThemeProvider';
-import {FormProvider} from '../context'
+
 
 // Componentes de autenticación
 import LoginPage from '../pages/Login/LoginPage';
@@ -50,11 +50,9 @@ const AppRouter: React.FC = () => {
       <ThemeProvider>
         <MuiThemeProviderWrapper>
           <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
-            <FormProvider>
+     
             <SidebarProvider>
-              {/* Debug component para desarrollo */}
-             
-              
+          
               <Router>
                 {/* Manejador de autenticación automática y notificaciones */}
                 <AuthHandler />
@@ -255,6 +253,16 @@ const AppRouter: React.FC = () => {
                       <DepreciacionPage />
                     </ProtectedRoute>
                   } />
+                  <Route path="/mantenedores/arbitrios" element={
+                    <ProtectedRoute>
+                      <DemoPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/mantenedores/escala" element={
+                    <ProtectedRoute>
+                      <DemoPage />
+                    </ProtectedRoute>
+                  } />
                   
                   {/* Rutas de sistema */}
                   <Route path="/sistema/usuarios" element={
@@ -341,7 +349,7 @@ const AppRouter: React.FC = () => {
                 </Routes>
               </Router>
             </SidebarProvider>
-            </FormProvider>
+   
           </LocalizationProvider>
         </MuiThemeProviderWrapper>
       </ThemeProvider>

@@ -1,20 +1,19 @@
 // src/pages/contribuyente/ConsultaContribuyente.tsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '@mui/material';
 import {
   Box,
-  Stack,
-  Button,
   Typography,
-  useTheme
+  Stack,
+  Button
 } from '@mui/material';
 import {
   PersonAdd as PersonAddIcon
 } from '@mui/icons-material';
 import { MainLayout } from '../../layout';
 import { Breadcrumb } from '../../components';
-import FiltroContribuyenteFormMUI from '../../components/contribuyentes/FiltroContribuyenteForm';
-import ContribuyenteListMUI from '../../components/contribuyentes/ContribuyenteList';
+import ContribuyenteConsulta from '../../components/contribuyentes/ContribuyenteConsulta';
 import { NotificationContainer } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useContribuyentes } from '../../hooks';
@@ -76,46 +75,22 @@ const ConsultaContribuyente: React.FC = () => {
         {/* Contenedor principal centrado */}
         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
           <Box sx={{ width: '100%', maxWidth: '900px' }}>
-            <Stack spacing={3}>
-              {/* Botón de nuevo contribuyente */}
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Button
-                  variant="contained"
-                  startIcon={<PersonAddIcon />}
-                  onClick={handleNuevo}
-                  sx={{
-                    textTransform: 'none',
-                    backgroundColor: theme.palette.primary.main,
-                    '&:hover': {
-                      backgroundColor: theme.palette.primary.dark,
-                    }
-                  }}
-                >
-                  Nuevo Contribuyente
-                </Button>
+            {/* Componente consolidado que incluye filtros y lista */}
+            <ContribuyenteConsulta
+              contribuyentes={contribuyentes}
+              onBuscar={handleBuscar}
+              onNuevo={handleNuevo}
+              onEditar={handleEditar}
+              onVer={handleVer}
+              loading={loading}
+            />
+
+            {/* Mostrar error si existe */}
+            {error && (
+              <Box sx={{ p: 2, textAlign: 'center', mt: 2 }}>
+                <Typography color="error">{error}</Typography>
               </Box>
-
-              {/* Filtros de búsqueda */}
-              <FiltroContribuyenteFormMUI
-                onBuscar={handleBuscar}
-                loading={loading}
-              />
-
-              {/* Lista de contribuyentes */}
-              <ContribuyenteListMUI
-                contribuyentes={contribuyentes}
-                onEditar={handleEditar}
-                onVer={handleVer}
-                loading={loading}
-              />
-
-              {/* Mostrar error si existe */}
-              {error && (
-                <Box sx={{ p: 2, textAlign: 'center' }}>
-                  <Typography color="error">{error}</Typography>
-                </Box>
-              )}
-            </Stack>
+            )}
           </Box>
         </Box>
 

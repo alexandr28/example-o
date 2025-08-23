@@ -55,7 +55,7 @@ export class ApiError extends Error {
 /**
  * Obtener headers básicos SIN AUTENTICACIÓN
  */
-const getBasicHeaders = (): HeadersInit => {
+const getBasicHeaders = (): Record<string, string> => {
   return {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -138,32 +138,31 @@ export default abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any
     const basicHeaders = getBasicHeaders();
     
     // Si hay headers personalizados en options, filtrar Authorization
-    let customHeaders = {};
+    let customHeaders: Record<string, string> = {};
     if (options.headers) {
       if (options.headers instanceof Headers) {
         customHeaders = {};
         options.headers.forEach((value, key) => {
-          // IMPORTANTE: Ignorar cualquier header Authorization
           if (key.toLowerCase() !== 'authorization') {
             customHeaders[key] = value;
           }
         });
       } else if (Array.isArray(options.headers)) {
         customHeaders = {};
-        options.headers.forEach(([key, value]) => {
+        (options.headers as Array<[string, string]>).forEach(([key, value]) => {
           if (key.toLowerCase() !== 'authorization') {
             customHeaders[key] = value;
           }
         });
       } else {
-        // Filtrar Authorization de objeto plano
-        const { Authorization, authorization, ...rest } = options.headers as any;
-        customHeaders = rest;
+        const headersObj = options.headers as Record<string, string>;
+        const { Authorization, authorization, ...rest } = headersObj;
+        customHeaders = { ...customHeaders, ...rest };
       }
     }
     
     // Combinar headers asegurándose de NO incluir Authorization
-    const finalHeaders = {
+    const finalHeaders: Record<string, string> = {
       ...basicHeaders,
       ...customHeaders
     };
