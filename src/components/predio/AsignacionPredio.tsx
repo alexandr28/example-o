@@ -9,7 +9,6 @@ import {
   Stack,
   Card,
   CardContent,
-  Divider,
   RadioGroup,
   FormControlLabel,
   Radio,
@@ -20,7 +19,6 @@ import {
   TableHead,
   TableRow,
   Chip,
-  IconButton,
   useTheme,
   alpha,
   Autocomplete,
@@ -45,9 +43,10 @@ import SelectorPredio from '../modal/SelectorPredio';
 import { NotificationService } from '../utils/Notification';
 import {
   useEstadoOptions,
-  useAnioOptions
+  useAnioOptions,
+  useModoDeclaracionOptions
 } from '../../hooks/useConstantesOptions';
-import { error } from 'console';
+import { CreateAsignacionAPIDTO } from '../../services/asignacionService';
 
 interface AsignacionData {
   año: number;
@@ -62,16 +61,29 @@ interface AsignacionData {
   estado: string;
 }
 
-const AsignacionPredio: React.FC = () => {
+interface AsignacionPredioProps {
+  onCrearAsignacion?: (datos: CreateAsignacionAPIDTO) => Promise<any>;
+  loading?: boolean;
+  error?: string | null;
+}
+
+const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
+  onCrearAsignacion,
+  loading: externalLoading = false,
+}) => {
   const theme = useTheme();
   const currentYear = new Date().getFullYear();
   
   // Hooks para opciones
   const { options: aniosOptions } = useAnioOptions(2020);
   const { options: estadosOptions } = useEstadoOptions();
+  const { options: modoDeclaracionOptions, loading: loadingModoDeclaracion } = useModoDeclaracionOptions();
   
   // Estado para controlar el tab activo
   const [activeTab, setActiveTab] = useState(0);
+  const [internalLoading, setInternalLoading] = useState(false);
+  
+  const loading = externalLoading || internalLoading;
   
   // Estados
   const [asignacionData, setAsignacionData] = useState<AsignacionData>({
@@ -93,18 +105,9 @@ const AsignacionPredio: React.FC = () => {
   // Debug para verificar las opciones (después de que el estado esté inicializado)
   useEffect(() => {
     console.log('🔍 aniosOptions:', aniosOptions);
-    console.log('🔍 asignacionData.año:', asignacionData.año);
-    console.log('🔍 asignacionData.año.toString():', asignacionData.año.toString());
-  }, [aniosOptions, asignacionData.año]);
-
-  // Opciones para modos de declaración
-  const modoDeclaracionOptions = [
-    { value: 'COMPRA', label: 'Compra', id: 'COMPRA' },
-    { value: 'VENTA', label: 'Venta', id: 'VENTA' },
-    { value: 'HERENCIA', label: 'Herencia', id: 'HERENCIA' },
-    { value: 'DONACION', label: 'Donación', id: 'DONACION' },
-    { value: 'OTRO', label: 'Otro', id: 'OTRO' }
-  ];
+    console.log('🔍 modoDeclaracionOptions:', modoDeclaracionOptions);
+    console.log('🔍 asignacionData.modoDeclaracion:', asignacionData.modoDeclaracion);
+  }, [aniosOptions, modoDeclaracionOptions, asignacionData.modoDeclaracion]);
 
   // Handlers
   const handleSelectContribuyente = (contribuyente: any) => {
@@ -113,18 +116,78 @@ const AsignacionPredio: React.FC = () => {
   };
 
   const handleSelectPredio = (predio: any) => {
+    console.log('🏠 [AsignacionPredio] Predio seleccionado:', predio);
+    console.log('🏠 [AsignacionPredio] Propiedades del predio:', Object.keys(predio));
+    console.log('🏠 [AsignacionPredio] Códigos disponibles:', {
+      codigoPredio: predio.codigoPredio,
+      codPredio: predio.codPredio,
+      codigo: predio.codigo,
+      id: predio.id
+    });
     setAsignacionData({ ...asignacionData, predio });
     setShowPredioModal(false);
   };
 
-  const handleRegistrar = () => {
+  const handleRegistrar = async () => {
     if (!asignacionData.contribuyente || !asignacionData.predio) {
       NotificationService.error('Debe seleccionar un contribuyente y un predio');
       return;
     }
 
-    // Aquí iría la lógica para registrar la asignación
-    NotificationService.success('Asignación registrada exitosamente');
+    if (!asignacionData.fechaDeclaracion || !asignacionData.fechaVenta) {
+      NotificationService.error('Debe seleccionar fechas de declaración y venta');
+      return;
+    }
+
+    if (!asignacionData.modoDeclaracion) {
+      NotificationService.error('Debe seleccionar un modo de declaración');
+      return;
+    }
+
+    try {
+      setInternalLoading(true);
+      
+      // Convertir datos del formulario al formato API
+      const codigoPredio = asignacionData.predio.codigoPredio || 
+                          asignacionData.predio.codPredio || 
+                          asignacionData.predio.codigo || 
+                          asignacionData.predio.id || '';
+                          
+      const codigoContribuyente = parseInt(asignacionData.contribuyente.codigo || 
+                                         asignacionData.contribuyente.codContribuyente || 
+                                         asignacionData.contribuyente.codigoPersona || '0');
+
+      const datosAPI: CreateAsignacionAPIDTO = {
+        anio: asignacionData.año,
+        codPredio: codigoPredio,
+        codContribuyente: codigoContribuyente,
+        codAsignacion: null,
+        porcentajeCondomino: asignacionData.porcentajeCondominio || null,
+        fechaDeclaracion: asignacionData.fechaDeclaracion.toISOString().split('T')[0],
+        fechaVenta: asignacionData.fechaVenta.toISOString().split('T')[0],
+        codModoDeclaracion: asignacionData.modoDeclaracion,
+        pensionista: asignacionData.esPensionista ? 1 : 0,
+        codEstado: "0201" // Estado activo por defecto
+      };
+
+      console.log('📋 [AsignacionPredio] Datos para API:', datosAPI);
+
+      if (onCrearAsignacion) {
+        const resultado = await onCrearAsignacion(datosAPI);
+        if (resultado) {
+          // Limpiar formulario después del éxito
+          handleNuevo();
+        }
+      } else {
+        NotificationService.success('Asignación registrada exitosamente (simulado)');
+      }
+
+    } catch (error: any) {
+      console.error('❌ [AsignacionPredio] Error al registrar:', error);
+      NotificationService.error(error.message || 'Error al registrar asignación');
+    } finally {
+      setInternalLoading(false);
+    }
   };
 
   const handleNuevo = () => {
@@ -143,7 +206,7 @@ const AsignacionPredio: React.FC = () => {
     NotificationService.info('Formulario limpiado');
   };
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
 
@@ -186,7 +249,8 @@ const AsignacionPredio: React.FC = () => {
             <Stack spacing={2}>
               {/* Primera fila - Contribuyente */}
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                <Box sx={{ flex: '0 0 120px' }}>
+                {/* Seleccionar  Contribuyente */}
+                <Box sx={{ flex: '0 0 150px' }}>
                   <Button
                     fullWidth
                     variant="outlined"
@@ -194,10 +258,11 @@ const AsignacionPredio: React.FC = () => {
                     startIcon={<PersonIcon />}
                     sx={{ height: 33 }}
                   >
-                    Seleccionar contribuyente
+                    Selecionar Contribuyente
                   </Button>
                 </Box>
-                <Box sx={{ flex: '0 0 80px' }}>
+                {/* Codigo Contribuyente */}
+                <Box sx={{ flex: '0 0 140px' }}>
                   <TextField
                     fullWidth
                     label="Código"
@@ -208,6 +273,7 @@ const AsignacionPredio: React.FC = () => {
                     }}
                   />
                 </Box>
+                {/* Nombre Contribuyente */}
                 <Box sx={{ flex: '1 1 200px' }}>
                   <TextField
                     fullWidth
@@ -216,7 +282,12 @@ const AsignacionPredio: React.FC = () => {
                     InputProps={{ readOnly: true }}
                   />
                 </Box>
-                <Box sx={{ flex: '0 0 120px' }}>
+              </Box>
+
+              {/* Segunda fila - Predio */}
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                {/* Seleccionar Predio */}
+                <Box sx={{ flex: '0 0 150px' }}>
                   <Button
                     fullWidth
                     variant="outlined"
@@ -225,27 +296,22 @@ const AsignacionPredio: React.FC = () => {
                     startIcon={<HomeIcon />}
                     sx={{ height: 33 }}
                   >
-                    Seleccionar predio
+                    Seleccionar Predio
                   </Button>
                 </Box>
-                <Box sx={{ flex: '0 0 80px' }}>
+                {/* Codigo Predio */}
+                <Box sx={{ flex: '0 0 140px' }}>
                   <TextField
                     fullWidth
                     label="Código de predio"
-                    value={asignacionData.predio?.codigoPredio || ''}
+                    value={asignacionData.predio?.codigoPredio || asignacionData.predio?.codPredio || asignacionData.predio?.codigo || asignacionData.predio?.id || ''}
                     InputProps={{ 
                       readOnly: true,
                       startAdornment: <HomeIcon sx={{ mr: 1, color: 'action.active' }} />
                     }}
                   />
                 </Box>
-
-              </Box>
-
-              {/* Segunda fila - Predio */}
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                
-                
+                {/* Direccion Predio */}
                 <Box sx={{ flex: '1 1 300px' }}>
                   <TextField
                     fullWidth
@@ -275,33 +341,49 @@ const AsignacionPredio: React.FC = () => {
             <Stack spacing={3}>
               {/* Primera fila */}
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <Box sx={{ flex: '0 0 138px' }}>
+
+                {/* Modo Declaracion - Usando datos del API */}
+                <Box sx={{ flex: '0 0 250px' }}>
                   <Autocomplete
                     options={modoDeclaracionOptions}
                     getOptionLabel={(option) => option?.label || ''}
-                    value={modoDeclaracionOptions.find(opt => opt.value === asignacionData.modoDeclaracion) || null}
-                    onChange={(_, newValue) => setAsignacionData({
-                      ...asignacionData,
-                      modoDeclaracion: newValue?.value || ''
-                    })}
+                    value={modoDeclaracionOptions.find(opt => String(opt.value) === String(asignacionData.modoDeclaracion)) || null}
+                    onChange={(_, newValue) => {
+                      console.log('📝 Modo Declaración seleccionado:', newValue);
+                      setAsignacionData({
+                        ...asignacionData,
+                        modoDeclaracion: newValue?.value?.toString() || ''
+                      });
+                    }}
+                    loading={loadingModoDeclaracion}
+                    disabled={loadingModoDeclaracion}
                     size="small"
                     renderInput={(params) => (
                       <TextField
                         {...params}
                         label="Modos Declaración"
-                        placeholder="Seleccione"
+                        placeholder={loadingModoDeclaracion ? "Cargando..." : "Seleccione"}
                         sx={{
                           '& .MuiInputBase-root':{
                              height:'33px'
                           }  
                         }}
                         required
+                        InputProps={{
+                          ...params.InputProps,
+                          endAdornment: (
+                            <>
+                              {loadingModoDeclaracion ? <CircularProgress color="inherit" size={20} /> : null}
+                              {params.InputProps.endAdornment}
+                            </>
+                          ),
+                        }}
+                        helperText={loadingModoDeclaracion ? "Cargando opciones del servidor..." : `${modoDeclaracionOptions.length} opciones disponibles`}
                       />
                     )}
-                    
                   />
                 </Box>
-
+                {/* Fecha de Venta */}
                 <Box sx={{ flex: '0 0 100px', maxWidth:'110px' }}>
                   <DatePicker
                     label="Fecha venta"
@@ -350,7 +432,7 @@ const AsignacionPredio: React.FC = () => {
                   />
                 </Box>
 
-                <Box sx={{ flex: '0 0 120px' }}>
+                <Box sx={{ flex: '0 0 180px' }}>
                   <Autocomplete
                     options={estadosOptions}
                     getOptionLabel={(option) => option?.label || ''}
@@ -457,10 +539,11 @@ const AsignacionPredio: React.FC = () => {
               <Button
                 variant="contained"
                 onClick={handleRegistrar}
-                startIcon={<AssignmentIcon />}
+                disabled={loading}
+                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <AssignmentIcon />}
                 sx={{ px: 4 }}
               >
-                Registrar
+                {loading ? 'Registrando...' : 'Registrar'}
               </Button>
               <Button
                 variant="outlined"

@@ -1,6 +1,7 @@
 // src/hooks/useAsignacion.ts
 import { useState, useCallback } from 'react';
-import { asignacionService, AsignacionPredio, AsignacionQueryParams } from '../services/asignacionService';
+import { asignacionService, AsignacionPredio, AsignacionQueryParams, CreateAsignacionAPIDTO } from '../services/asignacionService';
+import { NotificationService } from '../components/utils/Notification';
 
 export interface UseAsignacionReturn {
   asignaciones: AsignacionPredio[];
@@ -8,6 +9,7 @@ export interface UseAsignacionReturn {
   error: string | null;
   buscarAsignaciones: (params: AsignacionQueryParams) => Promise<void>;
   obtenerAsignacionPorId: (id: number) => Promise<AsignacionPredio | null>;
+  crearAsignacionAPI: (datos: CreateAsignacionAPIDTO) => Promise<AsignacionPredio | null>;
   limpiarAsignaciones: () => void;
   limpiarError: () => void;
 }
@@ -81,6 +83,42 @@ export const useAsignacion = (): UseAsignacionReturn => {
   }, []);
 
   /**
+   * Crear una nueva asignación usando API directa
+   */
+  const crearAsignacionAPI = useCallback(async (datos: CreateAsignacionAPIDTO): Promise<AsignacionPredio | null> => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('➕ [useAsignacion] Creando asignación con API directa:', datos);
+      
+      // Validar datos requeridos
+      if (!datos.anio || !datos.codPredio || !datos.codContribuyente) {
+        throw new Error('Año, código de predio y código de contribuyente son requeridos');
+      }
+      
+      const nuevaAsignacion = await asignacionService.crearAsignacionAPI(datos);
+      
+      console.log('✅ [useAsignacion] Asignación creada exitosamente:', nuevaAsignacion);
+      
+      // Agregar a la lista actual
+      setAsignaciones(prev => [nuevaAsignacion, ...prev]);
+      
+      NotificationService.success('Asignación de predio creada correctamente');
+      
+      return nuevaAsignacion;
+      
+    } catch (error: any) {
+      console.error('❌ [useAsignacion] Error al crear asignación:', error);
+      setError(error.message || 'Error al crear asignación de predio');
+      NotificationService.error(error.message || 'Error al crear asignación de predio');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
    * Limpiar mensajes de error
    */
   const limpiarError = useCallback(() => {
@@ -94,6 +132,7 @@ export const useAsignacion = (): UseAsignacionReturn => {
     error,
     buscarAsignaciones,
     obtenerAsignacionPorId,
+    crearAsignacionAPI,
     limpiarAsignaciones,
     limpiarError
   };

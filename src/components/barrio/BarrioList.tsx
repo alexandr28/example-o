@@ -20,7 +20,6 @@ import {
   TextField,
   InputAdornment,
   Stack,
-  Chip,
   Alert,
   Skeleton,
   useTheme,
@@ -65,11 +64,21 @@ const headCells: HeadCell[] = [
   { id: 'acciones', label: 'Acciones', align: 'center' }
 ];
 
+// Definir anchos de columna para layout fijo
+const getColumnWidth = (columnId: string): string => {
+  switch (columnId) {
+    case 'id': return '10%';
+    case 'nombre': return '45%';
+    case 'sector': return '30%';
+    case 'acciones': return '15%';
+    default: return 'auto';
+  }
+};
+
 const BarrioList: React.FC<BarrioListProps> = ({
   barrios = [],
   sectores = [],
   onEdit,
-  onSelect,
   loading = false,
   searchTerm = '',
   onSearch,
@@ -135,12 +144,6 @@ const BarrioList: React.FC<BarrioListProps> = ({
     setPage(0);
   };
 
-  // Manejar selección de barrio
-  const handleSelectBarrio = (barrio: Barrio) => {
-    if (onSelect) {
-      onSelect(barrio);
-    }
-  };
 
   // Filtrar y ordenar barrios
   const sortedAndFilteredBarrios = useMemo(() => {
@@ -211,7 +214,7 @@ const BarrioList: React.FC<BarrioListProps> = ({
       elevation={3} 
       sx={{ 
         width: '100%',
-        minWidth: '800px',
+        maxWidth: '100%',
         borderRadius: 2,
         background: 'linear-gradient(to bottom, #ffffff, #fafafa)',
         border: '1px solid',
@@ -219,44 +222,7 @@ const BarrioList: React.FC<BarrioListProps> = ({
       }}
     >
       <Stack spacing={2} sx={{ p: 2 }}>
-        {/* Header */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 2, 
-          pb: 2,
-          borderBottom: '2px solid',
-          borderColor: 'primary.main'
-        }}>
-          <Box sx={{
-            p: 1,
-            borderRadius: 1,
-            backgroundColor: 'primary.main',
-            color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <HomeIcon />
-          </Box>
-          <Typography variant="h6" fontWeight={600}>
-            Listar Barrios
-          </Typography>
-          <Box sx={{ flex: 1 }} />
-          <Chip
-            label={`Total: ${barrios.length}`}
-            color="primary"
-            variant="filled"
-            size="small"
-          />
-          <Chip
-            label={`Filtrados: ${sortedAndFilteredBarrios.length}`}
-            color="secondary"
-            variant="outlined"
-            size="small"
-          />
-        </Box>
-
+       
         {/* Barra de búsqueda expandida horizontalmente */}
         <Box sx={{ 
           display: 'flex', 
@@ -311,10 +277,12 @@ const BarrioList: React.FC<BarrioListProps> = ({
             maxHeight: 400,
             borderRadius: 2,
             border: `1px solid ${theme.palette.divider}`,
-            overflow: 'auto',
+            overflowY: 'auto',
+            overflowX: 'hidden',
             position: 'relative',
             '& .MuiTable-root': {
-              minWidth: 600
+              width: '100%',
+              tableLayout: 'fixed'
             },
             '&::-webkit-scrollbar': {
               width: 8,
@@ -333,7 +301,7 @@ const BarrioList: React.FC<BarrioListProps> = ({
             }
           }}
         >
-          <Table stickyHeader size="medium">
+          <Table stickyHeader size="small">
             <TableHead>
               <TableRow>
                 {headCells.map((headCell) => (
@@ -343,15 +311,18 @@ const BarrioList: React.FC<BarrioListProps> = ({
                     sx={{ 
                       fontWeight: 700,
                       fontSize: '0.875rem',
-                      bgcolor: alpha(theme.palette.primary.main, 0.08),
+                      bgcolor: '#f0f7ff',
                       color: theme.palette.primary.main,
                       borderBottom: `2px solid ${theme.palette.primary.main}`,
                       textTransform: 'uppercase',
                       letterSpacing: 0.5,
-                      py: 2,
+                      py: 1.5,
+                      px: 1.5,
                       position: 'sticky',
                       top: 0,
-                      zIndex: 1
+                      zIndex: 100,
+                      width: getColumnWidth(headCell.id as string),
+                      maxWidth: getColumnWidth(headCell.id as string)
                     }}
                   >
                     {headCell.sortable ? (
@@ -419,15 +390,11 @@ const BarrioList: React.FC<BarrioListProps> = ({
                   <Fade in={true} key={barrio.id} timeout={300 + (index * 100)}>
                     <TableRow
                       hover
-                      onClick={() => handleSelectBarrio(barrio)}
                       selected={selectedBarrio?.id === barrio.id}
                       sx={{ 
-                        cursor: 'pointer',
                         transition: 'all 0.2s ease-in-out',
                         '&:hover': {
                           bgcolor: alpha(theme.palette.primary.main, 0.04),
-                          transform: 'translateY(-1px)',
-                          boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.15)}`,
                         },
                         '&.Mui-selected': {
                           bgcolor: alpha(theme.palette.primary.main, 0.12),
@@ -443,7 +410,7 @@ const BarrioList: React.FC<BarrioListProps> = ({
                     >
                       <TableCell 
                         align="center"
-                        sx={{ py: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}
+                        sx={{ py: 1.5, px: 1.5, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}
                       >
                         <Box
                           sx={{
@@ -462,69 +429,52 @@ const BarrioList: React.FC<BarrioListProps> = ({
                           {barrio.id}
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ py: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}>
+                      <TableCell sx={{ py: 1.5, px: 1.5, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}>
                         <Box sx={{ 
                           display: 'flex', 
                           alignItems: 'center', 
-                          gap: 1.5
+                          gap: 1
                         }}>
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: 40,
-                              height: 40,
-                              borderRadius: 2,
-                              bgcolor: alpha(theme.palette.secondary.main, 0.1),
-                              color: theme.palette.secondary.main,
+                          <HomeIcon sx={{ 
+                            fontSize: 18, 
+                            color: theme.palette.secondary.main,
+                            flexShrink: 0 
+                          }} />
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              fontWeight: 500,
+                              color: theme.palette.text.primary,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
                             }}
                           >
-                            <HomeIcon sx={{ fontSize: 20 }} />
-                          </Box>
-                          <Box>
-                            <Typography 
-                              variant="body1" 
-                              sx={{ 
-                                fontWeight: 500,
-                                color: theme.palette.text.primary,
-                                mb: 0.5
-                              }}
-                            >
-                              {barrio.nombre}
-                            </Typography>
-                            <Typography 
-                              variant="caption" 
-                              sx={{ 
-                                color: theme.palette.text.secondary,
-                                fontSize: '0.75rem'
-                              }}
-                            >
-                              Barrio #{barrio.id}
-                            </Typography>
-                          </Box>
+                            {barrio.nombre}
+                          </Typography>
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ py: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}>
-                        <Chip
-                          icon={<LocationIcon fontSize="small" />}
-                          label={getNombreSector(barrio.codSector)}
-                          size="small"
-                          variant="outlined"
+                      <TableCell sx={{ py: 1.5, px: 1.5, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}>
+                        <Typography
+                          variant="body2"
                           sx={{
-                            bgcolor: alpha(theme.palette.info.main, 0.08),
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5,
                             color: theme.palette.info.dark,
-                            borderColor: alpha(theme.palette.info.main, 0.3),
                             fontWeight: 500,
-                            '& .MuiChip-icon': {
-                              color: theme.palette.info.main
-                            }
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
                           }}
-                        />
+                        >
+                          <LocationIcon sx={{ fontSize: 16, color: theme.palette.info.main }} />
+                          {getNombreSector(barrio.codSector)}
+                        </Typography>
                       </TableCell>
                       <TableCell 
                         align="center"
-                        sx={{ py: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}
+                        sx={{ py: 1.5, px: 1.5, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}
                       >
                         {onEdit && (
                           <Tooltip title="Editar barrio" arrow>

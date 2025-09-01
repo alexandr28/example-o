@@ -4,7 +4,8 @@ import { NotificationService } from '../components/utils/Notification';
 import { 
   contribuyenteService, 
   CreateContribuyenteAPIDTO,
-  ContribuyenteData 
+  ContribuyenteData,
+  ContribuyenteDetalle
 } from '../services/contribuyenteService';
 
 /**
@@ -44,27 +45,27 @@ export const useContribuyentes = () => {
    * Convierte datos de la API al formato de lista
    */
   const convertirAListItem = (data: any): ContribuyenteListItem => {
-    // Determinar el nombre completo
-    let nombreCompleto = '';
+    // Determinar el nombres completo
+    let nombresCompleto = '';
     
-    if (data.nombreCompleto) {
-      nombreCompleto = data.nombreCompleto;
+    if (data.nombresCompleto) {
+      nombresCompleto = data.nombresCompleto;
     } else if (data.razonSocial) {
-      nombreCompleto = data.razonSocial;
+      nombresCompleto = data.razonSocial;
     } else {
-      // Construir nombre desde apellidos y nombres
+      // Construir nombres desde apellidos y nombres
       const partes = [
-        data.apellidoPaterno || data.apellidopaterno,
-        data.apellidoMaterno || data.apellidomaterno,
+        data.apellidopaterno || data.apellidopaterno,
+        data.apellidomaterno || data.apellidomaterno,
         data.nombres
       ].filter(Boolean);
-      nombreCompleto = partes.join(' ').trim() || 'Sin nombre';
+      nombresCompleto = partes.join(' ').trim() || 'Sin nombres';
     }
     
     return {
       codigo: data.codigo || data.codContribuyente || data.codPersona || 0,
-      contribuyente: nombreCompleto,
-      documento: data.numeroDocumento || data.numerodocumento || 'Sin documento',
+      contribuyente: nombresCompleto,
+      documento: data.numerodocumento || data.numerodocumento || 'Sin documento',
       direccion: data.direccion === 'null' ? 'Sin dirección' : (data.direccion || 'Sin dirección'),
       telefono: data.telefono || '',
       tipoPersona: (data.tipoPersona === '0301' || data.codTipopersona === '0301') ? 'natural' : 'juridica'
@@ -87,10 +88,10 @@ export const useContribuyentes = () => {
       setLoading(true);
       setError(null);
       
-      console.log('🔄 [useContribuyentes] Cargando contribuyentes...');
+      console.log('🔄 [useContribuyentes] Cargando todos los contribuyentes con API general...');
       
-      // Usar el servicio para obtener los datos
-      const datos = await contribuyenteService.listarContribuyentes();
+      // Usar el nuevo método que usa la API general
+      const datos = await contribuyenteService.obtenerTodosContribuyentes();
       
       // Convertir al formato de lista y eliminar duplicados
       const listaFormateada = datos.map(convertirAListItem);
@@ -125,30 +126,17 @@ export const useContribuyentes = () => {
       
       let resultados: any[] = [];
       
-      // Si no hay filtros, cargar todos
+      // Construir parámetros de búsqueda para la nueva API general
+      const params: any = {
+        parametroBusqueda: filtro?.busqueda || '',
+        codUsuario: 1
+      };
+      
+      // Si no hay filtros específicos, obtener todos los contribuyentes
       if (!filtro || (!filtro.busqueda && !filtro.tipoContribuyente && !filtro.tipoDocumento)) {
-        resultados = await contribuyenteService.listarContribuyentes();
+        resultados = await contribuyenteService.obtenerTodosContribuyentes();
       } else {
-        // Construir parámetros de búsqueda
-        const params: any = {};
-        
-        if (filtro.busqueda) {
-          // Si es un número de documento exacto, buscar por ese campo
-          if (/^\d{8,11}$/.test(filtro.busqueda)) {
-            params.numeroDocumento = filtro.busqueda;
-          } else {
-            params.parametroBusqueda = filtro.busqueda;
-          }
-        }
-        
-        if (filtro.tipoContribuyente) {
-          params.tipoPersona = filtro.tipoContribuyente;
-        }
-        
-        if (filtro.tipoDocumento) {
-          params.tipoDocumento = filtro.tipoDocumento;
-        }
-        
+        // Usar la nueva API general con parámetro de búsqueda
         resultados = await contribuyenteService.buscarContribuyentes(params);
       }
       
@@ -345,6 +333,129 @@ export const useContribuyentes = () => {
       return false;
     }
   }, []);
+
+  /**
+   * Obtener detalle completo de un contribuyente usando query params
+   * GET /api/contribuyente?codTipoContribuyente=43905&codPersona=0
+   */
+  const obtenerContribuyenteDetalle = useCallback(async (
+    codTipoContribuyente: number | string, 
+    codPersona: number | string = 0
+  ): Promise<ContribuyenteDetalle | null> => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('🔍 [useContribuyentes] Obteniendo detalle completo del contribuyente:', { codTipoContribuyente, codPersona });
+      
+      const detalle = await contribuyenteService.obtenerContribuyenteDetalle(codTipoContribuyente, codPersona);
+      
+      if (!detalle) {
+        console.log('⚠️ [useContribuyentes] No se encontró el contribuyente');
+        return null;
+      }
+      
+      console.log('✅ [useContribuyentes] Detalle obtenido exitosamente:', detalle);
+      return detalle;
+      
+    } catch (error: any) {
+      console.error('❌ [useContribuyentes] Error obteniendo detalle:', error);
+      setError(error.message || 'Error al obtener detalle del contribuyente');
+      NotificationService.error('Error al obtener datos del contribuyente');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Buscar contribuyentes usando la nueva API con query params
+   */
+  const buscarContribuyentesConQueryParams = useCallback(async (
+    codTipoContribuyente?: number | string,
+    codPersona: number | string = 0
+  ): Promise<ContribuyenteListItem[]> => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('🔍 [useContribuyentes] Buscando con query params:', { codTipoContribuyente, codPersona });
+      
+      if (!codTipoContribuyente) {
+        // Si no hay código específico, usar la búsqueda general
+        await buscarContribuyentes();
+        return contribuyentes;
+      }
+      
+      // Obtener detalle específico del contribuyente
+      let detalle = await contribuyenteService.obtenerContribuyenteDetalle(codTipoContribuyente, codPersona);
+      
+      console.log('📋 [useContribuyentes] Detalle recibido del servicio:', detalle);
+      console.log('📋 [useContribuyentes] Tipo de detalle:', typeof detalle);
+      console.log('📋 [useContribuyentes] Es array:', Array.isArray(detalle));
+      
+      // Si el detalle es un array, tomar el primer elemento
+      if (Array.isArray(detalle) && detalle.length > 0) {
+        console.log('🔄 [useContribuyentes] Convirtiendo array a objeto, tomando primer elemento');
+        detalle = detalle[0];
+        console.log('📋 [useContribuyentes] Detalle convertido:', detalle);
+      }
+      
+      if (!detalle) {
+        console.log('⚠️ [useContribuyentes] No se encontró detalle del contribuyente');
+        setContribuyentes([]);
+        return [];
+      }
+      
+      // Validar que el detalle tenga los campos necesarios
+      // Verificar diferentes posibles nombres de campos
+      const codTipoContribuyenteDetalle = detalle.codContribuyente || detalle.codTipoContribuyente;
+      const codPersonaDetalle = detalle.codPersona || detalle.codPersona;
+      
+      if (!codTipoContribuyenteDetalle && !codPersonaDetalle && !detalle.numerodocumento) {
+        console.error('❌ [useContribuyentes] Detalle sin identificadores válidos:', detalle);
+        console.error('❌ [useContribuyentes] Campos disponibles:', Object.keys(detalle));
+        setContribuyentes([]);
+        return [];
+      }
+      
+      console.log('✅ [useContribuyentes] Códigos identificados:', { codTipoContribuyenteDetalle, codPersonaDetalle });
+      
+      // Construir nombres completo con validación - manejar diferentes formatos
+      const nombresCompleto = [
+        detalle.apellidopaterno || detalle.apellidopaterno || '',
+        detalle.apellidomaterno || detalle.apellidomaterno || '', 
+        detalle.nombres || detalle.nombres || ''
+      ].filter(Boolean).join(' ').trim() || 'Sin nombres';
+      
+      // Convertir el detalle al formato de lista
+      const itemLista: ContribuyenteListItem = {
+        codigo: codTipoContribuyenteDetalle || codPersonaDetalle || 0,
+        contribuyente: nombresCompleto,
+        documento: detalle.numerodocumento || detalle.numerodocumento || 'Sin documento',
+        direccion: detalle.direccion || 'Sin dirección',
+        telefono: detalle.telefono || '',
+        tipoPersona: detalle.codTipopersona === '0301' ? 'natural' : 'juridica'
+      };
+      
+      console.log('🔄 [useContribuyentes] Item convertido:', itemLista);
+      
+      const resultados = [itemLista];
+      setContribuyentes(resultados);
+      
+      console.log('✅ [useContribuyentes] Contribuyente encontrado y configurado:', resultados);
+      return resultados;
+      
+    } catch (error: any) {
+      console.error('❌ [useContribuyentes] Error en búsqueda con query params:', error);
+      setError(error.message || 'Error al buscar contribuyente');
+      NotificationService.error('Error al buscar contribuyente');
+      setContribuyentes([]);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, [buscarContribuyentes]);
   
   // Efecto para cargar contribuyentes al montar
   useEffect(() => {
@@ -366,6 +477,9 @@ export const useContribuyentes = () => {
     // Nuevos métodos para API POST
     crearContribuyenteAPI,
     crearContribuyenteDesdePersona,
-    verificarContribuyenteExistente
+    verificarContribuyenteExistente,
+    // Nuevos métodos para API GET con query params
+    obtenerContribuyenteDetalle,
+    buscarContribuyentesConQueryParams
   };
 };

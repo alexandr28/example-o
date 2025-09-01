@@ -5,12 +5,9 @@ import {
   Typography,
   Stack,
   Alert,
-  Button,
-  useTheme,
-  alpha
+  useTheme
 } from '@mui/material';
 import {
-  Refresh as RefreshIcon,
   TrendingDown as TrendingDownIcon,
   Info as InfoIcon
 } from '@mui/icons-material';
@@ -18,7 +15,6 @@ import { MainLayout } from '../../layout';
 import { DepreciacionUnificado, Breadcrumb } from '../../components';
 import { BreadcrumbItem } from '../../components/utils/Breadcrumb';
 import { useDepreciacion } from '../../hooks/useDepreciacion';
-import { NotificationService } from '../../components/utils/Notification';
 
 /**
  * Página principal para gestión de Depreciación con Material-UI
@@ -33,17 +29,14 @@ const DepreciacionPage: React.FC = () => {
     // tiposCasa, // ELIMINADO: ahora se carga en el componente con useClasificacionPredio
     anioSeleccionado,
     tipoCasaSeleccionado,
-    paginacion,
     loading,
     error,
-    cargarDepreciaciones,
     handleAnioChange,
     handleTipoCasaChange,
     registrarDepreciacion,
     buscarDepreciaciones,
     actualizarDepreciacion,
-    eliminarDepreciacion,
-    cambiarPagina
+    eliminarDepreciacion
   } = useDepreciacion();
 
   // Migas de pan para la navegación
@@ -100,14 +93,10 @@ const DepreciacionPage: React.FC = () => {
     }
   };
 
-  // Handler para actualizar
-  const handleRefresh = () => {
-    window.location.reload();
-  };
 
   return (
     <MainLayout>
-      <Box sx={{ width: '100%' }}>
+      <Box sx={{ width: '80%' }}>
         {/* Navegación de migas de pan */}
         <Breadcrumb items={breadcrumbItems} />
 
@@ -131,14 +120,7 @@ const DepreciacionPage: React.FC = () => {
             </Typography>
           </Box>
           
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<RefreshIcon />}
-            onClick={handleRefresh}
-          >
-            Actualizar
-          </Button>
+          
         </Stack>
 
         {/* Alert informativo */}

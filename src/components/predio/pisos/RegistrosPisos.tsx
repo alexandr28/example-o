@@ -1,6 +1,6 @@
 // src/components/predio/pisos/RegistrosPisos.tsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { Controller, UseFormReturn } from 'react-hook-form';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Paper,
@@ -20,10 +20,6 @@ import {
   IconButton,
   InputAdornment,
   FormHelperText,
-  FormControl,
-  Radio,
-  RadioGroup,
-  FormControlLabel,
   useTheme,
   alpha,
   Alert,
@@ -34,7 +30,6 @@ import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { es } from 'date-fns/locale';
 import {
-  CalendarMonth as CalendarIcon,
   Add as AddIcon,
   Search as SearchIcon,
   Home as HomeIcon,
@@ -43,39 +38,24 @@ import {
   Save as SaveIcon,
   Engineering as EngineeringIcon,
   Delete as DeleteIcon,
-  Edit as EditIcon,
   Visibility as VisibilityIcon,
   Category as CategoryIcon
 } from '@mui/icons-material';
 import { usePisos } from '../../../hooks/usePisos';
 import SelectorPredios from './SelectorPredios';
 import { NotificationService } from '../../utils/Notification';
+import { Predio } from '../../../models/Predio';
+import { useTiposMaterialPredominante } from '../../../hooks/useConstantesOptions';
 // import SearchableSelect from '../../ui/SearchableSelect'; // Replaced with Autocomplete
 import {
   useCategoriasValoresUnitariosOptions,
   useCategoriasValoresUnitariosHijosOptions,
   useLetraValoresUnitariosOptions,
   useEstadoConservacionOptions,
-  useAnioOptions,
   OptionFormat
 } from '../../../hooks/useConstantesOptions';
-import { constanteService } from '../../../services';
 import { valorUnitarioService, ValorUnitarioData } from '../../../services/valorUnitarioService';
-import { useValoresUnitarios } from '../../../hooks/useValoresUnitarios';
 
-// Enums
-enum Material {
-  CONCRETO = 'Concreto',
-  LADRILLO = 'Ladrillo',
-  ADOBE = 'Adobe'
-}
-
-enum EstadoConservacion {
-  MUY_BUENO = 'Muy bueno',
-  BUENO = 'Bueno',
-  REGULAR = 'Regular',
-  MALO = 'Malo'
-}
 
 enum FormaRegistro {
   INDIVIDUAL = 'INDIVIDUAL',
@@ -93,19 +73,11 @@ interface PisoFormData {
   formaRegistro: string;
   otrasInstalaciones: string;
   anio?: number;
+  areasComunes?: string;
 }
 
-interface Predio {
-  id: number | string;
-  codigoPredio: string;
-  direccion?: string;
-  tipoPredio?: string;
-  contribuyente?: string;
-  areaTerreno?: number;
-  anio?: number;
-  estadoPredio?: string;
-  condicionPropiedad?: string;
-}
+// No es necesario extender ya que el modelo Predio ya tiene todas las propiedades
+// codPredio, codTipoPredio y codCondicionPropiedad ya están definidas en el modelo
 
 interface CategoriaSeleccionada {
   id: string;
@@ -118,12 +90,29 @@ interface CategoriaSeleccionada {
 
 const RegistrosPisos: React.FC = () => {
   const theme = useTheme();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { crearPiso, guardarPiso, loading } = usePisos();
   
-  // Hook para valores unitarios (no necesitamos desestructurar métodos no utilizados)
+  // Obtener datos de edición desde navigation state
+  const navigationState = location.state as any;
+  const isEditMode = navigationState?.modoEdicion === 'editar';
+  const editData = navigationState?.datosEdicion;
+  
+  // Debug: Mostrar datos recibidos para edición
+  useEffect(() => {
+    if (navigationState) {
+      console.log('🎯 [RegistrosPisos] Navigation State recibido:', navigationState);
+      console.log('🔄 [RegistrosPisos] Modo edición:', isEditMode);
+      console.log('📋 [RegistrosPisos] Datos de edición:', editData);
+    }
+  }, [navigationState, isEditMode, editData]);
+  
+  // Hooks para datos
+  const { options: opcionesMaterialPredominante, loading: loadingMaterial, error: errorMaterial } = useTiposMaterialPredominante();
   
   // Estados - DECLARAR PRIMERO antes de usarlos
-  const [predio, setPredio] = useState<Predio | null>(null);
+  const [predio, setPredio] = useState<Predio | null>(editData?.predio || null);
   const [showSelectorPredios, setShowSelectorPredios] = useState(false);
   const [categoriasSeleccionadas, setCategoriasSeleccionadas] = useState<CategoriaSeleccionada[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -141,7 +130,27 @@ const RegistrosPisos: React.FC = () => {
   );
   const { options: opcionesLetras, loading: loadingLetras, error: errorLetras } = useLetraValoresUnitariosOptions();
   const { options: opcionesEstadoConservacion, loading: loadingEstado, error: errorEstado } = useEstadoConservacionOptions();
-  const { options: opcionesAnios, loading: loadingAnios, error: errorAnios } = useAnioOptions();
+  
+  // Efecto para pre-cargar categorías en modo edición
+  useEffect(() => {
+    if (isEditMode && editData?.piso && opcionesPadre.length > 0) {
+      console.log('🔄 [RegistrosPisos] Pre-cargando categorías para modo edición...');
+      
+      // En modo edición, crear una categoría ejemplo basada en los datos del piso
+      // Esto es una aproximación ya que el API solo devuelve códigos, no las categorías completas
+      const categoriaEjemplo: CategoriaSeleccionada = {
+        id: 'edit-category-1',
+        padre: opcionesPadre[0] || { value: '1001', label: 'ESTRUCTURAS', id: '1001' },
+        hijo: { value: '100101', label: 'MUROS Y COLUMNAS', id: '100101' },
+        letra: { value: 'A', label: 'A', id: 'A' },
+        fechaCreacion: new Date(),
+        valor: parseFloat(editData.piso.otrasInstalaciones || '0')
+      };
+      
+      setCategoriasSeleccionadas([categoriaEjemplo]);
+      console.log('✅ [RegistrosPisos] Categoría pre-cargada para edición:', categoriaEjemplo);
+    }
+  }, [isEditMode, editData, opcionesPadre]);
   
   // Debug: Log inmediato de las opciones hijas
   useEffect(() => {
@@ -154,42 +163,24 @@ const RegistrosPisos: React.FC = () => {
     }
   }, [opcionesHijas, categoriaPadre]);
   
-  // Estado del formulario
+  // Estado del formulario - Pre-cargar datos si es modo edición
   const [formData, setFormData] = useState<PisoFormData>({
-    descripcion: '',
-    fechaConstruccion: null,
-    antiguedad: '30 años',
-    estadoConservacion: '',
-    areaConstruida: '',
-    materialPredominante: '',
+    descripcion: editData?.piso?.numeroPiso?.toString() || '',
+    fechaConstruccion: editData?.piso?.fechaConstruccion ? new Date(editData.piso.fechaConstruccion) : null,
+    antiguedad: editData?.piso?.antiguedad || '30 años',
+    estadoConservacion: editData?.piso?.codEstadoConservacion || '',
+    areaConstruida: editData?.piso?.areaConstruida?.toString() || '',
+    materialPredominante: editData?.piso?.codMaterialEstructural || '',
     formaRegistro: FormaRegistro.INDIVIDUAL,
-    otrasInstalaciones: '0.00',
-    anio: new Date().getFullYear()
+    otrasInstalaciones: editData?.piso?.otrasInstalaciones?.toString() || '0.00',
+    anio: editData?.piso?.anio || new Date().getFullYear(),
+    areasComunes: editData?.piso?.areasComunes?.toString() || ''
   });
 
   // Opciones para selectores
-  const materiales = [
-    { value: 'Concreto', label: 'Concreto', id: 'concreto' },
-    { value: 'Ladrillo', label: 'Ladrillo', id: 'ladrillo' },
-    { value: 'Adobe', label: 'Adobe', id: 'adobe' },
-    { value: 'Madera', label: 'Madera', id: 'madera' },
-    { value: 'Metal', label: 'Metal', id: 'metal' }
-  ];
   
-  const formasRegistro = [
-    { value: FormaRegistro.INDIVIDUAL, label: 'Individual', id: 'individual' },
-    { value: FormaRegistro.MASIVO, label: 'Masivo', id: 'masivo' }
-  ];
   
-  const descripciones = [
-    { value: 'Primer piso', label: 'Primer piso', id: 'primer' },
-    { value: 'Segundo piso', label: 'Segundo piso', id: 'segundo' },
-    { value: 'Tercer piso', label: 'Tercer piso', id: 'tercer' },
-    { value: 'Sótano', label: 'Sótano', id: 'sotano' },
-    { value: 'Azotea', label: 'Azotea', id: 'azotea' }
-  ];
-
-  // Calcular antigüedad cuando cambia la fecha
+    // Calcular antigüedad cuando cambia la fecha
   useEffect(() => {
     if (formData.fechaConstruccion) {
       const fecha = new Date(formData.fechaConstruccion);
@@ -544,7 +535,14 @@ const RegistrosPisos: React.FC = () => {
     const newErrors: Record<string, string> = {};
     
     if (!predio) newErrors.predio = 'Debe seleccionar un predio';
-    if (!formData.descripcion) newErrors.descripcion = 'La descripción es requerida';
+    if (!formData.descripcion || formData.descripcion.trim() === '') {
+      newErrors.descripcion = 'El número de piso es requerido';
+    } else {
+      const numeroPiso = parseInt(formData.descripcion);
+      if (isNaN(numeroPiso) || numeroPiso < 0) {
+        newErrors.descripcion = 'El número de piso debe ser un número válido mayor o igual a 0';
+      }
+    }
     if (!formData.fechaConstruccion) newErrors.fechaConstruccion = 'La fecha es requerida';
     if (!formData.estadoConservacion) newErrors.estadoConservacion = 'Seleccione el estado';
     if (!formData.areaConstruida || parseFloat(formData.areaConstruida) <= 0) {
@@ -558,6 +556,13 @@ const RegistrosPisos: React.FC = () => {
 
   // Determinar el número de piso basado en la descripción
   const determinarNumeroPiso = (descripcion: string): number => {
+    // Si es un número directo, devolverlo
+    const numeroDirecto = parseInt(descripcion);
+    if (!isNaN(numeroDirecto)) {
+      return numeroDirecto;
+    }
+    
+    // Si es texto descriptivo, mapear a números
     const descripciones: Record<string, number> = {
       'Primer piso': 1,
       'Segundo piso': 2,
@@ -568,59 +573,116 @@ const RegistrosPisos: React.FC = () => {
     return descripciones[descripcion] || 1;
   };
 
-  // Guardar piso usando la nueva API POST
+  // Guardar piso usando la nueva API POST o PUT para edición
   const handleSubmit = async () => {
-    if (!validateForm()) {
+    console.log('🚀 [RegistrosPisos] handleSubmit iniciado');
+    console.log('📋 [RegistrosPisos] Estado del formulario:', {
+      formData,
+      predio: predio ? { codigo: predio.codigoPredio, id: predio.codPredio } : null,
+      categoriasSeleccionadas: categoriasSeleccionadas.length,
+      isEditMode,
+      loading
+    });
+
+    const validationResult = validateForm();
+    console.log('✅ [RegistrosPisos] Resultado de validación:', validationResult);
+    console.log('❌ [RegistrosPisos] Errores de validación:', errors);
+    
+    if (!validationResult) {
       NotificationService.error('Por favor complete todos los campos requeridos');
       return;
     }
 
     if (!predio) {
+      console.log('❌ [RegistrosPisos] Error: No hay predio seleccionado');
       NotificationService.error('Debe seleccionar un predio');
       return;
     }
 
     if (categoriasSeleccionadas.length === 0) {
+      console.log('❌ [RegistrosPisos] Error: No hay categorías seleccionadas');
       NotificationService.error('Debe seleccionar al menos una categoría');
       return;
     }
 
+    console.log('✅ [RegistrosPisos] Todas las validaciones pasaron, procediendo con la creación/actualización');
+
     try {
-      console.log('🏗️ [RegistrosPisos] Iniciando creación de piso con API POST');
+      const action = isEditMode ? 'actualización' : 'creación';
+      console.log(`🏗️ [RegistrosPisos] Iniciando ${action} de piso con API ${isEditMode ? 'PUT' : 'POST'}`);
       
-      // Preparar datos para el API POST según la estructura exacta
-      const datosParaCrear = {
+      // Preparar datos para el API - incluir codPiso para edición
+      const datosParaOperacion = {
+        // Incluir codPiso si es edición
+        ...(isEditMode && editData?.piso?.codPiso && { 
+          codPiso: editData.piso.codPiso 
+        }),
         // Datos básicos requeridos
         anio: formData.anio || new Date().getFullYear(),
-        codPredio: String(predio.codigoPredio),
+        codPredio: String(predio.codigoPredio).trim(),
         numeroPiso: determinarNumeroPiso(formData.descripcion),
-        areaConstruida: parseFloat(formData.areaConstruida),
+        areaConstruida: String(formData.areaConstruida || '0'),
         
         // Fecha de construcción
         fechaConstruccion: formData.fechaConstruccion 
           ? formData.fechaConstruccion.toISOString().split('T')[0]
           : '1990-01-01',
         
-        // Datos de categorías seleccionadas (usar la primera como representativa)
+        // Datos de categorías seleccionadas - buscar cada categoría específica
         ...(categoriasSeleccionadas.length > 0 && {
-          codLetraMurosColumnas: String(categoriasSeleccionadas[0]?.letra.value || '1101'),
-          murosColumnas: String(categoriasSeleccionadas[0]?.padre.value || '100101'),
-          codLetraTechos: String(categoriasSeleccionadas[0]?.letra.value || '1101'),
-          techos: String(categoriasSeleccionadas[0]?.hijo.value || '100102'),
-          codLetraPisos: String(categoriasSeleccionadas[0]?.letra.value || '1101'),
-          pisos: String(categoriasSeleccionadas[0]?.hijo.value || '100201'),
-          codLetraPuertasVentanas: String(categoriasSeleccionadas[0]?.letra.value || '1101'),
-          puertasVentanas: String(categoriasSeleccionadas[0]?.hijo.value || '100202'),
-          codLetraRevestimiento: String(categoriasSeleccionadas[0]?.letra.value || '1101'),
-          revestimiento: String(categoriasSeleccionadas[0]?.hijo.value || '100203'),
-          codLetraBanios: String(categoriasSeleccionadas[0]?.letra.value || '1101'),
-          banios: String(categoriasSeleccionadas[0]?.hijo.value || '100204'),
-          codLetraInstalacionesElectricas: String(categoriasSeleccionadas[0]?.letra.value || '1101'),
+          // Buscar los códigos de letra específicos para cada categoría (usar .id no .value)
+          codLetraMurosColumnas: String(
+            categoriasSeleccionadas.find(cat => cat.hijo.value === '100101')?.letra.id || 
+            categoriasSeleccionadas[0]?.letra.id || 
+            '1101'
+          ).trim(),
+          murosColumnas: '100101',
+          
+          codLetraTechos: String(
+            categoriasSeleccionadas.find(cat => cat.hijo.value === '100102')?.letra.id || 
+            categoriasSeleccionadas[0]?.letra.id || 
+            '1101'
+          ).trim(),
+          techos: '100102',
+          
+          codLetraPisos: String(
+            categoriasSeleccionadas.find(cat => cat.hijo.value === '100201')?.letra.id || 
+            categoriasSeleccionadas[0]?.letra.id || 
+            '1101'
+          ).trim(),
+          pisos: '100201',
+          
+          codLetraPuertasVentanas: String(
+            categoriasSeleccionadas.find(cat => cat.hijo.value === '100202')?.letra.id || 
+            categoriasSeleccionadas[0]?.letra.id || 
+            '1101'
+          ).trim(),
+          puertasVentanas: '100202',
+          
+          codLetraRevestimiento: String(
+            categoriasSeleccionadas.find(cat => cat.hijo.value === '100203')?.letra.id || 
+            categoriasSeleccionadas[0]?.letra.id || 
+            '1101'
+          ).trim(),
+          revestimiento: '100203',
+          
+          codLetraBanios: String(
+            categoriasSeleccionadas.find(cat => cat.hijo.value === '100204')?.letra.id || 
+            categoriasSeleccionadas[0]?.letra.id || 
+            '1101'
+          ).trim(),
+          banios: '100204',
+          
+          codLetraInstalacionesElectricas: String(
+            categoriasSeleccionadas.find(cat => cat.hijo.value === '100301')?.letra.id || 
+            categoriasSeleccionadas[0]?.letra.id || 
+            '1101'
+          ).trim(),
           instalacionesElectricas: '100301'
         }),
         
         // Estado de conservación del formulario
-        codEstadoConservacion: String(formData.estadoConservacion || '9402'),
+        codEstadoConservacion: String(formData.estadoConservacion || '9402').trim(),
         codMaterialEstructural: (() => {
           const materialMap: Record<string, string> = {
             'Concreto': '0703',
@@ -633,42 +695,130 @@ const RegistrosPisos: React.FC = () => {
         })()
       };
       
-      console.log('📤 [RegistrosPisos] Datos preparados para crear piso:', datosParaCrear);
+      // Obtener el código de predio correcto
+      const codigoPredio = predio?.codPredio || predio?.codigoPredio;
+      console.log('🏠 [RegistrosPisos] Códigos de predio disponibles:', {
+        'predio?.codPredio': predio?.codPredio,
+        'predio?.codigoPredio': predio?.codigoPredio,
+        'codigoPredio final': codigoPredio
+      });
       
-      // Llamar al hook actualizado para crear el piso
-      const pisoCreado = await crearPiso(datosParaCrear);
+      // Actualizar el dato con el código correcto
+      datosParaOperacion.codPredio = String(codigoPredio);
       
-      if (pisoCreado) {
-        console.log('✅ [RegistrosPisos] Piso creado exitosamente:', pisoCreado);
+      console.log(`📤 [RegistrosPisos] Datos finales para ${action}:`, datosParaOperacion);
+      
+      // Verificar que tenemos todos los datos requeridos
+      console.log('🔍 [RegistrosPisos] Verificación de datos requeridos:');
+      console.log('  - codPredio:', datosParaOperacion.codPredio);
+      console.log('  - numeroPiso:', datosParaOperacion.numeroPiso);
+      console.log('  - areaConstruida:', datosParaOperacion.areaConstruida);
+      console.log('  - anio:', datosParaOperacion.anio);
+      console.log('  - isEditMode:', isEditMode);
+      
+      // Validaciones adicionales para evitar errores de datos
+      if (!datosParaOperacion.codPredio || datosParaOperacion.codPredio === 'undefined') {
+        throw new Error('Código de predio inválido');
+      }
+      
+      if (isNaN(datosParaOperacion.numeroPiso) || datosParaOperacion.numeroPiso < 0) {
+        throw new Error('Número de piso inválido');
+      }
+      
+      if (isNaN(datosParaOperacion.areaConstruida) || datosParaOperacion.areaConstruida <= 0) {
+        throw new Error('Área construida inválida');
+      }
+      
+      // Llamar al hook apropiado según el modo
+      console.log(`🚀 [RegistrosPisos] Llamando a ${isEditMode ? 'guardarPiso' : 'crearPiso'}...`);
+      const pisoResultado = isEditMode 
+        ? await guardarPiso(datosParaOperacion) // Usar método de actualización
+        : await crearPiso(datosParaOperacion);
+      
+      console.log('📥 [RegistrosPisos] Resultado de la operación:', pisoResultado);
+      
+      if (pisoResultado) {
+        const accionCompleta = isEditMode ? 'actualizado' : 'creado';
+        console.log(`✅ [RegistrosPisos] Piso ${accionCompleta} exitosamente:`, pisoResultado);
         
-        // Limpiar formulario después del éxito
-        setFormData({
-          descripcion: '',
-          fechaConstruccion: null,
-          antiguedad: '30 años',
-          estadoConservacion: '',
-          areaConstruida: '',
-          materialPredominante: '',
-          formaRegistro: FormaRegistro.INDIVIDUAL,
-          otrasInstalaciones: '0.00',
-          anio: new Date().getFullYear()
-        });
-        limpiarCategorias();
+        // Limpiar formulario después del éxito solo si es creación
+        if (!isEditMode) {
+          setFormData({
+            descripcion: '',
+            fechaConstruccion: null,
+            antiguedad: '30 años',
+            estadoConservacion: '',
+            areaConstruida: '',
+            materialPredominante: '',
+            formaRegistro: FormaRegistro.INDIVIDUAL,
+            otrasInstalaciones: '0.00',
+            anio: new Date().getFullYear()
+          });
+          limpiarCategorias();
+          setPredio(null);
+        }
         
-        NotificationService.success(`Piso ${pisoCreado.numeroPiso} creado exitosamente`);
+        const numeroPiso = pisoResultado.numeroPiso || editData?.piso?.numeroPiso || formData.descripcion;
+        NotificationService.success(`Piso ${numeroPiso} ${accionCompleta} exitosamente`);
+        
+        // Redireccionar a la página de consulta después del registro exitoso
+        setTimeout(() => {
+          navigate('/predio/pisos/consulta');
+        }, 1500);
       } else {
-        throw new Error('No se pudo crear el piso');
+        const errorMsg = isEditMode ? 'No se pudo actualizar el piso' : 'No se pudo crear el piso';
+        throw new Error(errorMsg);
       }
       
     } catch (error: any) {
-      console.error('❌ [RegistrosPisos] Error al crear piso:', error);
-      NotificationService.error(error.message || 'Error al crear el piso');
+      const errorAction = isEditMode ? 'actualizar' : 'crear';
+      console.error(`❌ [RegistrosPisos] Error al ${errorAction} piso:`, error);
+      NotificationService.error(error.message || `Error al ${errorAction} el piso`);
     }
   };
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
       <Box sx={{ p: 3 }}>
+        
+        {/* Header mejorado */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            mb: 3,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.primary.main, 0.03)} 100%)`,
+            borderRadius: 2,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 2,
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'primary.main'
+              }}
+            >
+              <EngineeringIcon fontSize="medium" />
+            </Box>
+            <Box>
+              <Typography variant="h5" fontWeight="bold" color="text.primary">
+                {isEditMode ? 'Editar Piso' : 'Registro de Pisos'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {isEditMode 
+                  ? `Editando piso ${editData?.piso?.numeroPiso || ''} del predio ${editData?.predio?.codigoPredio || ''}` 
+                  : 'Registre y gestione los pisos de los predios en el sistema'}
+              </Typography>
+            </Box>
+          </Stack>
+        </Paper>
 
         {/* Sección: Seleccionar predio */}
         <Card sx={{ mb: 3 }}>
@@ -691,9 +841,10 @@ const RegistrosPisos: React.FC = () => {
                       variant="outlined"
                       onClick={() => setShowSelectorPredios(true)}
                       startIcon={<SearchIcon />}
+                      disabled={isEditMode}
                       sx={{ height: '35px', minHeight:'35px' }}
                     >
-                      Seleccionar predio
+                      {isEditMode ? 'Predio seleccionado' : 'Seleccionar predio'}
                     </Button>
                     {errors.predio && (
                       <FormHelperText error>{errors.predio}</FormHelperText>
@@ -705,7 +856,7 @@ const RegistrosPisos: React.FC = () => {
                   <TextField
                     fullWidth
                     label="Código de predio"
-                    value={predio?.codigoPredio || ''}
+                    value={predio?.codPredio || predio?.codigoPredio || ''}
                     InputProps={{
                       readOnly: true,
                       startAdornment: (
@@ -716,17 +867,7 @@ const RegistrosPisos: React.FC = () => {
                     }}
                   />
                 </Box>
-                  {predio &&( 
-                   <Box sx={{ flex: '0 0 150px' }}>
-                   <TextField
-                     fullWidth
-                     label="Tipo de predio"
-                     value={predio.tipoPredio || 'Sin especificar'}
-                     InputProps={{ readOnly: true }}
-                     variant="outlined"
-                   />
-                 </Box>
-                )} 
+                  
                 {predio &&( 
                   <Box sx={{ flex: '0 0 100px' }}>
                   <TextField
@@ -753,12 +894,34 @@ const RegistrosPisos: React.FC = () => {
                   <Box sx={{ flex: '0 0 100px' }}>
                   <TextField
                     fullWidth
-                    label="Contribuyente"
-                    value={predio.contribuyente || 'Sin asignar'}
+                    label="Conductor"
+                    value={predio.conductor || (predio as any).conductor || 'Sin asignar'}
                     InputProps={{ readOnly: true }}
                     variant="outlined"
                   />
                 </Box>
+                 )}
+                 {predio && predio.condicionPropiedad && (
+                  <Box sx={{ flex: '0 0 150px' }}>
+                    <TextField
+                      fullWidth
+                      label="Condición Propiedad"
+                      value={predio.condicionPropiedad || 'Sin especificar'}
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                    />
+                  </Box>
+                 )}
+                 {predio && predio.estadoPredio && (
+                  <Box sx={{ flex: '0 0 120px' }}>
+                    <TextField
+                      fullWidth
+                      label="Estado Predio"
+                      value={predio.estadoPredio || 'Sin estado'}
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                    />
+                  </Box>
                  )}
               </Box>
            
@@ -800,66 +963,58 @@ const RegistrosPisos: React.FC = () => {
             <Stack spacing={3}>
               {/* Primera fila */}
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                <Box sx={{ flex: '0 0 80px' }}>
-                  <Autocomplete
-                    options={opcionesAnios}
-                    getOptionLabel={(option) => option?.label || ''}
-                    value={opcionesAnios.find(opt => opt.value === formData.anio) || null}
-                    onChange={(_, newValue) => handleInputChange('anio', parseInt(newValue?.value?.toString() || '') || new Date().getFullYear())}
-                    disabled={loadingAnios}
+                {/* Selector Año */}
+                <Box sx={{ 
+                  flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '0 0 120px' },
+                  minWidth: { xs: '100%', md: '120px' }
+                }}>
+                  <TextField
+                    fullWidth
                     size="small"
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Año"
-                        placeholder="Año"
-                        error={!!errorAnios}
-                        helperText={errorAnios}
-                        sx={{ 
-                          '& .MuiInputBase-root': { 
-                            height: '33px' 
-                          }
-                        }}
-                        InputProps={{
-                          ...params.InputProps,
-                          endAdornment: (
-                            <>
-                              {loadingAnios ? <div>Loading...</div> : null}
-                              {params.InputProps.endAdornment}
-                            </>
-                          ),
-                        }}
-                      />
-                    )}
+                    label="Año"
+                    type="number"
+                    value={formData.anio || ''}
+                    onChange={(e) => handleInputChange('anio', parseInt(e.target.value) || null)}
+                    InputProps={{
+                      inputProps: { 
+                        min: 1900, 
+                        max: new Date().getFullYear() 
+                      }
+                    }}
                   />
                 </Box>
-
+                {/* N piso */}
                 <Box sx={{ flex: '0 0 120px' }}>
-                  <Autocomplete
-                    options={descripciones}
-                    getOptionLabel={(option) => option?.label || ''}
-                    value={descripciones.find(opt => opt.value === formData.descripcion) || null}
-                    onChange={(_, newValue) => handleInputChange('descripcion', newValue?.value || '')}
+                  <TextField
+                    label="N° piso"
+                    type="number"
+                    value={formData.descripcion || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || value === undefined) {
+                        handleInputChange('descripcion', '');
+                      } else {
+                        const numValue = parseInt(value);
+                        handleInputChange('descripcion', numValue >= 0 ? value : '');
+                      }
+                    }}
+                    fullWidth
                     size="small"
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Pisos"
-                        placeholder="Seleccione"
-                        required
-                        error={!!errors.descripcion}
-                        helperText={errors.descripcion}
-                        sx={{ 
-                          '& .MuiInputBase-root': { 
-                            height: '33px' 
-                          }
-                        }}
-                      />
-                    )}
+                    required
+                    error={!!errors.descripcion}
+                    helperText={errors.descripcion}
+                    InputProps={{
+                      inputProps: { min: 0 }
+                    }}
+                    sx={{ 
+                      '& .MuiInputBase-root': { 
+                        height: '33px' 
+                      }
+                    }}
                   />
                 </Box>
-
-                <Box sx={{ flex: '0 0 120px', maxWidth:'145px' }}>
+                {/* Fecha de Construccion */} 
+                <Box sx={{ flex: '0 0 180px', maxWidth:'170px' }}>
                   <DatePicker
                     label="Fecha construcción"
                     value={formData.fechaConstruccion}
@@ -894,8 +1049,8 @@ const RegistrosPisos: React.FC = () => {
                     }}
                   />
                 </Box>
-
-                <Box sx={{ flex: '0 0 130px' }}>
+                {/* Estado Conservacion */} 
+                <Box sx={{ flex: '0 0 180px' }}>
                   <Autocomplete
                     options={opcionesEstadoConservacion}
                     getOptionLabel={(option) => option?.label || ''}
@@ -929,17 +1084,26 @@ const RegistrosPisos: React.FC = () => {
                     )}
                   />
                 </Box>
-
-                <Box sx={{ flex: '0 0 125px' }}>
+                {/* Area Construccion */} 
+                <Box sx={{ flex: '0 0 150px' }}>
                   <TextField
                     fullWidth
                     size="small"
                     label="Área construida"
-                    value={formData.areaConstruida}
-                    onChange={(e) => handleInputChange('areaConstruida', e.target.value)}
+                    value={formData.areaConstruida || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || value === undefined) {
+                        handleInputChange('areaConstruida', '');
+                      } else {
+                        const numValue = parseFloat(value);
+                        handleInputChange('areaConstruida', numValue >= 0 ? value : '');
+                      }
+                    }}
                     error={!!errors.areaConstruida}
                     helperText={errors.areaConstruida}
                     InputProps={{
+                      inputProps: { min: 0, step: 0.01 },
                       endAdornment: <InputAdornment position="end">m²</InputAdornment>
                     }}
                     type="number"
@@ -950,13 +1114,14 @@ const RegistrosPisos: React.FC = () => {
                     }}
                   />
                 </Box>
-
-                <Box sx={{ flex: '0 0 140px' }}>
+                {/* Material Predominante */}
+                <Box sx={{ flex: '0 0 180px' }}>
                   <Autocomplete
-                    options={materiales}
+                    options={opcionesMaterialPredominante}
                     getOptionLabel={(option) => option?.label || ''}
-                    value={materiales.find(opt => opt.value === formData.materialPredominante) || null}
+                    value={opcionesMaterialPredominante.find(opt => opt.value === formData.materialPredominante) || null}
                     onChange={(_, newValue) => handleInputChange('materialPredominante', newValue?.value || '')}
+                    disabled={loadingMaterial}
                     size="small"
                     renderInput={(params) => (
                       <TextField
@@ -964,23 +1129,32 @@ const RegistrosPisos: React.FC = () => {
                         label="Material predominante"
                         placeholder="Seleccione"
                         required
-                        error={!!errors.materialPredominante}
-                        helperText={errors.materialPredominante}
+                        error={!!errors.materialPredominante || !!errorMaterial}
+                        helperText={errors.materialPredominante || errorMaterial}
                         sx={{ 
                           '& .MuiInputBase-root': { 
                             height: '33px' 
                           }
                         }}
+                        InputProps={{
+                          ...params.InputProps,
+                          endAdornment: (
+                            <>
+                              {loadingMaterial ? <div>Loading...</div> : null}
+                              {params.InputProps.endAdornment}
+                            </>
+                          ),
+                        }}
                       />
                     )}
                   />
                 </Box>
-
+              {/* vALOR UNITARIO */} 
                 <Box sx={{ flex: '0 0 100px' }}>
                   <TextField
                     fullWidth
                     size="small"
-                    label="Otras instalaciones"
+                    label="Valor Unitario"
                     value={formData.otrasInstalaciones}
                     InputProps={{
                       readOnly: true,
@@ -993,6 +1167,30 @@ const RegistrosPisos: React.FC = () => {
                       }
                     }}
                     helperText=""
+                  />
+                </Box>
+                
+                {/* Áreas Comunes */}
+                <Box sx={{ flex: '0 0 150px' }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Áreas comunes"
+                    type="number"
+                    value={formData.areasComunes || ''}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value);
+                      handleInputChange('areasComunes', value >= 0 ? e.target.value : '0');
+                    }}
+                    InputProps={{
+                      inputProps: { min: 0, step: 0.01 },
+                      endAdornment: <InputAdornment position="start">S/</InputAdornment>
+                    }}
+                    sx={{ 
+                      '& .MuiInputBase-root': { 
+                        height: '33px' 
+                      }
+                    }}
                   />
                 </Box>
 
@@ -1038,7 +1236,7 @@ const RegistrosPisos: React.FC = () => {
 
               {/* Selectores de categorías */}
               <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2, alignItems: 'flex-start' }}>
-                <Box sx={{ flex: '0 0 140px' }}>
+                <Box sx={{ flex: '0 0 260px' }}>
                   <Autocomplete
                     options={opcionesPadre}
                     getOptionLabel={(option) => option?.label || ''}
@@ -1084,7 +1282,7 @@ const RegistrosPisos: React.FC = () => {
                   />
                 </Box>
                 
-                <Box sx={{ flex: '0 0 160px' }}>
+                <Box sx={{ flex: '0 0 260px' }}>
                   <Autocomplete
                     options={opcionesHijas}
                     getOptionLabel={(option) => option?.label || ''}
@@ -1134,7 +1332,7 @@ const RegistrosPisos: React.FC = () => {
                     )}
                   />
                 </Box>
-                
+                {/* Letra  de Categoria */}
                 <Box sx={{ flex: '0 0 70px' }}>
                   <Autocomplete
                     options={opcionesLetras}
@@ -1346,7 +1544,7 @@ const RegistrosPisos: React.FC = () => {
               )}
             </Box>
 
-            {/* Botón guardar */}
+            {/* Botones de Limpiar y Registrar */}
             <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
               <Button
                 variant="outlined"
@@ -1370,6 +1568,7 @@ const RegistrosPisos: React.FC = () => {
               >
                 Limpiar Formulario
               </Button>
+              {/* Botón Registrar  */}
               <Button
                 variant="contained"
                 size="large"
@@ -1377,7 +1576,9 @@ const RegistrosPisos: React.FC = () => {
                 onClick={handleSubmit}
                 disabled={loading || !predio || categoriasSeleccionadas.length === 0}
               >
-                {loading ? 'Creando Piso...' : 'Crear Piso'}
+                {loading 
+                  ? (isEditMode ? 'Actualizando Piso...' : 'Registrando Piso...') 
+                  : (isEditMode ? 'Actualizar Piso' : 'Registrar Piso')}
               </Button>
             </Box>
           </CardContent>
@@ -1388,8 +1589,10 @@ const RegistrosPisos: React.FC = () => {
           open={showSelectorPredios}
           onClose={() => setShowSelectorPredios(false)}
           onSelect={(predioSeleccionado) => {
+            // El predio ya tiene todas las propiedades necesarias del modelo
             setPredio(predioSeleccionado);
             setShowSelectorPredios(false);
+            console.log('📋 [RegistrosPisos] Predio seleccionado:', predioSeleccionado);
           }}
         />
       </Box>

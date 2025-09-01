@@ -16,22 +16,15 @@ import {
   alpha,
   Skeleton,
   Alert,
-  Autocomplete,
   TextField,
-  InputAdornment,
-  CircularProgress,
   Tooltip
 } from '@mui/material';
 import {
   CalendarToday as CalendarIcon,
   TableChart as TableIcon,
-  Category as CategoryIcon,
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon
 } from '@mui/icons-material';
-import { LetraValorUnitario, SubcategoriaValorUnitario } from '../../models';
+import { LetraValorUnitario } from '../../models';
 import { valorUnitarioService } from '../../services/valorUnitarioService';
-import { API_CONFIG } from '../../config/api.unified.config';
 import { useValoresUnitarios } from '../../hooks/useValoresUnitarios';
 
 interface ValorUnitarioListProps {
@@ -63,13 +56,13 @@ const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Sincronizar añoTabla con añoSeleccionado cuando cambie
+  // Sincronizar añoTabla con añoSeleccionado solo en la primera carga
   useEffect(() => {
-    if (añoSeleccionado !== null && añoSeleccionado !== undefined && añoSeleccionado !== añoTabla) {
-      console.log('🔄 [ValorUnitarioList] Cambiando año de', añoTabla, 'a', añoSeleccionado);
+    if (añoSeleccionado !== null && añoSeleccionado !== undefined) {
+      console.log('🔄 [ValorUnitarioList] Inicializando año con:', añoSeleccionado);
       setAñoTabla(añoSeleccionado);
     }
-  }, [añoSeleccionado, añoTabla]);
+  }, [añoSeleccionado]); // Removemos añoTabla de las dependencias para evitar loops
 
   // Cargar valores unitarios cuando cambia el año usando GET API con query params
   useEffect(() => {
@@ -107,8 +100,8 @@ const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
         }
         
         console.log(`📤 [ValorUnitarioList] Cargando valores para año ${añoTabla}`);
-        // LLAMADA DIRECTA AL SERVICIO
-        const valores = await valorUnitarioService.consultarValoresUnitarios({ año: añoTabla });
+        // LLAMADA DIRECTA AL SERVICIO usando parámetro 'anio'
+        const valores = await valorUnitarioService.consultarValoresUnitarios({ anio: añoTabla });
         
         // Agrupar por subcategoría y letra (para la tabla)
         const resultado: Record<string, Record<string, number>> = {};
@@ -160,34 +153,45 @@ const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
     cargarValoresUnitarios();
   }, [añoTabla, obtenerValoresUnitariosPorCategoria]);
 
-  // Handler para cambio de año
-  const handleAñoTablaChange = (año: number | null) => {
-    console.log(`🔄 [ValorUnitarioList] Cambiando año a: ${año}`);
-    setAñoTabla(año);
+
+  // Mapear subcategorías del API a categorías del formulario
+  const mapearSubcategoriaACategoria = (subcategoria: string) => {
+    const mapa: Record<string, string> = {
+      'MUROS Y COLUMNAS': 'ESTRUCTURAS',
+      'TECHOS': 'ESTRUCTURAS', 
+      'PISOS': 'ACABADOS',
+      'PUERTAS Y VENTANAS': 'ACABADOS',
+      'REVESTIMIENTOS': 'ACABADOS',
+      'BAÑOS': 'ACABADOS',
+      'INSTALACIONES ELECTRICAS Y SANITARIAS': 'INSTALACIONES'
+    };
+    console.log('🗺️ [ValorUnitarioList] Mapeando subcategoría:', subcategoria, 'a categoría:', mapa[subcategoria]);
+    return mapa[subcategoria] || 'ACABADOS';  // Default a ACABADOS
   };
 
   // Handler para clic en celda de valor
   const handleCeldaClick = (subcategoria: string, letra: string, costo: number) => {
     if (!onValorSeleccionado || !añoTabla || costo <= 0) return;
     
-    console.log(`🎯 [ValorUnitarioList] Valor seleccionado:`, { subcategoria, letra, costo });
+    // Mapear subcategoría a categoría
+    const categoria = mapearSubcategoriaACategoria(subcategoria);
+    
+    console.log(`🎯 [ValorUnitarioList] Valor seleccionado:`, { 
+      subcategoria, 
+      categoria, 
+      letra, 
+      costo 
+    });
     
     onValorSeleccionado({
       año: añoTabla,
-      categoria: 'CATEGORIA_GENERAL', // Podríamos mapear esto si es necesario
+      categoria: categoria,
       subcategoria: subcategoria,
       letra: letra,
       costo: costo
     });
   };
 
-  // Convertir años al formato de SearchableSelect
-  const añoOptions = años.map(año => ({
-    id: año.value,
-    value: parseInt(año.value),
-    label: año.label,
-    description: año.value === new Date().getFullYear().toString() ? 'Año actual' : undefined
-  }));
 
   // Subcategorías para la tabla - ORDENADAS por categoría según especificación del usuario
   // ESTRUCTURAS: Muros y Columnas, Techos
@@ -257,47 +261,38 @@ const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
                 Tabla de Valores por Categoría
               </Typography>
             </Box>
-            
-            <Box sx={{ width: 280 }}>
-              <Autocomplete
-                options={años}
-                getOptionLabel={(option) => option.label}
-                value={años.find(a => parseInt(a.value) === añoTabla) || null}
-                onChange={(_, newValue) => {
-                  const nuevoAño = newValue ? parseInt(newValue.value) : null;
-                  handleAñoTablaChange(nuevoAño);
+            {/* Año */}
+            <Box sx={{ 
+              flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '0 0 120px' },
+              minWidth: { xs: '100%', md: '120px' }
+            }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Año"
+                type="number"
+                value={añoTabla || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  console.log(`📝 [ValorUnitarioList] Cambiando valor del input a: "${value}"`);
+                  if (value === '') {
+                    console.log(`📝 [ValorUnitarioList] Valor vacío, estableciendo null`);
+                    setAñoTabla(null);
+                  } else {
+                    const nuevoAño = parseInt(value);
+                    console.log(`📝 [ValorUnitarioList] Parseado a: ${nuevoAño}`);
+                    if (!isNaN(nuevoAño)) {
+                      console.log(`📝 [ValorUnitarioList] Estableciendo año: ${nuevoAño}`);
+                      setAñoTabla(nuevoAño);
+                    }
+                  }
                 }}
-                loading={loading}
-                disabled={loading}
-                isOptionEqualToValue={(option, value) => option.value === value.value}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Año de consulta"
-                    size="small"
-                    placeholder="Seleccione año"
-                    InputProps={{
-                      ...params.InputProps,
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <CalendarIcon sx={{ fontSize: 20 }} />
-                        </InputAdornment>
-                      ),
-                      endAdornment: (
-                        <>
-                          {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                          {params.InputProps.endAdornment}
-                        </>
-                      ),
-                    }}
-                    sx={{
-                      '& .MuiInputBase-root': {
-                        height: 40,
-                        backgroundColor: 'white'
-                      }
-                    }}
-                  />
-                )}
+                InputProps={{
+                  inputProps: { 
+                    min: 1900, 
+                    max: new Date().getFullYear() 
+                  }
+                }}
               />
             </Box>
           </Box>
@@ -332,6 +327,7 @@ const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
                 <TableHead>
                   <TableRow>
                     <TableCell 
+                      align="center"
                       sx={{ 
                         fontWeight: 600,
                         bgcolor: theme.palette.grey[100],
@@ -341,7 +337,7 @@ const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
                         zIndex: 2
                       }}
                     >
-                      CATEGORÍA
+                      LETRAS
                     </TableCell>
                     {subcategoriasTabla.map((subcategoria) => (
                       <TableCell 
@@ -366,7 +362,7 @@ const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
                     // Skeleton loading
                     [...Array(9)].map((_, index) => (
                       <TableRow key={index}>
-                        <TableCell>
+                        <TableCell align="center">
                           <Skeleton width={30} height={30} />
                         </TableCell>
                         {subcategoriasTabla.map((_, subIndex) => (
@@ -377,7 +373,7 @@ const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
                       </TableRow>
                     ))
                   ) : (
-                    letrasTabla.map((letra, index) => (
+                    letrasTabla.map((letra, _index) => (
                       <TableRow 
                         key={letra} 
                         hover
@@ -388,6 +384,7 @@ const ValorUnitarioList: React.FC<ValorUnitarioListProps> = ({
                         }}
                       >
                         <TableCell 
+                          align="center"
                           sx={{ 
                             fontWeight: 600,
                             position: 'sticky',

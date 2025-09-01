@@ -1,6 +1,6 @@
 // src/hooks/useConstantesOptions.ts
 import { useState, useEffect } from 'react';
-import { constanteService, type ConstanteData } from '../services';
+import { constanteService, type ConstanteData, type GrupoUsoData, type UbicacionAreaVerdeData, type UsoPredioData } from '../services';
 
 /**
  * Interface para las opciones formateadas
@@ -109,18 +109,11 @@ export const useTipoDocumentoOptions = (isJuridica: boolean = false) => {
  * Hook específico para estados civiles
  */
 export const useEstadoCivilOptions = () => {
-  const defaultOptions: OptionFormat[] = [
-    { value: '1801', label: 'Soltero/a', id: '1801' },
-    { value: '1802', label: 'Casado/a', id: '1802' },
-    { value: '1803', label: 'Divorciado/a', id: '1803' },
-    { value: '1804', label: 'Viudo/a', id: '1804' },
-    { value: '1805', label: 'Unión Libre', id: '1805' }
-  ];
 
   return useConstantesOptions(
     () => constanteService.obtenerTiposEstadoCivil(),
     undefined, // Usar formatter por defecto
-    defaultOptions
+
   );
 };
 
@@ -158,6 +151,25 @@ export const useTipoViaOptions = () => {
     defaultOptions
   );
 };
+
+/**
+ * Hook específico para Modo Declaracion
+ */
+export const useModoDeclaracionOptions = () => {
+  return useConstantesOptions(
+    () => constanteService.obtenerTiposModoDeclaracion(),
+    undefined,
+  );
+};
+/**
+ * Hook específico  Material Predominante
+ */
+export const useTiposMaterialPredominante = () => {
+  return useConstantesOptions(
+    () => constanteService.obtenerTiposMaterialEstructuralPredominante(),
+    undefined,
+  )
+}
 
 /**
  * Hook específico para condición de propiedad
@@ -568,6 +580,40 @@ export const useMaterialPredominante = () => {
     undefined,
   );
 }
+export const useTiposLadosDireccion = () => {
+  const defaultOptions: OptionFormat[] = [
+    { value: 'NINGUNO', label: 'NINGUNO', id: '8103' },
+    { value: 'PAR', label: 'PAR', id: '8101' },
+    { value: 'IMPAR', label: 'IMPAR', id: '8102' }
+  ];
+
+  const formatter = (item: any): OptionFormat => {
+    console.log('🔍 [useTiposLadosDireccion] Formatting item:', item);
+    return {
+      value: item.nombreCategoria?.trim() || item.nombre?.trim() || '',
+      label: item.nombreCategoria?.trim() || item.nombre?.trim() || '',
+      id: item.codConstante?.trim() || item.codigo?.toString() || ''
+    };
+  };
+
+  const fetchFunction = async () => {
+    console.log('🔍 [useTiposLadosDireccion] Calling constanteService.obtenerTiposLadosDirecciones()');
+    try {
+      const result = await constanteService.obtenerTiposLadosDirecciones();
+      console.log('🔍 [useTiposLadosDireccion] Raw API result:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ [useTiposLadosDireccion] Error fetching:', error);
+      throw error;
+    }
+  };
+
+  return useConstantesOptions(
+    fetchFunction,
+    formatter,
+    defaultOptions
+  );
+}
 
 /**
  * Hook específico para estados generales (Activo/Inactivo)
@@ -586,20 +632,22 @@ export const useEstadoOptions = () => {
 };
 
 export const useLetraValoresUnitariosOptions = () => {
-  const defaultOptions: OptionFormat[] = [
-    { value: 'A', label: 'A', id: 'A' },
-    { value: 'B', label: 'B', id: 'B' },
-    { value: 'C', label: 'C', id: 'C' },
-    { value: 'D', label: 'D', id: 'D' },
-    { value: 'E', label: 'E', id: 'E' },
-    { value: 'F', label: 'F', id: 'F' },
-    { value: 'G', label: 'G', id: 'G' },
-    { value: 'H', label: 'H', id: 'H' },
-    { value: 'I', label: 'I', id: 'I' },
-  ];
+  return useConstantesOptions(
+    () => constanteService.obtenerTiposLetrasValoresUnitarios(),
+    (data) => ({
+      value: data.nombreCategoria, // Usar la letra como valor
+      label: data.nombreCategoria, // Y también como label
+      id: data.codConstante
+    })
+  );
+}
 
-  const [options, setOptions] = useState<OptionFormat[]>(defaultOptions);
-  const [loading, setLoading] = useState(false);
+/**
+ * Hook específico para rutas
+ */
+export const useRutasOptions = () => {
+  const [options, setOptions] = useState<OptionFormat[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -610,36 +658,35 @@ export const useLetraValoresUnitariosOptions = () => {
         setLoading(true);
         setError(null);
         
-        console.log('🔍 [useLetraValoresUnitariosOptions] Intentando obtener letras...');
+        console.log('🔍 [useRutasOptions] Obteniendo rutas...');
         
-        const data = await constanteService.obtenerTiposLetrasValoresUnitarios();
+        const data = await constanteService.obtenerRutas();
         
         if (!mounted) return;
         
-        if (data && data.length > 0) {
-          const formattedOptions = data.map(item => ({
-            value: item.nombreCategoria, // Usar la letra como valor
-            label: item.nombreCategoria, // Y también como label
-            id: item.codConstante
-          }));
-          
-          console.log('✅ [useLetraValoresUnitariosOptions] Datos API obtenidos:', formattedOptions);
-          setOptions(formattedOptions);
-        } else {
-          console.log('⚠️ [useLetraValoresUnitariosOptions] API no devolvió datos, usando defaults');
-          setOptions(defaultOptions);
-        }
+        const formattedOptions = data.map(item => ({
+          value: item.codigo,
+          label: `${item.abreviatura} - ${item.descripcion}`,
+          id: item.codigo,
+          abreviatura: item.abreviatura,
+          descripcion: item.descripcion
+        }));
+        
+        console.log(`✅ [useRutasOptions] ${formattedOptions.length} rutas cargadas`);
+        setOptions(formattedOptions);
         
       } catch (err) {
         if (!mounted) return;
         
-        const errorMessage = err instanceof Error ? err.message : 'Error al cargar las letras';
-        console.error('❌ [useLetraValoresUnitariosOptions] Error:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Error al cargar las rutas';
+        console.error('❌ [useRutasOptions] Error:', err);
         setError(errorMessage);
         
-        // Usar opciones por defecto en caso de error
-        console.log('🔄 [useLetraValoresUnitariosOptions] Usando opciones por defecto debido al error');
-        setOptions(defaultOptions);
+        // Fallback options
+        const fallbackOptions: OptionFormat[] = [
+          { value: 1, label: 'R1 - RUTA 1', id: 1, abreviatura: 'R1', descripcion: 'RUTA 1' }
+        ];
+        setOptions(fallbackOptions);
       } finally {
         if (mounted) {
           setLoading(false);
@@ -655,4 +702,254 @@ export const useLetraValoresUnitariosOptions = () => {
   }, []);
 
   return { options, loading, error };
-}
+};
+
+/**
+ * Hook específico para grupos de uso
+ * API GET: http://26.161.18.122:8085/api/constante/listarGrupoUso
+ */
+export const useGrupoUsoOptions = () => {
+  const [options, setOptions] = useState<OptionFormat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadOptions = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log('🔍 [useGrupoUsoOptions] Obteniendo grupos de uso...');
+        
+        const data = await constanteService.listarGrupoUso();
+        
+        if (!mounted) return;
+        
+        const formattedOptions = data.map(item => ({
+          value: item.codigo,
+          label: item.descripcion,
+          id: item.codigo
+        }));
+        
+        console.log(`✅ [useGrupoUsoOptions] ${formattedOptions.length} grupos de uso cargados`);
+        setOptions(formattedOptions);
+        
+      } catch (err) {
+        if (!mounted) return;
+        
+        const errorMessage = err instanceof Error ? err.message : 'Error al cargar grupos de uso';
+        console.error('❌ [useGrupoUsoOptions] Error:', err);
+        setError(errorMessage);
+        
+        // Fallback options
+        const fallbackOptions: OptionFormat[] = [
+          { value: 1, label: 'Casa Habitación', id: 1 }
+        ];
+        setOptions(fallbackOptions);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadOptions();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return { options, loading, error };
+};
+
+/**
+ * Hook específico para ubicaciones de área verde
+ * API GET: http://26.161.18.122:8085/api/constante/listarUbicacionAreaVerd
+ */
+export const useUbicacionAreaVerdeOptions = () => {
+  const [options, setOptions] = useState<OptionFormat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadOptions = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log('🔍 [useUbicacionAreaVerdeOptions] Obteniendo ubicaciones de área verde...');
+        
+        const data = await constanteService.listarUbicacionAreaVerde();
+        
+        if (!mounted) return;
+        
+        const formattedOptions = data.map(item => ({
+          value: item.codigo,
+          label: `${item.abreviatura} - ${item.descripcion}`,
+          id: item.codigo,
+          abreviatura: item.abreviatura,
+          descripcion: item.descripcion
+        }));
+        
+        console.log(`✅ [useUbicacionAreaVerdeOptions] ${formattedOptions.length} ubicaciones cargadas`);
+        setOptions(formattedOptions);
+        
+      } catch (err) {
+        if (!mounted) return;
+        
+        const errorMessage = err instanceof Error ? err.message : 'Error al cargar ubicaciones de área verde';
+        console.error('❌ [useUbicacionAreaVerdeOptions] Error:', err);
+        setError(errorMessage);
+        
+        // Fallback options
+        const fallbackOptions: OptionFormat[] = [
+          { value: 3, label: 'C - Cerca de área verde', id: 3, abreviatura: 'C', descripcion: 'Cerca de área verde' }
+        ];
+        setOptions(fallbackOptions);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadOptions();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return { options, loading, error };
+};
+
+/**
+ * Hook específico para usos de predio
+ * API GET: http://26.161.18.122:8085/api/constante/listarUsoPredio
+ */
+export const useUsoPredioOptions = () => {
+  const [options, setOptions] = useState<OptionFormat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadOptions = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log('🔍 [useUsoPredioOptions] Obteniendo usos de predio...');
+        
+        const data = await constanteService.listarUsoPredio();
+        
+        if (!mounted) return;
+        
+        const formattedOptions = data.map(item => ({
+          value: item.codUso,
+          label: item.descripcion,
+          id: item.codUso,
+          codCriterio: item.codCriterio,
+          anio: item.anio,
+          codGrupoUso: item.codGrupoUso
+        }));
+        
+        console.log(`✅ [useUsoPredioOptions] ${formattedOptions.length} usos de predio cargados`);
+        setOptions(formattedOptions);
+        
+      } catch (err) {
+        if (!mounted) return;
+        
+        const errorMessage = err instanceof Error ? err.message : 'Error al cargar usos de predio';
+        console.error('❌ [useUsoPredioOptions] Error:', err);
+        setError(errorMessage);
+        
+        // Fallback options
+        const fallbackOptions: OptionFormat[] = [
+          { value: 1, label: 'Bodega', id: 1 }
+        ];
+        setOptions(fallbackOptions);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadOptions();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return { options, loading, error };
+};
+
+/**
+ * Hook específico para zonas
+ */
+export const useZonasOptions = () => {
+  const [options, setOptions] = useState<OptionFormat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadOptions = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log('🔍 [useZonasOptions] Obteniendo zonas...');
+        
+        const data = await constanteService.obtenerZonas();
+        
+        if (!mounted) return;
+        
+        const formattedOptions = data.map(item => ({
+          value: item.codigo,
+          label: `${item.abreviatura} - ${item.descripcion}`,
+          id: item.codigo,
+          abreviatura: item.abreviatura,
+          descripcion: item.descripcion
+        }));
+        
+        console.log(`✅ [useZonasOptions] ${formattedOptions.length} zonas cargadas`);
+        setOptions(formattedOptions);
+        
+      } catch (err) {
+        if (!mounted) return;
+        
+        const errorMessage = err instanceof Error ? err.message : 'Error al cargar las zonas';
+        console.error('❌ [useZonasOptions] Error:', err);
+        setError(errorMessage);
+        
+        // Fallback options
+        const fallbackOptions: OptionFormat[] = [
+          { value: 1, label: 'ZN01 - Zona 1', id: 1, abreviatura: 'ZN01', descripcion: 'Zona 1' }
+        ];
+        setOptions(fallbackOptions);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadOptions();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return { options, loading, error };
+};

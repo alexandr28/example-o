@@ -1,30 +1,27 @@
 // src/components/sector/SectorForm.tsx - Versión Material-UI
 import React, { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   Box,
   TextField,
   Button,
-  Typography,
   Paper,
-  Stack,
-  Chip,
   CircularProgress,
   IconButton,
   Tooltip,
-  Alert
+  Alert,
+  Autocomplete
 } from "@mui/material";
 import {
   Save as SaveIcon,
   Add as AddIcon,
   Clear as ClearIcon,
-  CloudOff as CloudOffIcon,
-  Edit as EditIcon,
-  Business as BusinessIcon
+  Edit as EditIcon
 } from "@mui/icons-material";
 import { Sector } from "../../models/Sector";
+import { useSectores } from "../../hooks/useSectores";
 
 // Schema de validación
 const sectorSchema = z.object({
@@ -33,14 +30,22 @@ const sectorSchema = z.object({
     .min(1, "El nombre del sector es requerido")
     .min(3, "El nombre debe tener al menos 3 caracteres")
     .max(100, "El nombre no puede exceder los 100 caracteres"),
-  // .regex(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/, 'El nombre solo puede contener letras y espacios')e
+  cuadrante: z
+    .number()
+    .int("El cuadrante debe ser un número entero")
+    .min(0, "El cuadrante debe ser un número positivo")
+    .optional(),
+  descripcion: z
+    .string()
+    .optional()
+    .refine(val => !val || val.length <= 200, "La descripción no puede exceder los 200 caracteres")
 });
 
 type SectorFormData = z.infer<typeof sectorSchema>;
 
 interface SectorFormProps {
   sectorSeleccionado?: Sector | null;
-  onGuardar: (data: { nombre: string }) => void | Promise<void>;
+  onGuardar: (data: { nombre: string; cuadrante?: number; descripcion?: string }) => void | Promise<void>;
   onNuevo: () => void;
   onEditar?: () => void;
   modoOffline?: boolean;
@@ -57,6 +62,8 @@ const SectorForm: React.FC<SectorFormProps> = ({
   loading = false,
   isEditMode = false,
 }) => {
+  const { cuadrantes, loadingCuadrantes, cargarCuadrantes } = useSectores();
+  
   const {
     register,
     handleSubmit,
@@ -64,9 +71,10 @@ const SectorForm: React.FC<SectorFormProps> = ({
     reset,
     setValue,
     watch,
+    control,
   } = useForm<SectorFormData>({
     resolver: zodResolver(sectorSchema),
-    defaultValues: { nombre: "" },
+    defaultValues: { nombre: "", cuadrante: undefined, descripcion: "" },
     mode: "onChange",
   });
 
@@ -76,12 +84,19 @@ const SectorForm: React.FC<SectorFormProps> = ({
   // Estado para debug
   // const [showDebug] = React.useState(false);
 
+  // Cargar cuadrantes al montar
+  useEffect(() => {
+    cargarCuadrantes();
+  }, [cargarCuadrantes]);
+
   // Actualizar formulario cuando cambia el sector seleccionado
   useEffect(() => {
     if (sectorSeleccionado) {
       setValue("nombre", sectorSeleccionado.nombre || "");
+      setValue("cuadrante", sectorSeleccionado.cuadrante || undefined);
+      setValue("descripcion", sectorSeleccionado.descripcion || "");
     } else {
-      reset({ nombre: "" });
+      reset({ nombre: "", cuadrante: undefined, descripcion: "" });
     }
   }, [sectorSeleccionado, setValue, reset]);
 
@@ -89,7 +104,7 @@ const SectorForm: React.FC<SectorFormProps> = ({
     try {
       await onGuardar(data);
       if (!isEditMode) {
-        reset({ nombre: "" });
+        reset({ nombre: "", cuadrante: undefined, descripcion: "" });
       }
     } catch (error) {
       console.error("Error al guardar:", error);
@@ -97,81 +112,44 @@ const SectorForm: React.FC<SectorFormProps> = ({
   };
 
   const handleNew = () => {
-    reset({ nombre: "" });
+    reset({ nombre: "", cuadrante: undefined, descripcion: "" });
     onNuevo();
   };
 
-  const isFormDisabled = loading || (sectorSeleccionado && !isEditMode);
+  const isFormDisabled = Boolean(loading || (sectorSeleccionado && !isEditMode));
 
   return (
     <Paper 
-      elevation={3} 
+      elevation={0} 
       sx={{ 
-        p: 3,
+        p: { xs: 1.5, sm: 2 },
+        pb: 1,
         borderRadius: 2,
         background: 'linear-gradient(to bottom, #ffffff, #fafafa)',
         border: '1px solid',
         borderColor: 'divider',
-        width: '100%'
+        width: { xs: '100%', sm: '100%', md: '80%', lg: '100%' },
+        mx: 'auto'
       }}
     >
       <Box component="form" onSubmit={handleSubmit(onSubmit)}>
-        {/* Header */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 2, 
-          mb: 2,
-          pb: 2,
-          borderBottom: '2px solid',
-          borderColor: 'primary.main'
-        }}>
-          <Box sx={{
-            p: 1,
-            borderRadius: 1,
-            backgroundColor: 'primary.main',
-            color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <BusinessIcon />
-          </Box>
-          <Typography variant="h6" fontWeight={600}>
-            Formulario de Sector
-          </Typography>
-          
-          {/* Chips informativos */}
-          <Box sx={{ flex: 1 }} />
-          {modoOffline && (
-            <Chip
-              icon={<CloudOffIcon />}
-              label="Sin conexión"
-              size="small"
-              color="warning"
-              variant="outlined"
-            />
-          )}
-          {sectorSeleccionado && (
-            <Chip
-              label={`ID: ${sectorSeleccionado.id}`}
-              size="small"
-              variant="outlined"
-              color="primary"
-            />
-          )}
-        </Box>
+      
+        
 
         {/* Fila única con todos los campos del formulario */}
         <Box sx={{ 
           display: 'flex', 
+          flexDirection: { xs: 'column', sm: 'column', md: 'row' },
           flexWrap: 'wrap', 
-          gap: 2,
-          mb: 3,
-          alignItems: 'center'
+          gap: { xs: 1.5, sm: 2 },
+          mb: 1.5,
+          alignItems: { xs: 'stretch', sm: 'stretch', md: 'center' }
         }}>
           {/* Nombre del Sector */}
-          <Box sx={{ flex: '1 1 250px', minWidth: '250px' }}>
+          <Box sx={{ 
+            flex: { xs: '1 1 100%', sm: '1 1 250px' }, 
+            minWidth: { xs: '100%', sm: '250px' } 
+          }}>
             <TextField
               {...register("nombre")}
               label="Nombre del Sector *"
@@ -199,17 +177,80 @@ const SectorForm: React.FC<SectorFormProps> = ({
             />
           </Box>
 
+          {/* Cuadrante */}
+          <Box sx={{ 
+            flex: { xs: '1 1 100%', sm: '1 1 200px' }, 
+            minWidth: { xs: '100%', sm: '200px' } 
+          }}>
+            <Controller
+              name="cuadrante"
+              control={control}
+              render={({ field }) => (
+                <Autocomplete
+                  options={cuadrantes || []}
+                  getOptionLabel={(option) => {
+                    if (typeof option === 'number') {
+                      const cuadrante = cuadrantes.find(c => c.codCuadrante === option);
+                      return cuadrante ? cuadrante.abreviatura : `Cuadrante ${option}`;
+                    }
+                    return option.abreviatura || `Cuadrante ${option.codCuadrante}`;
+                  }}
+                  value={cuadrantes?.find(c => c.codCuadrante === field.value) || null}
+                  onChange={(_, newValue) => {
+                    field.onChange(newValue?.codCuadrante || undefined);
+                  }}
+                  loading={loadingCuadrantes}
+                  disabled={isFormDisabled || loadingCuadrantes}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Cuadrante"
+                      error={!!errors.cuadrante}
+                      helperText={errors.cuadrante?.message}
+                      size="small"
+                      placeholder="Seleccione un cuadrante"
+                      InputProps={{
+                        ...params.InputProps,
+                        sx: { height: 40 },
+                        endAdornment: (
+                          <>
+                            {loadingCuadrantes ? <CircularProgress color="inherit" size={20} /> : null}
+                            {params.InputProps.endAdornment}
+                          </>
+                        ),
+                      }}
+                    />
+                  )}
+                  renderOption={(props, option) => (
+                    <Box component="li" {...props}>
+                      <Box>
+                        <strong>{option.abreviatura}</strong>
+                        {option.descripcion && (
+                          <Box component="span" sx={{ ml: 1, color: 'text.secondary' }}>
+                            - {option.descripcion}
+                          </Box>
+                        )}
+                      </Box>
+                    </Box>
+                  )}
+                />
+              )}
+            />
+          </Box>
+
           {/* Botones en la misma fila */}
           <Box sx={{ 
             display: 'flex', 
+            flexDirection: { xs: 'row', sm: 'row' },
             gap: 1,
             alignItems: 'center',
-            flex: '0 0 auto'
+            flex: { xs: '1 1 100%', sm: '1 1 100%', md: '0 0 auto' },
+            justifyContent: { xs: 'space-between', sm: 'flex-start', md: 'flex-start' }
           }}>
             <Button
               type="button"
-              variant="contained"
-              color="secondary"
+              variant="outlined"
+              color="primary"
               startIcon={<AddIcon />}
               onClick={handleNew}
               disabled={loading}
@@ -218,7 +259,11 @@ const SectorForm: React.FC<SectorFormProps> = ({
                 height: 40,
                 borderRadius: 2,
                 textTransform: 'none',
-                fontWeight: 600
+                fontWeight: 600,
+                backgroundColor: 'white',
+                '&:hover': {
+                  backgroundColor: 'rgba(25, 118, 210, 0.04)'
+                }
               }}
             >
               Nuevo
@@ -231,7 +276,7 @@ const SectorForm: React.FC<SectorFormProps> = ({
                 color="primary"
                 startIcon={<EditIcon />}
                 onClick={onEditar}
-                disabled={loading}
+                disabled={loading || (isDirty && isValid)}
                 sx={{ 
                   minWidth: 80,
                   height: 40,
@@ -271,7 +316,7 @@ const SectorForm: React.FC<SectorFormProps> = ({
 
         {/* Alertas */}
         {modoOffline && (
-          <Alert severity="warning" sx={{ mt: 2 }}>
+          <Alert severity="warning" sx={{ mt: 1 }}>
             Modo sin conexión. Los cambios se sincronizarán cuando se restablezca la conexión.
           </Alert>
         )}

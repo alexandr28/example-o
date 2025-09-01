@@ -55,13 +55,18 @@ body {
   padding: 6px 10px !important;
 }
 
-/* Labels más pequeños */
+/* Labels con tamaño mejorado para mayor legibilidad */
 .MuiInputLabel-root {
-  font-size: 0.75rem !important;
+  font-size: 0.875rem !important; /* 14px - aumentado de 0.75rem */
 }
 
 .MuiFormLabel-root {
-  font-size: 0.75rem !important;
+  font-size: 0.875rem !important; /* 14px - aumentado de 0.75rem */
+}
+
+/* Ajuste adicional para labels cuando están en estado shrink (cuando el campo tiene valor o foco) */
+.MuiInputLabel-shrink {
+  font-size: 0.75rem !important; /* Mantener más pequeño cuando está arriba */
 }
 
 /* Selects más compactos */

@@ -15,12 +15,9 @@ import {
   Avatar,
   useTheme,
   alpha,
-  IconButton,
   Divider,
-  Container,
   Stack,
   LinearProgress,
-  Tooltip,
   Badge
 } from '@mui/material';
 import {
@@ -28,13 +25,8 @@ import {
   Home,
   Assessment,
   TrendingUp,
-  Assignment,
   AttachMoney,
   Dashboard,
-  Brightness4,
-  Brightness7,
-  MenuOpen,
-  Menu as MenuIcon,
   CheckCircle,
   PendingActions,
   Error as ErrorIcon,
@@ -105,10 +97,9 @@ const quickActions = [
  * Página de demostración con diseño mejorado usando Material-UI
  */
 const DemoPage: FC = memo(() => {
-  const muiTheme = useTheme();
-  const { theme, toggleTheme } = useCustomTheme();
-  const { isExpanded, toggleSidebar } = useSidebar();
+  const { theme } = useCustomTheme();
   const { user } = useAuthContext();
+  const { isExpanded } = useSidebar();
 
   const getActivityIcon = (type: string) => {
     switch (type) {

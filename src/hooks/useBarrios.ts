@@ -204,7 +204,6 @@ export const useBarrios = () => {
           {
             nombre: data.nombre.trim(),
             codSector: data.codSector,
-            descripcion: data.descripcion?.trim() || ''
           }
         );
         
@@ -218,7 +217,6 @@ export const useBarrios = () => {
         const resultado = await barrioService.crearBarrio({
           nombre: data.nombre.trim(),
           codSector: data.codSector,
-          descripcion: data.descripcion?.trim() || ''
         });
         
         console.log('✅ [useBarrios] Barrio creado:', resultado);

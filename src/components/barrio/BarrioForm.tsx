@@ -1,5 +1,5 @@
 // src/components/barrio/BarrioForm.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -8,17 +8,20 @@ import {
   TextField,
   Button,
   Paper,
-  Typography,
   CircularProgress,
   Autocomplete,
-  Alert
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText
 } from '@mui/material';
 import {
   Save as SaveIcon,
-  Cancel as CancelIcon,
+  Delete as DeleteIcon,
   Add as AddIcon,
-  Edit as EditIcon,
-  Home as HomeIcon
+  Edit as EditIcon
 } from '@mui/icons-material';
 import { BarrioFormData } from '../../models/Barrio';
 import { useSectores } from '../../hooks/useSectores';
@@ -43,23 +46,27 @@ const schema = yup.object().shape({
 
 interface BarrioFormProps {
   onSubmit: (data: BarrioFormData) => void | Promise<void>;
-  onCancel?: () => void;
+  onDelete?: () => void | Promise<void>;
   onNew?: () => void;
-  onEdit?: () => void;
   initialData?: Partial<BarrioFormData>;
   isSubmitting?: boolean;
 }
 
 const BarrioForm: React.FC<BarrioFormProps> = ({
   onSubmit,
-  onCancel,
+  onDelete,
   onNew,
-  onEdit,
   initialData,
   isSubmitting = false
 }) => {
   // Hook para obtener sectores
   const { sectores, cargarSectores } = useSectores();
+  
+  // Estado para el modal de confirmación de eliminación
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  
+  // Estado para controlar si estamos en modo "nuevo" (independiente de initialData)
+  const [isNewMode, setIsNewMode] = useState(!initialData);
   
   // Configurar react-hook-form
   const {
@@ -83,12 +90,24 @@ const BarrioForm: React.FC<BarrioFormProps> = ({
     cargarSectores();
   }, [cargarSectores]);
 
+  // Actualizar modo cuando cambien los initialData
+  useEffect(() => {
+    setIsNewMode(!initialData);
+  }, [initialData]);
+
   // Observar cambios en el formulario para debug
   const formValues = watch();
   
   useEffect(() => {
     console.log('📝 [BarrioForm] Valores del formulario:', formValues);
-  }, [formValues]);
+    console.log('🔍 [BarrioForm] Props debug:', {
+      hasOnDelete: !!onDelete,
+      hasInitialData: !!initialData,
+      initialData: initialData,
+      isNewMode: isNewMode,
+      shouldShowDeleteButton: !!(onDelete && !isNewMode)
+    });
+  }, [formValues, onDelete, initialData, isNewMode]);
 
   // Manejar envío del formulario
   const onFormSubmit = async (data: BarrioFormData) => {
@@ -112,7 +131,27 @@ const BarrioForm: React.FC<BarrioFormProps> = ({
       nombre: '',
       codSector: 0
     });
+    setIsNewMode(true); // Activar modo "nuevo"
     onNew?.();
+  };
+
+  // Handlers para el modal de eliminación
+  const handleDeleteClick = () => {
+    setOpenDeleteDialog(true);
+  };
+
+  const handleDeleteCancel = () => {
+    setOpenDeleteDialog(false);
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      await onDelete?.();
+      setOpenDeleteDialog(false);
+    } catch (error) {
+      console.error('❌ [BarrioForm] Error al eliminar:', error);
+      // El modal se mantiene abierto si hay error
+    }
   };
 
   return (
@@ -127,31 +166,8 @@ const BarrioForm: React.FC<BarrioFormProps> = ({
       }}
     >
       <Box component="form" onSubmit={handleSubmit(onFormSubmit)}>
-        {/* Header */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 2, 
-          mb: 2,
-          pb: 2,
-          borderBottom: '2px solid',
-          borderColor: 'primary.main'
-        }}>
-          <Box sx={{
-            p: 1,
-            borderRadius: 1,
-            backgroundColor: 'primary.main',
-            color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <HomeIcon />
-          </Box>
-          <Typography variant="h6" fontWeight={600}>
-            Formulario de Barrio
-          </Typography>
-        </Box>
+       
+        
 
         {sectores.length === 0 && !isSubmitting && (
           <Alert severity="warning" sx={{ mb: 2 }}>
@@ -159,16 +175,16 @@ const BarrioForm: React.FC<BarrioFormProps> = ({
           </Alert>
         )}
 
-        {/* Fila única con todos los campos del formulario */}
+        {/* Primera fila con los campos del formulario */}
         <Box sx={{ 
           display: 'flex', 
           flexWrap: 'wrap', 
           gap: 2,
-          mb: 3,
+          mb: 2,
           alignItems: 'flex-start'
         }}>
           {/* Nombre del Barrio */}
-          <Box sx={{ flex: '1 1 200px', minWidth: '200px' }}>
+          <Box sx={{ flex: '1 1 250px', minWidth: '250px' }}>
             <TextField
               {...register('nombre')}
               label="Nombre del Barrio *"
@@ -176,7 +192,12 @@ const BarrioForm: React.FC<BarrioFormProps> = ({
               fullWidth
               size="small"
               error={!!errors.nombre}
-              helperText={errors.nombre?.message}
+              helperText={
+                errors.nombre?.message || 
+                (formValues.nombre?.includes('/') || formValues.nombre?.includes('\\') 
+                  ? "Nota: Los caracteres / y \\ serán reemplazados por -" 
+                  : "")
+              }
               disabled={isSubmitting}
               inputProps={{ maxLength: 100 }}
               sx={{ height: 40 }}
@@ -184,7 +205,7 @@ const BarrioForm: React.FC<BarrioFormProps> = ({
           </Box>
 
           {/* Sector */}
-          <Box sx={{ flex: '1 1 180px', minWidth: '180px' }}>
+          <Box sx={{ flex: '1 1 250px', minWidth: '250px' }}>
             <Controller
               name="codSector"
               control={control}
@@ -221,89 +242,138 @@ const BarrioForm: React.FC<BarrioFormProps> = ({
               )}
             />
           </Box>
+        </Box>
 
-          {/* Botones en la misma fila */}
-          <Box sx={{ 
-            display: 'flex', 
-            gap: 1,
-            alignItems: 'center',
-            flex: '0 0 auto'
-          }}>
-            <Button
-              type="button"
-              variant="contained"
-              color="secondary"
-              startIcon={<AddIcon />}
-              onClick={handleNew}
-              disabled={isSubmitting}
-              sx={{ 
-                minWidth: 80,
-                height: 40,
-                borderRadius: 2,
-                textTransform: 'none',
-                fontWeight: 600
-              }}
-            >
-              Nuevo
-            </Button>
-            
+        {/* Segunda fila con los botones */}
+        <Box sx={{ 
+          display: 'flex', 
+          gap: 1,
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          mb: 3
+        }}>
+          <Button
+            type="button"
+            variant="outlined"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={handleNew}
+            disabled={isSubmitting}
+            sx={{ 
+              minWidth: 80,
+              height: 40,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              backgroundColor: 'white',
+              '&:hover': {
+                backgroundColor: 'rgba(25, 118, 210, 0.04)'
+              }
+            }}
+          >
+            Nuevo
+          </Button>
+          
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : (isNewMode ? <SaveIcon /> : <EditIcon />)}
+            disabled={isSubmitting || sectores.length === 0}
+            sx={{ 
+              minWidth: 120,
+              height: 40,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600
+            }}
+          >
+            {isSubmitting 
+              ? (isNewMode ? 'Guardando...' : 'Actualizando...') 
+              : (isNewMode ? 'Guardar' : 'Actualizar')
+            }
+          </Button>
+
+          {onDelete && !isNewMode && (
             <Button
               type="button"
               variant="outlined"
-              color="primary"
-              startIcon={<EditIcon />}
-              onClick={onEdit}
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={handleDeleteClick}
               disabled={isSubmitting}
               sx={{ 
-                minWidth: 80,
+                minWidth: 90,
                 height: 40,
                 borderRadius: 2,
                 textTransform: 'none',
                 fontWeight: 600
               }}
             >
-              Editar
+              Eliminar
             </Button>
-            
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-              disabled={isSubmitting || sectores.length === 0}
-              sx={{ 
-                minWidth: 100,
-                height: 40,
-                borderRadius: 2,
-                textTransform: 'none',
-                fontWeight: 600
-              }}
-            >
-              {isSubmitting ? 'Guardando...' : initialData ? 'Actualizar' : 'Guardar'}
-            </Button>
-
-            {onCancel && (
-              <Button
-                type="button"
-                variant="outlined"
-                color="error"
-                startIcon={<CancelIcon />}
-                onClick={onCancel}
-                disabled={isSubmitting}
-                sx={{ 
-                  minWidth: 80,
-                  height: 40,
-                  borderRadius: 2,
-                  textTransform: 'none',
-                  fontWeight: 600
-                }}
-              >
-                Cancelar
-              </Button>
-            )}
-          </Box>
+          )}
         </Box>
       </Box>
+
+      {/* Modal de confirmación de eliminación */}
+      <Dialog
+        open={openDeleteDialog}
+        onClose={handleDeleteCancel}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+          }
+        }}
+      >
+        <DialogTitle 
+          sx={{ 
+            pb: 1,
+            fontSize: '1.25rem',
+            fontWeight: 600,
+            color: 'error.main'
+          }}
+        >
+          Confirmar Eliminación
+        </DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <DialogContentText sx={{ fontSize: '1rem', color: 'text.primary' }}>
+            ¿Está seguro que desea eliminar este barrio?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5, pt: 1.5, gap: 1 }}>
+          <Button 
+            onClick={handleDeleteCancel}
+            variant="outlined"
+            color="inherit"
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 500,
+              px: 3
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleDeleteConfirm}
+            variant="contained"
+            color="error"
+            disabled={isSubmitting}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              px: 3
+            }}
+          >
+            {isSubmitting ? 'Eliminando...' : 'Eliminar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 };

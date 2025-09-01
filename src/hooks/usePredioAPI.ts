@@ -4,9 +4,47 @@ import { predioService } from '../services/predioService';
 import { 
   Predio, 
   FiltroPredio,
-  PredioFormData 
+  PredioFormData
 } from '../models/Predio';
+import { PredioData, CreatePredioDTO } from '../services/predioService';
 import { NotificationService } from '../components/utils/Notification';
+
+// Function to map PredioData to Predio
+const mapPredioDataToModel = (data: PredioData): Predio => {
+  return {
+    codigoPredio: data.codPredio?.trim() || '',
+    anio: data.anio,
+    fechaAdquisicion: data.fechaAdquisicion,
+    condicionPropiedad: data.condicionPropiedad || 'PROPIETARIO_UNICO',
+    direccion: data.direccion,
+    direccionId: data.codDireccion ? Number(data.codDireccion) : undefined,
+    numeroFinca: data.numeroFinca,
+    otroNumero: data.otroNumero,
+    conductor: data.conductor || 'PRIVADO',
+    estadoPredio: data.estadoPredio || 'TERMINADO',
+    areaTerreno: data.areaTerreno || 0,
+    numeroPisos: data.numeroPisos,
+    totalAreaConstruccion: data.totalAreaConstruccion,
+    valorTotalConstruccion: data.valorTotalConstruccion,
+    valorTerreno: data.valorTerreno,
+    autoavaluo: data.autoavaluo,
+    
+    // Códigos originales de la API
+    codPredio: data.codPredio,
+    codClasificacion: data.codClasificacion ? Number(data.codClasificacion) : undefined,
+    estPredio: data.estPredio,
+    codTipoPredio: data.codTipoPredio ? Number(data.codTipoPredio) : undefined,
+    codCondicionPropiedad: data.codCondicionPropiedad ? Number(data.codCondicionPropiedad) : undefined,
+    codDireccion: data.codDireccion ? Number(data.codDireccion) : undefined,
+    codUsoPredio: data.codUsoPredio ? Number(data.codUsoPredio) : undefined,
+    codListaConductor: data.codListaConductor ? Number(data.codListaConductor) : undefined,
+    codUbicacionAreaVerde: data.codUbicacionAreaVerde ? Number(data.codUbicacionAreaVerde) : undefined,
+    codEstado: data.codEstado ? Number(data.codEstado) : undefined,
+    codUsuario: data.codUsuario,
+    
+    numeroCondominos: data.numeroCondominos ? Number(data.numeroCondominos) : undefined,
+  };
+};
 
 interface UsePrediosReturn {
   // Estado
@@ -26,6 +64,7 @@ interface UsePrediosReturn {
   
   // Acciones
   cargarPredios: () => Promise<void>;
+  cargarTodosPredios: () => Promise<void>;
   buscarPredios: (filtros: FiltroPredio) => Promise<void>;
   buscarPrediosConFormData: (codPredio?: string, anio?: number, direccion?: number) => Promise<void>;
   obtenerPredioPorCodigo: (codigoPredio: string) => Promise<void>;
@@ -58,11 +97,39 @@ export const usePredios = (): UsePrediosReturn => {
       setError(null);
       
       const prediosData = await predioService.obtenerPredios();
-      setPredios(prediosData);
+      const prediosMapeados = prediosData.map(mapPredioDataToModel);
+      setPredios(prediosMapeados);
       
       NotificationService.success(`${prediosData.length} predios cargados`);
     } catch (err: any) {
       const mensaje = err.message || 'Error al cargar predios';
+      setError(mensaje);
+      NotificationService.error(mensaje);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Cargar todos los predios usando API GET /all
+   * GET http://26.161.18.122:8080/api/predio/all
+   */
+  const cargarTodosPredios = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('📡 [usePredios] Cargando todos los predios desde API /all');
+      
+      const prediosData = await predioService.obtenerTodosPredios();
+      const prediosMapeados = prediosData.map(mapPredioDataToModel);
+      setPredios(prediosMapeados);
+      
+      NotificationService.success(`${prediosData.length} predios cargados desde API`);
+      console.log(`✅ [usePredios] ${prediosData.length} predios cargados exitosamente`);
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al cargar todos los predios';
+      console.error('❌ [usePredios] Error:', err);
       setError(mensaje);
       NotificationService.error(mensaje);
     } finally {
@@ -86,7 +153,8 @@ export const usePredios = (): UsePrediosReturn => {
       };
       
       const prediosData = await predioService.buscarPredios(parametros);
-      setPredios(prediosData);
+      const prediosMapeados = prediosData.map(mapPredioDataToModel);
+      setPredios(prediosMapeados);
       
       NotificationService.info(`${prediosData.length} predios encontrados`);
     } catch (err: any) {
@@ -117,7 +185,8 @@ export const usePredios = (): UsePrediosReturn => {
       };
       
       const prediosData = await predioService.buscarPredios(parametros);
-      setPredios(prediosData);
+      const prediosMapeados = prediosData.map(mapPredioDataToModel);
+      setPredios(prediosMapeados);
       
       NotificationService.info(`${prediosData.length} predios encontrados`);
     } catch (err: any) {
@@ -140,7 +209,8 @@ export const usePredios = (): UsePrediosReturn => {
       const predio = await predioService.obtenerPredioPorCodigo(codigoPredio);
       
       if (predio) {
-        setPredioSeleccionado(predio);
+        const predioMapeado = mapPredioDataToModel(predio);
+        setPredioSeleccionado(predioMapeado);
         NotificationService.success('Predio encontrado');
       } else {
         NotificationService.warning('No se encontró el predio');
@@ -163,7 +233,8 @@ export const usePredios = (): UsePrediosReturn => {
       setError(null);
       
       const prediosData = await predioService.obtenerPrediosPorAnio(anio);
-      setPredios(prediosData);
+      const prediosMapeados = prediosData.map(mapPredioDataToModel);
+      setPredios(prediosMapeados);
       
       NotificationService.info(`${prediosData.length} predios del año ${anio}`);
     } catch (err: any) {
@@ -184,7 +255,8 @@ export const usePredios = (): UsePrediosReturn => {
       setError(null);
       
       const prediosData = await predioService.obtenerPrediosPorDireccion(direccionId);
-      setPredios(prediosData);
+      const prediosMapeados = prediosData.map(mapPredioDataToModel);
+      setPredios(prediosMapeados);
       
       NotificationService.info(`${prediosData.length} predios en esta dirección`);
     } catch (err: any) {
@@ -233,28 +305,28 @@ export const usePredios = (): UsePrediosReturn => {
         codPredio: null, // SIEMPRE null - SQL lo asigna automáticamente
         numeroFinca: Number(datos.numeroFinca),
         otroNumero: String(datos.otroNumero || ""),
-        codClasificacion: String(datos.codClasificacion || "0502"), // Por defecto según el JSON ejemplo
+        codClasificacion: String("0502"), // Por defecto según el JSON ejemplo
         estPredio: String(datos.estadoPredio || "2503"), // Por defecto según el JSON ejemplo
-        codTipoPredio: String(datos.codTipoPredio || "2601"), // Por defecto según el JSON ejemplo
-        codCondicionPropiedad: String(datos.codCondicionPropiedad || "2701"), // Por defecto según el JSON ejemplo
+        codTipoPredio: String("2601"), // Por defecto según el JSON ejemplo
+        codCondicionPropiedad: String("2701"), // Por defecto según el JSON ejemplo
         codDireccion: Number(datos.direccionId),
-        codUsoPredio: Number(datos.codUsoPredio || 1), // Por defecto según el JSON ejemplo
+        codUsoPredio: Number(1), // Por defecto según el JSON ejemplo
         fechaAdquisicion: datos.fechaAdquisicion 
           ? (datos.fechaAdquisicion instanceof Date 
               ? datos.fechaAdquisicion.toISOString().split('T')[0]
               : String(datos.fechaAdquisicion).split('T')[0])
           : new Date().toISOString().split('T')[0],
         numeroCondominos: Number(datos.numeroCondominos || 2), // Por defecto según el JSON ejemplo
-        codListaConductor: String(datos.codListaConductor || "1401"), // Por defecto según el JSON ejemplo
-        codUbicacionAreaVerde: Number(datos.codUbicacionAreaVerde || 1), // Por defecto según el JSON ejemplo
+        codListaConductor: String("1401"), // Por defecto según el JSON ejemplo
+        codUbicacionAreaVerde: Number(1), // Por defecto según el JSON ejemplo
         areaTerreno: Number(datos.areaTerreno),
         numeroPisos: Number(datos.numeroPisos || 1),
         totalAreaConstruccion: datos.totalAreaConstruccion ? Number(datos.totalAreaConstruccion) : null,
         valorTotalConstruccion: datos.valorTotalConstruccion ? Number(datos.valorTotalConstruccion) : null,
         valorTerreno: datos.valorTerreno ? Number(datos.valorTerreno) : null,
         autoavaluo: datos.autoavaluo ? Number(datos.autoavaluo) : null,
-        codEstado: String(datos.codEstado || "0201"), // Por defecto según el JSON ejemplo
-        codUsuario: Number(datos.codUsuario || 1)
+        codEstado: String("0201"), // Por defecto según el JSON ejemplo
+        codUsuario: Number(1)
       };
       
       console.log('📤 [usePredios] Datos preparados para API POST:', datosApi);
@@ -266,8 +338,9 @@ export const usePredios = (): UsePrediosReturn => {
       // Actualizar lista de predios
       await cargarPredios();
       
+      const predioMapeado = mapPredioDataToModel(nuevoPredio);
       NotificationService.success(`Predio ${nuevoPredio.codPredio || 'nuevo'} creado exitosamente`);
-      return nuevoPredio;
+      return predioMapeado;
     } catch (err: any) {
       const mensaje = err.message || 'Error al crear predio';
       console.error('❌ [usePredios] Error creando predio:', err);
@@ -283,36 +356,40 @@ export const usePredios = (): UsePrediosReturn => {
    * Actualizar predio existente
    */
   const actualizarPredio = useCallback(async (
-    codigoPredio: string, 
+    _codigoPredio: string, 
     datos: PredioFormData
   ): Promise<Predio | null> => {
     try {
       setLoading(true);
       setError(null);
       
-      // Preparar datos para la API
-      const datosApi = {
-        numeroFinca: datos.numeroFinca,
-        otroNumero: datos.otroNumero,
+      // Preparar datos para la API según UpdatePredioDTO
+      const datosApi: Partial<CreatePredioDTO> = {
+        numeroFinca: datos.numeroFinca ? Number(datos.numeroFinca) : undefined,
+        otroNumero: datos.otroNumero || undefined,
         areaTerreno: datos.areaTerreno,
-        fechaAdquisicion: datos.fechaAdquisicion?.toString() || null,
-        condicionPropiedad: datos.condicionPropiedad,
-        conductor: datos.conductor,
-        estadoPredio: datos.estadoPredio,
-        numeroPisos: datos.numeroPisos,
-        totalAreaConstruccion: datos.totalAreaConstruccion,
-        valorTerreno: datos.valorTerreno,
-        valorTotalConstruccion: datos.valorTotalConstruccion,
-        autoavaluo: datos.autoavaluo
+        fechaAdquisicion: datos.fechaAdquisicion 
+          ? (datos.fechaAdquisicion instanceof Date 
+              ? datos.fechaAdquisicion.toISOString().split('T')[0]
+              : String(datos.fechaAdquisicion).split('T')[0])
+          : undefined,
+        numeroPisos: datos.numeroPisos || undefined,
+        totalAreaConstruccion: datos.totalAreaConstruccion || undefined,
+        valorTerreno: datos.valorTerreno || undefined,
+        valorTotalConstruccion: datos.valorTotalConstruccion || undefined,
+        autoavaluo: datos.autoavaluo || undefined
       };
       
-      const predioActualizado = await predioService.actualizarPredio(codigoPredio, datosApi);
+      const anio = datos.anio || new Date().getFullYear();
+      const codDireccion = datos.direccionId || 1; // Usar direccionId del formulario
+      const predioActualizado = await predioService.actualizarPredio(anio, codDireccion, datosApi);
       
       // Actualizar lista
       await cargarPredios();
       
+      const predioMapeado = mapPredioDataToModel(predioActualizado);
       NotificationService.success('Predio actualizado exitosamente');
-      return predioActualizado;
+      return predioMapeado;
     } catch (err: any) {
       const mensaje = err.message || 'Error al actualizar predio';
       setError(mensaje);
@@ -382,6 +459,7 @@ export const usePredios = (): UsePrediosReturn => {
     
     // Acciones
     cargarPredios,
+    cargarTodosPredios,
     buscarPredios,
     buscarPrediosConFormData,
     obtenerPredioPorCodigo,

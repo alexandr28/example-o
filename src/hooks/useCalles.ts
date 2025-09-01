@@ -4,7 +4,7 @@ import { useCrudEntity } from './useCrudEntity';
 import { 
   CalleData, 
   CreateCalleDTO, 
-  UpdateCalleDTO
+  UpdateCalleDTO,
 } from '../services/calleApiService';
 import { SectorData } from '../services/sectorService';
 import { BarrioData } from '../services/barrioService';
@@ -24,6 +24,7 @@ export const useCalles = () => {
   const [loadingBarrios, setLoadingBarrios] = useState(false);
   const [loadingTiposVia, setLoadingTiposVia] = useState(false);
   const [modoEdicion, setModoEdicion] = useState(false);
+  
 
   // Hook genérico para CRUD
   const [state, actions] = useCrudEntity<CalleData, CreateCalleDTO, UpdateCalleDTO>(
@@ -37,7 +38,7 @@ export const useCalles = () => {
         // Ordenar por nombre de vía y luego por nombre
         const viaComparison = (a.nombreVia || '').localeCompare(b.nombreVia || '');
         if (viaComparison !== 0) return viaComparison;
-        return a.nombre.localeCompare(b.nombre);
+        return (a.nombre || '').localeCompare(b.nombre || '');
       },
       localFilter: (items, filter) => {
         let filtered = items;
@@ -45,9 +46,9 @@ export const useCalles = () => {
         if (filter.search) {
           const searchLower = filter.search.toLowerCase();
           filtered = filtered.filter(item => 
-            item.nombre.toLowerCase().includes(searchLower) ||
+            item.nombre?.toLowerCase().includes(searchLower) ||
             item.nombreVia?.toLowerCase().includes(searchLower) ||
-            item.nombreCompleto?.toLowerCase().includes(searchLower)
+            item.codigo?.toString().includes(searchLower)
           );
         }
         
@@ -57,9 +58,9 @@ export const useCalles = () => {
           );
         }
         
-        if (filter.codigoBarrio) {
+        if (filter.codBarrio) {
           filtered = filtered.filter(item => 
-            item.codigoBarrio === filter.codigoBarrio
+            item.codBarrio === filter.codBarrio
           );
         }
         
@@ -123,24 +124,29 @@ export const useCalles = () => {
   }, [cargarDependencias]);
 
   // Filtrar barrios por sector
-  const filtrarBarriosPorSector = useCallback((codigoSector: number) => {
-    if (!codigoSector || codigoSector === 0) {
+  const filtrarBarriosPorSector = useCallback((codSector: number) => {
+    if (!codSector || codSector === 0) {
       setBarriosFiltrados(barrios);
     } else {
-      const barriosFiltrados = barrios.filter(b => b.codigoSector === codigoSector);
+      const barriosFiltrados = barrios.filter(b => b.codSector === codSector);
       setBarriosFiltrados(barriosFiltrados);
     }
   }, [barrios]);
 
   // Helpers para obtener nombres
-  const obtenerNombreSector = useCallback((codigoSector: number): string => {
-    const sector = sectores.find(s => s.codigo === codigoSector);
+  const obtenerNombreSector = useCallback((codSector: number): string => {
+    const sector = sectores.find(s => s.codigo === codSector);
     return sector?.nombre || 'Sin sector';
   }, [sectores]);
 
-  const obtenerNombreBarrio = useCallback((codigoBarrio: number): string => {
-    const barrio = barrios.find(b => b.codigo === codigoBarrio);
+  const obtenerNombreBarrio = useCallback((codBarrio: number): string => {
+    const barrio = barrios.find(b => b.codigo === codBarrio);
     return barrio?.nombre || 'Sin barrio';
+  }, [barrios]);
+
+  const obtenerCodigoSector = useCallback((codBarrio: number): number => {
+    const barrio = barrios.find(b => b.codigo === codBarrio);
+    return barrio?.codSector || 0;
   }, [barrios]);
 
   const obtenerNombreTipoVia = useCallback((codigoVia: number): string => {
@@ -154,21 +160,22 @@ export const useCalles = () => {
   }, [actions]);
 
   // Buscar por barrio
-  const buscarPorBarrio = useCallback((codigoBarrio: number) => {
-    actions.setFilters({ codigoBarrio });
+  const buscarPorBarrio = useCallback((codBarrio: number) => {
+    actions.setFilters({ codBarrio });
   }, [actions]);
 
   // Buscar por sector
-  const buscarPorSector = useCallback((codigoSector: number) => {
-    actions.setFilters({ codigoSector });
-    filtrarBarriosPorSector(codigoSector);
+  const buscarPorSector = useCallback((codSector: number) => {
+    actions.setFilters({ codSector });
+    filtrarBarriosPorSector(codSector);
   }, [actions, filtrarBarriosPorSector]);
+
 
   // Crear calle con validación
   const crearCalle = useCallback(async (data: CreateCalleDTO) => {
     // Validar que el barrio existe
-    const barrioExiste = barrios.some(b => b.codigo === data.codigoBarrio);
-    if (!barrioExiste && data.codigoBarrio > 0) {
+    const barrioExiste = barrios.some(b => b.codigo === data.codBarrio);
+    if (!barrioExiste && data.codBarrio > 0) {
       throw new Error('El barrio seleccionado no existe');
     }
     
@@ -179,23 +186,45 @@ export const useCalles = () => {
   const guardarCalle = useCallback(async (data: CreateCalleDTO | UpdateCalleDTO) => {
     if (state.selectedItem && modoEdicion) {
       // Actualizar
-      return actions.updateItem(state.selectedItem.codigo, data as UpdateCalleDTO);
+      return actions.updateItem(state.selectedItem.codigo!, data as UpdateCalleDTO);
     } else {
       // Crear
       return crearCalle(data as CreateCalleDTO);
     }
   }, [state.selectedItem, modoEdicion, actions, crearCalle]);
 
+  // Actualizar sector
+  const actualizarSector = useCallback(async (sectorId: number, nombre: string) => {
+    try {
+      console.log('📝 [useCalles] Actualizando sector:', sectorId, nombre);
+      
+      await calleService.actualizarSector(sectorId, { nombreSector: nombre });
+      
+      // Recargar sectores después de actualizar
+      await cargarSectores();
+      
+      console.log('✅ Sector actualizado exitosamente');
+      return true;
+      
+    } catch (error: any) {
+      console.error('❌ [useCalles] Error al actualizar sector:', error);
+      throw error;
+    }
+  }, [cargarSectores]);
+
+  // Datos a mostrar son siempre los items del estado
+  const callesToShow = state.items;
+
   return {
     // Estado
-    calles: state.items,
+    calles: callesToShow,
     calleSeleccionada: state.selectedItem,
     loading: state.loading,
     error: state.error,
     page: state.page,
     pageSize: state.pageSize,
-    totalItems: state.totalItems,
-    totalPages: state.totalPages,
+    totalItems: callesToShow.length,
+    totalPages: Math.ceil(callesToShow.length / state.pageSize),
     searchTerm: state.searchTerm,
     isOffline: state.isOffline,
     modoEdicion,
@@ -237,7 +266,9 @@ export const useCalles = () => {
     cargarTiposVia,
     obtenerNombreSector,
     obtenerNombreBarrio,
+    obtenerCodigoSector,
     obtenerNombreTipoVia,
+    actualizarSector,
     refrescar: actions.refresh,
     limpiarError: actions.clearError,
     resetear: actions.reset

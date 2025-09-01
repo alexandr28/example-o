@@ -29,7 +29,7 @@ export default defineConfig({
     proxy: {
       // Proxy para todas las rutas /api/*
       '/api': {
-        target: 'http://26.161.18.122:8080',
+        target: 'http://26.161.18.122:8085',
         changeOrigin: true,
         secure: false,
         configure: (proxy, _options) => {
@@ -47,7 +47,7 @@ export default defineConfig({
       
       // Proxy para rutas de autenticación /auth/*
       '/auth': {
-        target: 'http://192.168.20.160:8080',
+        target: 'http://192.168.20.160:8085',
         changeOrigin: true,
         secure: false
       }

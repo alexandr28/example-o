@@ -9,7 +9,6 @@ import {
   Alert,
   CircularProgress,
   FormHelperText,
-  Autocomplete,
   Paper,
   useTheme,
   alpha
@@ -17,10 +16,8 @@ import {
 import { 
   Save as SaveIcon, 
   Add as AddIcon,
-  CalendarToday as CalendarIcon,
-  AttachMoney as MoneyIcon,
   LocationOn as LocationIcon,
-  Assignment as AssignmentIcon
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { useAranceles, useArancel } from '../../hooks/useAranceles';
 import SelectorDirecciones from '../modal/SelectorDirecciones';
@@ -31,7 +28,15 @@ interface ArancelFormData {
   costoArancel: number;
 }
 
-export const AsignacionArancelForm: React.FC = () => {
+interface AsignacionArancelFormProps {
+  onRedirectToList?: (searchParams: { anio: number; codDireccion: number }) => void;
+  editData?: any;
+}
+
+export const AsignacionArancelForm: React.FC<AsignacionArancelFormProps> = ({ 
+  onRedirectToList,
+  editData 
+}) => {
   // Estados
   const [formData, setFormData] = useState<ArancelFormData>({
     anio: null,
@@ -45,7 +50,7 @@ export const AsignacionArancelForm: React.FC = () => {
   const [codArancelActual, setCodArancelActual] = useState<number | null>(null);
 
   // Hooks
-  const { crearArancelSinAuth, actualizarArancel, loading } = useAranceles();
+  const { crearArancelSinAuth, actualizarArancelSinAuth, eliminarArancel, loading } = useAranceles();
 
   // Hook para obtener arancel existente cuando se selecciona año y dirección
   const { arancel: arancelExistente } = useArancel(
@@ -68,12 +73,31 @@ export const AsignacionArancelForm: React.FC = () => {
     }
   }, [arancelExistente]);
 
-  // Generar opciones de años
-  const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: 10 }, (_, i) => ({
-    value: currentYear - i,
-    label: (currentYear - i).toString()
-  }));
+  // Efecto para manejar datos de edición desde la lista
+  useEffect(() => {
+    if (editData) {
+      console.log('✏️ [AsignacionArancelForm] Cargando datos para edición:', editData);
+      
+      setFormData({
+        anio: editData.anio,
+        codDireccion: editData.codDireccion,
+        costoArancel: editData.costoArancel
+      });
+      
+      setCodArancelActual(editData.codArancel);
+      setIsEditMode(true);
+      
+      // Crear un objeto de dirección temporal para mostrar
+      const direccionTemp = {
+        id: editData.codDireccion,
+        codDireccion: editData.codDireccion,
+        sector: `Dirección ${editData.codDireccion}`,
+        // Agregar datos mínimos para mostrar
+      };
+      setDireccionSeleccionada(direccionTemp);
+    }
+  }, [editData]);
+
 
   // Validación del formulario
   const validateForm = (): boolean => {
@@ -116,12 +140,19 @@ export const AsignacionArancelForm: React.FC = () => {
     if (!validateForm()) return;
 
     try {
+      // Guardar los valores antes de limpiar el formulario para la redirección
+      const savedAnio = formData.anio!;
+      const savedCodDireccion = formData.codDireccion!;
+
       if (isEditMode && codArancelActual) {
-        // Para actualización, usar el método original
-        await actualizarArancel(codArancelActual, {
+        // Para actualización, usar el nuevo método PUT sin autenticación con JSON
+        console.log('📝 [AsignacionArancelForm] Actualizando arancel sin autenticación');
+        await actualizarArancelSinAuth({
+          codArancel: codArancelActual,
           anio: formData.anio!,
           codDireccion: formData.codDireccion!,
-          costoArancel: formData.costoArancel
+          costo: formData.costoArancel,
+          codUsuario: 1
         });
       } else {
         // Para creación, usar el nuevo método sin autenticación con JSON
@@ -132,6 +163,20 @@ export const AsignacionArancelForm: React.FC = () => {
           codDireccion: formData.codDireccion!,
           costo: formData.costoArancel, // Usar 'costo' según el DTO
           codUsuario: 1 // Usuario por defecto
+        });
+      }
+
+      console.log('✅ [AsignacionArancelForm] Arancel guardado exitosamente');
+      
+      // Redirigir a la lista con los parámetros de búsqueda precargados
+      if (onRedirectToList) {
+        console.log('🔄 [AsignacionArancelForm] Redirigiendo a lista con parámetros:', {
+          anio: savedAnio,
+          codDireccion: savedCodDireccion
+        });
+        onRedirectToList({
+          anio: savedAnio,
+          codDireccion: savedCodDireccion
         });
       }
 
@@ -152,6 +197,32 @@ export const AsignacionArancelForm: React.FC = () => {
     setIsEditMode(false);
     setCodArancelActual(null);
     setErrors({});
+  };
+
+  const handleEliminar = async () => {
+    if (!codArancelActual) return;
+
+    const confirmDelete = window.confirm('¿Está seguro de que desea eliminar este arancel?');
+    if (!confirmDelete) return;
+
+    try {
+      console.log('🗑️ [AsignacionArancelForm] Eliminando arancel:', codArancelActual);
+      await eliminarArancel(codArancelActual);
+      
+      // Redirigir a la lista con los parámetros de búsqueda para mostrar el resultado
+      if (onRedirectToList && formData.anio && formData.codDireccion) {
+        onRedirectToList({
+          anio: formData.anio,
+          codDireccion: formData.codDireccion
+        });
+      }
+      
+      // Limpiar formulario
+      handleNuevo();
+      
+    } catch (error) {
+      console.error('❌ [AsignacionArancelForm] Error eliminando arancel:', error);
+    }
   };
 
   // Función para formatear la dirección mostrada
@@ -187,31 +258,7 @@ export const AsignacionArancelForm: React.FC = () => {
         borderColor: 'divider'
       }}
     >
-      {/* Header */}
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: 2, 
-        mb: 3,
-        pb: 2,
-        borderBottom: '2px solid',
-        borderColor: 'primary.main'
-      }}>
-        <Box sx={{
-          p: 1,
-          borderRadius: 1,
-          backgroundColor: 'primary.main',
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <AssignmentIcon />
-        </Box>
-        <Typography variant="h6" fontWeight={600}>
-          {isEditMode ? 'Editar Arancel' : 'Asignación de Aranceles'}
-        </Typography>
-      </Box>
+     
 
       {/* Mostrar estado de edición */}
       {isEditMode && (
@@ -229,46 +276,33 @@ export const AsignacionArancelForm: React.FC = () => {
         mb: 2
       }}>
         {/* Año */}
-        <Box sx={{ flex: '1 1 150px', minWidth: '150px' }}>
-          <Autocomplete
-            options={yearOptions}
-            getOptionLabel={(option) => option.label}
-            value={yearOptions.find(y => y.value === formData.anio) || null}
-            onChange={(_, newValue) => {
-              handleAnioChange(newValue ? newValue.value : '');
+        <Box sx={{ 
+          flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '0 0 120px' },
+          minWidth: { xs: '100%', md: '120px' }
+        }}>
+          <TextField
+            fullWidth
+            size="small"
+            label="Año"
+            type="number"
+            value={formData.anio || ''}
+            onChange={(e) => {
+              const newYear = parseInt(e.target.value) || '';
+              handleAnioChange(newYear);
             }}
-            loading={loading}
-            disabled={loading}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Año *"
-                size="small"
-                placeholder="Seleccione año"
-                error={!!errors.anio}
-                helperText={errors.anio}
-                InputProps={{
-                  ...params.InputProps,
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <CalendarIcon sx={{ fontSize: 16 }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <>
-                      {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                      {params.InputProps.endAdornment}
-                    </>
-                  ),
-                  sx: { height: 40 }
-                }}
-              />
-            )}
+            error={!!errors.anio}
+            helperText={errors.anio}
+            InputProps={{
+              inputProps: { 
+                min: 1900, 
+                max: new Date().getFullYear() 
+              }
+            }}
           />
         </Box>
 
         {/* Costo Arancel */}
-        <Box sx={{ flex: '1 1 150px', minWidth: '150px' }}>
+        <Box sx={{ flex: '0 0 150px', minWidth: '150px' }}>
           <TextField
             label="Costo Arancel *"
             type="number"
@@ -281,10 +315,10 @@ export const AsignacionArancelForm: React.FC = () => {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <MoneyIcon sx={{ fontSize: 16 }} />
+                 S./
                 </InputAdornment>
               ),
-              endAdornment: <InputAdornment position="end">S/</InputAdornment>,
+             
               sx: { height: 40 },
               inputProps: { min: 0, step: 0.01 }
             }}
@@ -293,7 +327,7 @@ export const AsignacionArancelForm: React.FC = () => {
         </Box>
 
         {/* Seleccionar Dirección */}
-        <Box sx={{ flex: '1 1 200px', minWidth: '200px' }}>
+        <Box sx={{ flex: '0 0 180px', minWidth: '180px' }}>
           <Button
             variant="outlined"
             color="primary"
@@ -357,6 +391,32 @@ export const AsignacionArancelForm: React.FC = () => {
           >
             Nuevo
           </Button>
+
+          {/* Botón Eliminar - Solo visible en modo edición */}
+          {isEditMode && codArancelActual && (
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={handleEliminar}
+              disabled={loading}
+              sx={{ 
+                minWidth: 100,
+                height: 40,
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 600,
+                borderColor: 'error.main',
+                color: 'error.main',
+                '&:hover': {
+                  borderColor: 'error.dark',
+                  backgroundColor: alpha(theme.palette.error.main, 0.04)
+                }
+              }}
+            >
+              Eliminar
+            </Button>
+          )}
         </Box>
       </Box>
 

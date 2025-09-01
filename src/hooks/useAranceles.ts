@@ -1,6 +1,6 @@
 // src/hooks/useAranceles.ts
 import { useState, useEffect, useCallback } from 'react';
-import arancelService, { ArancelData, CreateArancelDTO, UpdateArancelDTO, CrearArancelApiDTO } from '../services/arancelService';
+import arancelService, { ArancelData, CreateArancelDTO, UpdateArancelDTO, CrearArancelApiDTO, ActualizarArancelApiDTO } from '../services/arancelService';
 
 interface UseArancelesResult {
   aranceles: ArancelData[];
@@ -11,10 +11,14 @@ interface UseArancelesResult {
   crearArancel: (datos: CreateArancelDTO) => Promise<ArancelData>;
   crearArancelSinAuth: (datos: CrearArancelApiDTO) => Promise<ArancelData>; // Nuevo método sin autenticación
   actualizarArancel: (codArancel: number, datos: UpdateArancelDTO) => Promise<ArancelData>;
+  actualizarArancelSinAuth: (datos: ActualizarArancelApiDTO) => Promise<ArancelData>; // Nuevo método PUT sin autenticación
   eliminarArancel: (codArancel: number) => Promise<void>;
   obtenerPorAnioYDireccion: (anio: number, codDireccion: number) => Promise<ArancelData | null>;
   recargar: () => Promise<void>;
   cargarPorAnio: (anio: number) => Promise<void>;
+  // Nuevos métodos para la API general
+  cargarTodosAranceles: () => Promise<void>;
+  buscarAranceles: (parametroBusqueda: string, anio?: number) => Promise<void>;
 }
 
 /**
@@ -25,33 +29,33 @@ export const useAranceles = (anioInicial?: number): UseArancelesResult => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Cargar aranceles con parámetros flexibles
+  // Cargar aranceles usando GET con query params
   const cargarAranceles = useCallback(async (params?: { 
     anio?: number; 
-    codDireccion?: number 
+    codDireccion?: number;
+    codUsuario?: number;
+    parametroBusqueda?: string;
   }) => {
     try {
       setLoading(true);
       setError(null);
       
-      // IMPORTANTE: El API requiere codDireccion para evitar error 403
+      // Construir parámetros de consulta para el API GET
       const queryParams = {
         anio: params?.anio || anioInicial,
-        codDireccion: params?.codDireccion || 1, // Valor por defecto para evitar 403
-        codUsuario: 1
+        codDireccion: params?.codDireccion,
+        codUsuario: params?.codUsuario || 1,
+        parametroBusqueda: params?.parametroBusqueda || 'a'
       };
       
-      console.log('🔄 [useAranceles] Cargando aranceles con parámetros:', queryParams);
+      console.log('🔄 [useAranceles] Cargando aranceles con query params:', queryParams);
+      console.log('📡 [useAranceles] URL ejemplo: http://26.161.18.122:8085/api/arancel?codDireccion=' + 
+                  (queryParams.codDireccion || '') + '&anio=' + (queryParams.anio || '') + 
+                  '&parametroBusqueda=' + queryParams.parametroBusqueda + '&codUsuario=' + queryParams.codUsuario);
       
-      // Solo hacer la petición si tenemos al menos el año
-      if (!queryParams.anio) {
-        console.log('⚠️ [useAranceles] No se proporcionó año, saltando petición');
-        setAranceles([]);
-        return;
-      }
-      
+      // Hacer petición con los parámetros proporcionados
       const data = await arancelService.listarAranceles(queryParams);
-      console.log('✅ [useAranceles] Datos recibidos:', data);
+      console.log('✅ [useAranceles] Datos recibidos del API:', data);
       setAranceles(data);
       
     } catch (error: any) {
@@ -124,6 +128,53 @@ export const useAranceles = (anioInicial?: number): UseArancelesResult => {
     }
   }, [cargarAranceles]);
 
+  // Actualizar arancel usando PUT JSON sin autenticación
+  const actualizarArancelSinAuth = useCallback(async (datos: ActualizarArancelApiDTO): Promise<ArancelData> => {
+    try {
+      console.log('📝 [useAranceles] Actualizando arancel sin autenticación:', datos);
+      
+      // Validaciones básicas
+      if (!datos.codArancel) {
+        throw new Error('Debe proporcionar un código de arancel');
+      }
+      
+      if (!datos.anio) {
+        throw new Error('Debe proporcionar un año');
+      }
+      
+      if (!datos.codDireccion) {
+        throw new Error('Debe proporcionar un código de dirección');
+      }
+      
+      if (datos.costo === undefined || datos.costo < 0) {
+        throw new Error('Debe proporcionar un costo válido');
+      }
+      
+      const arancelActualizado = await arancelService.actualizarArancelSinAuth(datos);
+      
+      // Actualizar estado local inmediatamente
+      setAranceles(prev => prev.map(arancel => 
+        arancel.codArancel === datos.codArancel ? arancelActualizado : arancel
+      ));
+      
+      // Recargar lista para asegurar sincronización
+      try {
+        console.log('🔄 [useAranceles] Recargando datos después de la actualización...');
+        await cargarAranceles({ anio: datos.anio, codDireccion: datos.codDireccion });
+        console.log('✅ [useAranceles] Datos recargados exitosamente');
+      } catch (err) {
+        console.warn('⚠️ [useAranceles] Error recargando datos:', err);
+      }
+      
+      console.log('✅ [useAranceles] Arancel actualizado exitosamente usando API sin autenticación');
+      return arancelActualizado;
+      
+    } catch (error: any) {
+      console.error('❌ [useAranceles] Error actualizando arancel sin auth:', error);
+      throw error;
+    }
+  }, [cargarAranceles]);
+
   // Actualizar arancel
   const actualizarArancel = useCallback(async (
     codArancel: number, 
@@ -176,6 +227,53 @@ export const useAranceles = (anioInicial?: number): UseArancelesResult => {
     await cargarAranceles({ anio, codDireccion: 1 });
   }, [cargarAranceles]);
 
+  // Cargar todos los aranceles usando la nueva API general
+  const cargarTodosAranceles = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('🔄 [useAranceles] Cargando todos los aranceles con API general');
+      
+      const data = await arancelService.obtenerTodosAranceles();
+      console.log('✅ [useAranceles] Todos los aranceles cargados:', data);
+      setAranceles(data);
+      
+    } catch (error: any) {
+      console.error('❌ [useAranceles] Error cargando todos los aranceles:', error);
+      setError(error.message || 'Error al cargar todos los aranceles');
+      setAranceles([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Buscar aranceles con parámetro de búsqueda usando la nueva API
+  const buscarAranceles = useCallback(async (parametroBusqueda: string, anio?: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('🔍 [useAranceles] Buscando aranceles:', { parametroBusqueda, anio });
+      
+      const data = await arancelService.listarAranceles({
+        parametroBusqueda,
+        anio: anio || new Date().getFullYear(),
+        codUsuario: 1
+      });
+      
+      console.log('✅ [useAranceles] Aranceles encontrados:', data);
+      setAranceles(data);
+      
+    } catch (error: any) {
+      console.error('❌ [useAranceles] Error buscando aranceles:', error);
+      setError(error.message || 'Error al buscar aranceles');
+      setAranceles([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return {
     aranceles,
     loading,
@@ -183,10 +281,14 @@ export const useAranceles = (anioInicial?: number): UseArancelesResult => {
     crearArancel,
     crearArancelSinAuth, // Nuevo método sin autenticación
     actualizarArancel,
+    actualizarArancelSinAuth, // Nuevo método PUT sin autenticación
     eliminarArancel,
     obtenerPorAnioYDireccion,
     recargar: cargarAranceles,
-    cargarPorAnio
+    cargarPorAnio,
+    // Nuevos métodos para la API general
+    cargarTodosAranceles,
+    buscarAranceles
   };
 };
 

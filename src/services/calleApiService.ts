@@ -11,9 +11,11 @@ export interface CalleData {
   codVia: number;
   codTipoVia: number | string;
   codBarrio: number;
+  codSector?: number;
   nombreVia: string;
   descTipoVia: string;
   nombreBarrio: string;
+  nombreSector?: string;
   
   // Campos para compatibilidad
   codigo?: number;
@@ -45,6 +47,12 @@ export interface BusquedaCalleParams {
   tipo?: string;
   estado?: string;
   codUsuario?: number;
+  parametrosBusqueda?: string;
+  nombreVia?: string;
+}
+
+export interface UpdateSectorDTO {
+  nombreSector: string;
 }
 
 /**
@@ -65,9 +73,11 @@ class CalleApiService extends BaseApiService<CalleData, CreateCalleDTO, UpdateCa
           codVia: item.codVia || 0,
           codTipoVia: item.codTipoVia || '',
           codBarrio: item.codBarrio || 0,
+          codSector: item.codSector || 0,
           nombreVia: item.nombreVia || '',
           descTipoVia: item.descTipoVia || '',
           nombreBarrio: item.nombreBarrio || '',
+          nombreSector: item.nombreSector || '',
           
           // Campos para compatibilidad
           codigo: item.codVia || item.codigo || 0,
@@ -216,20 +226,67 @@ class CalleApiService extends BaseApiService<CalleData, CreateCalleDTO, UpdateCa
     }
   }
   
+
   /**
-   * Buscar vías por nombre
+   * Buscar vías por nombre (método legacy)
    */
   async buscarPorNombre(nombre: string): Promise<CalleData[]> {
     try {
-      const params: BusquedaCalleParams = {
-        nombre: nombre.trim(),
-        estado: 'ACTIVO'
-      };
-      
-      return await this.getAll(params);
+      // Usar la nueva API para búsquedas
+      return await this.buscarPorNombreVia(nombre);
       
     } catch (error: any) {
       console.error('❌ [CalleApiService] Error buscando vías:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualizar sector
+   */
+  async actualizarSector(sectorId: number, data: UpdateSectorDTO): Promise<any> {
+    try {
+      console.log('📝 [CalleApiService] Actualizando sector:', sectorId, data);
+      
+      // En desarrollo, usar ruta relativa para que el proxy de Vite funcione
+      const url = import.meta.env.DEV 
+        ? `/api/sector/${sectorId}` 
+        : buildApiUrl(`/api/sector/${sectorId}`);
+      
+      console.log('📡 URL para actualizar sector:', url);
+      
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+          // NO Authorization - la API no requiere autenticación
+        },
+        body: JSON.stringify(data)
+      });
+      
+      console.log('📡 Status:', response.status);
+      const responseText = await response.text();
+      console.log('📡 Response:', responseText);
+      
+      if (!response.ok) {
+        throw new Error(`Error al actualizar sector: ${response.status} - ${responseText}`);
+      }
+      
+      // Manejar diferentes tipos de respuesta
+      let responseData;
+      try {
+        responseData = responseText ? JSON.parse(responseText) : { success: true };
+      } catch {
+        // Si no es JSON válido, asumir éxito si status es OK
+        responseData = { success: true, message: responseText };
+      }
+      
+      console.log('✅ Sector actualizado exitosamente');
+      return responseData;
+      
+    } catch (error: any) {
+      console.error('❌ [CalleApiService] Error actualizando sector:', error);
       throw error;
     }
   }

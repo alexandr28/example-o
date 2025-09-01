@@ -18,8 +18,6 @@ import {
   Tooltip,
   Button,
   CircularProgress,
-  Card,
-  CardContent,
   InputAdornment,
   useTheme,
   alpha
@@ -28,20 +26,16 @@ import {
   Search as SearchIcon,
   Refresh as RefreshIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon,
   Visibility as VisibilityIcon,
   Add as AddIcon,
   Clear as ClearIcon,
   FilterList as FilterIcon,
   Home as HomeIcon,
   Terrain as TerrainIcon,
-  AttachMoney as MoneyIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { usePredios } from '../../hooks/usePredioAPI';
 import { Predio } from '../../models/Predio';
-import { NotificationService } from '../utils/Notification';
-import { formatCurrency } from '../../utils/formatters';
 import { Direccion } from '../../models/Direcciones';
 
 /**
@@ -100,9 +94,8 @@ const ConsultaPredios: React.FC = () => {
     predios, 
     loading, 
     cargarPredios, 
+    cargarTodosPredios,
     buscarPredios,
-    eliminarPredio,
-    estadisticas,
     cargarEstadisticas
   } = usePredios();
 
@@ -120,7 +113,8 @@ const ConsultaPredios: React.FC = () => {
   // Cargar datos al montar
   useEffect(() => {
     cargarEstadisticas();
-  }, [cargarEstadisticas]);
+    cargarTodosPredios(); // Cargar todos los predios usando API /all
+  }, [cargarEstadisticas, cargarTodosPredios]);
 
   // Filtrar predios localmente
   const filteredPredios = useMemo(() => {
@@ -156,15 +150,6 @@ const ConsultaPredios: React.FC = () => {
     navigate(`/predio/editar/${predio.codigoPredio}`);
   };
 
-  const handleDelete = async (codigoPredio: string) => {
-    if (window.confirm(`¿Está seguro de eliminar el predio ${codigoPredio}?`)) {
-      const result = await eliminarPredio(codigoPredio);
-      if (result) {
-        NotificationService.success('Predio eliminado exitosamente');
-      }
-    }
-  };
-
   const handleView = (predio: Predio) => {
     navigate(`/predio/detalle/${predio.codigoPredio}`);
   };
@@ -181,7 +166,7 @@ const ConsultaPredios: React.FC = () => {
       condicionPropiedad: ''
     });
     setSearchTerm('');
-    cargarPredios();
+    cargarTodosPredios(); // Usar API /all para refrescar
   };
 
   const getEstadoChip = (estado?: string) => {
@@ -397,7 +382,7 @@ const ConsultaPredios: React.FC = () => {
         }}>
           <Table stickyHeader size="medium">
             <TableHead>
-              <TableRow>
+              <TableRow key="header-row">
                 <TableCell sx={{
                   bgcolor: alpha(theme.palette.primary.main, 0.08),
                   color: theme.palette.primary.main,
@@ -489,7 +474,7 @@ const ConsultaPredios: React.FC = () => {
             </TableHead>
             <TableBody>
               {loading ? (
-                <TableRow>
+                <TableRow key="loading-row">
                   <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                     <Stack alignItems="center" spacing={2}>
                       <CircularProgress 
@@ -506,7 +491,7 @@ const ConsultaPredios: React.FC = () => {
               ) : paginatedPredios.length > 0 ? (
                 paginatedPredios.map((predio, index) => (
                   <TableRow
-                    key={predio.codigoPredio}
+                    key={predio.codPredio || predio.codigoPredio || `predio-${index}`}
                     hover
                     sx={{
                       cursor: 'pointer',
@@ -529,7 +514,7 @@ const ConsultaPredios: React.FC = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Chip
                           icon={<TerrainIcon fontSize="small" />}
-                          label={predio.codigoPredio}
+                          label={predio.codPredio || predio.codigoPredio || 'Sin código'}
                           size="small"
                           variant="outlined"
                           color="primary"
@@ -654,7 +639,7 @@ const ConsultaPredios: React.FC = () => {
                   </TableRow>
                 ))
               ) : (
-                <TableRow>
+                <TableRow key="no-data-row">
                   <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
                     <Stack alignItems="center" spacing={3}>
                       <Box sx={{

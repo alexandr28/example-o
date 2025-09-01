@@ -1,7 +1,20 @@
 // src/utils/calleAdapter.ts
 import { CalleData } from '../services/calleApiService';
-import { Calle, TipoVia, TIPO_VIA_OPTIONS } from '../models/Calle';
+import { Calle, TIPO_VIA_OPTIONS } from '../models/Calle';
 import { useCalles } from '../hooks/useCalles';
+
+/**
+ * Constantes para tipos de vía
+ */
+const TipoViaConstants = {
+  AVENIDA: 'AVENIDA',
+  CALLE: 'CALLE',
+  JIRON: 'JIRON',
+  PASAJE: 'PASAJE',
+  MALECON: 'MALECON',
+  PLAZA: 'PLAZA',
+  PARQUE: 'PARQUE'
+} as const;
 
 /**
  * Adaptador para transformar entre el modelo de dominio (Calle) 
@@ -24,10 +37,10 @@ export class CalleAdapter {
       descripTipoVia: apiData.nombreVia,
       
       // Mapear a los campos del modelo antiguo
-      sectorId: 0, // No viene en la API, se debe obtener del barrio
-      barrioId: apiData.codigoBarrio,
+      codSector: 0, // No viene en la API, se debe obtener del barrio
+      codBarrio: apiData.codigoBarrio,
       
-      estado: apiData.estado === 'ACTIVO',
+      estado: apiData.estado,
       fechaCreacion: apiData.fechaRegistro,
       fechaModificacion: apiData.fechaModificacion,
       usuarioCreacion: apiData.codUsuario?.toString(),
@@ -39,12 +52,9 @@ export class CalleAdapter {
    * Convierte Calle (modelo de dominio) a CreateCalleDTO
    */
   static fromModelToCreateDTO(calle: Partial<Calle>): any {
-    // Encontrar el código de vía basado en el tipo
-    const tipoViaOption = TIPO_VIA_OPTIONS.find(opt => opt.value === calle.tipoVia);
-    
     return {
-      codigoBarrio: calle.barrioId || 0,
-      codigoVia: calle.codTipoVia || this.obtenerCodigoVia(calle.tipoVia || ''),
+      codigoBarrio: calle.codBarrio || 0,
+      codigoVia: calle.codTipoVia || 2, // Default to CALLE
       nombre: calle.nombre || '',
       descripcion: ''
     };
@@ -58,25 +68,25 @@ export class CalleAdapter {
     
     // Mapeo de nombres de API a tipos de vía del modelo
     const mapeo: Record<string, string> = {
-      'avenida': TipoVia.AVENIDA,
-      'av.': TipoVia.AVENIDA,
-      'calle': TipoVia.CALLE,
-      'ca.': TipoVia.CALLE,
-      'jirón': TipoVia.JIRON,
-      'jiron': TipoVia.JIRON,
-      'jr.': TipoVia.JIRON,
-      'pasaje': TipoVia.PASAJE,
-      'pj.': TipoVia.PASAJE,
-      'malecón': TipoVia.MALECON,
-      'malecon': TipoVia.MALECON,
-      'ml.': TipoVia.MALECON,
-      'plaza': TipoVia.PLAZA,
-      'pz.': TipoVia.PLAZA,
-      'parque': TipoVia.PARQUE,
-      'pq.': TipoVia.PARQUE
+      'avenida': TipoViaConstants.AVENIDA,
+      'av.': TipoViaConstants.AVENIDA,
+      'calle': TipoViaConstants.CALLE,
+      'ca.': TipoViaConstants.CALLE,
+      'jirón': TipoViaConstants.JIRON,
+      'jiron': TipoViaConstants.JIRON,
+      'jr.': TipoViaConstants.JIRON,
+      'pasaje': TipoViaConstants.PASAJE,
+      'pj.': TipoViaConstants.PASAJE,
+      'malecón': TipoViaConstants.MALECON,
+      'malecon': TipoViaConstants.MALECON,
+      'ml.': TipoViaConstants.MALECON,
+      'plaza': TipoViaConstants.PLAZA,
+      'pz.': TipoViaConstants.PLAZA,
+      'parque': TipoViaConstants.PARQUE,
+      'pq.': TipoViaConstants.PARQUE
     };
 
-    return mapeo[nombreNormalizado] || TipoVia.CALLE;
+    return mapeo[nombreNormalizado] || TipoViaConstants.CALLE;
   }
 
   /**
@@ -85,13 +95,13 @@ export class CalleAdapter {
   private static obtenerCodigoVia(tipoVia: string): number {
     // Mapeo de tipos a códigos (basado en tu API)
     const mapeo: Record<string, number> = {
-      [TipoVia.AVENIDA]: 1,
-      [TipoVia.CALLE]: 2,
-      [TipoVia.JIRON]: 3,
-      [TipoVia.PASAJE]: 4,
-      [TipoVia.MALECON]: 6,
-      [TipoVia.PLAZA]: 8,
-      [TipoVia.PARQUE]: 9
+      [TipoViaConstants.AVENIDA]: 1,
+      [TipoViaConstants.CALLE]: 2,
+      [TipoViaConstants.JIRON]: 3,
+      [TipoViaConstants.PASAJE]: 4,
+      [TipoViaConstants.MALECON]: 6,
+      [TipoViaConstants.PLAZA]: 8,
+      [TipoViaConstants.PARQUE]: 9
     };
 
     return mapeo[tipoVia] || 2; // Por defecto CALLE

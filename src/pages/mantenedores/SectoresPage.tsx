@@ -10,11 +10,22 @@ import {
   Tab,
   useTheme,
   alpha,
-  Typography
+  Typography,
+  Alert,
+  AlertTitle,
+  Button,
+  Chip,
+  Stack,
+  Divider
 } from '@mui/material';
 import {
   Add as AddIcon,
-  List as ListIcon
+  List as ListIcon,
+  Business as BusinessIcon,
+  WifiOff as WifiOffIcon,
+  Refresh as RefreshIcon,
+  Settings as SettingsIcon,
+  Error as ErrorIcon
 } from '@mui/icons-material';
 
 // Interface para TabPanel
@@ -79,18 +90,27 @@ const SectoresPage: React.FC = () => {
     setTabValue(newValue);
   };
 
-  // Manejo de edición
-  const handleEditar = () => {
-    if (sectorSeleccionado) {
+  // Manejo de edición - versión mejorada que recibe el sector como parámetro
+  const handleEditar = (sector?: any) => {
+    // Si se pasa un sector como parámetro (desde la lista), usarlo directamente
+    if (sector) {
+      seleccionarSector(sector);
       setModoEdicion(true);
       setTabValue(0); // Cambiar al tab de formulario al editar
-    } else {
+    } 
+    // Si no se pasa parámetro, verificar si hay uno seleccionado (para otras funciones)
+    else if (sectorSeleccionado) {
+      setModoEdicion(true);
+      setTabValue(0); // Cambiar al tab de formulario al editar
+    } 
+    // Solo mostrar el mensaje si no hay sector seleccionado Y no se pasó uno como parámetro
+    else {
       showMessage("⚠️ Por favor, seleccione un sector para editar");
     }
   };
 
   // Manejo de guardado
-  const handleGuardar = async (data: { nombre: string }) => {
+  const handleGuardar = async (data: { nombre: string; cuadrante?: number; descripcion?: string }) => {
     try {
       await guardarSector(data);
       showMessage(
@@ -134,7 +154,7 @@ const SectoresPage: React.FC = () => {
 
   return (
     <MainLayout title="Mantenimiento de Sectores">
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
         {/* Toast flotante en la parte inferior derecha */}
         {successMessage && (
           <div
@@ -143,9 +163,9 @@ const SectoresPage: React.FC = () => {
               bottom: 24,
               right: 24,
               zIndex: 9999,
-              minWidth: 280,
-              maxWidth: 400,
-              boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+              minWidth: 200,
+              maxWidth: 350,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
               pointerEvents: "auto",
             }}
             className={`border px-4 py-3 rounded ${
@@ -161,49 +181,123 @@ const SectoresPage: React.FC = () => {
           </div>
         )}
 
-        {/* Header con breadcrumb */}
-        <Box sx={{ mb: 2 }}>
-          <Breadcrumb items={breadcrumbItems} />
-          <Typography variant="h4" component="h1" sx={{ mt: 2 }}>
-            Gestión de Sectores
-          </Typography>
-        </Box>
-
-        {/* Alerta de modo offline */}
-        {isOfflineMode && (
-          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded relative mb-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <span className="font-medium">⚠️ Modo sin conexión:</span>
-                <span className="ml-1">Trabajando con datos locales.</span>
-              </div>
-              <button
-                onClick={handleForceReload}
-                className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300"
-                disabled={loading}
-              >
-                Reconectar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Mensajes de error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative mb-4">
-            <span className="block sm:inline">{error}</span>
-          </div>
-        )}
-
-        {/* Contenedor principal con tabs */}
+        {/* Header mejorado con Material UI */}
         <Paper 
-          elevation={2}
+          elevation={0}
           sx={{ 
-            borderRadius: 2,
-            overflow: 'hidden',
-            border: `1px solid ${theme.palette.divider}`,
+            p: { xs: 2, sm: 3 },
+            mb: 3,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)`,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+            borderRadius: 2
           }}
         >
+          <Breadcrumb items={breadcrumbItems} />
+          
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            gap: { xs: 2, sm: 3 },
+            mt: 2
+          }}>
+            {/* Icono principal */}
+            <Box sx={{
+              p: 1.5,
+              borderRadius: 2,
+              background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
+            }}>
+              <BusinessIcon sx={{ fontSize: { xs: 28, sm: 32 } }} />
+            </Box>
+            
+            {/* Título y descripción */}
+            <Box sx={{ flex: 1 }}>
+              <Typography 
+                variant="h4" 
+                component="h1" 
+                sx={{ 
+                  fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' },
+                  fontWeight: 700,
+                  color: theme.palette.primary.dark,
+                  mb: 0.5
+                }}
+              >
+                Gestión de Sectores
+              </Typography>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  color: theme.palette.text.secondary,
+                  fontSize: { xs: '0.875rem', sm: '1rem' }
+                }}
+              >
+                Administra los sectores geográficos del sistema tributario
+              </Typography>
+            </Box>
+            
+            {/* Estadísticas */}
+            <Stack 
+              direction="row" 
+              spacing={2}
+              sx={{ display: { xs: 'none', md: 'flex' } }}
+            >
+             
+            
+            </Stack>
+          </Box>
+        </Paper>
+
+        {/* Alertas con Material UI */}
+        <Stack spacing={2} sx={{ mb: 2 }}>
+          {isOfflineMode && (
+            <Alert 
+              severity="warning" 
+              icon={<WifiOffIcon />}
+              action={
+                <Button 
+                  color="inherit" 
+                  size="small"
+                  startIcon={<RefreshIcon />}
+                  onClick={handleForceReload}
+                  disabled={loading}
+                  sx={{ fontWeight: 600 }}
+                >
+                  Reconectar
+                </Button>
+              }
+              sx={{ 
+                borderRadius: 1,
+                '& .MuiAlert-icon': {
+                  fontSize: 24
+                }
+              }}
+            >
+              <AlertTitle sx={{ fontWeight: 600 }}>Modo sin conexión</AlertTitle>
+              Trabajando con datos almacenados localmente. Los cambios se sincronizarán cuando se restablezca la conexión.
+            </Alert>
+          )}
+
+      
+        </Stack>
+
+        {/* Contenedor principal con tabs */}
+        <Box sx={{ 
+          maxWidth: { xs: '100%', sm: '100%', md: '90%', lg: '900px' }, 
+          mx: 'auto' 
+        }}>
+          <Paper 
+            elevation={0}
+            sx={{ 
+              borderRadius: 2,
+              overflow: 'hidden',
+              border: `1px solid ${theme.palette.divider}`,
+            }}
+          >
           {/* Header con tabs */}
           <Box sx={{ 
             bgcolor: alpha(theme.palette.primary.main, 0.04),
@@ -213,12 +307,15 @@ const SectoresPage: React.FC = () => {
               value={tabValue}
               onChange={handleTabChange}
               aria-label="sector tabs"
+              variant="scrollable"
+              scrollButtons="auto"
               sx={{
                 '& .MuiTab-root': {
-                  minHeight: 64,
+                  minHeight: { xs: 48, sm: 56, md: 64 },
                   textTransform: 'none',
                   fontWeight: 500,
-                  fontSize: '0.95rem',
+                  fontSize: { xs: '0.8rem', sm: '0.9rem', md: '0.95rem' },
+                  px: { xs: 1, sm: 2, md: 3 },
                   '&.Mui-selected': {
                     fontWeight: 600,
                   }
@@ -248,7 +345,7 @@ const SectoresPage: React.FC = () => {
 
           {/* Panel de Formulario */}
           <TabPanel value={tabValue} index={0}>
-            <Box sx={{ p: 3 }}>
+          
               <SectorForm
                 sectorSeleccionado={sectorSeleccionado}
                 onGuardar={handleGuardar}
@@ -258,7 +355,7 @@ const SectoresPage: React.FC = () => {
                 loading={loading}
                 isEditMode={modoEdicion}
               />
-            </Box>
+        
           </TabPanel>
 
           {/* Panel de Lista */}
@@ -276,7 +373,8 @@ const SectoresPage: React.FC = () => {
               />
             </Box>
           </TabPanel>
-        </Paper>
+          </Paper>
+        </Box>
       </Box>
     </MainLayout>
   );

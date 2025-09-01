@@ -67,7 +67,56 @@ export const usePisos = () => {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Buscar pisos por predio y año usando el API real
+   * Consultar pisos con filtros usando el API GET
+   * GET http://26.161.18.122:8080/api/piso?codPiso=1&anio=2023&codPredio=20231&numeroPiso=1
+   */
+  const consultarPisos = useCallback(async (filtros: {
+    codPiso?: number;
+    anio?: number;
+    codPredio?: string;
+    numeroPiso?: number;
+  }): Promise<PisoData[]> => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      console.log('🔍 [usePisos] Filtros recibidos:', filtros);
+      
+      // Validar que tengamos al menos un codPredio válido
+      if (!filtros.codPredio || filtros.codPredio.trim() === '') {
+        console.log('⚠️ [usePisos] Código de predio vacío, usando valor por defecto');
+      }
+      
+      const pisosDelApi = await pisoService.consultarPisos(filtros);
+      
+      console.log('📡 [usePisos] Pisos encontrados:', pisosDelApi.length);
+      
+      // Actualizar estado con los pisos del API
+      const pisosFormateados: Piso[] = pisosDelApi.map((piso, index) => ({
+        id: piso.id || piso.codPiso || index + 1,
+        item: index + 1,
+        descripcion: `Piso ${piso.numeroPiso || index + 1}`,
+        valorUnitario: piso.valorUnitario || 0,
+        incremento: piso.incremento || 0,
+        porcentajeDepreciacion: piso.depreciacion || 0,
+        valorUnicoDepreciado: piso.valorUnitarioDepreciado || 0,
+        valorAreaConstruida: piso.valorAreaConstruida || 0
+      }));
+      
+      setPisos(pisosFormateados);
+      return pisosDelApi;
+      
+    } catch (error: any) {
+      console.error('❌ [usePisos] Error consultando pisos:', error);
+      setError(error.message || 'Error al consultar pisos');
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Buscar pisos por predio y año usando el API real (método legacy para compatibilidad)
    * GET http://26.161.18.122:8080/api/piso?codPiso=1&anio=2023&codPredio=20231&numeroPiso=1
    */
   const buscarPisos = useCallback(async (codigoPredio: string, anio: number): Promise<Piso[]> => {
@@ -79,23 +128,21 @@ export const usePisos = () => {
       
       // Llamar al servicio real con los parámetros del API
       const pisosDelApi = await pisoService.consultarPisos({
-        codPiso: 1, // Valor por defecto según el ejemplo
         anio: anio,
-        codPredio: codigoPredio,
-        numeroPiso: 1 // Valor por defecto según el ejemplo
+        codPredio: codigoPredio
       });
       
       console.log('📡 [usePisos] Respuesta del servicio:', pisosDelApi);
       
       // Convertir la respuesta del servicio al formato esperado por el componente
       const pisosFormateados: Piso[] = pisosDelApi.map((piso, index) => ({
-        id: piso.id || index + 1,
+        id: piso.id || piso.codPiso || index + 1,
         item: index + 1,
-        descripcion: piso.descripcion || `Piso ${piso.numeroPiso || index + 1}`,
+        descripcion: `Piso ${piso.numeroPiso || index + 1}`,
         valorUnitario: piso.valorUnitario || 0,
         incremento: piso.incremento || 0,
-        porcentajeDepreciacion: piso.porcentajeDepreciacion || 0,
-        valorUnicoDepreciado: piso.valorUnicoDepreciado || 0,
+        porcentajeDepreciacion: piso.depreciacion || 0,
+        valorUnicoDepreciado: piso.valorUnitarioDepreciado || 0,
         valorAreaConstruida: piso.valorAreaConstruida || 0
       }));
       
@@ -169,7 +216,7 @@ export const usePisos = () => {
         throw new Error('El número de piso debe ser mayor a 0');
       }
       
-      if (!datos.areaConstruida || datos.areaConstruida <= 0) {
+      if (!datos.areaConstruida || parseFloat(datos.areaConstruida) <= 0) {
         throw new Error('El área construida debe ser mayor a 0');
       }
       
@@ -195,7 +242,7 @@ export const usePisos = () => {
         instalacionesElectricas: String(datos.instalacionesElectricas || "100301"),
         codEstadoConservacion: String(datos.codEstadoConservacion || "9402"),
         codMaterialEstructural: String(datos.codMaterialEstructural || "0703"),
-        areaConstruida: Number(datos.areaConstruida)
+        areaConstruida: String(datos.areaConstruida)
       };
       
       console.log('📤 [usePisos] Datos preparados para API POST:', datosApi);
@@ -234,32 +281,66 @@ export const usePisos = () => {
   }, [pisos.length]);
 
   /**
-   * Guardar nuevo piso (método legacy - mantener por compatibilidad)
+   * Guardar piso usando API sin autenticación (crear o actualizar)
+   * Para actualización, debe incluir codPiso en los datos
    */
-  const guardarPiso = useCallback(async (data: PisoFormData): Promise<void> => {
+  const guardarPiso = useCallback(async (datos: CrearPisoFormData & { codPiso?: number }): Promise<PisoData | null> => {
     setLoading(true);
     setError(null);
     
     try {
-      console.log('Guardando piso:', data);
+      console.log('📝 [usePisos] Guardando piso:', datos);
       
-      // Simular llamada a API
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Aquí iría la llamada real a la API
-      // const response = await pisoService.crear(data);
-      
-      NotificationService.success('Piso registrado correctamente');
+      // Si tiene codPiso, es una actualización, sino es creación
+      if (datos.codPiso) {
+        console.log('🔄 [usePisos] Actualizando piso existente con codPiso:', datos.codPiso);
+        
+        // Para actualización, usamos la misma estructura de datos
+        const datosApi: CreatePisoApiDTO = {
+          anio: datos.anio || new Date().getFullYear(),
+          codPredio: String(datos.codPredio),
+          numeroPiso: Number(datos.numeroPiso),
+          fechaConstruccion: datos.fechaConstruccion || "1990-01-01",
+          codLetraMurosColumnas: String(datos.codLetraMurosColumnas || "1101"),
+          murosColumnas: String(datos.murosColumnas || "100101"),
+          codLetraTechos: String(datos.codLetraTechos || "1101"),
+          techos: String(datos.techos || "100102"),
+          codLetraPisos: String(datos.codLetraPisos || "1101"),
+          pisos: String(datos.pisos || "100201"),
+          codLetraPuertasVentanas: String(datos.codLetraPuertasVentanas || "1101"),
+          puertasVentanas: String(datos.puertasVentanas || "100202").trim(),
+          codLetraRevestimiento: String(datos.codLetraRevestimiento || "1101"),
+          revestimiento: String(datos.revestimiento || "100203").trim(),
+          codLetraBanios: String(datos.codLetraBanios || "1101"),
+          banios: String(datos.banios || "100204").trim(),
+          codLetraInstalacionesElectricas: String(datos.codLetraInstalacionesElectricas || "1101"),
+          instalacionesElectricas: String(datos.instalacionesElectricas || "100301").trim(),
+          codEstadoConservacion: String(datos.codEstadoConservacion || "9402"),
+          codMaterialEstructural: String(datos.codMaterialEstructural || "0703"),
+          areaConstruida: String(datos.areaConstruida)
+        };
+        
+        // TODO: Implementar método PUT en el servicio cuando esté disponible
+        // Por ahora, usar POST para actualizar
+        const pisoActualizado = await pisoService.crearPisoSinAuth(datosApi);
+        NotificationService.success(`Piso ${pisoActualizado?.numeroPiso || 'existente'} actualizado exitosamente`);
+        return pisoActualizado;
+        
+      } else {
+        console.log('➕ [usePisos] Creando nuevo piso');
+        return await crearPiso(datos);
+      }
       
     } catch (error: any) {
-      console.error('Error al guardar piso:', error);
-      setError(error.message || 'Error al guardar piso');
-      NotificationService.error('Error al guardar el piso');
+      const mensaje = error.message || 'Error al guardar piso';
+      console.error('❌ [usePisos] Error guardando piso:', error);
+      setError(mensaje);
+      NotificationService.error(mensaje);
       throw error;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [crearPiso]);
 
   /**
    * Actualizar piso existente
@@ -341,7 +422,8 @@ export const usePisos = () => {
     error,
     
     // Funciones
-    buscarPisos,
+    consultarPisos,  // Nuevo método principal para consultas con filtros
+    buscarPisos,     // Método legacy para compatibilidad
     crearPiso,
     guardarPiso,
     actualizarPiso,

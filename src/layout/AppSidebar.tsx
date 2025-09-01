@@ -178,6 +178,14 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
+    id: 'cuenta-corriente',
+    label: 'Cuenta Corriente',
+    icon: <AccountBalanceIcon />,
+    subMenuItems: [
+      { id: 'consulta-cuenta', label: 'Consulta Cuenta', path: '/cuenta-corriente/consulta' },
+    ],
+  },
+  {
     id: 'fraccionamiento',
     label: 'Fraccionamiento',
     icon: <FraccionamientoIcon />,
@@ -186,16 +194,6 @@ const menuItems: MenuItem[] = [
       { id: 'consulta-fraccionamiento', label: 'Consulta', path: '/fraccionamiento/consulta' },
       { id: 'gestion-lotes', label: 'Gestión de Lotes', path: '/fraccionamiento/lotes' },
       { id: 'aprobaciones', label: 'Aprobaciones', path: '/fraccionamiento/aprobaciones' },
-    ],
-  },
-  {
-    id: 'cuenta-corriente',
-    label: 'Cuenta Corriente',
-    icon: <AccountBalanceIcon />,
-    subMenuItems: [
-      { id: 'estado-cuenta', label: 'Estado de Cuenta', path: '/cuenta-corriente/estado' },
-      { id: 'cargo-nuevo', label: 'Nuevo Cargo', path: '/cuenta-corriente/cargo/nuevo' },
-    
     ],
   },
   {
@@ -238,19 +236,18 @@ const sistemaMenuItems: MenuItem[] = [
     icon: <SettingsIcon />,
     subMenuItems: [
       // Ubicación
-      { id: 'calles-ubicacion', label: 'Calles', path: '/mantenedores/calles' },
       { id: 'sectores-ubicacion', label: 'Sectores', path: '/mantenedores/sectores' },
       { id: 'barrios-ubicacion', label: 'Barrios', path: '/mantenedores/barrios' },
+      { id: 'calles-ubicacion', label: 'Calles', path: '/mantenedores/calles' },
       { id: 'direcciones-ubicacion', label: 'Direcciones', path: '/mantenedores/direcciones' },
       // Arancel
-      { id: 'asignacion-arancel', label: 'Asignación Arancel', path: '/mantenedores/aranceles' },
+      { id: 'asignacion-arancel', label: 'Valores Arancelarios', path: '/mantenedores/aranceles' },
       { id: 'valoresUnitarios-arancel', label: 'Valores Unitarios', path: '/mantenedores/valores-unitarios' },
       // Tarifas
       { id: 'uit-epa', label: 'UIT - EPA', path: '/mantenedores/uit' },
-      { id: 'alcabala', label: 'Alcabala', path: '/mantenedores/alcabala' },
       { id: 'depreciacion', label: 'Depreciación', path: '/mantenedores/depreciacion' },
+      { id: 'alcabala', label: 'Alcabala', path: '/mantenedores/alcabala' },
       { id: 'arbitrios', label: 'Arbitrios', path: '/mantenedores/arbitrios' },
-      // Otros
       { id: 'escala', label: 'Escala', path: '/mantenedores/escala' },
     ],
   },

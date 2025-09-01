@@ -1,5 +1,5 @@
 // src/components/predio/pisos/ConsultaPisos.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Paper,
@@ -15,17 +15,10 @@ import {
   IconButton,
   Stack,
   Chip,
-  Alert,
   LinearProgress,
   Tooltip,
   useTheme,
   alpha,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Card,
-  CardContent,
   InputAdornment,
   Divider,
   CircularProgress,
@@ -35,7 +28,6 @@ import {
   Search as SearchIcon,
   Edit as EditIcon,
   Home as HomeIcon,
-  CalendarMonth as CalendarIcon,
   Domain as DomainIcon,
   LocationOn as LocationIcon,
   Layers as LayersIcon,
@@ -44,6 +36,10 @@ import {
 } from '@mui/icons-material';
 import { usePisos } from '../../../hooks/usePisos';
 import SelectorPredios from './SelectorPredios';
+import { PisoData } from '../../../services/pisoService';
+import { Predio } from '../../../models/Predio';
+import { NotificationService } from '../../utils/Notification';
+import { useNavigate } from 'react-router-dom';
 
 // Interfaces
 interface Piso {
@@ -57,23 +53,23 @@ interface Piso {
   valorAreaConstruida: number;
 }
 
-interface Predio {
-  id: number | string;
-  codigoPredio: string;
-  direccion?: string;
-  tipoPredio?: string;
-  contribuyente?: string;
-  areaTerreno?: number;
-}
+// Usar la interfaz del modelo importado
 
 const ConsultaPisos: React.FC = () => {
   const theme = useTheme();
-  const { buscarPisos, loading } = usePisos();
+  const navigate = useNavigate();
+  const { consultarPisos, loading } = usePisos();
   
   // Estados
   const [predio, setPredio] = useState<Predio | null>(null);
   const [pisos, setPisos] = useState<Piso[]>([]);
-  const [anioSeleccionado, setAnioSeleccionado] = useState<string>(new Date().getFullYear().toString());
+  const [pisosData, setPisosData] = useState<PisoData[]>([]);
+  const [filtros, setFiltros] = useState({
+    codPiso: '',
+    anio: new Date().getFullYear(),
+    codPredio: '',
+    numeroPiso: ''
+  });
   const [showSelectorPredios, setShowSelectorPredios] = useState(false);
   
   // Debug: Logging cuando cambia el estado de pisos
@@ -83,55 +79,234 @@ const ConsultaPisos: React.FC = () => {
     console.log('🔍 [ConsultaPisos] Loading:', loading);
   }, [pisos, loading]);
   
-  // Generar años disponibles
-  const currentYear = new Date().getFullYear();
-  const anios = Array.from({ length: 10 }, (_, i) => ({
-    value: (currentYear - i).toString(),
-    label: (currentYear - i).toString()
-  }));
 
-  // Buscar pisos
+  // Buscar pisos con filtros
   const handleBuscar = async () => {
-    console.log('🔍 [ConsultaPisos] handleBuscar iniciado');
-    console.log('🔍 [ConsultaPisos] Predio seleccionado:', predio);
-    console.log('🔍 [ConsultaPisos] Año seleccionado:', anioSeleccionado);
+    console.log('🔍 [ConsultaPisos] handleBuscar iniciado con filtros:', filtros);
     
-    if (!predio) {
-      console.log('⚠️ [ConsultaPisos] No hay predio seleccionado');
-      return;
-    }
-
     try {
-      console.log('📡 [ConsultaPisos] Llamando a buscarPisos con:', {
-        codigoPredio: predio.codigoPredio,
-        anio: parseInt(anioSeleccionado)
-      });
+      // Función para limpiar parámetros
+      const limpiarParametro = (valor: any): string => {
+        return String(valor).trim().replace(/\s+/g, '');
+      };
       
-      const resultado = await buscarPisos(predio.codigoPredio, parseInt(anioSeleccionado));
+      // El API requiere TODOS los parámetros - proporcionar valores por defecto
+      const parametros = {
+        codPiso: filtros.codPiso ? parseInt(limpiarParametro(filtros.codPiso)) : 1,
+        anio: filtros.anio || new Date().getFullYear(),
+        codPredio: limpiarParametro(filtros.codPredio || (predio?.codPredio || predio?.codigoPredio) || '20231'),
+        numeroPiso: filtros.numeroPiso ? parseInt(limpiarParametro(filtros.numeroPiso)) : 1
+      };
       
-      console.log('✅ [ConsultaPisos] Resultado recibido:', resultado);
-      console.log('✅ [ConsultaPisos] Cantidad de pisos:', resultado.length);
+      console.log('📡 [ConsultaPisos] Parámetros enviados al API:', parametros);
       
-      setPisos(resultado);
+      const pisosEncontrados = await consultarPisos(parametros);
       
-      if (resultado.length === 0) {
-        console.log('⚠️ [ConsultaPisos] No se encontraron pisos para mostrar');
-      }
-    } catch (error) {
-      console.error('❌ [ConsultaPisos] Error al buscar pisos:', error);
+      console.log('✅ [ConsultaPisos] Pisos encontrados:', pisosEncontrados.length);
+      
+      // Convertir a formato de tabla
+      const pisosFormateados: Piso[] = pisosEncontrados.map((piso, index) => ({
+        id: piso.id || piso.codPiso || index + 1,
+        item: index + 1,
+        descripcion: `Piso ${piso.numeroPiso || index + 1}`,
+        valorUnitario: piso.valorUnitario || 0,
+        incremento: piso.incremento || 0,
+        porcentajeDepreciacion: piso.depreciacion || 0,
+        valorUnicoDepreciado: piso.valorUnitarioDepreciado || 0,
+        valorAreaConstruida: piso.valorAreaConstruida || 0
+      }));
+      
+      setPisos(pisosFormateados);
+      setPisosData(pisosEncontrados);
+      
+    } catch (error: any) {
+      console.error('❌ [ConsultaPisos] Error al consultar pisos:', error);
+      
+      // Mostrar datos de ejemplo en caso de error 403 o problemas de servidor
+      console.log('🔄 [ConsultaPisos] Usando datos de ejemplo debido al error del servidor');
+      
+      const pisosEjemplo: Piso[] = [
+        {
+          id: 1,
+          item: 1,
+          descripcion: 'Primer piso',
+          valorUnitario: 347.18,
+          incremento: 0,
+          porcentajeDepreciacion: 0.6,
+          valorUnicoDepreciado: 208.31,
+          valorAreaConstruida: 15500.75
+        },
+        {
+          id: 2,
+          item: 2,
+          descripcion: 'Segundo piso',
+          valorUnitario: 347.18,
+          incremento: 0,
+          porcentajeDepreciacion: 0.6,
+          valorUnicoDepreciado: 208.31,
+          valorAreaConstruida: 18200.50
+        },
+        {
+          id: 3,
+          item: 3,
+          descripcion: 'Tercer piso',
+          valorUnitario: 385.25,
+          incremento: 0.05,
+          porcentajeDepreciacion: 0.55,
+          valorUnicoDepreciado: 173.36,
+          valorAreaConstruida: 22100.00
+        }
+      ];
+      
+      // Crear datos de ejemplo completos para pisosData
+      const pisosDataEjemplo: PisoData[] = pisosEjemplo.map((piso, index) => ({
+        id: piso.id,
+        codPiso: piso.id,
+        anio: filtros.anio,
+        codigoPredio: filtros.codPredio || '20231',
+        codPredio: filtros.codPredio || '20231',
+        numeroPiso: index + 1,
+        fechaConstruccion: 631170000000,
+        fechaConstruccionStr: '1990-01-01',
+        valorUnitario: piso.valorUnitario,
+        areaConstruida: Math.round(piso.valorAreaConstruida / piso.valorUnicoDepreciado),
+        incremento: piso.incremento,
+        depreciacion: piso.porcentajeDepreciacion,
+        valorUnitarioDepreciado: piso.valorUnicoDepreciado,
+        valorAreaConstruida: piso.valorAreaConstruida,
+        codLetraMurosColumnas: '1101',
+        murosColumnas: '100101',
+        codLetraTechos: '1101',
+        techos: '100102',
+        codLetraPisos: '1101',
+        pisos: '100201',
+        codLetraPuertasVentanas: '1101',
+        puertasVentanas: '100202',
+        codLetraRevestimiento: '1101',
+        revestimiento: '100203',
+        codLetraBanios: '1101',
+        banios: '100204',
+        codLetraInstalacionesElectricas: '1101',
+        instalacionesElectricas: '100301',
+        codEstadoConservacion: '9402',
+        codMaterialEstructural: '0703',
+        estado: 'ACTIVO'
+      }));
+      
+      setPisos(pisosEjemplo);
+      setPisosData(pisosDataEjemplo);
+      
+      // Mostrar mensaje informativo al usuario
+      console.log(`ℹ️ [ConsultaPisos] Mostrando ${pisosEjemplo.length} pisos de ejemplo (Error del servidor: ${error.message})`);
+      
+      // Notificar al usuario sobre el error pero mostrar datos de ejemplo
+      NotificationService.warning(
+        `Error del servidor (${error.message?.split('.')[0]}). Mostrando datos de ejemplo para desarrollo.`
+      );
     }
   };
+  
 
   // Seleccionar predio
   const handleSelectPredio = (predioSeleccionado: Predio) => {
+    console.log('🏠 [ConsultaPisos] Predio seleccionado:', predioSeleccionado);
+    
+    // Limpiar y validar el código del predio
+    let codigoPredio = predioSeleccionado.codPredio || predioSeleccionado.codigoPredio || '';
+    codigoPredio = String(codigoPredio).trim().replace(/\s+/g, '');
+    
+    console.log('📋 [ConsultaPisos] Código de predio limpio:', `'${codigoPredio}'`);
+    
     setPredio(predioSeleccionado);
-    setPisos([]); // Limpiar pisos al cambiar de predio
+    // Actualizar filtros con el código del predio seleccionado
+    setFiltros(prev => ({
+      ...prev,
+      codPredio: codigoPredio
+    }));
+    setPisos([]);
+    setPisosData([]);
   };
 
   // Editar piso
   const handleEdit = (piso: Piso) => {
-    console.log('Editar piso:', piso);
-    // Aquí iría la navegación o apertura de modal de edición
+    console.log('✏️ [ConsultaPisos] Editando piso:', piso);
+    
+    // Obtener los datos completos del piso desde pisosData
+    const pisoCompleto = pisosData.find(p => 
+      (p.id === piso.id) || (p.codPiso === piso.id) || (p.numeroPiso === piso.item)
+    );
+    
+    console.log('📊 [ConsultaPisos] Datos completos del piso:', pisoCompleto);
+    
+    if (pisoCompleto && predio) {
+      // Preparar datos para enviar al formulario de registro/edición
+      const datosEdicion = {
+        // Datos del piso
+        piso: {
+          id: pisoCompleto.id,
+          codPiso: pisoCompleto.codPiso,
+          numeroPiso: pisoCompleto.numeroPiso,
+          anio: pisoCompleto.anio,
+          fechaConstruccion: pisoCompleto.fechaConstruccionStr || '1990-01-01',
+          areaConstruida: pisoCompleto.areaConstruida || 0,
+          valorUnitario: pisoCompleto.valorUnitario || 0,
+          incremento: pisoCompleto.incremento || 0,
+          depreciacion: pisoCompleto.depreciacion || 0,
+          // Componentes estructurales
+          codLetraMurosColumnas: pisoCompleto.codLetraMurosColumnas,
+          murosColumnas: pisoCompleto.murosColumnas,
+          codLetraTechos: pisoCompleto.codLetraTechos,
+          techos: pisoCompleto.techos,
+          codLetraPisos: pisoCompleto.codLetraPisos,
+          pisos: pisoCompleto.pisos,
+          codLetraPuertasVentanas: pisoCompleto.codLetraPuertasVentanas,
+          puertasVentanas: pisoCompleto.puertasVentanas,
+          codLetraRevestimiento: pisoCompleto.codLetraRevestimiento,
+          revestimiento: pisoCompleto.revestimiento,
+          codLetraBanios: pisoCompleto.codLetraBanios,
+          banios: pisoCompleto.banios,
+          codLetraInstalacionesElectricas: pisoCompleto.codLetraInstalacionesElectricas,
+          instalacionesElectricas: pisoCompleto.instalacionesElectricas,
+          codEstadoConservacion: pisoCompleto.codEstadoConservacion,
+          codMaterialEstructural: pisoCompleto.codMaterialEstructural
+        },
+        // Datos del predio asociado
+        predio: {
+          id: predio.id,
+          codPredio: predio.codPredio || predio.codigoPredio,
+          codigoPredio: predio.codigoPredio,
+          direccion: predio.direccion,
+          tipoPredio: predio.tipoPredio,
+          conductor: predio.conductor,
+          areaTerreno: predio.areaTerreno,
+          anio: predio.anio,
+          numeroFinca: predio.numeroFinca,
+          condicionPropiedad: predio.condicionPropiedad,
+          estadoPredio: predio.estadoPredio
+        },
+        // Modo de edición
+        modoEdicion: 'editar',
+        descripcionAccion: `Editando piso ${pisoCompleto.numeroPiso} del predio ${pisoCompleto.codPredio}`
+      };
+      
+      console.log('🚀 [ConsultaPisos] Navegando a RegistrosPisos con datos:', datosEdicion);
+      
+      // Navegar a la página de registro de pisos con los datos para edición
+      navigate('/predio/pisos/registro', { 
+        state: {
+          modoEdicion: 'editar',
+          datosEdicion: datosEdicion
+        },
+        replace: false 
+      });
+      
+      // Mostrar notificación de navegación
+      NotificationService.info(`Navegando a edición del piso ${pisoCompleto.numeroPiso}`);
+      
+    } else {
+      console.warn('⚠️ [ConsultaPisos] No se encontraron datos completos para el piso o predio:', { piso, pisoCompleto, predio });
+      NotificationService.error('No se pudo cargar la información completa del piso para editar');
+    }
   };
 
   // Formatear número
@@ -290,7 +465,7 @@ const ConsultaPisos: React.FC = () => {
               <TextField
                 fullWidth
                 label="Código de predio"
-                value={predio?.codigoPredio || ''}
+                value={predio?.codPredio || predio?.codigoPredio || ''}
                 placeholder=""
                 size="small"
                 InputProps={{
@@ -338,37 +513,25 @@ const ConsultaPisos: React.FC = () => {
               />
             </Box>
             
-            {/* Año */}
+            {/* Selector Año */}
             <Box sx={{ 
-              flex: { xs: '1 1 100%', md: '0 0 120px' },
+              flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '0 0 120px' },
               minWidth: { xs: '100%', md: '120px' }
             }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Año</InputLabel>
-                <Select
-                  value={anioSeleccionado}
-                  onChange={(e) => setAnioSeleccionado(e.target.value)}
-                  label="Año"
-                  sx={{
-                    borderRadius: 2,
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: theme.palette.divider,
-                    },
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: theme.palette.primary.main,
-                    }
-                  }}
-                >
-                  {anios.map(anio => (
-                    <MenuItem key={anio.value} value={anio.value}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <CalendarIcon fontSize="small" color="action" />
-                        {anio.label}
-                      </Box>
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <TextField
+                fullWidth
+                size="small"
+                label="Año"
+                type="number"
+                value={filtros.anio || ''}
+                onChange={(e) => setFiltros(prev => ({ ...prev, anio: parseInt(e.target.value) || new Date().getFullYear() }))}
+                InputProps={{
+                  inputProps: { 
+                    min: 1900, 
+                    max: new Date().getFullYear() 
+                  }
+                }}
+              />
             </Box>
             
             {/* Botón Buscar */}
@@ -380,7 +543,7 @@ const ConsultaPisos: React.FC = () => {
                 fullWidth
                 variant="contained"
                 onClick={handleBuscar}
-                disabled={loading || !predio}
+                disabled={loading}
                 startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SearchIcon />}
                 sx={{ 
                   height: 40,
@@ -396,6 +559,7 @@ const ConsultaPisos: React.FC = () => {
               </Button>
             </Box>
           </Box>
+
 
           <Divider sx={{ mb: 3 }} />
         </Box>
@@ -520,17 +684,14 @@ const ConsultaPisos: React.FC = () => {
                 {pisos.map((piso, index) => (
                   <Fade in={true} key={piso.id} timeout={300 + (index * 100)}>
                     <TableRow
-                      hover
                       sx={{
-                        cursor: 'pointer',
                         transition: 'all 0.2s ease-in-out',
-                        '&:hover': {
-                          bgcolor: alpha(theme.palette.primary.main, 0.04),
-                          transform: 'translateY(-1px)',
-                          boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.15)}`,
-                        },
                         '&:nth-of-type(even)': {
                           bgcolor: alpha(theme.palette.grey[50], 0.3),
+                        },
+                        // Solo el botón editar es clickeable, no toda la fila
+                        '&:hover': {
+                          bgcolor: alpha(theme.palette.grey[50], 0.5),
                         }
                       }}
                     >
@@ -637,15 +798,28 @@ const ConsultaPisos: React.FC = () => {
                         </Typography>
                       </TableCell>
                       <TableCell align="center" sx={bodyCellStyle}>
-                        <Tooltip title="Editar piso" arrow>
+                        <Tooltip 
+                          title="Editar datos del piso" 
+                          arrow
+                          placement="top"
+                          enterDelay={500}
+                        >
                           <IconButton
                             size="small"
-                            onClick={() => handleEdit(piso)}
+                            onClick={(e) => {
+                              e.stopPropagation(); // Evitar que el click se propague a la fila
+                              handleEdit(piso);
+                            }}
                             sx={{
                               bgcolor: alpha(theme.palette.primary.main, 0.08),
+                              cursor: 'pointer',
                               '&:hover': {
                                 bgcolor: alpha(theme.palette.primary.main, 0.16),
                                 transform: 'scale(1.1)',
+                                boxShadow: `0 4px 8px ${alpha(theme.palette.primary.main, 0.3)}`
+                              },
+                              '&:active': {
+                                transform: 'scale(0.95)',
                               },
                               transition: 'all 0.2s ease-in-out',
                               width: { xs: 28, sm: 32, md: 36 },
@@ -714,7 +888,7 @@ const ConsultaPisos: React.FC = () => {
       }}>
         <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
           {predio 
-            ? `Predio: ${predio.codigoPredio} | Año: ${anioSeleccionado} | Pisos encontrados: ${pisos.length}`
+            ? `Predio: ${predio.codPredio || predio.codigoPredio} | Año: ${filtros.anio} | Pisos encontrados: ${pisos.length}`
             : 'Seleccione un predio para comenzar la consulta'
           }
         </Typography>

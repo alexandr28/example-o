@@ -21,6 +21,52 @@ export interface ConstanteResponse {
 }
 
 /**
+ * Interface para los datos de ruta
+ */
+export interface RutaData {
+  codigo: number;
+  descripcion: string;
+  abreviatura: string;
+}
+
+/**
+ * Interface para los datos de zona
+ */
+export interface ZonaData {
+  codigo: number;
+  descripcion: string;
+  abreviatura: string;
+}
+
+/**
+ * Interface para los datos de grupo de uso
+ */
+export interface GrupoUsoData {
+  codigo: number;
+  descripcion: string;
+}
+
+/**
+ * Interface para los datos de ubicación de área verde
+ */
+export interface UbicacionAreaVerdeData {
+  codigo: number;
+  descripcion: string;
+  abreviatura: string;
+}
+
+/**
+ * Interface para los datos de uso de predio
+ */
+export interface UsoPredioData {
+  codUso: number;
+  descripcion: string;
+  codCriterio: number;
+  anio: number;
+  codGrupoUso: number;
+}
+
+/**
  * Códigos de constantes padres
  */
 export const CODIGO_CONSTANTE_PADRE = {
@@ -166,18 +212,16 @@ class ConstanteService {
       
       console.log(`🔍 [ConstanteService] Buscando constantes para padre: ${codConstantePadre}`);
       
-      // Construir URL con query params
-      const url = buildApiUrl('/api/constante/listarConstantePadre', {
-        codConstante: codConstantePadre
-      });
+      // Construir URL completa con puerto 8085
+      const url = `http://26.161.18.122:8085/api/constante/listarConstantePadre?codConstante=${codConstantePadre}`;
       
       console.log(`📤 [ConstanteService] GET request a: ${url}`);
       
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
+          'Accept': 'application/json'
+          // Sin autenticación - sin Content-Type en GET
         }
       });
       
@@ -188,16 +232,26 @@ class ConstanteService {
       const responseData: ConstanteResponse = await response.json();
       console.log(`📡 [ConstanteService] Respuesta recibida:`, responseData);
       
-      // Validar respuesta
-      if (responseData.success && Array.isArray(responseData.data)) {
-        // Guardar en cache
-        this.setCachedData(cacheKey, responseData.data);
-        
-        console.log(`✅ [ConstanteService] ${responseData.data.length} constantes obtenidas`);
-        return responseData.data;
+      // El API devuelve un array directo según el JSON ejemplo
+      let data: ConstanteData[] = [];
+      
+      if (Array.isArray(responseData)) {
+        data = responseData;
+      } else if (responseData.success && Array.isArray(responseData.data)) {
+        data = responseData.data;
+      } else if (typeof responseData === 'object' && responseData) {
+        // Manejar JSON simple como en el ejemplo
+        data = [{
+          codConstante: responseData.codConstante || '',
+          nombreCategoria: responseData.nombreCategoria || ''
+        }];
       }
       
-      return [];
+      // Guardar en cache
+      this.setCachedData(cacheKey, data);
+      
+      console.log(`✅ [ConstanteService] ${data.length} constantes obtenidas`);
+      return data;
       
     } catch (error: any) {
       console.error(`❌ [ConstanteService] Error al obtener constantes:`, error);
@@ -220,18 +274,16 @@ class ConstanteService {
       
       console.log(`🔍 [ConstanteService] Buscando constantes para hijo: ${codConstanteHijo}`);
       
-      // Construir URL con query params
-      const url = buildApiUrl('/api/constante/listarConstanteHijo', {
-        codConstante: codConstanteHijo
-      });
+      // Construir URL completa con puerto 8085
+      const url = `http://26.161.18.122:8085/api/constante/listarConstanteHijo?codConstante=${codConstanteHijo}`;
       
       console.log(`📤 [ConstanteService] GET request a: ${url}`);
       
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
+          'Accept': 'application/json'
+          // Sin autenticación - sin Content-Type en GET
         }
       });
       
@@ -242,16 +294,26 @@ class ConstanteService {
       const responseData: ConstanteResponse = await response.json();
       console.log(`📡 [ConstanteService] Respuesta hijo recibida:`, responseData);
       
-      // Validar respuesta
-      if (responseData.success && Array.isArray(responseData.data)) {
-        // Guardar en cache
-        this.setCachedData(cacheKey, responseData.data);
-        
-        console.log(`✅ [ConstanteService] ${responseData.data.length} constantes hijo obtenidas`);
-        return responseData.data;
+      // El API devuelve un array directo según el JSON ejemplo
+      let data: ConstanteData[] = [];
+      
+      if (Array.isArray(responseData)) {
+        data = responseData;
+      } else if (responseData.success && Array.isArray(responseData.data)) {
+        data = responseData.data;
+      } else if (typeof responseData === 'object' && responseData) {
+        // Manejar JSON simple como en el ejemplo
+        data = [{
+          codConstante: responseData.codConstante || '',
+          nombreCategoria: responseData.nombreCategoria || ''
+        }];
       }
       
-      return [];
+      // Guardar en cache
+      this.setCachedData(cacheKey, data);
+      
+      console.log(`✅ [ConstanteService] ${data.length} constantes hijo obtenidas`);
+      return data;
       
     } catch (error: any) {
       console.error(`❌ [ConstanteService] Error al obtener constantes hijo:`, error);
@@ -1715,6 +1777,301 @@ class ConstanteService {
     } catch (error) {
       console.error('Error al obtener nombre de tipo condicion de licencia:', error);
       return codigo;
+    }
+  }
+
+  /**
+   * Obtiene todas las rutas disponibles
+   */
+  async obtenerRutas(): Promise<RutaData[]> {
+    try {
+      // Verificar cache primero
+      const cacheKey = 'rutas';
+      const cached = this.getCachedData(cacheKey);
+      if (cached) {
+        // Transformar ConstanteData a RutaData
+        return cached.map(item => ({
+          codigo: parseInt(item.codConstante) || 0,
+          descripcion: item.nombreCategoria || '',
+          abreviatura: item.codConstante || ''
+        }));
+      }
+      
+      console.log('🔍 [ConstanteService] Obteniendo rutas desde:', `${API_CONFIG.baseURL}/api/constante/listarRuta`);
+      
+      const response = await fetch(`${API_CONFIG.baseURL}/api/constante/listarRuta`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('📡 [ConstanteService] Rutas recibidas:', data);
+      
+      // Si es un array, procesarlo directamente
+      if (Array.isArray(data)) {
+        const rutasData: RutaData[] = data.map(item => ({
+          codigo: item.codigo || 0,
+          descripcion: item.descripcion || '',
+          abreviatura: item.abreviatura || ''
+        }));
+        
+        // Guardar en cache como ConstanteData para compatibilidad
+        const constanteData: ConstanteData[] = data.map(item => ({
+          codConstante: String(item.codigo || 0),
+          nombreCategoria: item.descripcion || ''
+        }));
+        this.setCachedData(cacheKey, constanteData);
+        
+        console.log(`✅ [ConstanteService] ${rutasData.length} rutas obtenidas`);
+        return rutasData;
+      }
+      
+      return [];
+      
+    } catch (error: any) {
+      console.error('❌ [ConstanteService] Error al obtener rutas:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene lista de grupos de uso
+   * API GET: http://26.161.18.122:8085/api/constante/listarGrupoUso
+   */
+  async listarGrupoUso(): Promise<GrupoUsoData[]> {
+    try {
+      const cacheKey = 'grupo_uso';
+      const cached = this.getCachedData(cacheKey);
+      if (cached) {
+        return cached.map(item => ({
+          codigo: parseInt(item.codConstante) || 0,
+          descripcion: item.nombreCategoria || ''
+        }));
+      }
+      
+      console.log('🔍 [ConstanteService] Obteniendo grupos de uso');
+      
+      const url = `http://26.161.18.122:8085/api/constante/listarGrupoUso`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+          // Sin autenticación
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('📡 [ConstanteService] Grupos de uso recibidos:', data);
+      
+      let gruposUso: GrupoUsoData[] = [];
+      
+      if (Array.isArray(data)) {
+        gruposUso = data.map(item => ({
+          codigo: item.codigo || 0,
+          descripcion: item.descripcion || ''
+        }));
+        
+        // Guardar en cache como ConstanteData para compatibilidad
+        const constanteData: ConstanteData[] = data.map(item => ({
+          codConstante: String(item.codigo || 0),
+          nombreCategoria: item.descripcion || ''
+        }));
+        this.setCachedData(cacheKey, constanteData);
+      }
+      
+      console.log(`✅ [ConstanteService] ${gruposUso.length} grupos de uso obtenidos`);
+      return gruposUso;
+      
+    } catch (error: any) {
+      console.error('❌ [ConstanteService] Error al obtener grupos de uso:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene lista de ubicaciones de área verde
+   * API GET: http://26.161.18.122:8085/api/constante/listarUbicacionAreaVerd
+   */
+  async listarUbicacionAreaVerde(): Promise<UbicacionAreaVerdeData[]> {
+    try {
+      const cacheKey = 'ubicacion_area_verde';
+      const cached = this.getCachedData(cacheKey);
+      if (cached) {
+        return cached.map(item => ({
+          codigo: parseInt(item.codConstante) || 0,
+          descripcion: item.nombreCategoria || '',
+          abreviatura: item.codConstante || ''
+        }));
+      }
+      
+      console.log('🔍 [ConstanteService] Obteniendo ubicaciones de área verde');
+      
+      const url = `http://26.161.18.122:8085/api/constante/listarUbicacionAreaVerd`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+          // Sin autenticación
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('📡 [ConstanteService] Ubicaciones de área verde recibidas:', data);
+      
+      let ubicaciones: UbicacionAreaVerdeData[] = [];
+      
+      if (Array.isArray(data)) {
+        ubicaciones = data.map(item => ({
+          codigo: item.codigo || 0,
+          descripcion: item.descripcion || '',
+          abreviatura: item.abreviatura || ''
+        }));
+        
+        // Guardar en cache como ConstanteData para compatibilidad
+        const constanteData: ConstanteData[] = data.map(item => ({
+          codConstante: String(item.codigo || 0),
+          nombreCategoria: item.descripcion || ''
+        }));
+        this.setCachedData(cacheKey, constanteData);
+      }
+      
+      console.log(`✅ [ConstanteService] ${ubicaciones.length} ubicaciones de área verde obtenidas`);
+      return ubicaciones;
+      
+    } catch (error: any) {
+      console.error('❌ [ConstanteService] Error al obtener ubicaciones de área verde:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene lista de usos de predio
+   * API GET: http://26.161.18.122:8085/api/constante/listarUsoPredio
+   */
+  async listarUsoPredio(): Promise<UsoPredioData[]> {
+    try {
+      const cacheKey = 'uso_predio';
+      const cached = this.getCachedData(cacheKey);
+      if (cached) {
+        // Nota: Esta conversión es aproximada porque la estructura es diferente
+        return [];
+      }
+      
+      console.log('🔍 [ConstanteService] Obteniendo usos de predio');
+      
+      const url = `http://26.161.18.122:8085/api/constante/listarUsoPredio`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+          // Sin autenticación
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('📡 [ConstanteService] Usos de predio recibidos:', data);
+      
+      let usosPredio: UsoPredioData[] = [];
+      
+      if (Array.isArray(data)) {
+        usosPredio = data.map(item => ({
+          codUso: item.codUso || 0,
+          descripcion: item.descripcion || '',
+          codCriterio: item.codCriterio || 0,
+          anio: item.anio || 0,
+          codGrupoUso: item.codGrupoUso || 0
+        }));
+      }
+      
+      console.log(`✅ [ConstanteService] ${usosPredio.length} usos de predio obtenidos`);
+      return usosPredio;
+      
+    } catch (error: any) {
+      console.error('❌ [ConstanteService] Error al obtener usos de predio:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene todas las zonas disponibles
+   */
+  async obtenerZonas(): Promise<ZonaData[]> {
+    try {
+      // Verificar cache primero
+      const cacheKey = 'zonas';
+      const cached = this.getCachedData(cacheKey);
+      if (cached) {
+        // Transformar ConstanteData a ZonaData
+        return cached.map(item => ({
+          codigo: parseInt(item.codConstante) || 0,
+          descripcion: item.nombreCategoria || '',
+          abreviatura: item.codConstante || ''
+        }));
+      }
+      
+      console.log('🔍 [ConstanteService] Obteniendo zonas desde:', `${API_CONFIG.baseURL}/api/constante/listarZona`);
+      
+      const response = await fetch(`${API_CONFIG.baseURL}/api/constante/listarZona`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('📡 [ConstanteService] Zonas recibidas:', data);
+      
+      // Si es un array, procesarlo directamente
+      if (Array.isArray(data)) {
+        const zonasData: ZonaData[] = data.map(item => ({
+          codigo: item.codigo || 0,
+          descripcion: item.descripcion || '',
+          abreviatura: item.abreviatura || ''
+        }));
+        
+        // Guardar en cache como ConstanteData para compatibilidad
+        const constanteData: ConstanteData[] = data.map(item => ({
+          codConstante: String(item.codigo || 0),
+          nombreCategoria: item.descripcion || ''
+        }));
+        this.setCachedData(cacheKey, constanteData);
+        
+        console.log(`✅ [ConstanteService] ${zonasData.length} zonas obtenidas`);
+        return zonasData;
+      }
+      
+      return [];
+      
+    } catch (error: any) {
+      console.error('❌ [ConstanteService] Error al obtener zonas:', error);
+      throw error;
     }
   }
 

@@ -83,22 +83,64 @@ class BarrioService extends BaseApiService<BarrioData, CreateBarrioDTO, UpdateBa
     try {
       console.log('📝 [BarrioService] Creando barrio con datos:', data);
       
-      // Usar fetch directamente para evitar headers no deseados
-      const response = await fetch(buildApiUrl(this.endpoint), {
+      // En desarrollo, usar ruta relativa para que el proxy de Vite funcione
+      const url = import.meta.env.DEV ? this.endpoint : buildApiUrl(this.endpoint);
+      console.log('📡 URL para crear barrio:', url);
+      console.log('📡 Modo:', import.meta.env.DEV ? 'Desarrollo (usando proxy)' : 'Producción');
+      
+      // Función para sanitizar texto y evitar problemas con caracteres especiales
+      const sanitizeText = (text: string): string => {
+        // Reemplazar caracteres problemáticos que pueden causar errores 403
+        return text
+          .replace(/\//g, '-')  // Reemplazar / con -
+          .replace(/\\/g, '-')  // Reemplazar \ con -
+          .replace(/[<>]/g, '') // Eliminar < y >
+          .trim();
+      };
+      
+      // Preparar los datos en el formato exacto que espera el API
+      const requestBody = {
+        nombreBarrio: sanitizeText(data.nombreBarrio),
+        codSector: data.codSector
+      };
+      
+      // Solo agregar descripcion si existe
+      if (data.descripcion && data.descripcion.trim() !== '') {
+        (requestBody as any).descripcion = sanitizeText(data.descripcion);
+      }
+      
+      console.log('📡 Nombre original:', data.nombreBarrio);
+      console.log('📡 Nombre sanitizado:', requestBody.nombreBarrio);
+      
+      console.log('📡 Datos a enviar (JSON):', JSON.stringify(requestBody, null, 2));
+      
+      // Usar fetch con JSON como especifica el API
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
-          // NO Authorization
+          // NO Authorization - la API no requiere autenticación
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(requestBody)
       });
       
       console.log('📡 Status:', response.status);
+      console.log('📡 Status Text:', response.statusText);
+      console.log('📡 Headers:', response.headers);
+      
       const responseText = await response.text();
       console.log('📡 Respuesta:', responseText);
       
       if (!response.ok) {
+        console.error('❌ Error en la respuesta:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: responseText,
+          url: url,
+          method: 'POST',
+          data: data
+        });
         throw new Error(`Error ${response.status}: ${responseText || response.statusText}`);
       }
       
@@ -192,6 +234,64 @@ class BarrioService extends BaseApiService<BarrioData, CreateBarrioDTO, UpdateBa
   }
   
   /**
+   * Método PUT directo al API
+   */
+  async update(id: number, datos: UpdateBarrioDTO): Promise<BarrioData> {
+    try {
+      // Preparar el payload con la estructura completa requerida
+      const payload = {
+        codBarrio: id,
+        nombreBarrio: datos.nombreBarrio || '',
+        codSector: datos.codSector || 0
+      };
+
+      console.log('📤 [BarrioService] Enviando PUT:', payload);
+
+      const response = await fetch(`${API_CONFIG.baseURL}/api/barrio`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
+      }
+      
+      // Manejar diferentes tipos de respuesta
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        const data = await response.json();
+        return {
+          codigo: data.codBarrio || id,
+          nombre: data.nombreBarrio || datos.nombreBarrio || '',
+          codSector: data.codSector || datos.codSector || 0,
+          descripcion: datos.descripcion || '',
+          estado: datos.estado || 'ACTIVO',
+          fechaModificacion: new Date().toISOString()
+        };
+      } else {
+        // Si respuesta es texto/número, asumir éxito
+        return {
+          codigo: id,
+          nombre: datos.nombreBarrio || '',
+          codSector: datos.codSector || 0,
+          descripcion: datos.descripcion || '',
+          estado: datos.estado || 'ACTIVO',
+          fechaModificacion: new Date().toISOString()
+        };
+      }
+    } catch (error: any) {
+      console.error('❌ [BarrioService] Error en PUT:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Actualiza un barrio existente
    */
   async actualizarBarrio(id: number, datos: { 
@@ -212,17 +312,26 @@ class BarrioService extends BaseApiService<BarrioData, CreateBarrioDTO, UpdateBa
         throw new Error('El sector no es válido');
       }
       
+      // Función para sanitizar texto (la misma que en create)
+      const sanitizeText = (text: string): string => {
+        return text
+          .replace(/\//g, '-')  // Reemplazar / con -
+          .replace(/\\/g, '-')  // Reemplazar \ con -
+          .replace(/[<>]/g, '') // Eliminar < y >
+          .trim();
+      };
+      
       // Convertir al formato del API
       const datosParaAPI: UpdateBarrioDTO = {};
       
       if (datos.nombre !== undefined) {
-        datosParaAPI.nombreBarrio = datos.nombre.trim();
+        datosParaAPI.nombreBarrio = sanitizeText(datos.nombre);
       }
       if (datos.codSector !== undefined) {
         datosParaAPI.codSector = datos.codSector;
       }
       if (datos.descripcion !== undefined) {
-        datosParaAPI.descripcion = datos.descripcion.trim();
+        datosParaAPI.descripcion = sanitizeText(datos.descripcion);
       }
       if (datos.estado !== undefined) {
         datosParaAPI.estado = datos.estado;
@@ -230,36 +339,7 @@ class BarrioService extends BaseApiService<BarrioData, CreateBarrioDTO, UpdateBa
       
       datosParaAPI.fechaModificacion = new Date().toISOString();
       
-      // Usar fetch directamente para el PUT también
-      const response = await fetch(buildApiUrl(`${this.endpoint}/${id}`), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(datosParaAPI)
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
-      }
-      
-      // Manejar respuesta
-      const responseText = await response.text();
-      
-      // Asumir éxito si el status es OK
-      const barrioActualizado: BarrioData = {
-        codigo: id,
-        nombre: datos.nombre || '',
-        codSector: datos.codSector || 0,
-        descripcion: datos.descripcion || '',
-        estado: datos.estado || 'ACTIVO',
-        fechaModificacion: new Date().toISOString()
-      };
-      
-      this.clearCache();
-      return barrioActualizado;
+      return await this.update(id, datosParaAPI);
       
     } catch (error: any) {
       console.error('❌ [BarrioService] Error actualizando barrio:', error);

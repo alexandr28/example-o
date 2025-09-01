@@ -28,6 +28,10 @@ interface DireccionData {
   loteFinal?: number;
   descripcion?: string;
   estado?: string;
+  ruta?: number;
+  zona?: number;
+  rutaNombre?: string;
+  zonaNombre?: string;
 }
 
 interface CreateDireccionDTO {
@@ -38,6 +42,8 @@ interface CreateDireccionDTO {
   lado?: string;
   loteInicial?: number;
   loteFinal?: number;
+  ruta: number; // Requerido
+  zona: number; // Requerido
 }
 
 interface UpdateDireccionDTO extends Partial<CreateDireccionDTO> {
@@ -142,11 +148,20 @@ export const useDirecciones = () => {
       
       console.log('🔍 Cargando direcciones con parámetros:', parametros);
       
-      // Intentar cargar desde el servicio real
+      // Intentar cargar desde el servicio real con query params
       try {
         // Importar el servicio si no está importado
         const direccionService = (await import('../services/direccionService')).default;
-        const direccionesApi = await direccionService.obtenerTodos();
+        
+        // Llamar con query params específicos
+        const queryParams = {
+          parametrosBusqueda: parametros?.parametrosBusqueda || parametros?.nombreVia || 'a',
+          codUsuario: 1,
+          ...(parametros?.codigoSector && { codigoSector: parametros.codigoSector }),
+          ...(parametros?.codigoBarrio && { codigoBarrio: parametros.codigoBarrio })
+        };
+        
+        const direccionesApi = await direccionService.getAll(queryParams);
         
         if (direccionesApi && direccionesApi.length > 0) {
           console.log('✅ Direcciones cargadas desde API:', direccionesApi.length);
@@ -339,6 +354,35 @@ export const useDirecciones = () => {
     await cargarDirecciones(criterios);
   }, [cargarDirecciones]);
 
+  // Buscar direcciones por nombre de vía
+  const buscarPorNombreVia = useCallback(async (nombreVia: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('🔍 [useDirecciones] Buscando por nombre de vía:', nombreVia);
+      
+      // Importar el servicio
+      const direccionService = (await import('../services/direccionService')).default;
+      
+      // Buscar usando el nuevo endpoint
+      const direccionesEncontradas = await direccionService.buscarPorNombreVia(nombreVia);
+      
+      console.log('✅ [useDirecciones] Direcciones encontradas:', direccionesEncontradas.length);
+      
+      setDirecciones(direccionesEncontradas);
+      
+      return direccionesEncontradas;
+      
+    } catch (error: any) {
+      console.error('❌ [useDirecciones] Error en búsqueda:', error);
+      setError(error.message || 'Error al buscar direcciones');
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Cargar datos iniciales
   useEffect(() => {
     if (!cargaInicialRef.current) {
@@ -382,6 +426,7 @@ export const useDirecciones = () => {
     actualizarDireccion,
     eliminarDireccion,
     buscarDirecciones,
+    buscarPorNombreVia,
     setDireccionSeleccionada,
     handleSectorChange,
     handleBarrioChange

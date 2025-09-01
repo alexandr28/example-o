@@ -315,24 +315,12 @@ class PersonaService extends BaseApiService<PersonaData, CreatePersonaDTO, Updat
     try {
       console.log('➕ [PersonaService] Creando nueva persona con API directa:', datos);
       
-      const API_URL = 'http://26.161.18.122:8080/api/persona';
+      const API_URL = '/api/persona'; // Usar proxy local
       
       // Validar datos requeridos
       if (!datos.numerodocumento || !datos.nombres) {
         throw new Error('Número de documento y nombres son requeridos');
       }
-
-      // Verificación de duplicados deshabilitada temporalmente para debugging
-      // TODO: Reactivar cuando se confirme que el error de PK está resuelto
-      /*
-      console.log('🔍 [PersonaService] Verificando persona existente con documento:', datos.numerodocumento);
-      const personaExistente = await this.verificarPersonaExistente(datos.numerodocumento);
-      
-      if (personaExistente) {
-        console.log('⚠️ [PersonaService] Ya existe una persona con el documento:', datos.numerodocumento);
-        throw new Error(`Ya existe una persona registrada con el documento ${datos.numerodocumento}`);
-      }
-      */
       
       // Asegurar que codPersona no se envía en el request (omitirlo completamente)
       const { codPersona, ...datosParaEnviar } = datos;

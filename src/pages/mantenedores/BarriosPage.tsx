@@ -13,18 +13,17 @@ import {
   Box,
   Paper,
   Typography,
-  TextField,
-  InputAdornment,
   Alert,
   Tabs,
   Tab,
   useTheme,
-  alpha
+  alpha,
+  Stack,
 } from '@mui/material';
 import {
-  Search as SearchIcon,
   Add as AddIcon,
-  List as ListIcon
+  List as ListIcon,
+  Home as HomeIcon,
 } from '@mui/icons-material';
 
 // Interface para TabPanel
@@ -56,14 +55,12 @@ const BarrioPage: React.FC = () => {
     loading,
     error,
     searchTerm,
-    setSearchTerm,
     barrioSeleccionado,
     modoEdicion,
     seleccionarBarrio,
     limpiarSeleccion,
     guardarBarrio,
     eliminarBarrio,
-    estadisticas
   } = useBarrios();
 
   const { sectores } = useSectores();
@@ -113,53 +110,131 @@ const BarrioPage: React.FC = () => {
     await eliminarBarrio(barrio.id);
   };
 
+  // Manejar eliminación desde el formulario
+  const handleEliminarDesdeFormulario = async () => {
+    if (barrioSeleccionado) {
+      await eliminarBarrio(barrioSeleccionado.id);
+      limpiarSeleccion();
+      setTabValue(1); // Cambiar al tab de lista después de eliminar
+    }
+  };
+
   return (
     <MainLayout>
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
         {/* Breadcrumb */}
         <Breadcrumb items={breadcrumbItems} />
 
-        {/* Encabezado */}
-        <Box sx={{ mb: 4, mt: 2 }}>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Gestión de Barrios
-          </Typography>
-        </Box>
-
-        {/* Contenedor principal con tabs */}
+        {/* Header mejorado con Material UI */}
         <Paper 
-          elevation={2}
+          elevation={0}
           sx={{ 
-            borderRadius: 2,
-            overflow: 'hidden',
-            border: `1px solid ${theme.palette.divider}`,
+            p: { xs: 2, sm: 3 },
+            mb: 3,
+            mt: 2,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)`,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+            borderRadius: 2
           }}
         >
-          {/* Header con tabs */}
           <Box sx={{ 
-            bgcolor: alpha(theme.palette.primary.main, 0.04),
-            borderBottom: `1px solid ${theme.palette.divider}`
+            display: 'flex', 
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            gap: { xs: 2, sm: 3 },
           }}>
-            <Tabs
-              value={tabValue}
-              onChange={handleTabChange}
-              aria-label="barrio tabs"
-              sx={{
-                '& .MuiTab-root': {
-                  minHeight: 64,
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  fontSize: '0.95rem',
-                  '&.Mui-selected': {
-                    fontWeight: 600,
-                  }
-                },
-                '& .MuiTabs-indicator': {
-                  height: 3,
-                  borderRadius: '3px 3px 0 0'
-                }
-              }}
+            {/* Icono principal */}
+            <Box sx={{
+              p: 1.5,
+              borderRadius: 2,
+              background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
+            }}>
+              <HomeIcon sx={{ fontSize: { xs: 28, sm: 32 } }} />
+            </Box>
+            
+            {/* Título y descripción */}
+            <Box sx={{ flex: 1 }}>
+              <Typography 
+                variant="h4" 
+                component="h1" 
+                sx={{ 
+                  fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' },
+                  fontWeight: 700,
+                  color: theme.palette.primary.dark,
+                  mb: 0.5
+                }}
+              >
+                Gestión de Barrios
+              </Typography>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  color: theme.palette.text.secondary,
+                  fontSize: { xs: '0.875rem', sm: '1rem' }
+                }}
+              >
+                Administra los barrios por sector del sistema tributario
+              </Typography>
+            </Box>
+            
+            {/* Estadísticas */}
+            <Stack 
+              direction="row" 
+              spacing={2}
+              sx={{ display: { xs: 'none', md: 'flex' } }}
             >
+              
+              
+            </Stack>
+          </Box>
+        </Paper>
+
+        {/* Contenedor principal con tabs */}
+        <Box sx={{ 
+          maxWidth: { xs: '100%', sm: '100%', md: '90%', lg: '80%' }, 
+          mx: 'auto' 
+        }}>
+          <Paper 
+            elevation={0}
+            sx={{ 
+              borderRadius: 2,
+              overflow: 'hidden',
+              border: `1px solid ${theme.palette.divider}`,
+            }}
+          >
+            {/* Header con tabs */}
+            <Box sx={{ 
+              bgcolor: alpha(theme.palette.primary.main, 0.04),
+              borderBottom: `1px solid ${theme.palette.divider}`
+            }}>
+              <Tabs
+                value={tabValue}
+                onChange={handleTabChange}
+                aria-label="barrio tabs"
+                variant="scrollable"
+                scrollButtons="auto"
+                sx={{
+                  '& .MuiTab-root': {
+                    minHeight: { xs: 48, sm: 56, md: 64 },
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: { xs: '0.8rem', sm: '0.9rem', md: '0.95rem' },
+                    px: { xs: 1, sm: 2, md: 3 },
+                    '&.Mui-selected': {
+                      fontWeight: 600,
+                    }
+                  },
+                  '& .MuiTabs-indicator': {
+                    height: 3,
+                    borderRadius: '3px 3px 0 0'
+                  }
+                }}
+              >
               <Tab 
                 icon={<AddIcon />} 
                 iconPosition="start"
@@ -177,38 +252,47 @@ const BarrioPage: React.FC = () => {
             </Tabs>
           </Box>
 
-          {/* Panel de Formulario */}
-          <TabPanel value={tabValue} index={0}>
-            <Box sx={{ p: 3 }}>
-              <BarrioForm
-                onSubmit={handleGuardar}
-                onCancel={limpiarSeleccion}
-                initialData={barrioSeleccionado || undefined}
-                isSubmitting={guardando}
-              />
-            </Box>
-          </TabPanel>
+            {/* Panel de Formulario */}
+            <TabPanel value={tabValue} index={0}>
+              
+                <BarrioForm
+                  onSubmit={handleGuardar}
+                  onNew={limpiarSeleccion}
+                  onDelete={handleEliminarDesdeFormulario}
+                  initialData={barrioSeleccionado || undefined}
+                  isSubmitting={guardando}
+                />
+             
+            </TabPanel>
 
-          {/* Panel de Lista */}
-          <TabPanel value={tabValue} index={1}>
-            <Box sx={{ p: 3 }}>
-              <BarrioList
-                barrios={barrios || []}
-                sectores={sectores || []}
-                onEdit={abrirModal}
-                onDelete={handleEliminar}
-                loading={loading}
-                searchTerm={searchTerm}
-                selectedBarrio={barrioSeleccionado}
-              />
-            </Box>
-          </TabPanel>
-        </Paper>
+            {/* Panel de Lista */}
+            <TabPanel value={tabValue} index={1}>
+              <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 } }}>
+                <BarrioList
+                  barrios={barrios || []}
+                  sectores={sectores || []}
+                  onEdit={abrirModal}
+                  onDelete={handleEliminar}
+                  loading={loading}
+                  searchTerm={searchTerm}
+                  selectedBarrio={barrioSeleccionado}
+                />
+              </Box>
+            </TabPanel>
+          </Paper>
+        </Box>
 
         {/* Mensaje de error global */}
         {error && (
-          <Box sx={{ mt: 2 }}>
-            <Alert severity="error">
+          <Box sx={{ 
+            mt: 2,
+            maxWidth: { xs: '100%', sm: '100%', md: '90%', lg: '80%' }, 
+            mx: 'auto' 
+          }}>
+            <Alert 
+              severity="error"
+              sx={{ borderRadius: 2 }}
+            >
               {error}
             </Alert>
           </Box>

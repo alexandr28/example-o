@@ -2,6 +2,8 @@
 export interface Sector {
   id: number;
   nombre: string;
+  cuadrante?: number;
+  nombreCuadrante?: string;
   descripcion?: string;
   estado?: boolean | string;  // Puede ser boolean o 'ACTIVO'/'INACTIVO'
   fechaCreacion?: Date | string;
@@ -13,6 +15,7 @@ export interface Sector {
 // Tipo para el formulario
 export interface SectorFormData {
   nombre: string;
+  cuadrante?: number;
   descripcion?: string;
 }
 

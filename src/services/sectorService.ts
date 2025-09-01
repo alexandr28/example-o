@@ -7,32 +7,32 @@ import { API_CONFIG } from '../config/api.unified.config';
  * Interfaces para Sector
  */
 export interface SectorData {
-  codigo: number;
-  nombre: string;
-  descripcion?: string;
-  estado?: string;
-  fechaRegistro?: string;
-  fechaModificacion?: string;
-  codUsuario?: number;
+  codSector: number;
+  nombreSector: string;
+  cuadrante?: number | null;
+  nombreCuadrante?: string | null;
 }
 
 export interface CreateSectorDTO {
-  nombreSector: string;  // ← IMPORTANTE: Usar nombreSector, no nombre
-  descripcion?: string;
-  codUsuario?: number;
+  nombreSector: string;
+  cuadrante?: number | null;
 }
 
 export interface UpdateSectorDTO {
-  nombreSector?: string;  // ← IMPORTANTE: Usar nombreSector
-  descripcion?: string;
-  estado?: string;
-  fechaModificacion?: string;
+  nombreSector?: string;
+  cuadrante?: number | null;
 }
 
 export interface BusquedaSectorParams {
-  nombre?: string;
-  estado?: string;
-  codUsuario?: number;
+  nombreSector?: string;
+  cuadrante?: number;
+}
+
+export interface CuadranteData {
+  codCuadrante: number;
+  descripcion?: string | null;
+  abreviatura: string;
+  referenciaBarrio?: string | null;
 }
 
 /**
@@ -47,17 +47,14 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
       '/api/sector',
       {
         normalizeItem: (item: any) => ({
-          codigo: item.codSector || item.codigo || 0,
-          nombre: item.nombre || item.nombreSector || '',  // Mapear nombreSector a nombre
-          descripcion: item.descripcion || '',
-          estado: item.estado || 'ACTIVO',
-          fechaRegistro: item.fechaRegistro,
-          fechaModificacion: item.fechaModificacion,
-          codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario
+          codSector: item.codSector || 0,
+          nombreSector: item.nombreSector || '',
+          cuadrante: item.cuadrante || null,
+          nombreCuadrante: item.nombreCuadrante || (item.cuadrante ? `Cuadrante ${item.cuadrante}` : null)
         }),
         
         validateItem: (item: SectorData) => {
-          return !!item.codigo && !!item.nombre && item.nombre.trim().length > 0;
+          return !!item.codSector && !!item.nombreSector && item.nombreSector.trim().length > 0;
         }
       },
       'sector_cache'
@@ -72,134 +69,108 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
   }
   
   /**
-   * Sobrescribir create para manejar la respuesta numérica
+   * Sobrescribir getAll para usar el endpoint sin autenticación
    */
-  async create(data: CreateSectorDTO): Promise<SectorData> {
+  async getAll(): Promise<SectorData[]> {
     try {
-      console.log('📝 [SectorService] Creando sector con datos:', data);
+      console.log('📋 [SectorService] Obteniendo todos los sectores desde:', `${API_CONFIG.baseURL}/api/sector`);
       
-      // IMPORTANTE: Asegurarse de que NO se envíe ningún header de autorización
-      const response = await fetch(buildApiUrl(this.endpoint), {
-        method: 'POST',
+      const response = await fetch(`${API_CONFIG.baseURL}/api/sector`, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
           // NO Authorization header
-        },
-        body: JSON.stringify(data)
+        }
       });
       
-      console.log('📡 Status:', response.status);
-      const responseText = await response.text();
-      console.log('📡 Respuesta:', responseText);
-      
       if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${responseText || response.statusText}`);
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
       
-      // Manejar diferentes tipos de respuesta
-      console.log('📋 Tipo de respuesta:', typeof responseText);
-      console.log('📋 Longitud respuesta:', responseText.length);
-      console.log('📋 Respuesta exacta:', responseText);
+      const data = await response.json();
+      console.log('📡 [SectorService] Datos recibidos:', data);
       
-      // Limpiar la respuesta de espacios y comillas
-      const cleanResponse = responseText.trim().replace(/['"]/g, '');
-      
-      // Si la respuesta es "null" (string) o vacía
-      if (cleanResponse === 'null' || cleanResponse === '' || responseText.trim() === '') {
-        console.log('⚠️ Servidor devolvió null o vacío, pero status es OK');
-        console.log('✅ Asumiendo éxito, creando con ID temporal');
-        
-        // Generar un ID temporal único
-        const tempId = Math.floor(Date.now() / 1000); // Usar segundos para evitar IDs muy largos
-        
-        const nuevoSector: SectorData = {
-          codigo: tempId,
-          nombre: data.nombreSector,
-          descripcion: data.descripcion || '',
-          estado: 'ACTIVO',
-          fechaRegistro: new Date().toISOString(),
-          codUsuario: data.codUsuario || API_CONFIG.defaultParams.codUsuario
-        };
-        
-        this.clearCache();
-        
-        // Importante: El ID es temporal, será actualizado al recargar
-        console.log('ℹ️ Sector creado con ID temporal:', tempId);
-        
-        return nuevoSector;
+      // Si es un array, procesarlo directamente con normalización local
+      if (Array.isArray(data)) {
+        return data.map(item => ({
+          codSector: item.codSector || 0,
+          nombreSector: item.nombreSector || '',
+          cuadrante: typeof item.cuadrante === 'number' ? item.cuadrante : null,
+          nombreCuadrante: item.nombreCuadrante || (item.cuadrante ? `Cuadrante ${item.cuadrante}` : null)
+        }));
       }
       
-      // Intentar parsear como número
-      const responseNumber = parseInt(cleanResponse, 10);
-      
-      // Si es un número válido y positivo
-      if (!isNaN(responseNumber) && responseNumber > 0) {
-        console.log('✅ Sector creado con ID:', responseNumber);
-        
-        const nuevoSector: SectorData = {
-          codigo: responseNumber,
-          nombre: data.nombreSector,
-          descripcion: data.descripcion || '',
-          estado: 'ACTIVO',
-          fechaRegistro: new Date().toISOString(),
-          codUsuario: data.codUsuario || API_CONFIG.defaultParams.codUsuario
-        };
-        
-        this.clearCache();
-        return nuevoSector;
-      }
-      
-      // Si el parse resulta en NaN o número inválido, pero el status es OK
-      if (response.ok) {
-        console.log('⚠️ No se pudo parsear el ID, pero la respuesta fue exitosa');
-        console.log('✅ Creando con ID temporal');
-        
-        const tempId = Math.floor(Date.now() / 1000);
-        
-        const nuevoSector: SectorData = {
-          codigo: tempId,
-          nombre: data.nombreSector,
-          descripcion: data.descripcion || '',
-          estado: 'ACTIVO',
-          fechaRegistro: new Date().toISOString(),
-          codUsuario: data.codUsuario || API_CONFIG.defaultParams.codUsuario
-        };
-        
-        this.clearCache();
-        return nuevoSector;
-      }
-      
-      // Si llegamos aquí, algo salió mal
-      console.error('❌ Respuesta no manejable:', responseText);
-      throw new Error(`Error al crear sector`);
+      throw new Error('La respuesta no es un array válido');
       
     } catch (error: any) {
-      console.error('❌ [SectorService] Error al crear:', error);
+      console.error('❌ [SectorService] Error obteniendo sectores:', error);
       throw error;
     }
   }
   
   /**
-   * Crea un nuevo sector
-   * IMPORTANTE: Convierte "nombre" a "nombreSector" para el API
+   * Método POST directo al API
    */
-  async crearSector(datos: { nombre: string; descripcion?: string }): Promise<SectorData> {
+  async create(datos: CreateSectorDTO): Promise<SectorData> {
+    try {
+      const response = await fetch(`${API_CONFIG.baseURL}/api/sector`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(datos)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      // Manejar diferentes tipos de respuesta
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        const data = await response.json();
+        return {
+          codSector: data.codSector || Date.now(),
+          nombreSector: datos.nombreSector,
+          cuadrante: datos.cuadrante
+        };
+      } else {
+        // Si respuesta es texto/número, asumir éxito
+        const responseText = await response.text();
+        const possibleId = parseInt(responseText);
+        
+        return {
+          codSector: !isNaN(possibleId) ? possibleId : Date.now(),
+          nombreSector: datos.nombreSector,
+          cuadrante: datos.cuadrante
+        };
+      }
+    } catch (error: any) {
+      console.error('❌ [SectorService] Error en POST:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crea un nuevo sector
+   */
+  async crearSector(datos: { nombreSector: string; cuadrante?: number }): Promise<SectorData> {
     try {
       // Validaciones
-      if (!datos.nombre || datos.nombre.trim().length === 0) {
+      if (!datos.nombreSector || datos.nombreSector.trim().length === 0) {
         throw new Error('El nombre del sector es requerido');
       }
       
-      if (datos.nombre.trim().length < 3) {
+      if (datos.nombreSector.trim().length < 3) {
         throw new Error('El nombre del sector debe tener al menos 3 caracteres');
       }
       
-      // IMPORTANTE: Convertir nombre a nombreSector
       const datosParaAPI: CreateSectorDTO = {
-        nombreSector: datos.nombre.trim(),  // ← Usar nombreSector
-        descripcion: datos.descripcion?.trim() || ''
-        // NO incluir codUsuario si no es necesario
+        nombreSector: datos.nombreSector.trim(),
+        cuadrante: datos.cuadrante || null
       };
       
       console.log('📤 Enviando al API:', datosParaAPI);
@@ -215,37 +186,83 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
   }
   
   /**
+   * Método PUT directo al API
+   */
+  async update(id: number, datos: UpdateSectorDTO): Promise<SectorData> {
+    try {
+      // Preparar el payload con la estructura completa requerida
+      const payload = {
+        codSector: id,
+        nombreSector: datos.nombreSector || '',
+        cuadrante: datos.cuadrante || null,
+        nombreCuadrante: datos.cuadrante ? `Cuadrante ${datos.cuadrante}` : null
+      };
+
+      console.log('📤 [SectorService] Enviando PUT:', payload);
+
+      const response = await fetch(`${API_CONFIG.baseURL}/api/sector`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      // Manejar diferentes tipos de respuesta
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        const data = await response.json();
+        return {
+          codSector: data.codSector || id,
+          nombreSector: data.nombreSector || datos.nombreSector || '',
+          cuadrante: data.cuadrante || datos.cuadrante || null
+        };
+      } else {
+        // Si respuesta es texto/número, asumir éxito
+        return {
+          codSector: id,
+          nombreSector: datos.nombreSector || '',
+          cuadrante: datos.cuadrante || null
+        };
+      }
+    } catch (error: any) {
+      console.error('❌ [SectorService] Error en PUT:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Actualiza un sector existente
    */
-  async actualizarSector(id: number, datos: { nombre?: string; descripcion?: string; estado?: string }): Promise<SectorData> {
+  async actualizarSector(id: number, datos: { nombreSector?: string; cuadrante?: number }): Promise<SectorData> {
     try {
       console.log('📝 [SectorService] Actualizando sector:', id, datos);
       
       // Validaciones
-      if (datos.nombre !== undefined) {
-        if (datos.nombre.trim().length === 0) {
+      if (datos.nombreSector !== undefined) {
+        if (datos.nombreSector.trim().length === 0) {
           throw new Error('El nombre del sector no puede estar vacío');
         }
         
-        if (datos.nombre.trim().length < 3) {
+        if (datos.nombreSector.trim().length < 3) {
           throw new Error('El nombre del sector debe tener al menos 3 caracteres');
         }
       }
       
-      // Convertir nombre a nombreSector para el API
       const datosParaAPI: UpdateSectorDTO = {};
       
-      if (datos.nombre !== undefined) {
-        datosParaAPI.nombreSector = datos.nombre.trim();
+      if (datos.nombreSector !== undefined) {
+        datosParaAPI.nombreSector = datos.nombreSector.trim();
       }
-      if (datos.descripcion !== undefined) {
-        datosParaAPI.descripcion = datos.descripcion.trim();
+      if (datos.cuadrante !== undefined) {
+        datosParaAPI.cuadrante = datos.cuadrante || null;
       }
-      if (datos.estado !== undefined) {
-        datosParaAPI.estado = datos.estado;
-      }
-      
-      datosParaAPI.fechaModificacion = new Date().toISOString();
       
       return await this.update(id, datosParaAPI);
       
@@ -256,36 +273,15 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
   }
   
   /**
-   * Elimina un sector (cambio de estado lógico)
-   */
-  async eliminarSector(id: number): Promise<void> {
-    try {
-      console.log('🗑️ [SectorService] Eliminando sector:', id);
-      
-      await this.update(id, {
-        estado: 'INACTIVO',
-        fechaModificacion: new Date().toISOString()
-      });
-      
-      console.log('✅ [SectorService] Sector marcado como inactivo');
-      
-    } catch (error: any) {
-      console.error('❌ [SectorService] Error eliminando sector:', error);
-      throw error;
-    }
-  }
-  
-  /**
    * Busca sectores por nombre
    */
-  async buscarPorNombre(nombre: string): Promise<SectorData[]> {
+  async buscarPorNombre(nombreSector: string): Promise<SectorData[]> {
     try {
-      const params: BusquedaSectorParams = {
-        nombre: nombre.trim(),
-        estado: 'ACTIVO'
-      };
+      const allSectors = await this.getAll();
       
-      return await this.search(params);
+      return allSectors.filter(sector => 
+        sector.nombreSector.toLowerCase().includes(nombreSector.toLowerCase())
+      );
       
     } catch (error: any) {
       console.error('❌ [SectorService] Error buscando sectores:', error);
@@ -294,33 +290,56 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
   }
   
   /**
-   * Obtiene sectores activos
-   */
-  async obtenerActivos(): Promise<SectorData[]> {
-    try {
-      return await this.search({ estado: 'ACTIVO' });
-    } catch (error: any) {
-      console.error('❌ [SectorService] Error obteniendo sectores activos:', error);
-      throw error;
-    }
-  }
-  
-  /**
    * Obtiene todos los sectores
    */
-  async obtenerTodos(params?: BusquedaSectorParams): Promise<SectorData[]> {
+  async obtenerTodos(): Promise<SectorData[]> {
     try {
       console.log('📋 [SectorService] Obteniendo todos los sectores');
       
-      const queryParams = {
-        ...API_CONFIG.defaultParams,
-        ...params
-      };
-      
-      return await this.getAll(queryParams);
+      return await this.getAll();
       
     } catch (error: any) {
       console.error('❌ [SectorService] Error obteniendo sectores:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene todos los cuadrantes disponibles
+   */
+  async obtenerCuadrantes(): Promise<CuadranteData[]> {
+    try {
+      console.log('📋 [SectorService] Obteniendo cuadrantes desde:', `${API_CONFIG.baseURL}/api/sector/listarCuadrante`);
+      
+      const response = await fetch(`${API_CONFIG.baseURL}/api/sector/listarCuadrante`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('📡 [SectorService] Cuadrantes recibidos:', data);
+      
+      // Si es un array, procesarlo directamente
+      if (Array.isArray(data)) {
+        return data.map(item => ({
+          codCuadrante: item.codCuadrante || 0,
+          descripcion: item.descripcion || null,
+          abreviatura: item.abreviatura || '',
+          referenciaBarrio: item.referenciaBarrio || null
+        }));
+      }
+      
+      throw new Error('La respuesta no es un array válido');
+      
+    } catch (error: any) {
+      console.error('❌ [SectorService] Error obteniendo cuadrantes:', error);
       throw error;
     }
   }

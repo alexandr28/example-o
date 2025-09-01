@@ -1,5 +1,5 @@
 // src/components/calles/CalleForm.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -8,15 +8,21 @@ import {
   TextField,
   Button,
   Paper,
-  Typography,
   CircularProgress,
   Alert,
-  Autocomplete
+  Autocomplete,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText,
+  IconButton
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
-  Save as SaveIcon
+  Save as SaveIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 // import SearchableSelect from '../ui/SearchableSelect';
 import { CalleFormData } from '../../models/Calle';
@@ -54,9 +60,9 @@ const schema = yup.object().shape({
 
 interface CalleFormProps {
   onSubmit: (data: CalleFormData) => void | Promise<void>;
-  onCancel?: () => void;
+  onDelete?: () => void | Promise<void>;
   onNew?: () => void;
-  onEdit?: () => void;
+  onUpdateSector?: (sectorId: number, nombre: string) => Promise<boolean>;
   initialData?: Partial<CalleFormData>;
   isSubmitting?: boolean;
 }
@@ -70,13 +76,18 @@ interface TipoViaOption {
 const CalleForm: React.FC<CalleFormProps> = ({
   onSubmit,
   onNew,
-  onEdit,
+  onDelete,
+  onUpdateSector,
   initialData,
   isSubmitting = false
 }) => {
   const [tiposVia, setTiposVia] = useState<TipoViaOption[]>([]);
   const [loadingTiposVia, setLoadingTiposVia] = useState(false);
   const [errorTiposVia, setErrorTiposVia] = useState<string | null>(null);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [openEditSectorDialog, setOpenEditSectorDialog] = useState(false);
+  const [editingSector, setEditingSector] = useState<{id: number, nombre: string} | null>(null);
+  const [newSectorName, setNewSectorName] = useState('');
   
   // Usar hooks para sectores y barrios
   const { sectores, loading: loadingSectores, error: errorSectores } = useSectores();
@@ -92,6 +103,7 @@ const CalleForm: React.FC<CalleFormProps> = ({
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors }
   } = useForm<CalleFormData>({
     resolver: yupResolver(schema),
@@ -104,6 +116,22 @@ const CalleForm: React.FC<CalleFormProps> = ({
   });
 
   const selectedSector = watch('codSector');
+
+  // Filtrar barrios por sector seleccionado
+  const barriosFiltrados = useMemo(() => {
+    if (!selectedSector || selectedSector === 0) {
+      return [];
+    }
+    return todosLosBarrios?.filter(barrio => barrio.codSector === selectedSector) || [];
+  }, [selectedSector, todosLosBarrios]);
+
+  // Resetear barrio cuando cambia el sector
+  useEffect(() => {
+    // Solo resetear si no es la carga inicial
+    if (selectedSector !== initialData?.codSector) {
+      setValue('codBarrio', 0);
+    }
+  }, [selectedSector, setValue, initialData?.codSector]);
 
   // Cargar tipos de vía
   useEffect(() => {
@@ -160,6 +188,14 @@ const CalleForm: React.FC<CalleFormProps> = ({
         codBarrio: initialData.codBarrio || 0,
         nombreCalle: initialData.nombreCalle || '',
       });
+    } else {
+      // Si no hay datos iniciales, limpiar el formulario
+      reset({
+        tipoVia: 0,
+        codSector: 0,
+        codBarrio: 0,
+        nombreCalle: ''
+      });
     }
   }, [initialData, reset]);
 
@@ -206,6 +242,14 @@ const CalleForm: React.FC<CalleFormProps> = ({
       
       // Enviar los datos
       await onSubmit(datosParaHook as any);
+      
+      // Limpiar el formulario después de enviar exitosamente
+      reset({
+        tipoVia: 0,
+        codSector: 0,
+        codBarrio: 0,
+        nombreCalle: ''
+      });
     } catch (error) {
       console.error('❌ Error al enviar formulario:', error);
     }
@@ -220,6 +264,58 @@ const CalleForm: React.FC<CalleFormProps> = ({
     });
     onNew?.();
   };
+
+  // Handlers para el modal de eliminación
+  const handleDeleteClick = () => {
+    setOpenDeleteDialog(true);
+  };
+
+  const handleDeleteCancel = () => {
+    setOpenDeleteDialog(false);
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      await onDelete?.();
+      setOpenDeleteDialog(false);
+    } catch (error) {
+      console.error('❌ Error al eliminar:', error);
+    }
+  };
+
+  // Handlers para editar sector
+  const handleEditSector = (sector: any) => {
+    setEditingSector({ id: sector.id, nombre: sector.nombre });
+    setNewSectorName(sector.nombre);
+    setOpenEditSectorDialog(true);
+  };
+
+  const handleEditSectorCancel = () => {
+    setOpenEditSectorDialog(false);
+    setEditingSector(null);
+    setNewSectorName('');
+  };
+
+  const handleEditSectorConfirm = async () => {
+    if (!editingSector || !onUpdateSector || !newSectorName.trim()) return;
+
+    try {
+      await onUpdateSector(editingSector.id, newSectorName.trim());
+      setOpenEditSectorDialog(false);
+      setEditingSector(null);
+      setNewSectorName('');
+    } catch (error) {
+      console.error('❌ Error al actualizar sector:', error);
+    }
+  };
+
+  // Determinar si el formulario tiene datos iniciales (modo edición)
+  const hasInitialData = initialData && (
+    initialData.tipoVia || 
+    initialData.codSector || 
+    initialData.codBarrio || 
+    (initialData.nombreCalle && initialData.nombreCalle.trim() !== '')
+  );
 
   // Opciones preparadas para SearchableSelect (actualmente no usado)
   // Se mantienen comentadas por si se necesitan en el futuro
@@ -256,30 +352,7 @@ const CalleForm: React.FC<CalleFormProps> = ({
         </Alert>
       )}
       
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: 2, 
-        mb: 2,
-        pb: 2,
-        borderBottom: '2px solid',
-        borderColor: 'primary.main'
-      }}>
-        <Box sx={{
-          p: 1,
-          borderRadius: 1,
-          backgroundColor: 'primary.main',
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <AddIcon />
-        </Box>
-        <Typography variant="h6" fontWeight={600}>
-          Formulario de Calle
-        </Typography>
-      </Box>
+      
       
       <form onSubmit={handleSubmit(handleFormSubmit)}>
         {/* Primera fila: Todos los campos del formulario en horizontal */}
@@ -343,6 +416,23 @@ const CalleForm: React.FC<CalleFormProps> = ({
                   }}
                   loading={loadingSectores}
                   disabled={loadingSectores || isSubmitting}
+                  renderOption={(props, option) => (
+                    <Box component="li" {...props} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>{option.nombre}</span>
+                      {onUpdateSector && (
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditSector(option);
+                          }}
+                          sx={{ ml: 1 }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </Box>
+                  )}
                   renderInput={(params) => (
                     <TextField
                       {...params}
@@ -374,22 +464,26 @@ const CalleForm: React.FC<CalleFormProps> = ({
               control={control}
               render={({ field }) => (
                 <Autocomplete
-                  options={todosLosBarrios || []}
+                  options={barriosFiltrados || []}
                   getOptionLabel={(option) => option.nombre || 'Sin nombre'}
-                  value={todosLosBarrios?.find(b => b.id === field.value) || null}
+                  value={barriosFiltrados?.find(b => b.id === field.value) || null}
                   onChange={(_, newValue) => {
                     field.onChange(newValue?.id || 0);
                   }}
                   loading={loadingBarrios}
-                  disabled={loadingBarrios || isSubmitting}
+                  disabled={loadingBarrios || isSubmitting || !selectedSector || selectedSector === 0}
                   renderInput={(params) => (
                     <TextField
                       {...params}
                       label="Barrio *"
                       error={!!errors.codBarrio}
-                      helperText={errors.codBarrio?.message}
+                      helperText={
+                        !selectedSector || selectedSector === 0 
+                          ? "" 
+                          : errors.codBarrio?.message || (barriosFiltrados.length === 0 ? "No hay barrios para este sector" : "")
+                      }
                       size="small"
-                      placeholder="Seleccione un barrio"
+                      placeholder={!selectedSector || selectedSector === 0 ? "Primero seleccione un sector" : "Seleccione un barrio"}
                       InputProps={{
                         ...params.InputProps,
                         endAdornment: (
@@ -420,14 +514,17 @@ const CalleForm: React.FC<CalleFormProps> = ({
               inputProps={{ maxLength: 100 }}
             />
           </Box>
-          <Box sx={{ 
+        </Box>
+
+        {/* Segunda fila: Botones de acción alineados a la derecha */}
+        <Box sx={{ 
           display: 'flex', 
-          justifyContent: 'center',
+          justifyContent: 'flex-end',
           alignItems: 'center',
-          gap: 2, 
-          
-        
+          gap: 1,
+          mb: 3
         }}>
+           {/* Seccion Buttons */}
           <Button
             type="button"
             variant="contained"
@@ -447,45 +544,173 @@ const CalleForm: React.FC<CalleFormProps> = ({
           </Button>
           
           <Button
-            type="button"
-            variant="outlined"
-            color="primary"
-            startIcon={<EditIcon />}
-            onClick={onEdit}
-            disabled={isSubmitting}
-            sx={{ 
-              minWidth: 80,
-              height: 40,
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 600
-            }}
-          >
-            Editar
-          </Button>
-          
-          <Button
             type="submit"
             variant="contained"
             color="primary"
-            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : (hasInitialData ? <EditIcon /> : <SaveIcon />)}
             disabled={isSubmitting}
             sx={{ 
-              minWidth: 80,
+              minWidth: 100,
               height: 40,
               borderRadius: 2,
               textTransform: 'none',
               fontWeight: 600
             }}
           >
-            {isSubmitting ? 'Guardando...' : 'Guardar'}
+            {isSubmitting 
+              ? (hasInitialData ? 'Actualizando...' : 'Guardando...') 
+              : (hasInitialData ? 'Actualizar' : 'Guardar')
+            }
           </Button>
-        </Box>
-        </Box>
 
-        {/* Segunda fila: Botones de acción */}
+          {hasInitialData && onDelete && (
+            <Button
+              type="button"
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={handleDeleteClick}
+              disabled={isSubmitting}
+              sx={{ 
+                minWidth: 90,
+                height: 40,
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 600
+              }}
+            >
+              Eliminar
+            </Button>
+          )}
+        </Box>
         
       </form>
+
+      {/* Modal de confirmación de eliminación */}
+      <Dialog
+        open={openDeleteDialog}
+        onClose={handleDeleteCancel}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+          }
+        }}
+      >
+        <DialogTitle 
+          sx={{ 
+            pb: 1,
+            fontSize: '1.25rem',
+            fontWeight: 600,
+            color: 'error.main'
+          }}
+        >
+          Confirmar Eliminación
+        </DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <DialogContentText sx={{ fontSize: '1rem', color: 'text.primary' }}>
+            ¿Está seguro que desea eliminar esta calle?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5, pt: 1.5, gap: 1 }}>
+          <Button 
+            onClick={handleDeleteCancel}
+            variant="outlined"
+            color="inherit"
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 500,
+              px: 3
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleDeleteConfirm}
+            variant="contained"
+            color="error"
+            disabled={isSubmitting}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              px: 3
+            }}
+          >
+            {isSubmitting ? 'Eliminando...' : 'Eliminar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de edición de sector */}
+      <Dialog
+        open={openEditSectorDialog}
+        onClose={handleEditSectorCancel}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+          }
+        }}
+      >
+        <DialogTitle 
+          sx={{ 
+            pb: 1,
+            fontSize: '1.25rem',
+            fontWeight: 600,
+            color: 'primary.main'
+          }}
+        >
+          Editar Sector
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Nombre del Sector"
+            value={newSectorName}
+            onChange={(e) => setNewSectorName(e.target.value)}
+            variant="outlined"
+            size="small"
+            sx={{ mt: 1 }}
+            placeholder="Ingrese el nuevo nombre del sector"
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5, pt: 1.5, gap: 1 }}>
+          <Button 
+            onClick={handleEditSectorCancel}
+            variant="outlined"
+            color="inherit"
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 500,
+              px: 3
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleEditSectorConfirm}
+            variant="contained"
+            color="primary"
+            disabled={!newSectorName.trim()}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              px: 3
+            }}
+          >
+            Actualizar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 };

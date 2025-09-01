@@ -10,6 +10,7 @@ export interface Calle {
   nombreVia: string; // Nombre de la vía
   descTipoVia: string; // Descripción del tipo de vía (ej: "CALLE")
   nombreBarrio: string; // Nombre del barrio
+  nombreSector?: string; // Nombre del sector
   
   // Campos adicionales para compatibilidad
   id?: number;

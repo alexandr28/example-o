@@ -1,7 +1,6 @@
 // src/components/contribuyentes/ContribuyenteForm.tsx
 import React, { useState, useCallback } from 'react';
-import { useForm, Controller } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
 import {
   Paper,
   Box,
@@ -12,7 +11,6 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   Collapse,
-  Alert,
   CircularProgress,
   useTheme,
   alpha
@@ -23,9 +21,7 @@ import {
   Add as AddIcon,
   Save as SaveIcon,
   Edit as EditIcon,
-  Clear as ClearIcon,
   Groups as GroupsIcon,
-  Badge as BadgeIcon
 } from '@mui/icons-material';
 import PersonaFormMUI from './PersonaForm';
 import FormSectionMUI from '../utils/FormSecction';
@@ -48,7 +44,6 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
   loading: externalLoading = false
 }) => {
   const theme = useTheme();
-  const navigate = useNavigate();
   const [internalLoading, setInternalLoading] = useState(false);
   const [showConyugeRepresentante, setShowConyugeRepresentante] = useState(false);
   const [isDireccionModalOpen, setIsDireccionModalOpen] = useState(false);
@@ -61,7 +56,7 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
   const principalForm = useForm({
     defaultValues: {
       esPersonaJuridica: false,
-      tipoDocumento: 'DNI',
+      tipoDocumento: '4101', // Código para DNI
       numeroDocumento: '',
       nombres: '',
       razonSocial: '',
@@ -71,8 +66,8 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
       nFinca: '',
       otroNumero: '',
       telefono: '',
-      sexo: 'Masculino',
-      estadoCivil: 'Soltero/a',
+      sexo: '2001', // Código para Masculino
+      estadoCivil: '', // Dejar vacío para que sea seleccionado por el usuario
       fechaNacimiento: null,
       ...initialData
     },
@@ -82,7 +77,7 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
   // Formulario para cónyuge/representante
   const conyugeRepresentanteForm = useForm({
     defaultValues: {
-      tipoDocumento: 'DNI',
+      tipoDocumento: '4101', // Código para DNI
       numeroDocumento: '',
       nombres: '',
       apellidoPaterno: '',
@@ -91,8 +86,8 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
       nFinca: '',
       otroNumero: '',
       telefono: '',
-      sexo: 'Masculino',
-      estadoCivil: 'Casado/a',
+      sexo: '2001', // Código para Masculino
+      estadoCivil: '', // Dejar vacío para que sea seleccionado por el usuario
       fechaNacimiento: null
     }
   });
@@ -101,7 +96,7 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
 
   // Manejar cambio de tipo de contribuyente
   const handleTipoContribuyenteChange = useCallback((
-    event: React.MouseEvent<HTMLElement>,
+    _event: React.MouseEvent<HTMLElement>,
     newValue: 'natural' | 'juridica' | null
   ) => {
     if (newValue !== null) {
@@ -110,12 +105,12 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
       
       // Resetear algunos campos según el tipo
       if (newValue === 'juridica') {
-        principalForm.setValue('tipoDocumento', 'RUC');
+        principalForm.setValue('tipoDocumento', '4102'); // Código para RUC
         principalForm.setValue('nombres', '');
         principalForm.setValue('apellidoPaterno', '');
         principalForm.setValue('apellidoMaterno', '');
       } else {
-        principalForm.setValue('tipoDocumento', 'DNI');
+        principalForm.setValue('tipoDocumento', '4101'); // Código para DNI
         principalForm.setValue('razonSocial', '');
       }
     }
@@ -171,30 +166,181 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
     return texto;
   }, []);
 
-  // Manejar submit del formulario
+
+  // Función para convertir datos del formulario al formato requerido por la API
+  const convertirDatosPersona = (formData: any, esJuridica: boolean) => {
+    // Convertir estado civil a número
+    let codEstadoCivil = 1; // Soltero por defecto
+    if (formData.estadoCivil) {
+      if (formData.estadoCivil === '1801' || formData.estadoCivil === 'SOLTERO') {
+        codEstadoCivil = 1;
+      } else if (formData.estadoCivil === '1802' || formData.estadoCivil === 'CASADO') {
+        codEstadoCivil = 2;
+      } else if (formData.estadoCivil === '1803' || formData.estadoCivil === 'VIUDO') {
+        codEstadoCivil = 3;
+      } else if (formData.estadoCivil === '1804' || formData.estadoCivil === 'DIVORCIADO') {
+        codEstadoCivil = 4;
+      } else if (typeof formData.estadoCivil === 'string' && !isNaN(parseInt(formData.estadoCivil))) {
+        codEstadoCivil = parseInt(formData.estadoCivil);
+      }
+    }
+    
+    return {
+      // Datos requeridos según tu especificación
+      codPersona: null, // Se generará por SQL
+      codTipopersona: esJuridica ? "0302" : "0301",
+      codTipoDocumento: formData.tipoDocumento === '4101' ? 1 : formData.tipoDocumento === '4102' ? 2 : 1, // DNI=1, RUC=2
+      numerodocumento: formData.numeroDocumento?.toString() || '',
+      nombres: esJuridica ? formData.razonSocial : formData.nombres,
+      apellidomaterno: formData.apellidoMaterno || '',
+      apellidopaterno: formData.apellidoPaterno || '',
+      fechanacimiento: formData.fechaNacimiento ? 
+        (formData.fechaNacimiento instanceof Date ? 
+          formData.fechaNacimiento.toISOString().split('T')[0] : 
+          formData.fechaNacimiento.split('T')[0]) : "1980-01-01",
+      codestadocivil: codEstadoCivil,
+      codsexo: formData.sexo === '2001' ? 1 : formData.sexo === '2002' ? 2 : 1, // Masculino=1, Femenino=2
+      telefono: formData.telefono?.toString() || '',
+      codDireccion: formData.direccion?.id || formData.direccion?.codigo || 1,
+      lote: formData.nFinca?.toString() || null,
+      otros: formData.otroNumero?.toString() || null,
+      parametroBusqueda: null,
+      codUsuario: 1
+    };
+  };
+
+
+  // Manejar submit del formulario con APIs secuenciales usando hooks
   const handleSubmit = principalForm.handleSubmit(async (data) => {
     try {
       setInternalLoading(true);
+      console.log('📤 [ContribuyenteForm] Iniciando proceso de guardado con APIs:', data);
+
+      // PASO 1: Preparar datos de persona principal
+      const personaPrincipalData = convertirDatosPersona(data, esPersonaJuridica);
+      console.log('📋 [ContribuyenteForm] Datos persona principal para API:', personaPrincipalData);
       
-      // Si hay formulario de cónyuge/representante, validarlo también
+      // Crear persona principal usando el servicio directamente
+      const { personaService } = await import('../../services/personaService');
+      const personaPrincipal = await personaService.crearPersonaAPI(personaPrincipalData);
+      
+      if (!personaPrincipal) {
+        throw new Error('Error al crear persona principal');
+      }
+      
+      console.log('✅ [ContribuyenteForm] Persona principal creada:', personaPrincipal);
+
+      // PASO 1.5: Buscar la persona creada para obtener el codPersona
+      // Según tu especificación, necesitamos buscar por tipo y documento
+      const codTipoPersona = esPersonaJuridica ? "0302" : "0301";
+      const numeroDocumento = data.numeroDocumento;
+      
+      console.log('🔍 [ContribuyenteForm] Buscando persona creada con tipo:', codTipoPersona, 'y documento:', numeroDocumento);
+      
+      // Usar el API GET con query params para buscar la persona
+      const urlBusqueda = `/api/persona/listarPersonaPorTipoPersonaNombreVia?codTipoPersona=${codTipoPersona}&parametroBusqueda=a`;
+      
+      const responseBusqueda = await fetch(urlBusqueda, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      let personaEncontrada = null;
+      
+      if (responseBusqueda.ok) {
+        const personas = await responseBusqueda.json();
+        console.log('📋 [ContribuyenteForm] Personas encontradas:', personas);
+        
+        // Filtrar por numero de documento
+        if (Array.isArray(personas)) {
+          personaEncontrada = personas.find((p: any) => p.numerodocumento === numeroDocumento);
+        } else if (personas.data && Array.isArray(personas.data)) {
+          personaEncontrada = personas.data.find((p: any) => p.numerodocumento === numeroDocumento);
+        }
+        
+        console.log('✅ [ContribuyenteForm] Persona encontrada con codPersona:', personaEncontrada);
+      }
+      
+      // Si no se encuentra, usar el codPersona de la respuesta de creación
+      const codPersonaPrincipal = personaEncontrada?.codPersona || personaPrincipal.codPersona;
+      
+      if (!codPersonaPrincipal) {
+        throw new Error('No se pudo obtener el código de persona');
+      }
+
+      let conyugeRepresentanteId = null;
+
+      // PASO 2: Si hay cónyuge/representante, guardarlo también
       if (showConyugeRepresentante) {
         const conyugeData = conyugeRepresentanteForm.getValues();
-        data = {
-          ...data,
-          tieneConyugeRepresentante: true,
-          conyugeRepresentante: conyugeData
-        };
+        
+        // Verificar que tiene datos mínimos requeridos
+        if (conyugeData.numeroDocumento && conyugeData.nombres) {
+          console.log('👫 [ContribuyenteForm] Creando cónyuge/representante:', conyugeData);
+          
+          const conyugePersonaData = convertirDatosPersona(conyugeData, false);
+          const conyugePersona = await personaService.crearPersonaAPI(conyugePersonaData);
+          
+          if (conyugePersona) {
+            // Buscar el cónyuge creado para obtener su codPersona
+            const urlBusquedaConyuge = `/api/persona/listarPersonaPorTipoPersonaNombreVia?codTipoPersona=0301&parametroBusqueda=a`;
+            const responseBusquedaConyuge = await fetch(urlBusquedaConyuge, {
+              method: 'GET',
+              headers: { 'Accept': 'application/json' }
+            });
+            
+            if (responseBusquedaConyuge.ok) {
+              const personasConyuge = await responseBusquedaConyuge.json();
+              const conyugeEncontrado = (Array.isArray(personasConyuge) ? personasConyuge : personasConyuge.data || [])
+                .find((p: any) => p.numerodocumento === conyugeData.numeroDocumento);
+              
+              conyugeRepresentanteId = conyugeEncontrado?.codPersona || conyugePersona.codPersona;
+            }
+            
+            console.log('✅ [ContribuyenteForm] Cónyuge/Representante creado con codPersona:', conyugeRepresentanteId);
+          }
+        }
+      }
+
+      // PASO 3: Crear contribuyente usando el API directamente
+      const { contribuyenteService } = await import('../../services/contribuyenteService');
+      
+      const contribuyenteAPIData = {
+        codPersona: codPersonaPrincipal,
+        codConyuge: conyugeRepresentanteId,
+        codRepresentanteLegal: esPersonaJuridica ? conyugeRepresentanteId : null,
+        codestado: "2156", // Estado activo según tu especificación
+        codUsuario: 1
+      };
+      
+      console.log('📋 [ContribuyenteForm] Datos contribuyente para API:', contribuyenteAPIData);
+      
+      const contribuyente = await contribuyenteService.crearContribuyenteAPI(contribuyenteAPIData);
+      
+      if (!contribuyente) {
+        throw new Error('Error al crear contribuyente');
       }
       
-      console.log('📤 Datos del formulario:', data);
+      console.log('✅ [ContribuyenteForm] Contribuyente creado exitosamente:', contribuyente);
       
+      NotificationService.success('Contribuyente registrado exitosamente');
+
+      // Llamar callback opcional
       if (onSubmit) {
-        await onSubmit(data);
+        await onSubmit({
+          persona: personaPrincipal,
+          contribuyente: contribuyente,
+          conyugeRepresentante: conyugeRepresentanteId
+        });
       }
-      
-      NotificationService.success('Contribuyente guardado correctamente');
+
+      // Resetear formularios después del éxito
+      handleNuevo();
+
     } catch (error: any) {
-      console.error('❌ Error al guardar:', error);
+      console.error('❌ [ContribuyenteForm] Error al guardar:', error);
       NotificationService.error(error.message || 'Error al guardar contribuyente');
     } finally {
       setInternalLoading(false);

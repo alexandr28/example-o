@@ -1,5 +1,5 @@
 // src/components/depreciacion/DepreciacionUnificado.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Paper,
   Box,
@@ -23,8 +23,6 @@ import {
   IconButton,
   Tooltip,
   Alert,
-  Card,
-  CardContent,
   Tab,
   Tabs
 } from '@mui/material';
@@ -35,17 +33,15 @@ import {
   Search as SearchIcon,
   TrendingDown as TrendingDownIcon,
   CheckCircle as CheckCircleIcon,
-  HighlightOff as HighlightOffIcon,
   Warning as WarningIcon,
   Error as ErrorIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   Construction as ConstructionIcon,
-  Refresh as RefreshIcon
+  Add as AddIcon
 } from '@mui/icons-material';
 import { Depreciacion } from '../../models/Depreciacion';
 import { 
-  useAnioOptions, 
   useClasificacionPredio,
   useTipoNivelAntiguedad,
   useMaterialPredominante 
@@ -102,8 +98,6 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
   onTipoCasaChange,
   onRegistrar,
   onBuscar,
-  onActualizar,
-  onEliminar,
   loading = false
 }) => {
   const theme = useTheme();
@@ -113,8 +107,10 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
   const [nivelAntiguedadSeleccionado, setNivelAntiguedadSeleccionado] = useState<string | null>(null);
   const [materialEstructuralSeleccionado, setMaterialEstructuralSeleccionado] = useState<string | null>(null);
   
-  // Usar el hook para obtener años disponibles
-  const { options: aniosDisponibles, loading: loadingAnios } = useAnioOptions(2020, new Date().getFullYear() + 2);
+  // Estado para modo de edición
+  const [isEditMode, setIsEditMode] = useState(false);
+  
+  // Hook para años disponibles ya no es necesario al usar TextField
   
   // Usar el hook para obtener tipos de casa (clasificación de predios)
   const { options: tiposCasa, loading: loadingTiposCasa } = useClasificacionPredio();
@@ -166,9 +162,6 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
     setTabValue(newValue);
   };
 
-  const handleAnioSelect = (anio: { value: string | number, label: string } | null) => {
-    onAnioChange(anio ? (typeof anio.value === 'number' ? anio.value : parseInt(anio.value.toString())) : null);
-  };
 
   const handleTipoCasaSelect = (tipo: { value: string | number, label: string } | null) => {
     onTipoCasaChange(tipo ? tipo.value.toString() : null);
@@ -188,7 +181,7 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
     setEstadosConservacion(nuevosEstados);
   };
 
-  const handleRegistrar = () => {
+  const handleRegistrar = async () => {
     // Construir objeto con los datos del formulario
     const datosFormulario = {
       nivelAntiguedad: nivelAntiguedadSeleccionado,
@@ -199,17 +192,105 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
       }, {} as Record<string, number>)
     };
     
-    onRegistrar(datosFormulario);
-    
-    // Limpiar formulario después del registro
-    setEstadosConservacion(prev => prev.map(estado => ({ ...estado, value: 0.00 })));
-    setNivelAntiguedadSeleccionado(null);
-    setMaterialEstructuralSeleccionado(null);
+    try {
+      // Ejecutar el registro
+      await onRegistrar(datosFormulario);
+      
+      // Limpiar formulario después del registro exitoso
+      setEstadosConservacion(prev => prev.map(estado => ({ ...estado, value: 0.00 })));
+      setNivelAntiguedadSeleccionado(null);
+      setMaterialEstructuralSeleccionado(null);
+      setIsEditMode(false);
+      
+      // Cambiar a la pestaña de búsqueda (ahora es index 0)
+      setTabValue(0);
+      
+      // Ejecutar búsqueda para mostrar los datos recién agregados
+      setTimeout(() => {
+        onBuscar();
+        setHasSearched(true);
+      }, 100);
+      
+    } catch (error) {
+      // En caso de error, mantener los datos en el formulario
+      console.error('Error al registrar:', error);
+    }
   };
 
   const handleBuscar = () => {
     onBuscar();
     setHasSearched(true);
+  };
+
+  const handleNuevo = () => {
+    // Limpiar formulario y salir del modo edición
+    setEstadosConservacion(prev => prev.map(estado => ({ ...estado, value: 0.00 })));
+    setNivelAntiguedadSeleccionado(null);
+    setMaterialEstructuralSeleccionado(null);
+    onAnioChange(null);
+    onTipoCasaChange(null);
+    setIsEditMode(false);
+  };
+
+  const handleEliminar = () => {
+    // Aquí se implementaría la lógica de eliminación
+    // Por ahora solo limpiamos el formulario y salimos del modo edición
+    handleNuevo();
+  };
+
+  const handleEditarDepreciacion = (depreciacion: Depreciacion) => {
+    // Cargar datos en el formulario
+    onAnioChange(depreciacion.anio);
+    
+    // Buscar y establecer el tipo de casa correcto
+    const tipoCasa = tiposCasa.find(tipo => 
+      tipo.label === depreciacion.tipoCasa || 
+      tipo.value === depreciacion.tipoCasa
+    );
+    if (tipoCasa) {
+      onTipoCasaChange(tipoCasa.value.toString());
+    }
+    
+    // Buscar y establecer el nivel de antigüedad correcto
+    const nivelAntigu = nivelesAntiguedad.find(nivel => 
+      nivel.label === depreciacion.antiguedad || 
+      nivel.value === depreciacion.antiguedad
+    );
+    if (nivelAntigu) {
+      setNivelAntiguedadSeleccionado(nivelAntigu.value.toString());
+    }
+    
+    // Buscar y establecer el material estructural correcto  
+    const materialEstr = materialesEstructurales.find(material => 
+      material.label === depreciacion.material || 
+      material.value === depreciacion.material
+    );
+    if (materialEstr) {
+      setMaterialEstructuralSeleccionado(materialEstr.value.toString());
+    }
+    
+    // Cargar estados de conservación
+    const nuevosEstados = estadosConservacion.map(estado => {
+      switch (estado.field) {
+        case 'porcMuyBueno':
+          return { ...estado, value: depreciacion.porcMuyBueno };
+        case 'porcBueno':
+          return { ...estado, value: depreciacion.porcBueno };
+        case 'porcRegular':
+          return { ...estado, value: depreciacion.porcRegular };
+        case 'porcMalo':
+          return { ...estado, value: depreciacion.porcMalo };
+        default:
+          return estado;
+      }
+    });
+    setEstadosConservacion(nuevosEstados);
+    
+    // Activar modo edición
+    setIsEditMode(true);
+    
+    // Cambiar a la pestaña de registro (ahora es index 1)
+    setTabValue(1);
   };
 
   // Obtener color del material
@@ -256,103 +337,59 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
           }}
         >
           <Tab 
-            icon={<SaveIcon />} 
+            icon={<SearchIcon />} 
             iconPosition="start"
-            label="Registrar Depreciación" 
+            label="Buscar y Consultar" 
             id="depreciacion-tab-0"
             aria-controls="depreciacion-tabpanel-0"
           />
           <Tab 
-            icon={<SearchIcon />} 
+            icon={<SaveIcon />} 
             iconPosition="start"
-            label="Buscar y Consultar" 
+            label="Registrar Depreciación" 
             id="depreciacion-tab-1"
             aria-controls="depreciacion-tabpanel-1"
           />
         </Tabs>
       </Box>
 
-      {/* Panel de Registro */}
-      <TabPanel value={tabValue} index={0}>
-        <Box sx={{ p: 3 }}>
-          <Stack spacing={3}>
-            {/* Título de la sección de registro */}
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <Box
-                sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 2,
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <TrendingDownIcon color="primary" />
-              </Box>
-              <Box>
-                <Typography variant="h6" fontWeight={600}>
-                  Configurar Depreciación
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Configure los valores de depreciación por estado de conservación
-                </Typography>
-              </Box>
-            </Stack>
+      {/* Panel de Registro - Ahora en index 1 */}
+      <TabPanel value={tabValue} index={1}>
+        <Box sx={{ p: { xs: 1, sm: 2 } }}>
+          <Stack spacing={{ xs: 1.5, sm: 2 }}>
+         
 
-            <Divider />
-
-            {/* Controles de selección - todos en una sola fila */}
+            {/* Controles de búsqueda en una sola fila */}
             <Box sx={{ 
-              display: 'grid', 
-              gridTemplateColumns: { 
-                xs: '1fr', 
-                sm: 'repeat(2, 1fr)',
-                md: 'repeat(4, 1fr)' 
-              },
-              gap: 1.5
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              flexWrap: 'wrap',
+              gap: { xs: 1, sm: 1.5 },
+              alignItems: { xs: 'stretch', sm: 'center' },
+              '& > *': {
+                flex: { xs: '1 1 auto', sm: '0 0 auto' }
+              }
             }}>
-              {/* Año */}
-              <Autocomplete
-                size="small"
-                options={aniosDisponibles}
-                getOptionLabel={(option) => option.label}
-                value={aniosDisponibles.find(a => (typeof a.value === 'number' ? a.value : parseInt(a.value.toString())) === anioSeleccionado) || null}
-                onChange={(_, newValue) => handleAnioSelect(newValue)}
-                loading={loading || loadingAnios}
-                disabled={loading || loadingAnios}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Año"
-                    placeholder="Año"
-                    size="small"
-                    InputProps={{
-                      ...params.InputProps,
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <CalendarIcon sx={{ fontSize: 14 }} />
-                        </InputAdornment>
-                      ),
-                      endAdornment: (
-                        <>
-                          {(loading || loadingAnios) ? <CircularProgress color="inherit" size={14} /> : null}
-                          {params.InputProps.endAdornment}
-                        </>
-                      ),
-                    }}
-                    sx={{
-                      '& .MuiInputLabel-root': {
-                        fontSize: '0.875rem'
-                      },
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: '0.875rem'
-                      }
-                    }}
-                  />
-                )}
-              />
+              {/* Selector Año */}
+              <Box sx={{ 
+                flex: { xs: '1 1 100%', sm: '1 1 calc(40% - 8px)', md: '0 0 120px' },
+                minWidth: { xs: '100%', sm: '120px', md: '120px' }
+              }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Año"
+                  type="number"
+                  value={anioSeleccionado || ''}
+                  onChange={(e) => onAnioChange(parseInt(e.target.value) || null)}
+                  InputProps={{
+                    inputProps: { 
+                      min: 1900, 
+                      max: new Date().getFullYear() 
+                    }
+                  }}
+                />
+              </Box>
               
               {/* Tipo de Casa */}
               <Autocomplete
@@ -363,6 +400,10 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                 onChange={(_, newValue) => handleTipoCasaSelect(newValue)}
                 loading={loading || loadingTiposCasa}
                 disabled={loading || loadingTiposCasa || !anioSeleccionado}
+                sx={{ 
+                  width: { xs: '100%', sm: 240, md: 240 },
+                  flex: { xs: '1 1 100%', sm: '1 1 60%' }
+                }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -388,13 +429,27 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                         fontSize: '0.875rem'
                       },
                       '& .MuiOutlinedInput-root': {
-                        fontSize: '0.875rem'
+                        fontSize: '0.875rem',
+                        height: 32,
+                        width: '100%'
                       }
                     }}
                   />
                 )}
               />
+            </Box>
 
+            {/* Controles de selección - Segunda fila: Nivel de Antigüedad y Material Estructural */}
+            <Box sx={{ 
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              flexWrap: 'wrap',
+              gap: { xs: 1, sm: 1.5 },
+              alignItems: { xs: 'stretch', sm: 'center' },
+              '& > *': {
+                flex: { xs: '1 1 auto', sm: '0 0 auto' }
+              }
+            }}>
               {/* Nivel de Antigüedad */}
               <Autocomplete
                 size="small"
@@ -404,6 +459,10 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                 onChange={(_, newValue) => handleNivelAntiguedadSelect(newValue)}
                 loading={loading || loadingNivelesAntiguedad}
                 disabled={loading || loadingNivelesAntiguedad || !tipoCasaSeleccionado}
+                sx={{ 
+                  width: { xs: '100%', sm: 180, md: 180 },
+                  flex: { xs: '1 1 100%', sm: '1 1 48%' }
+                }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -414,22 +473,25 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                       ...params.InputProps,
                       startAdornment: (
                         <InputAdornment position="start">
-                          <CalendarIcon sx={{ fontSize: 14 }} />
+                          <CalendarIcon sx={{ fontSize: 12 }} />
                         </InputAdornment>
                       ),
                       endAdornment: (
                         <>
-                          {(loading || loadingNivelesAntiguedad) ? <CircularProgress color="inherit" size={14} /> : null}
+                          {(loading || loadingNivelesAntiguedad) ? <CircularProgress color="inherit" size={12} /> : null}
                           {params.InputProps.endAdornment}
                         </>
                       ),
                     }}
                     sx={{
+                      width: '100%',
                       '& .MuiInputLabel-root': {
-                        fontSize: '0.875rem'
+                        fontSize: '0.75rem'
                       },
                       '& .MuiOutlinedInput-root': {
-                        fontSize: '0.875rem'
+                        fontSize: '0.75rem',
+                        height: 32,
+                        width: '100%'
                       }
                     }}
                   />
@@ -445,6 +507,10 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                 onChange={(_, newValue) => handleMaterialEstructuralSelect(newValue)}
                 loading={loading || loadingMaterialesEstructurales}
                 disabled={loading || loadingMaterialesEstructurales || !tipoCasaSeleccionado}
+                sx={{ 
+                  width: { xs: '100%', sm: 180, md: 180 },
+                  flex: { xs: '1 1 100%', sm: '1 1 48%' }
+                }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -455,22 +521,25 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                       ...params.InputProps,
                       startAdornment: (
                         <InputAdornment position="start">
-                          <ConstructionIcon sx={{ fontSize: 14 }} />
+                          <ConstructionIcon sx={{ fontSize: 12 }} />
                         </InputAdornment>
                       ),
                       endAdornment: (
                         <>
-                          {(loading || loadingMaterialesEstructurales) ? <CircularProgress color="inherit" size={14} /> : null}
+                          {(loading || loadingMaterialesEstructurales) ? <CircularProgress color="inherit" size={12} /> : null}
                           {params.InputProps.endAdornment}
                         </>
                       ),
                     }}
                     sx={{
+                      width: '100%',
                       '& .MuiInputLabel-root': {
-                        fontSize: '0.875rem'
+                        fontSize: '0.75rem'
                       },
                       '& .MuiOutlinedInput-root': {
-                        fontSize: '0.875rem'
+                        fontSize: '0.75rem',
+                        height: 32,
+                        width: '100%'
                       }
                     }}
                   />
@@ -485,14 +554,21 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
               </Typography>
               <Box sx={{ 
                 display: 'grid', 
-                gridTemplateColumns: { xs: '1fr 1fr', md: '1fr 1fr 1fr 1fr' },
-                gap: 1.5
+                gridTemplateColumns: { 
+                  xs: 'repeat(1, 1fr)', 
+                  sm: 'repeat(2, 1fr)',
+                  md: 'repeat(4, 1fr)' 
+                },
+                gap: { xs: 1, sm: 1.5 },
+                maxWidth: { xs: '100%', sm: 600, md: 800 },
+                justifyContent: 'start' // Alinear al inicio para mantener elementos compactos
               }}>
                 {estadosConservacion.map((estado, index) => (
                   <Box key={estado.nombre} sx={{ 
                     border: `1px solid ${theme.palette.divider}`,
                     borderRadius: 1,
-                    p: 1.5,
+                    p: 1, // Reducido de 1.5 para más compacto
+                    width: '100%', // Asegurar que use todo el ancho del grid
                     '&:hover': {
                       borderColor: estado.color,
                       boxShadow: `0 0 0 1px ${alpha(estado.color, 0.2)}`
@@ -516,10 +592,10 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
-                            <TrendingDownIcon fontSize="small" color="action" />
+                            <TrendingDownIcon sx={{ fontSize: 14 }} color="action" />
                           </InputAdornment>
                         ),
-                        endAdornment: <InputAdornment position="end" sx={{ fontSize: '0.75rem' }}>%</InputAdornment>
+                        endAdornment: <InputAdornment position="end" sx={{ fontSize: '0.7rem' }}>%</InputAdornment>
                       }}
                       inputProps={{
                         step: 0.01,
@@ -527,9 +603,10 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                         max: 100
                       }}
                       sx={{
+                        maxWidth: { xs: '100%', sm: 150 },
                         '& .MuiOutlinedInput-root': {
-                          height: 32,
-                          fontSize: '0.875rem',
+                          height: { xs: 32, sm: 28 },
+                          fontSize: { xs: '0.8rem', sm: '0.75rem' },
                           '&:hover fieldset': {
                             borderColor: estado.color,
                           },
@@ -538,7 +615,7 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                           }
                         },
                         '& .MuiOutlinedInput-input': {
-                          padding: '6px 8px'
+                          padding: '4px 6px' // Padding más compacto
                         }
                       }}
                     />
@@ -549,16 +626,46 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
 
             {/* Información adicional */}
             {anioSeleccionado && tipoCasaSeleccionado && nivelAntiguedadSeleccionado && materialEstructuralSeleccionado && (
-              <Alert severity="info" variant="outlined">
-                Configure los porcentajes de depreciación para {tiposCasa.find(t => t.value === tipoCasaSeleccionado)?.label} 
-                {' '}con antigüedad {nivelesAntiguedad.find(n => n.value === nivelAntiguedadSeleccionado)?.label}
-                {' '}y material {materialesEstructurales.find(m => m.value === materialEstructuralSeleccionado)?.label}
-                {' '}en el año {anioSeleccionado}
-              </Alert>
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'center', // Centrar el Alert
+                width: '100%' 
+              }}>
+              
+              </Box>
             )}
 
-            {/* Botón Registrar */}
-            <Stack direction="row" justifyContent="center">
+            {/* Línea divisoria */}
+            <Divider sx={{ my: 2 }} />
+
+            {/* Botones de acción */}
+            <Stack 
+              direction={{ xs: 'column', sm: 'row' }}
+              justifyContent="center" 
+              alignItems="center"
+              spacing={{ xs: 1, sm: 2 }}
+              sx={{ width: '100%' }}
+            >
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleNuevo}
+                startIcon={<AddIcon fontSize="small" />}
+                sx={{
+                  height: 36,
+                  px: 3,
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  minWidth: { xs: 120, sm: 100 },
+                  width: { xs: '100%', sm: 'auto' },
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                Nuevo
+              </Button>
+              
               <Button
                 variant="contained"
                 size="small"
@@ -569,71 +676,88 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                   height: 36,
                   px: 3,
                   fontWeight: 600,
-                  fontSize: '0.875rem'
+                  fontSize: '0.875rem',
+                  minWidth: { xs: 140, sm: 120 },
+                  width: { xs: '100%', sm: 'auto' },
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
               >
-                {loading ? 'Registrando...' : 'Registrar'}
+                {loading ? 'Registrando...' : 'Guardar'}
               </Button>
+              
+              {isEditMode && (
+                <Button
+                  variant="outlined"
+                  color="error"
+                  size="small"
+                  onClick={handleEliminar}
+                  startIcon={<DeleteIcon fontSize="small" />}
+                  sx={{
+                    height: 36,
+                    px: 3,
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                    minWidth: { xs: 120, sm: 110 },
+                    width: { xs: '100%', sm: 'auto' },
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderColor: 'error.main',
+                    color: 'error.main',
+                    '&:hover': {
+                      borderColor: 'error.dark',
+                      backgroundColor: 'error.light'
+                    }
+                  }}
+                >
+                  Eliminar
+                </Button>
+              )}
             </Stack>
           </Stack>
         </Box>
       </TabPanel>
 
-      {/* Panel de Búsqueda */}
-      <TabPanel value={tabValue} index={1}>
-        <Box sx={{ p: 2 }}>
-          <Stack spacing={2}>
-            {/* Título de la sección de búsqueda */}
-            <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-              <SearchIcon color="primary" fontSize="small" />
-              <Typography variant="subtitle1" fontWeight={500}>
-                Búsqueda de Depreciación
-              </Typography>
-            </Stack>
+      {/* Panel de Búsqueda - Ahora en index 0 */}
+      <TabPanel value={tabValue} index={0}>
+        <Box sx={{ p: { xs: 1, sm: 2 } }}>
+          <Stack spacing={{ xs: 1.5, sm: 2 }}>
+         
 
             {/* Controles de búsqueda en una sola fila */}
             <Box sx={{ 
               display: 'flex', 
+              flexDirection: { xs: 'column', sm: 'row' },
               flexWrap: 'wrap',
-              gap: 1,
-              alignItems: 'center',
-              p: 2,
+              gap: { xs: 1, sm: 1 },
+              alignItems: { xs: 'stretch', sm: 'center' },
+              p: { xs: 1.5, sm: 2 },
               bgcolor: alpha(theme.palette.grey[100], 0.5),
               borderRadius: 1,
               border: `1px solid ${theme.palette.divider}`
             }}>
-              <Autocomplete
-                size="small"
-                options={aniosDisponibles}
-                getOptionLabel={(option) => option.label}
-                value={aniosDisponibles.find(a => (typeof a.value === 'number' ? a.value : parseInt(a.value.toString())) === anioSeleccionado) || null}
-                onChange={(_, newValue) => handleAnioSelect(newValue)}
-                loading={loading || loadingAnios}
-                disabled={loading || loadingAnios}
-                sx={{ minWidth: 120, maxWidth: 150 }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Año"
-                    size="small"
-                    placeholder="Año"
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        height: 28,
-                        fontSize: '0.8rem',
-                        bgcolor: 'white'
-                      },
-                      '& .MuiInputLabel-root': {
-                        fontSize: '0.8rem',
-                        top: '-2px'
-                      },
-                      '& .MuiInputLabel-shrink': {
-                        top: '0px'
-                      }
-                    }}
-                  />
-                )}
-              />
+              {/* Selector Año Busqueda */}
+              <Box sx={{ 
+                flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '0 0 120px' },
+                minWidth: { xs: '100%', md: '120px' }
+              }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Año"
+                  type="number"
+                  value={anioSeleccionado || ''}
+                  onChange={(e) => onAnioChange(parseInt(e.target.value) || null)}
+                  InputProps={{
+                    inputProps: { 
+                      min: 1900, 
+                      max: new Date().getFullYear() 
+                    }
+                  }}
+                />
+              </Box>
               
               <Autocomplete
                 size="small"
@@ -643,7 +767,11 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                 onChange={(_, newValue) => handleTipoCasaSelect(newValue)}
                 loading={loading || loadingTiposCasa}
                 disabled={loading || loadingTiposCasa}
-                sx={{ minWidth: 180, maxWidth: 220 }}
+                sx={{ 
+                  flex: { xs: '1 1 100%', sm: '1 1 auto' },
+                  minWidth: { xs: '100%', sm: 200 },
+                  maxWidth: { xs: '100%', sm: 350 }
+                }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -677,7 +805,8 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                 sx={{ 
                   height: 28, 
                   px: 2, 
-                  minWidth: 80,
+                  minWidth: { xs: 100, sm: 80 },
+                  width: { xs: '100%', sm: 'auto' },
                   fontSize: '0.75rem',
                   fontWeight: 600
                 }}
@@ -723,12 +852,14 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                   component={Paper} 
                   elevation={2}
                   sx={{ 
-                    maxHeight: 400,
+                    maxHeight: { xs: 300, sm: 400 },
                     overflow: 'auto',
                     border: `1px solid ${theme.palette.divider}`,
                     borderRadius: 2,
+                    mt: 2,
+                    position: 'relative',
                     '& .MuiTable-root': {
-                      minWidth: 650
+                      minWidth: { xs: 500, sm: 650 }
                     }
                   }}
                 >
@@ -739,9 +870,11 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                           sx={{ 
                             fontWeight: 700,
                             fontSize: '0.875rem',
-                            bgcolor: alpha(theme.palette.primary.main, 0.08),
+                            bgcolor: '#ffffff !important',
                             color: theme.palette.primary.main,
-                            borderBottom: `2px solid ${theme.palette.primary.main}`
+                            borderBottom: `2px solid ${theme.palette.primary.main}`,
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            zIndex: 1000
                           }}
                         >
                           MATERIAL
@@ -750,9 +883,11 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                           sx={{ 
                             fontWeight: 700,
                             fontSize: '0.875rem',
-                            bgcolor: alpha(theme.palette.primary.main, 0.08),
+                            bgcolor: '#ffffff !important',
                             color: theme.palette.primary.main,
-                            borderBottom: `2px solid ${theme.palette.primary.main}`
+                            borderBottom: `2px solid ${theme.palette.primary.main}`,
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            zIndex: 1000
                           }}
                         >
                           ANTIGÜEDAD
@@ -762,9 +897,15 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                           sx={{ 
                             fontWeight: 700,
                             fontSize: '0.875rem',
-                            bgcolor: alpha(theme.palette.success.main, 0.08),
+                            bgcolor: '#ffffff',
                             color: theme.palette.success.main,
-                            borderBottom: `2px solid ${theme.palette.success.main}`
+                            borderBottom: `2px solid ${theme.palette.success.main}`,
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 104,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                            borderTop: 'none',
+                            paddingTop: 0
                           }}
                         >
                           MUY BUENO
@@ -774,9 +915,15 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                           sx={{ 
                             fontWeight: 700,
                             fontSize: '0.875rem',
-                            bgcolor: alpha(theme.palette.info.main, 0.08),
+                            bgcolor: '#ffffff',
                             color: theme.palette.info.main,
-                            borderBottom: `2px solid ${theme.palette.info.main}`
+                            borderBottom: `2px solid ${theme.palette.info.main}`,
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 104,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                            borderTop: 'none',
+                            paddingTop: 0
                           }}
                         >
                           BUENO
@@ -786,9 +933,15 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                           sx={{ 
                             fontWeight: 700,
                             fontSize: '0.875rem',
-                            bgcolor: alpha(theme.palette.warning.main, 0.08),
+                            bgcolor: '#ffffff',
                             color: theme.palette.warning.main,
-                            borderBottom: `2px solid ${theme.palette.warning.main}`
+                            borderBottom: `2px solid ${theme.palette.warning.main}`,
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 104,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                            borderTop: 'none',
+                            paddingTop: 0
                           }}
                         >
                           REGULAR
@@ -798,9 +951,15 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                           sx={{ 
                             fontWeight: 700,
                             fontSize: '0.875rem',
-                            bgcolor: alpha(theme.palette.error.main, 0.08),
+                            bgcolor: '#ffffff',
                             color: theme.palette.error.main,
-                            borderBottom: `2px solid ${theme.palette.error.main}`
+                            borderBottom: `2px solid ${theme.palette.error.main}`,
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 104,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                            borderTop: 'none',
+                            paddingTop: 0
                           }}
                         >
                           MALO
@@ -810,9 +969,15 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                           sx={{ 
                             fontWeight: 700,
                             fontSize: '0.875rem',
-                            bgcolor: alpha(theme.palette.primary.main, 0.08),
+                            bgcolor: '#ffffff',
                             color: theme.palette.primary.main,
-                            borderBottom: `2px solid ${theme.palette.primary.main}`
+                            borderBottom: `2px solid ${theme.palette.primary.main}`,
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 104,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                            borderTop: 'none',
+                            paddingTop: 0
                           }}
                         >
                           ACCIONES
@@ -966,23 +1131,21 @@ const DepreciacionUnificado: React.FC<DepreciacionUnificadoProps> = ({
                             </Box>
                           </TableCell>
                           <TableCell align="center" sx={{ py: 1.5 }}>
-                            {onActualizar && (
-                              <Tooltip title="Editar depreciación" arrow>
-                                <IconButton 
-                                  size="small" 
-                                  color="primary"
-                                  onClick={() => onActualizar(depreciacion.id!, depreciacion)}
-                                  sx={{
-                                    bgcolor: alpha(theme.palette.primary.main, 0.08),
-                                    '&:hover': {
-                                      bgcolor: alpha(theme.palette.primary.main, 0.16),
-                                    }
-                                  }}
-                                >
-                                  <EditIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            )}
+                            <Tooltip title="Editar depreciación" arrow>
+                              <IconButton 
+                                size="small" 
+                                color="primary"
+                                onClick={() => handleEditarDepreciacion(depreciacion)}
+                                sx={{
+                                  bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                  '&:hover': {
+                                    bgcolor: alpha(theme.palette.primary.main, 0.16),
+                                  }
+                                }}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
                           </TableCell>
                         </TableRow>
                       ))}

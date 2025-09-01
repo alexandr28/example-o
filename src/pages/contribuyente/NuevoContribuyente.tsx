@@ -19,7 +19,7 @@ import { NotificationService } from '../../components/utils/Notification';
  */
 const NuevoContribuyente: React.FC = () => {
   const navigate = useNavigate();
-  const { guardarContribuyente } = useContribuyentes();
+  // Ya no necesitamos el hook aquí porque el formulario maneja todo internamente
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -47,15 +47,10 @@ const NuevoContribuyente: React.FC = () => {
     }, duration);
   };
 
-  // Manejar el guardado del contribuyente
-  const handleSubmit = useCallback(async (formData: any) => {
+  // Manejar el resultado del guardado del contribuyente
+  const handleSubmit = useCallback(async (resultado: any) => {
     try {
-      setLoading(true);
-      setError(null);
-      
-      console.log('📤 [NuevoContribuyente] Guardando contribuyente:', formData);
-      
-      await guardarContribuyente(formData);
+      console.log('✅ [NuevoContribuyente] Contribuyente guardado exitosamente:', resultado);
       
       showMessage('✅ Contribuyente guardado exitosamente', 'success');
       
@@ -65,15 +60,10 @@ const NuevoContribuyente: React.FC = () => {
       }, 2000);
       
     } catch (error: any) {
-      console.error('❌ [NuevoContribuyente] Error al guardar:', error);
-      showMessage(
-        `❌ Error al guardar: ${error.message || 'Error desconocido'}`,
-        'error'
-      );
-    } finally {
-      setLoading(false);
+      console.error('❌ [NuevoContribuyente] Error:', error);
+      showMessage(`❌ Error: ${error.message || 'Error desconocido'}`, 'error');
     }
-  }, [guardarContribuyente, navigate]);
+  }, [navigate]);
 
   // Manejar edición (por implementar)
   const handleEdit = useCallback(() => {
@@ -129,7 +119,7 @@ const NuevoContribuyente: React.FC = () => {
           onSubmit={handleSubmit}
           onEdit={handleEdit}
           onNew={handleNew}
-          loading={loading}
+          loading={false} // El formulario maneja su propio loading
         />
         
         {/* Contenedor de notificaciones */}

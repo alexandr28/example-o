@@ -3,19 +3,23 @@ import { buildApiUrl } from '../config/api.unified.config';
 
 export interface AsignacionPredio {
   id: number;
+  anio: number;
   codPredio: string;
   codContribuyente: string;
-  anio: number;
-  fechaAsignacion: string;
-  estado: string;
-  contribuyente?: string;
-  direccionPredio?: string;
-  tipoPredio?: string;
-  modoDeclaracion?: string;
-  fechaVenta?: string;
-  fechaDeclaracion?: string;
+  codAsignacion: string | null;
+  porcentajeCondominio: number;
+  fechaDeclaracion: number; // timestamp
+  fechaVenta: number; // timestamp
+  fechaDeclaracionStr: string;
+  fechaVentaStr: string;
+  codModoDeclaracion: string;
+  pensionista: number;
+  codEstado: string;
+  codUsuario: number | null;
+  nombreContribuyente: string;
+  // Campos adicionales para compatibilidad
+  estado?: string;
   esPensionista?: boolean;
-  porcentajeCondominio?: number;
   porcentajeLibre?: number;
 }
 
@@ -23,6 +27,19 @@ export interface AsignacionQueryParams {
   codPredio?: string;
   codContribuyente?: string;
   anio?: number;
+}
+
+export interface CreateAsignacionAPIDTO {
+  anio: number;
+  codPredio: string;
+  codContribuyente: number;
+  codAsignacion: null;
+  porcentajeCondomino: number | null;
+  fechaDeclaracion: string; // formato: "YYYY-MM-DD"
+  fechaVenta: string; // formato: "YYYY-MM-DD"
+  codModoDeclaracion: string;
+  pensionista: number; // 1 = sí, 0 = no
+  codEstado: string;
 }
 
 class AsignacionService {
@@ -74,76 +91,146 @@ class AsignacionService {
       const responseData = await response.json();
       console.log('📡 [AsignacionService] Respuesta del API:', responseData);
 
+      // Manejar diferentes formatos de respuesta
+      let asignacionesData;
+      
       if (responseData.success && responseData.data) {
-        // Normalizar los datos del API
-        const asignacionesData = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
-        
-        const asignacionesFormateadas = asignacionesData.map((item: any, index: number) => ({
-          id: item.id || index,
-          codPredio: item.codPredio || '',
-          codContribuyente: item.codContribuyente || '',
-          anio: item.anio || new Date().getFullYear(),
-          fechaAsignacion: item.fechaAsignacion || '',
-          estado: item.estado || 'Activo',
-          contribuyente: item.contribuyente || item.nombreContribuyente || '',
-          direccionPredio: item.direccionPredio || item.direccion || '',
-          tipoPredio: item.tipoPredio || '',
-          modoDeclaracion: item.modoDeclaracion || '',
-          fechaVenta: item.fechaVenta || '',
-          fechaDeclaracion: item.fechaDeclaracion || '',
-          esPensionista: item.esPensionista || false,
-          porcentajeCondominio: item.porcentajeCondominio || 100,
-          porcentajeLibre: item.porcentajeLibre || 100
-        }));
-
-        console.log('✅ [AsignacionService] Asignaciones formateadas:', asignacionesFormateadas);
-        return asignacionesFormateadas;
+        // Formato con wrapper (success/data)
+        asignacionesData = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+      } else if (Array.isArray(responseData)) {
+        // Formato array directo
+        asignacionesData = responseData;
+      } else if (responseData.anio || responseData.codPredio || responseData.codContribuyente) {
+        // Formato objeto directo (según tu ejemplo JSON)
+        asignacionesData = [responseData];
       } else {
-        console.log('⚠️ [AsignacionService] No se encontraron asignaciones en la respuesta');
+        console.log('⚠️ [AsignacionService] Formato de respuesta no reconocido');
         return [];
       }
+      
+      const asignacionesFormateadas = asignacionesData.map((item: any, index: number) => ({
+        id: item.codAsignacion || index + 1,
+        anio: item.anio || new Date().getFullYear(),
+        codPredio: (item.codPredio || '').trim(), // Trim spaces como en el JSON
+        codContribuyente: item.codContribuyente?.toString() || '',
+        codAsignacion: item.codAsignacion,
+        porcentajeCondominio: item.porcentajeCondomino || 100.0,
+        fechaDeclaracion: item.fechaDeclaracion || 0,
+        fechaVenta: item.fechaVenta || 0,
+        fechaDeclaracionStr: item.fechaDeclaracionStr || '',
+        fechaVentaStr: item.fechaVentaStr || '',
+        codModoDeclaracion: item.codModoDeclaracion || '',
+        pensionista: item.pensionista || 0,
+        codEstado: item.codEstado || '0201',
+        codUsuario: item.codUsuario,
+        nombreContribuyente: item.nombreContribuyente || '',
+        // Campos de compatibilidad
+        estado: item.codEstado === "0201" ? "Activo" : "Inactivo",
+        esPensionista: item.pensionista === 1,
+        porcentajeLibre: 100 - (item.porcentajeCondomino || 100)
+      }));
+
+      console.log('✅ [AsignacionService] Asignaciones formateadas:', asignacionesFormateadas);
+      return asignacionesFormateadas;
       
     } catch (error) {
       console.error('❌ [AsignacionService] Error al buscar asignaciones:', error);
       
-      // En caso de error, devolver datos de ejemplo para desarrollo
+      // En caso de error, devolver datos de ejemplo basados en tu formato JSON
       console.log('🔄 [AsignacionService] Usando datos de ejemplo debido al error');
       return [
         {
           id: 1,
-          codPredio: '20231',
-          codContribuyente: '1',
-          anio: 2023,
-          fechaAsignacion: '2023-01-15',
-          estado: 'Activo',
-          contribuyente: 'Juan Pérez García',
-          direccionPredio: 'Av. Principal 123',
-          tipoPredio: 'Predio independiente',
-          modoDeclaracion: 'COMPRA',
-          fechaVenta: '2023-01-10',
-          fechaDeclaracion: '2023-01-15',
+          anio: 2025,
+          codPredio: "20259",
+          codContribuyente: "2",
+          codAsignacion: null,
+          porcentajeCondominio: 100.0,
+          fechaDeclaracion: 1744693200000,
+          fechaVenta: 1735966800000,
+          fechaDeclaracionStr: "2025-04-15",
+          fechaVentaStr: "2025-01-04",
+          codModoDeclaracion: "0401",
+          pensionista: 0,
+          codEstado: "0201",
+          codUsuario: null,
+          nombreContribuyente: "Mantilla Miñano jhonathan",
+          // Campos de compatibilidad
+          estado: "Activo",
           esPensionista: false,
-          porcentajeCondominio: 100,
-          porcentajeLibre: 100
-        },
-        {
-          id: 2,
-          codPredio: '20232',
-          codContribuyente: '2',
-          anio: 2023,
-          fechaAsignacion: '2023-02-20',
-          estado: 'Activo',
-          contribuyente: 'María López Sánchez',
-          direccionPredio: 'Jr. Las Flores 456',
-          tipoPredio: 'Departamento en edificio',
-          modoDeclaracion: 'HERENCIA',
-          fechaVenta: '',
-          fechaDeclaracion: '2023-02-20',
-          esPensionista: true,
-          porcentajeCondominio: 50,
-          porcentajeLibre: 50
+          porcentajeLibre: 0
         }
       ];
+    }
+  }
+
+  /**
+   * Crear una nueva asignación de predio
+   * POST http://26.161.18.122:8080/api/asignacionpredio
+   * @param datos - Datos de la asignación a crear
+   * @returns Promise con la asignación creada
+   */
+  async crearAsignacionAPI(datos: CreateAsignacionAPIDTO): Promise<AsignacionPredio> {
+    try {
+      console.log('➕ [AsignacionService] Creando asignación con API directa:', datos);
+      
+      // Validar datos requeridos
+      if (!datos.anio || !datos.codPredio || !datos.codContribuyente) {
+        throw new Error('Año, código de predio y código de contribuyente son requeridos');
+      }
+      
+      // Asegurar que codAsignacion no se envía en el request (debe ser null)
+      const datosParaEnviar = {
+        ...datos,
+        codAsignacion: null // Forzar a null para que SQL genere el ID
+      };
+      
+      console.log('📤 [AsignacionService] Enviando datos (codAsignacion=null):', JSON.stringify(datosParaEnviar, null, 2));
+      
+      const response = await fetch(this.baseURL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(datosParaEnviar)
+      });
+      
+      console.log(`📥 [AsignacionService] Respuesta del servidor: ${response.status} ${response.statusText}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [AsignacionService] Error del servidor:', errorText);
+        throw new Error(`Error ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('✅ [AsignacionService] Asignación creada exitosamente:', responseData);
+      
+      // Normalizar los datos de respuesta
+      const asignacionNormalizada: AsignacionPredio = {
+        id: responseData.codAsignacion || responseData.id || Math.floor(Math.random() * 10000),
+        codPredio: responseData.codPredio || datos.codPredio,
+        codContribuyente: responseData.codContribuyente?.toString() || datos.codContribuyente.toString(),
+        anio: responseData.anio || datos.anio,
+        fechaAsignacion: responseData.fechaDeclaracion || datos.fechaDeclaracion,
+        estado: responseData.codEstado === "0201" ? "Activo" : "Inactivo",
+        contribuyente: responseData.contribuyente || '',
+        direccionPredio: responseData.direccionPredio || '',
+        tipoPredio: responseData.tipoPredio || '',
+        modoDeclaracion: responseData.codModoDeclaracion || datos.codModoDeclaracion,
+        fechaVenta: responseData.fechaVenta || datos.fechaVenta,
+        fechaDeclaracion: responseData.fechaDeclaracion || datos.fechaDeclaracion,
+        esPensionista: (responseData.pensionista || datos.pensionista) === 1,
+        porcentajeCondominio: responseData.porcentajeCondomino || datos.porcentajeCondomino || 100,
+        porcentajeLibre: 100 - (responseData.porcentajeCondomino || datos.porcentajeCondomino || 0)
+      };
+      
+      return asignacionNormalizada;
+      
+    } catch (error: any) {
+      console.error('❌ [AsignacionService] Error al crear asignación:', error);
+      throw error;
     }
   }
 

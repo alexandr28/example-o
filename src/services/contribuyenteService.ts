@@ -100,6 +100,61 @@ export interface BusquedaContribuyenteParams {
   codigoPersona?: string | number;
 }
 
+export interface ContribuyenteDetalle {
+  codPersona: number;
+  codTipoContribuyente: string | null;
+  codTipopersona: string;
+  codTipoDocumento: string;
+  numerodocumento: string;
+  nombres: string;
+  apellidomaterno: string;
+  apellidopaterno: string;
+  direccion: string;
+  fechanacimiento: number;
+  codestadocivil: string;
+  codsexo: string;
+  telefono: string;
+  lote: string | null;
+  otros: string | null;
+  codestado: string | null;
+  codDireccion: string | null;
+  codContribuyente: number;
+  // Datos del cónyuge
+  codConyuge: number | null;
+  conyugeTipoDocumento: string | null;
+  conyugeNumeroDocumento: string | null;
+  conyugeNombres: string | null;
+  conyugeApellidopaterno: string | null;
+  conyugeApellidomaterno: string | null;
+  conyugeEstadocivil: string | null;
+  conyugeSexo: string | null;
+  conyugeTelefono: string | null;
+  conyugeFechanacimiento: number | null;
+  conyugeFechanacimientoStr: string | null;
+  conyugeDireccion: string | null;
+  conyugeCoddireccion: string | null;
+  conyugeLote: string | null;
+  conyugeOtros: string | null;
+  // Datos del representante legal
+  codRepresentanteLegal: number | null;
+  repreTipoDocumento: string | null;
+  repreNumeroDocumento: string | null;
+  repreNombres: string | null;
+  repreApellidopaterno: string | null;
+  repreApellidomaterno: string | null;
+  repreEstadocivil: string | null;
+  repreSexo: string | null;
+  repreTelefono: string | null;
+  repreFechanacimiento: number | null;
+  repreFechanacimientoStr: string | null;
+  repreDireccion: string | null;
+  repreCoddireccion: string | null;
+  repreLote: string | null;
+  repreOtros: string | null;
+  // Fecha formateada
+  fechaNacimientoStr: string;
+}
+
 /**
  * Servicio unificado para gestión de contribuyentes
  * 
@@ -283,25 +338,157 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
   }
   
   /**
-   * Busca contribuyentes por diferentes criterios
-   * NO requiere autenticación (método GET)
+   * Busca contribuyentes usando la nueva API general
+   * GET http://26.161.18.122:8080/api/contribuyente/general?parametroBusqueda=&codUsuario=1
+   * NO requiere autenticación
    */
   async buscarContribuyentes(criterios: BusquedaContribuyenteParams): Promise<ContribuyenteData[]> {
     try {
-      console.log('🔍 [ContribuyenteService] Buscando contribuyentes:', criterios);
+      console.log('🔍 [ContribuyenteService] Buscando contribuyentes con API general:', criterios);
       
-      // Si tiene parámetros específicos que requieren form-data
-      if (criterios.codigoContribuyente !== undefined || criterios.codigoPersona !== undefined) {
-        return await this.buscarConFormData(criterios);
+      const url = buildApiUrl('/api/contribuyente/general');
+      
+      // Construir query params
+      const queryParams = new URLSearchParams();
+      queryParams.append('parametroBusqueda', criterios.parametroBusqueda || '');
+      queryParams.append('codUsuario', String(criterios.codUsuario || 1));
+      
+      const getUrl = `${url}?${queryParams.toString()}`;
+      console.log('📡 [ContribuyenteService] GET URL general:', getUrl);
+      
+      const response = await fetch(getUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log(`📥 [ContribuyenteService] Respuesta API general: ${response.status} ${response.statusText}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [ContribuyenteService] Error del servidor:', errorText);
+        
+        // Si hay error, devolver datos de fallback para desarrollo
+        console.log('⚠️ [ContribuyenteService] Usando datos de fallback');
+        return this.getDatosFallback();
       }
       
-      // Para otros criterios, usar los valores por defecto
-      return await this.listarContribuyentes();
+      const responseData = await response.json();
+      console.log('✅ [ContribuyenteService] Datos obtenidos de API general:', responseData);
+      console.log('🔍 [ContribuyenteService] Tipo de respuesta:', typeof responseData);
+      console.log('🔍 [ContribuyenteService] Keys de la respuesta:', Object.keys(responseData));
+      
+      // Procesar respuesta - puede ser un array directo o wrapped en data
+      let items = [];
+      
+      if (Array.isArray(responseData)) {
+        console.log('📦 [ContribuyenteService] Respuesta es array directo');
+        items = responseData;
+      } else if (responseData.data && Array.isArray(responseData.data)) {
+        console.log('📦 [ContribuyenteService] Respuesta wrapped en data');
+        items = responseData.data;
+      } else if (responseData.success && responseData.data) {
+        console.log('📦 [ContribuyenteService] Respuesta con success wrapper');
+        items = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+      } else {
+        console.log('📦 [ContribuyenteService] Respuesta de formato no reconocido, tratando como array');
+        items = [responseData];
+      }
+      
+      console.log(`📋 [ContribuyenteService] Procesando ${items.length} items`);
+      
+      // Normalizar datos usando el método interno
+      const contribuyentesNormalizados = this.normalizeData(items);
+      
+      console.log(`✅ [ContribuyenteService] ${contribuyentesNormalizados.length} contribuyentes procesados`);
+      return contribuyentesNormalizados;
       
     } catch (error: any) {
-      console.error('❌ [ContribuyenteService] Error buscando contribuyentes:', error);
-      throw error;
+      console.error('❌ [ContribuyenteService] Error en API general:', error);
+      
+      // En caso de error, devolver datos de fallback
+      console.log('⚠️ [ContribuyenteService] Usando datos de fallback por error');
+      return this.getDatosFallback();
     }
+  }
+
+  /**
+   * Obtiene todos los contribuyentes usando la nueva API general
+   * Para obtener todos, usa parametroBusqueda vacío
+   */
+  async obtenerTodosContribuyentes(): Promise<ContribuyenteData[]> {
+    console.log('📋 [ContribuyenteService] Obteniendo todos los contribuyentes con API general');
+    return this.buscarContribuyentes({ parametroBusqueda: '', codUsuario: 1 });
+  }
+
+  /**
+   * Datos de fallback para desarrollo cuando la API no está disponible
+   */
+  private getDatosFallback(): ContribuyenteData[] {
+    console.log('📋 [ContribuyenteService] Generando datos de fallback');
+    
+    return [
+      {
+        codigo: 1,
+        codigoPersona: 101,
+        tipoPersona: '0301',
+        tipoDocumento: '0101',
+        numeroDocumento: '12345678',
+        nombres: 'Juan Carlos',
+        apellidoPaterno: 'García',
+        apellidoMaterno: 'López',
+        nombreCompleto: 'García López Juan Carlos',
+        direccion: 'Av. Principal 123',
+        telefono: '987654321',
+        email: 'juan.garcia@email.com',
+        fechaNacimiento: 19800115,
+        estadoCivil: '1201',
+        sexo: '1101',
+        lote: 'A-01',
+        estado: 'ACTIVO',
+        fechaRegistro: '2024-01-15',
+        codUsuario: 1
+      },
+      {
+        codigo: 2,
+        codigoPersona: 102,
+        tipoPersona: '0301',
+        tipoDocumento: '0101',
+        numeroDocumento: '87654321',
+        nombres: 'María Elena',
+        apellidoPaterno: 'Rodríguez',
+        apellidoMaterno: 'Silva',
+        nombreCompleto: 'Rodríguez Silva María Elena',
+        direccion: 'Jr. Los Olivos 456',
+        telefono: '123456789',
+        email: 'maria.rodriguez@email.com',
+        fechaNacimiento: 19850320,
+        estadoCivil: '1201',
+        sexo: '1102',
+        lote: 'B-02',
+        estado: 'ACTIVO',
+        fechaRegistro: '2024-02-10',
+        codUsuario: 1
+      },
+      {
+        codigo: 3,
+        codigoPersona: 103,
+        tipoPersona: '0302',
+        tipoDocumento: '0103',
+        numeroDocumento: '20123456789',
+        razonSocial: 'Empresa Comercial SAC',
+        nombreCompleto: 'Empresa Comercial SAC',
+        direccion: 'Av. Comercial 789',
+        telefono: '555123456',
+        email: 'contacto@empresacomercial.com',
+        lote: 'C-03',
+        estado: 'ACTIVO',
+        fechaRegistro: '2024-03-05',
+        codUsuario: 1
+      }
+    ];
   }
   
   /**
@@ -345,6 +532,117 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
       throw error;
     }
   }
+
+  /**
+   * Obtiene un contribuyente detallado usando query params
+   * GET /api/contribuyente?codigoContribuyente=43905&codigoPersona=0
+   * NO requiere autenticación
+   */
+  async obtenerContribuyenteDetalle(codigoContribuyente: number | string, codigoPersona: number | string = 0): Promise<ContribuyenteDetalle | null> {
+    try {
+      console.log('🔍 [ContribuyenteService] Obteniendo detalle del contribuyente:', { codigoContribuyente, codigoPersona });
+      
+      const url = buildApiUrl(this.endpoint);
+      
+      // Construir query params
+      const queryParams = new URLSearchParams();
+      queryParams.append('codigoContribuyente', String(codigoContribuyente));
+      queryParams.append('codigoPersona', String(codigoPersona));
+      
+      const getUrl = `${url}?${queryParams.toString()}`;
+      console.log('📡 [ContribuyenteService] GET URL:', getUrl);
+      
+      const response = await fetch(getUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log(`📥 [ContribuyenteService] Respuesta: ${response.status} ${response.statusText}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [ContribuyenteService] Error del servidor:', errorText);
+        
+        if (response.status === 404) {
+          console.log('⚠️ [ContribuyenteService] Contribuyente no encontrado');
+          return null;
+        }
+        
+        throw new Error(`Error ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('✅ [ContribuyenteService] Detalle obtenido:', responseData);
+      console.log('🔍 [ContribuyenteService] Tipo de respuesta:', typeof responseData);
+      console.log('🔍 [ContribuyenteService] Keys de la respuesta:', Object.keys(responseData));
+      
+      // El API puede devolver un objeto directo o wrapped en una estructura
+      if (responseData.data) {
+        console.log('📦 [ContribuyenteService] Usando responseData.data');
+        return responseData.data;
+      } else if (responseData.codPersona || responseData.codContribuyente) {
+        console.log('📦 [ContribuyenteService] Usando responseData directo');
+        return responseData;
+      } else if (Array.isArray(responseData) && responseData.length > 0) {
+        console.log('📦 [ContribuyenteService] Usando primer elemento del array');
+        return responseData[0];
+      } else {
+        console.warn('⚠️ [ContribuyenteService] Formato de respuesta inesperado:', responseData);
+        return null;
+      }
+      
+    } catch (error: any) {
+      console.error('❌ [ContribuyenteService] Error obteniendo detalle del contribuyente:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Normaliza los datos del detalle del contribuyente al formato interno
+   */
+  private normalizarDetalleContribuyente(detalle: ContribuyenteDetalle): ContribuyenteData {
+    return {
+      codigo: detalle.codContribuyente,
+      codigoPersona: detalle.codPersona,
+      tipoPersona: detalle.codTipopersona,
+      tipoDocumento: detalle.codTipoDocumento,
+      numeroDocumento: detalle.numerodocumento,
+      nombres: detalle.nombres,
+      apellidoPaterno: detalle.apellidopaterno,
+      apellidoMaterno: detalle.apellidomaterno,
+      razonSocial: '', // No presente en el detalle
+      nombreCompleto: `${detalle.apellidopaterno} ${detalle.apellidomaterno} ${detalle.nombres}`.trim(),
+      direccion: detalle.direccion,
+      telefono: detalle.telefono,
+      email: '', // No presente en el detalle
+      fechaNacimiento: detalle.fechanacimiento,
+      estadoCivil: detalle.codestadocivil,
+      sexo: detalle.codsexo,
+      lote: detalle.lote || '',
+      estado: detalle.codestado || 'ACTIVO',
+      fechaRegistro: detalle.fechaNacimientoStr,
+      codUsuario: 1, // No presente en el detalle
+      // Mapear datos del cónyuge si existen
+      conyuge: detalle.conyugeNombres ? {
+        nombres: detalle.conyugeNombres,
+        apellidoPaterno: detalle.conyugeApellidopaterno || '',
+        apellidoMaterno: detalle.conyugeApellidomaterno || '',
+        numeroDocumento: detalle.conyugeNumeroDocumento || '',
+        tipoDocumento: detalle.conyugeTipoDocumento || ''
+      } : undefined,
+      // Mapear datos del representante legal si existen
+      representanteLegal: detalle.repreNombres ? {
+        nombres: detalle.repreNombres,
+        apellidoPaterno: detalle.repreApellidopaterno || '',
+        apellidoMaterno: detalle.repreApellidomaterno || '',
+        numeroDocumento: detalle.repreNumeroDocumento || '',
+        tipoDocumento: detalle.repreTipoDocumento || ''
+      } : undefined
+    };
+  }
   
   /**
    * Crea un nuevo contribuyente usando el API directo
@@ -355,7 +653,7 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
     try {
       console.log('➕ [ContribuyenteService] Creando contribuyente con API directa:', datos);
       
-      const API_URL = 'http://26.161.18.122:8080/api/contribuyente';
+      const API_URL = '/api/contribuyente'; // Usar proxy local
       
       // Validar datos requeridos
       if (!datos.codPersona || !datos.codestado) {

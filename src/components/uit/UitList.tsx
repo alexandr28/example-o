@@ -13,26 +13,18 @@ import {
   Stack,
   TextField,
   InputAdornment,
-  Button,
-  Skeleton,
-  Divider,
-  Card,
-  CardContent
+  Button
 } from '@mui/material';
 import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import {
   Edit as EditIcon,
-  TrendingUp as TrendingUpIcon,
-  CalendarToday as CalendarIcon,
   AttachMoney as MoneyIcon,
-  ShowChart as ShowChartIcon,
   Search as SearchIcon,
-  FileDownload as ExportIcon,
   Refresh as RefreshIcon,
   Clear as ClearIcon,
   AccountBalance as AccountBalanceIcon
 } from '@mui/icons-material';
-import { UITData } from '../../services/uitService';
+import { UITData, uitService } from '../../services/uitService';
 import { NotificationService } from '../utils/Notification';
 
 interface UitListProps {
@@ -53,59 +45,36 @@ const UitList: React.FC<UitListProps> = ({
 }) => {
   const theme = useTheme();
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<UITData[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
     pageSize: 5, // Reducir a 5 filas por página
   });
 
-  // Filtrar UITs únicos por año (eliminar duplicados de alícuotas)
-  const uitsUnicos = uits.reduce((acc: UITData[], uit: UITData) => {
-    const existeAnio = acc.find(u => u.anio === uit.anio);
-    
-    if (!existeAnio) {
-      // Primer registro de este año
-      acc.push(uit);
-    } else {
-      // Si ya existe el año, dar prioridad a registros con valor UIT válido
-      const esValorUIT = uit.valor > 0 || (uit.valorUit && uit.valorUit > 0);
-      const existenteEsValorUIT = existeAnio.valor > 0 || (existeAnio.valorUit && existeAnio.valorUit > 0);
-      
-      // Priorizar registros que no son alícuotas (sin rangoInicial)
-      const esAlicuota = uit.alicuota !== undefined && uit.rangoInicial !== undefined;
-      const existenteEsAlicuota = existeAnio.alicuota !== undefined && existeAnio.rangoInicial !== undefined;
-      
-      if (esValorUIT && !esAlicuota && (existenteEsAlicuota || !existenteEsValorUIT)) {
-        // Reemplazar con el registro de valor UIT (no alícuota)
-        const index = acc.findIndex(u => u.anio === uit.anio);
-        acc[index] = uit;
-      }
-    }
-    
-    return acc;
-  }, []);
-
-  console.log('🔍 [UitList] UITs originales:', uits.length, 'UITs únicos:', uitsUnicos.length);
-  console.log('📊 [UitList] UITs únicos detalle:', uitsUnicos.map(u => ({
-    anio: u.anio,
-    valor: u.valor,
-    valorUit: u.valorUit,
-    esAlicuota: u.alicuota !== undefined
-  })));
-
-  // Filtrar UITs según búsqueda
-  const filteredUits = uitsUnicos.filter(uit => 
-    uit.anio.toString().includes(searchTerm) ||
-    uit.valor.toString().includes(searchTerm)
-  );
-
-  // Formatear moneda
-  const formatCurrency = (value: number): string => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-      minimumFractionDigits: 2
-    }).format(value);
+  // Función para procesar UITs - NO eliminar duplicados, mostrar todos los registros
+  const procesarUItsUnicos = (uitsArray: UITData[]) => {
+    // Mostrar todos los registros tal como vienen del API
+    // No filtrar duplicados ya que cada registro puede representar una alícuota diferente
+    return uitsArray;
   };
+
+  // Determinar qué datos mostrar: resultados de búsqueda o UITs originales
+  const datosAMostrar = hasSearched ? searchResults : uits;
+  const uitsUnicos = procesarUItsUnicos(datosAMostrar);
+
+  console.log('🔍 [UitList] Modo:', hasSearched ? 'Búsqueda' : 'Datos originales');
+  console.log('📊 [UitList] Datos a mostrar:', datosAMostrar.length, 'UITs únicos:', uitsUnicos.length);
+
+  // Para búsquedas, mostrar todos los resultados; para datos originales, aplicar filtro de texto
+  const filteredUits = hasSearched 
+    ? uitsUnicos // Mostrar todos los resultados de búsqueda
+    : uitsUnicos.filter(uit => 
+        uit.anio.toString().includes(searchTerm) ||
+        uit.valor.toString().includes(searchTerm)
+      );
+
 
   // Formatear número sin símbolo de moneda
   const formatNumber = (value: number): string => {
@@ -114,17 +83,57 @@ const UitList: React.FC<UitListProps> = ({
       maximumFractionDigits: 2
     }).format(value);
   };
+ 
+  // Función para buscar UITs por año
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) {
+      NotificationService.warning('Ingrese un año para buscar');
+      return;
+    }
 
+    const año = parseInt(searchTerm.trim());
+    if (isNaN(año) || año < 1990 || año > 2100) {
+      NotificationService.error('Ingrese un año válido (entre 1990 y 2100)');
+      return;
+    }
 
-  // Exportar datos
-  const handleExportar = () => {
-    // Aquí iría la lógica de exportación
-    NotificationService.info('Funcionalidad de exportación en desarrollo');
+    try {
+      setIsSearching(true);
+      console.log('🔍 [UitList] Buscando UITs para año:', año);
+      
+      const results = await uitService.listarUITs(año);
+      console.log('📊 [UitList] Resultados encontrados:', results.length);
+      
+      setSearchResults(results);
+      setHasSearched(true);
+      
+      if (results.length === 0) {
+        NotificationService.info(`No se encontraron UITs para el año ${año}`);
+      } else {
+        NotificationService.success(`Se encontraron ${results.length} registro(s) para el año ${año}`);
+      }
+    } catch (error: any) {
+      console.error('❌ [UitList] Error en búsqueda:', error);
+      NotificationService.error('Error al buscar UITs: ' + (error.message || 'Error desconocido'));
+      setSearchResults([]);
+      setHasSearched(false);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   // Limpiar búsqueda
   const handleClearSearch = () => {
     setSearchTerm('');
+    setSearchResults([]);
+    setHasSearched(false);
+  };
+
+  // Manejar Enter en el campo de búsqueda
+  const handleSearchKeyPress = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter') {
+      handleSearch();
+    }
   };
 
   // Definir columnas para DataGrid con mejor styling y alineación corregida
@@ -132,7 +141,7 @@ const UitList: React.FC<UitListProps> = ({
     {
       field: 'anio',
       headerName: 'Año',
-      width: 140,
+      width: 100,
       align: 'center',
       headerAlign: 'center',
       renderCell: (params: GridRenderCellParams) => (
@@ -145,7 +154,6 @@ const UitList: React.FC<UitListProps> = ({
           sx={{ py: 1 }}
         >
           <Chip
-            icon={<CalendarIcon fontSize="small" />}
             label={params.value}
             size="small"
             variant="outlined"
@@ -153,14 +161,11 @@ const UitList: React.FC<UitListProps> = ({
             sx={{
               fontWeight: 600,
               bgcolor: alpha(theme.palette.primary.main, 0.04),
-              height: 28,
-              '& .MuiChip-icon': {
-                color: theme.palette.primary.main
-              },
+              height: 24,
               '& .MuiChip-label': {
                 paddingLeft: 1,
                 paddingRight: 1,
-                fontSize: '0.8rem'
+                fontSize: '0.75rem'
               }
             }}
           />
@@ -168,9 +173,44 @@ const UitList: React.FC<UitListProps> = ({
       )
     },
     {
-      field: 'valor',
+      field: 'valorUit',
       headerName: 'Valor UIT',
-      width: 200,
+      width: 130,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params: GridRenderCellParams) => {
+        // Usar valorUit si existe, sino usar valor
+        const valorMostrar = params.row.valorUit || params.row.valor || 0;
+        return (
+          <Box 
+            display="flex" 
+            alignItems="center" 
+            justifyContent="center" 
+            height="100%"
+            width="100%"
+            sx={{ py: 1 }}
+          >
+            <Typography 
+              variant="body2" 
+              fontWeight={700}
+              sx={{
+                color: theme.palette.success.main,
+                fontSize: '0.8rem',
+                lineHeight: 1.2,
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
+              S/ {formatNumber(valorMostrar)}
+            </Typography>
+          </Box>
+        );
+      }
+    },
+    {
+      field: 'alicuota',
+      headerName: 'Alícuota (%)',
+      width: 130,
       align: 'center',
       headerAlign: 'center',
       renderCell: (params: GridRenderCellParams) => (
@@ -184,24 +224,21 @@ const UitList: React.FC<UitListProps> = ({
         >
           <Typography 
             variant="body2" 
-            fontWeight={700}
             sx={{
-              color: theme.palette.success.main,
-              fontSize: '0.875rem',
-              lineHeight: 1.2,
-              display: 'flex',
-              alignItems: 'center'
+              color: theme.palette.text.primary,
+              fontSize: '0.8rem',
+              fontWeight: 500
             }}
           >
-            {formatNumber(params.value)}
+            {params.value ? `${(params.value * 100).toFixed(1)}%` : '-'}
           </Typography>
         </Box>
       )
     },
     {
-      field: 'fechaVigenciaDesde',
-      headerName: 'Vigencia Desde',
-      width: 180,
+      field: 'rangoInicial',
+      headerName: 'Rango Inicial',
+      width: 140,
       align: 'center',
       headerAlign: 'center',
       renderCell: (params: GridRenderCellParams) => (
@@ -211,27 +248,24 @@ const UitList: React.FC<UitListProps> = ({
           justifyContent="center" 
           height="100%"
           width="100%"
-          gap={1}
           sx={{ py: 1 }}
         >
-          <CalendarIcon 
-            fontSize="small" 
-            sx={{ color: theme.palette.info.main }} 
-          />
           <Typography 
             variant="body2" 
-            color="text.secondary"
-            sx={{ fontSize: '0.8rem' }}
+            sx={{
+              color: theme.palette.text.secondary,
+              fontSize: '0.8rem'
+            }}
           >
-            {params.value ? new Date(params.value).toLocaleDateString('es-PE') : '-'}
+            {params.value !== undefined ? formatNumber(params.value) : '-'}
           </Typography>
         </Box>
       )
     },
     {
-      field: 'fechaVigenciaHasta',
-      headerName: 'Vigencia Hasta',
-      width: 180,
+      field: 'rangoFinal',
+      headerName: 'Rango Final',
+      width: 130,
       align: 'center',
       headerAlign: 'center',
       renderCell: (params: GridRenderCellParams) => (
@@ -241,19 +275,72 @@ const UitList: React.FC<UitListProps> = ({
           justifyContent="center" 
           height="100%"
           width="100%"
-          gap={1}
           sx={{ py: 1 }}
         >
-          <CalendarIcon 
-            fontSize="small" 
-            sx={{ color: theme.palette.warning.main }} 
-          />
           <Typography 
             variant="body2" 
-            color="text.secondary"
-            sx={{ fontSize: '0.8rem' }}
+            sx={{
+              color: theme.palette.text.secondary,
+              fontSize: '0.8rem'
+            }}
           >
-            {params.value ? new Date(params.value).toLocaleDateString('es-PE') : '-'}
+            {params.value !== undefined && params.value > 0 ? formatNumber(params.value) : params.value === 0 ? '∞' : '-'}
+          </Typography>
+        </Box>
+      )
+    },
+    {
+      field: 'impuestoParcial',
+      headerName: 'Imp. Parcial',
+      width: 130,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params: GridRenderCellParams) => (
+        <Box 
+          display="flex" 
+          alignItems="center" 
+          justifyContent="center" 
+          height="100%"
+          width="100%"
+          sx={{ py: 1 }}
+        >
+          <Typography 
+            variant="body2" 
+            sx={{
+              color: theme.palette.info.main,
+              fontSize: '0.8rem',
+              fontWeight: 500
+            }}
+          >
+            {params.value !== undefined ? formatNumber(params.value) : '-'}
+          </Typography>
+        </Box>
+      )
+    },
+    {
+      field: 'impuestoAcumulado',
+      headerName: 'Imp. Acumulado',
+      width: 160,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params: GridRenderCellParams) => (
+        <Box 
+          display="flex" 
+          alignItems="center" 
+          justifyContent="center" 
+          height="100%"
+          width="100%"
+          sx={{ py: 1 }}
+        >
+          <Typography 
+            variant="body2" 
+            sx={{
+              color: theme.palette.warning.main,
+              fontSize: '0.8rem',
+              fontWeight: 600
+            }}
+          >
+            {params.value !== undefined ? formatNumber(params.value) : '-'}
           </Typography>
         </Box>
       )
@@ -261,7 +348,7 @@ const UitList: React.FC<UitListProps> = ({
     {
       field: 'acciones',
       headerName: 'Acciones',
-      width: 120,
+      width: 100,
       align: 'center',
       headerAlign: 'center',
       sortable: false,
@@ -273,21 +360,37 @@ const UitList: React.FC<UitListProps> = ({
           height="100%"
           width="100%"
           sx={{ py: 1 }}
+          onClick={(e) => e.stopPropagation()} // Prevenir propagación del click
         >
           <Tooltip title="Editar UIT" arrow>
             <IconButton
               size="small"
-              onClick={() => onEditar?.(params.row)}
+              onClick={(e) => {
+                e.stopPropagation(); // Prevenir que el click se propague a la fila
+                console.log('🎯 [UitList] Editando UIT:', params.row);
+                onEditar?.(params.row);
+              }}
               sx={{
-                bgcolor: alpha(theme.palette.primary.main, 0.08),
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                width: 28,
+                height: 28,
                 '&:hover': {
-                  bgcolor: alpha(theme.palette.primary.main, 0.16),
-                  transform: 'scale(1.1)',
+                  bgcolor: alpha(theme.palette.primary.main, 0.2),
+                  borderColor: theme.palette.primary.main,
+                  transform: 'scale(1.05)',
+                  boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.3)}`,
                 },
                 transition: 'all 0.2s ease-in-out'
               }}
             >
-              <EditIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
+              <EditIcon 
+                sx={{ 
+                  fontSize: 16,
+                  color: theme.palette.primary.main,
+                  fontWeight: 'bold'
+                }} 
+              />
             </IconButton>
           </Tooltip>
         </Box>
@@ -299,9 +402,6 @@ const UitList: React.FC<UitListProps> = ({
   const anioActual = new Date().getFullYear();
   const uitActual = uitsUnicos.find(u => u.anio === anioActual);
   const uitAnterior = uitsUnicos.find(u => u.anio === anioActual - 1);
-  const variacion = uitActual && uitAnterior 
-    ? ((uitActual.valor - uitAnterior.valor) / uitAnterior.valor) * 100 
-    : 0;
 
   return (
     <Paper 
@@ -345,149 +445,34 @@ const UitList: React.FC<UitListProps> = ({
               </Typography>
             </Box>
           </Box>
-          
-          <Stack direction="row" spacing={1}>
-            <Chip
-              icon={<CalendarIcon />}
-              label={`Año Actual: ${anioActual}`}
-              color="primary"
-              variant="filled"
-              sx={{ fontWeight: 600 }}
-            />
-            <Chip
-              icon={<MoneyIcon />}
-              label={uitActual ? formatCurrency(uitActual.valor) : 'N/A'}
-              color="success"
-              variant="outlined"
-              sx={{ fontWeight: 600 }}
-            />
-            {variacion !== 0 && (
-              <Chip
-                icon={variacion > 0 ? <TrendingUpIcon /> : <ShowChartIcon />}
-                label={`${variacion > 0 ? '+' : ''}${variacion.toFixed(1)}%`}
-                color={variacion > 0 ? 'success' : 'error'}
-                variant="outlined"
-                size="small"
-              />
-            )}
-          </Stack>
+     
         </Stack>
       </Box>
 
-      {/* Sección de estadísticas con Flexbox */}
-      <Box sx={{ px: 3, py: 2, bgcolor: alpha(theme.palette.grey[50], 0.5) }}>
-        <Box sx={{ 
-          display: 'flex', 
-          flexWrap: 'wrap', 
-          gap: 2,
-          '@media (max-width: 600px)': {
-            flexDirection: 'column'
-          }
-        }}>
-          {/* Card 1 - Año Actual */}
-          <Box sx={{ 
-            flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' },
-            minWidth: { xs: '100%', sm: '200px', md: '150px' }
-          }}>
-            <Card elevation={1} sx={{ height: '100%', borderRadius: 2 }}>
-              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <CalendarIcon color="primary" />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="h6" fontWeight={600}>
-                      {anioActual}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Año Actual
-                    </Typography>
-                  </Box>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Box>
-
-          {/* Card 2 - Valor UIT Vigente */}
-          <Box sx={{ 
-            flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' },
-            minWidth: { xs: '100%', sm: '200px', md: '150px' }
-          }}>
-            <Card elevation={1} sx={{ height: '100%', borderRadius: 2 }}>
-              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <MoneyIcon color="success" />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="h6" fontWeight={600} color="success.main">
-                      {uitActual ? formatCurrency(uitActual.valor) : 'N/A'}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Valor UIT Vigente
-                    </Typography>
-                  </Box>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Box>
-
-          {/* Card 3 - Variación Anual */}
-          <Box sx={{ 
-            flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' },
-            minWidth: { xs: '100%', sm: '200px', md: '150px' }
-          }}>
-            <Card elevation={1} sx={{ height: '100%', borderRadius: 2 }}>
-              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <ShowChartIcon color={variacion >= 0 ? 'success' : 'error'} />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography 
-                      variant="h6" 
-                      fontWeight={600}
-                      color={variacion >= 0 ? 'success.main' : 'error.main'}
-                    >
-                      {variacion !== 0 ? `${variacion > 0 ? '+' : ''}${variacion.toFixed(1)}%` : 'N/A'}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Variación Anual
-                    </Typography>
-                  </Box>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Box>
-
-          {/* Card 4 - Total Registros */}
-          <Box sx={{ 
-            flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 calc(25% - 12px)' },
-            minWidth: { xs: '100%', sm: '200px', md: '150px' }
-          }}>
-            <Card elevation={1} sx={{ height: '100%', borderRadius: 2 }}>
-              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <AccountBalanceIcon color="info" />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="h6" fontWeight={600} color="info.main">
-                      {uitsUnicos.length}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Total Registros
-                    </Typography>
-                  </Box>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Box>
-        </Box>
-      </Box>
-
-      <Divider />
-
-      {/* Barra de búsqueda mejorada */}
+ 
+      {/* Barra de búsqueda por Año */}
       <Box sx={{ px: 3, py: 2 }}>
-        <Stack direction="row" spacing={2} alignItems="center">
+        <Stack 
+          direction="row" 
+          spacing={2} 
+          alignItems="center" 
+          justifyContent="flex-start"
+          sx={{ 
+            minHeight: 33,
+            alignItems: 'center', // Reforzar alineación vertical
+            '& > *': { // Aplicar a todos los hijos directos
+              margin: 0,
+              alignSelf: 'center'
+            }
+          }}
+        >
           <TextField
             size="small"
-            placeholder="Buscar por año o valor UIT..."
+            placeholder="Ingrese año"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyPress={handleSearchKeyPress}
+            type="number"
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -508,9 +493,23 @@ const UitList: React.FC<UitListProps> = ({
             }}
             sx={{ 
               flex: 1,
-              maxWidth: 400,
+              maxWidth: 150,
+              margin: 0, // Eliminar márgenes que puedan causar desalineación
               '& .MuiOutlinedInput-root': {
                 borderRadius: 2,
+                height: 33, // Mismo height que el botón
+                display: 'flex',
+                alignItems: 'center',
+                margin: 0,
+                '& input': {
+                  padding: '8.5px 14px', // Padding estándar de MUI small
+                  height: 'auto',
+                  lineHeight: 1,
+                },
+                '& .MuiInputAdornment-root': {
+                  height: '100%',
+                  maxHeight: 33,
+                },
                 '&:hover fieldset': {
                   borderColor: theme.palette.primary.main,
                 },
@@ -518,26 +517,55 @@ const UitList: React.FC<UitListProps> = ({
             }}
           />
           
-          <Stack direction="row" spacing={1}>
+          {/* Botones de búsqueda */}
+          <Button
+            variant="contained"
+            startIcon={isSearching ? <CircularProgress size={16} color="inherit" /> : <SearchIcon />}
+            onClick={handleSearch}
+            disabled={isSearching || !searchTerm.trim()}
+            sx={{
+              minWidth: 100,
+              height: 33,
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: 2,
+              margin: 0, // Eliminar márgenes
+              padding: '0 16px', // Padding interno consistente
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              lineHeight: 1,
+              boxSizing: 'border-box'
+            }}
+          >
+            {isSearching ? 'Buscando...' : 'Buscar'}
+          </Button>
+
+          {/* Botón para mostrar todos los datos nuevamente */}
+          {hasSearched && (
             <Button
               variant="outlined"
-              size="small"
-              startIcon={<ExportIcon />}
-              onClick={handleExportar}
-              sx={{ borderRadius: 2 }}
-            >
-              Exportar
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
               startIcon={<RefreshIcon />}
-              onClick={() => window.location.reload()}
-              sx={{ borderRadius: 2 }}
+              onClick={handleClearSearch}
+              sx={{
+                minWidth: 100,
+                height: 33, // Mismo height que los otros elementos
+                textTransform: 'none',
+                fontWeight: 600,
+                borderRadius: 2,
+                margin: 0, // Eliminar márgenes
+                padding: '0 16px', // Padding interno consistente
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                lineHeight: 1,
+                boxSizing: 'border-box'
+              }}
             >
-              Actualizar
+              Ver Todos
             </Button>
-          </Stack>
+          )}
+
         </Stack>
       </Box>
 
@@ -561,7 +589,7 @@ const UitList: React.FC<UitListProps> = ({
             onPaginationModelChange={setPaginationModel}
             pageSizeOptions={[5, 10, 15]}
             disableRowSelectionOnClick
-            loading={loading}
+            loading={loading || isSearching}
             rowHeight={56} // Altura específica para mejor alineación
             sx={{
               border: 'none',
@@ -610,14 +638,12 @@ const UitList: React.FC<UitListProps> = ({
                 },
               },
               '& .MuiDataGrid-row': {
-                cursor: 'pointer',
+                cursor: 'default', // Cambiar cursor para indicar que la fila no es clickeable
                 transition: 'all 0.2s ease-in-out',
                 maxHeight: '56px !important',
                 minHeight: '56px !important',
                 '&:hover': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.04),
-                  transform: 'translateY(-1px)',
-                  boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.12)}`,
+                  backgroundColor: alpha(theme.palette.primary.main, 0.02), // Hover más sutil
                 },
                 '&.Mui-selected': {
                   backgroundColor: alpha(theme.palette.primary.main, 0.12),

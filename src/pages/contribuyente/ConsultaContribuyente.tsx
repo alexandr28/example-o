@@ -31,7 +31,8 @@ const ConsultaContribuyente: React.FC = () => {
     contribuyentes, 
     loading, 
     error, 
-    buscarContribuyentes
+    buscarContribuyentes,
+    buscarContribuyentesConQueryParams
   } = useContribuyentes();
 
   // Migas de pan para la navegación
@@ -41,10 +42,17 @@ const ConsultaContribuyente: React.FC = () => {
     { label: 'Consulta contribuyente', active: true }
   ];
 
-  // Manejar la búsqueda de contribuyentes
+  // Manejar la búsqueda de contribuyentes con nueva API general
   const handleBuscar = (filtro: any) => {
-    console.log('🔍 Buscando con filtros:', filtro);
-    buscarContribuyentes(filtro);
+    console.log('🔍 Buscando con filtros usando API general:', filtro);
+    
+    // Usar la nueva búsqueda general que utiliza el endpoint /general
+    const filtroGeneral = {
+      busqueda: filtro.busqueda || ''
+    };
+    
+    console.log('🔍 Filtro para API general:', filtroGeneral);
+    buscarContribuyentes(filtroGeneral);
   };
 
   // Manejar la navegación a nuevo contribuyente
@@ -58,12 +66,6 @@ const ConsultaContribuyente: React.FC = () => {
     navigate(`/contribuyente/editar/${codigo}`);
   };
 
-  // Manejar ver detalles de un contribuyente
-  const handleVer = (codigo: string | number) => {
-    console.log('Ver contribuyente:', codigo);
-    navigate(`/contribuyente/ver/${codigo}`);
-  };
-
   return (
     <MainLayout title="Consulta de Contribuyentes">
       <Box sx={{ p: 3 }}>
@@ -74,14 +76,13 @@ const ConsultaContribuyente: React.FC = () => {
 
         {/* Contenedor principal centrado */}
         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-          <Box sx={{ width: '100%', maxWidth: '900px' }}>
+          <Box sx={{ width: '100%', maxWidth: '100%' }}>
             {/* Componente consolidado que incluye filtros y lista */}
             <ContribuyenteConsulta
               contribuyentes={contribuyentes}
               onBuscar={handleBuscar}
               onNuevo={handleNuevo}
               onEditar={handleEditar}
-              onVer={handleVer}
               loading={loading}
             />
 

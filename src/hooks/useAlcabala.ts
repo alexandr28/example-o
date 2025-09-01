@@ -4,7 +4,7 @@ import { alcabalaService } from '../services/alcabalaService';
 import { NotificationService } from '../components/utils/Notification';
 
 // Tipos
-interface Alcabala {
+interface AlcabalaData {
   id: number;
   anio: number;
   tasa: number;
@@ -25,7 +25,7 @@ interface PaginacionData {
  */
 export const useAlcabala = () => {
   // Estados
-  const [alcabalas, setAlcabalas] = useState<Alcabala[]>([]);
+  const [alcabalas, setAlcabalas] = useState<AlcabalaData[]>([]);
   const [anioSeleccionado, setAnioSeleccionado] = useState<number | null>(null);
   const [tasaAlcabala, setTasaAlcabala] = useState<number>(0);
   const [loading, setLoading] = useState(false);

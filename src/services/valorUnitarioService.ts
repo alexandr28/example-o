@@ -215,42 +215,40 @@ class ValorUnitarioService extends BaseApiService<ValorUnitarioData, CreateValor
 
   /**
    * Consulta valores unitarios usando el API específico con GET y query params
-   * URL: GET http://26.161.18.122:8080/api/valoresunitarios?param1=value1&param2=value2
+   * URL: GET http://26.161.18.122:8085/api/valoresunitarios?anio=2024
    * NO requiere autenticación
    */
   async consultarValoresUnitarios(params: {
-    año?: number;
-    
+    anio?: number;
   }): Promise<ValorUnitarioData[]> {
     try {
       console.log('🔍 [ValorUnitarioService] Consultando valores unitarios con parámetros:', params);
-      console.log('🔍 [ValorUnitarioService] Tipo de params.año:', typeof params.año, 'Valor:', params.año);
+      console.log('🔍 [ValorUnitarioService] Tipo de params.anio:', typeof params.anio, 'Valor:', params.anio);
       
       // Construir parámetros de consulta
       const queryParams = new URLSearchParams();
       
       // IMPORTANTE: Usar año actual por defecto si no se proporciona o es inválido
-      const añoFinal = (params.año != null && params.año !== undefined && params.año > 0) 
-        ? params.año 
+      const anioFinal = (params.anio != null && params.anio !== undefined && params.anio > 0) 
+        ? params.anio 
         : new Date().getFullYear();
       
-      queryParams.append('anio', String(añoFinal));
-      console.log('📋 [ValorUnitarioService] Usando año:', añoFinal, '(original:', params.año, ')');
+      queryParams.append('anio', String(anioFinal));
+      console.log('📋 [ValorUnitarioService] Usando año:', anioFinal, '(original:', params.anio, ')');
       
-      // IMPORTANTE: Usar URL completa con API_CONFIG.baseURL como en direccionService
-      // Solo añadir ? si hay query params
+      // IMPORTANTE: Usar URL completa con API_CONFIG.baseURL usando puerto 8085
       const queryString = queryParams.toString();
-      const url = `${API_CONFIG.baseURL}${this.endpoint}${queryString ? `?${queryString}` : ''}`;
+      const url = `http://26.161.18.122:8085/api/valoresunitarios${queryString ? `?${queryString}` : ''}`;
       
       console.log('📡 [ValorUnitarioService] URL final construida:', url);
       console.log('📡 [ValorUnitarioService] Query params string:', queryParams.toString());
       
-      // Petición directa sin autenticación (igual que direccionService)
+      // Petición directa sin autenticación
       const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Accept': 'application/json'
-          // NO incluir Authorization como en direccionService
+          // NO incluir Authorization - sin autenticación
           // NO incluir Content-Type en GET
         }
       });
@@ -527,7 +525,7 @@ class ValorUnitarioService extends BaseApiService<ValorUnitarioData, CreateValor
 
   /**
    * Crea un nuevo valor unitario usando POST sin autenticación
-   * URL: POST http://26.161.18.122:8080/api/valoresunitarios
+   * URL: POST http://26.161.18.122:8085/api/valoresunitarios
    * NO requiere autenticación
    */
   async crearValorUnitarioSinAuth(datos: CrearValorUnitarioApiDTO): Promise<ValorUnitarioData> {
@@ -562,8 +560,8 @@ class ValorUnitarioService extends BaseApiService<ValorUnitarioData, CreateValor
   "costo": ${datosParaEnviar.costo}
 }`);
       
-      // Construir URL completa
-      const url = `${API_CONFIG.baseURL}${this.endpoint}`;
+      // Construir URL completa usando puerto 8085
+      const url = `http://26.161.18.122:8085/api/valoresunitarios`;
       
       console.log('📡 [ValorUnitarioService] URL para crear:', url);
       console.log('📡 [ValorUnitarioService] Datos a enviar (con códigos null):', datosParaEnviar);

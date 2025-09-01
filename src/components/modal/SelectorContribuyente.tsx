@@ -20,14 +20,11 @@ import {
   Stack,
   InputAdornment,
   Chip,
-  Tabs,
-  Tab,
   Radio,
   TablePagination,
   CircularProgress,
   Alert,
   Avatar,
-  Tooltip,
   useTheme,
   alpha
 } from '@mui/material';
@@ -39,7 +36,6 @@ import {
   Badge as BadgeIcon,
   Phone as PhoneIcon,
   LocationOn as LocationIcon,
-  AccountBox as AccountBoxIcon,
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import { useContribuyentes } from '../../hooks/useContribuyentes';
@@ -76,20 +72,22 @@ const SelectorContribuyente: React.FC<SelectorContribuyenteProps> = ({
 }) => {
   const theme = useTheme();
   
-  // Hook de contribuyentes
+  // Hook de contribuyentes - incluimos el método de búsqueda con query params
   const { 
     contribuyentes, 
     loading, 
     error,
-    cargarContribuyentes
+    cargarContribuyentes,
+    buscarContribuyentesConQueryParams
   } = useContribuyentes();
 
-  // Estados locales
-  const [searchTerm, setSearchTerm] = useState('');
+  // Estados locales - Filtros por códigos
+  const [codigoContribuyente, setCodigoContribuyente] = useState('');
+  const [codigoPersona, setCodigoPersona] = useState('');
   const [selectedContribuyente, setSelectedContribuyente] = useState<Contribuyente | null>(null);
-  const [tabValue, setTabValue] = useState(0); // 0: Todos, 1: Naturales, 2: Jurídicas
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [hasSearched, setHasSearched] = useState(false);
   
   // Ref para controlar la carga inicial
   const hasLoadedRef = useRef(false);
@@ -119,37 +117,19 @@ const SelectorContribuyente: React.FC<SelectorContribuyenteProps> = ({
   // Resetear estados cuando se cierra el modal
   useEffect(() => {
     if (!isOpen) {
-      setSearchTerm('');
+      setCodigoContribuyente('');
+      setCodigoPersona('');
       setSelectedContribuyente(null);
       setPage(0);
-      setTabValue(0);
+      setHasSearched(false);
     }
   }, [isOpen]);
 
-  // Filtrar contribuyentes por búsqueda y tipo
+  // Los contribuyentes mostrados dependen de si se ha buscado o no
   const filteredContribuyentes = useMemo(() => {
-    let filtered = contribuyentes;
-
-    // Filtrar por tipo según tab seleccionado
-    if (tabValue === 1) {
-      filtered = filtered.filter(c => c.tipoPersona === 'natural');
-    } else if (tabValue === 2) {
-      filtered = filtered.filter(c => c.tipoPersona === 'juridica');
-    }
-
-    // Filtrar por término de búsqueda
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(c => 
-        c.contribuyente.toLowerCase().includes(term) ||
-        c.documento.toLowerCase().includes(term) ||
-        c.direccion.toLowerCase().includes(term) ||
-        (c.telefono && c.telefono.toLowerCase().includes(term))
-      );
-    }
-
-    return filtered;
-  }, [contribuyentes, searchTerm, tabValue]);
+    // Los resultados ya vienen filtrados de la API, solo los devolvemos
+    return contribuyentes;
+  }, [contribuyentes]);
 
   // Paginar resultados
   const paginatedContribuyentes = useMemo(() => {
@@ -159,14 +139,46 @@ const SelectorContribuyente: React.FC<SelectorContribuyenteProps> = ({
   }, [filteredContribuyentes, page, rowsPerPage]);
 
   // Handlers
-  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(event.target.value);
+  const handleBuscar = async () => {
+    if (!codigoContribuyente && !codigoPersona) {
+      NotificationService.warning('Ingrese al menos un código para buscar');
+      return;
+    }
+
+    setHasSearched(true);
     setPage(0);
+    
+    console.log('🔍 [SelectorContribuyente] Buscando con códigos:', {
+      codigoContribuyente,
+      codigoPersona
+    });
+
+    try {
+      // Llamar a la API con los códigos
+      const resultados = await buscarContribuyentesConQueryParams(
+        codigoContribuyente || undefined,
+        codigoPersona || '0'
+      );
+      
+      if (resultados.length === 0) {
+        NotificationService.info('No se encontraron contribuyentes con los códigos especificados');
+      } else {
+        NotificationService.success(`Se encontró ${resultados.length} contribuyente${resultados.length !== 1 ? 's' : ''}`);
+      }
+    } catch (error) {
+      console.error('❌ [SelectorContribuyente] Error en búsqueda:', error);
+      NotificationService.error('Error al buscar contribuyentes');
+    }
   };
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
+  const handleLimpiar = async () => {
+    setCodigoContribuyente('');
+    setCodigoPersona('');
+    setHasSearched(false);
     setPage(0);
+    
+    // Recargar todos los contribuyentes
+    await cargarContribuyentes();
   };
 
   const handleSelectContribuyente = (contribuyente: Contribuyente) => {
@@ -190,36 +202,6 @@ const SelectorContribuyente: React.FC<SelectorContribuyenteProps> = ({
     setPage(0);
   };
 
-  const getDocumentTypeIcon = (documento: string) => {
-    if (documento.length === 8) {
-      return <BadgeIcon sx={{ fontSize: 16 }} />;
-    }
-    if (documento.length === 11) {
-      return <BusinessIcon sx={{ fontSize: 16 }} />;
-    }
-    return <AccountBoxIcon sx={{ fontSize: 16 }} />;
-  };
-
-  const getPersonTypeChip = (tipo?: 'natural' | 'juridica') => {
-    if (tipo === 'juridica') {
-      return (
-        <Chip 
-          size="small" 
-          label="Jurídica" 
-          color="primary"
-          icon={<BusinessIcon />}
-        />
-      );
-    }
-    return (
-      <Chip 
-        size="small" 
-        label="Natural" 
-        color="info"
-        icon={<PersonIcon />}
-      />
-    );
-  };
 
   return (
     <Dialog 
@@ -244,59 +226,225 @@ const SelectorContribuyente: React.FC<SelectorContribuyenteProps> = ({
       </DialogTitle>
 
       <DialogContent dividers sx={{ p: 0 }}>
-        {/* Barra de búsqueda */}
-        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <TextField
-            fullWidth
-            placeholder="Buscar por nombre, documento, dirección o teléfono..."
-            value={searchTerm}
-            onChange={handleSearch}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              )
-            }}
-          />
+        {/* Sección de Filtros de Búsqueda - Estilo ContribuyenteConsulta */}
+        <Paper 
+          elevation={0}
+          sx={{ 
+            borderRadius: 0,
+            background: 'linear-gradient(to bottom, #ffffff, #fafafa)',
+            borderBottom: '1px solid',
+            borderColor: 'divider'
+          }}
+        >
+          <Box sx={{ p: 3 }}>
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 2, 
+              mb: 3,
+              pb: 2,
+              borderBottom: '2px solid',
+              borderColor: 'primary.main'
+            }}>
+              <Box sx={{
+                p: 1,
+                borderRadius: 1,
+                backgroundColor: 'primary.main',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <SearchIcon />
+              </Box>
+              <Typography variant="h6" fontWeight={600}>
+                Búsqueda por Códigos
+              </Typography>
+              {(codigoContribuyente || codigoPersona) && (
+                <Chip 
+                  label="Códigos ingresados" 
+                  color="primary" 
+                  size="small"
+                  icon={<BadgeIcon />}
+                />
+              )}
+            </Box>
+
+            {/* Filtros de búsqueda por códigos */}
+            <Stack spacing={2}>
+              <Box sx={{ 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                gap: 2,
+                alignItems: 'flex-end'
+              }}>
+                {/* Código Contribuyente */}
+                <Box sx={{ flex: '1 1 200px' }}>
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    label="Código Contribuyente"
+                    placeholder="Ej: 43905"
+                    value={codigoContribuyente}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      setCodigoContribuyente(value);
+                    }}
+                    disabled={loading}
+                    size="small"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <BadgeIcon sx={{ fontSize: 20 }} />
+                        </InputAdornment>
+                      ),
+                      endAdornment: codigoContribuyente && (
+                        <InputAdornment position="end">
+                          <IconButton
+                            size="small"
+                            onClick={() => setCodigoContribuyente('')}
+                            disabled={loading}
+                          >
+                            <CloseIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </InputAdornment>
+                      )
+                    }}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleBuscar();
+                      }
+                    }}
+                  />
+                </Box>
+
+                {/* Código Persona */}
+                <Box sx={{ flex: '1 1 200px' }}>
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    label="Código Persona"
+                    placeholder="Ej: 6 (opcional)"
+                    value={codigoPersona}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      setCodigoPersona(value);
+                    }}
+                    disabled={loading}
+                    size="small"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <PersonIcon sx={{ fontSize: 20 }} />
+                        </InputAdornment>
+                      ),
+                      endAdornment: codigoPersona && (
+                        <InputAdornment position="end">
+                          <IconButton
+                            size="small"
+                            onClick={() => setCodigoPersona('')}
+                            disabled={loading}
+                          >
+                            <CloseIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </InputAdornment>
+                      )
+                    }}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleBuscar();
+                      }
+                    }}
+                  />
+                </Box>
+
+                {/* Botones de acción */}
+                <Box sx={{ 
+                  display: 'flex',
+                  gap: 1,
+                  flex: '0 0 auto'
+                }}>
+                  <Button
+                    variant="contained"
+                    onClick={handleBuscar}
+                    disabled={loading}
+                    startIcon={loading ? <CircularProgress size={16} /> : <SearchIcon />}
+                    size="small"
+                    sx={{ height: 40 }}
+                  >
+                    Buscar
+                  </Button>
+                  
+                  <Button
+                    variant="outlined"
+                    onClick={handleLimpiar}
+                    disabled={loading}
+                    startIcon={<CloseIcon />}
+                    size="small"
+                    sx={{ height: 40 }}
+                  >
+                    Limpiar
+                  </Button>
+                </Box>
+              </Box>
+
+              {/* Texto de ayuda */}
+              <Typography variant="caption" color="text.secondary">
+                {loading 
+                  ? 'Buscando...'
+                  : hasSearched 
+                    ? `${filteredContribuyentes.length} contribuyente${filteredContribuyentes.length !== 1 ? 's' : ''} encontrado${filteredContribuyentes.length !== 1 ? 's' : ''}`
+                    : `Total de contribuyentes disponibles: ${contribuyentes.length}. Use los códigos para búsqueda específica.`
+                }
+              </Typography>
+            </Stack>
+          </Box>
+        </Paper>
+
+        {/* Sección de Resultados - Estilo ContribuyenteConsulta */}
+        <Box sx={{ 
+          background: 'white',
+          borderBottom: '1px solid',
+          borderColor: 'divider'
+        }}>
+          <Box sx={{ 
+            px: 3, 
+            pt: 2,
+            pb: 1,
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 2,
+            borderBottom: '1px solid',
+            borderColor: 'divider'
+          }}>
+            <Typography variant="subtitle1" fontWeight={600}>
+              Contribuyentes Disponibles
+            </Typography>
+            <Chip 
+              label={`${filteredContribuyentes.length} registro${filteredContribuyentes.length !== 1 ? 's' : ''}`}
+              color="info" 
+              size="small"
+            />
+          </Box>
         </Box>
 
-        {/* Tabs de filtro */}
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={tabValue} onChange={handleTabChange}>
-            <Tab 
-              label={`Todos (${contribuyentes.length})`} 
-              icon={<Stack direction="row" spacing={0.5}>
-                <PersonIcon sx={{ fontSize: 20 }} />
-                <BusinessIcon sx={{ fontSize: 20 }} />
-              </Stack>} 
-              iconPosition="start"
-            />
-            <Tab 
-              label={`Personas Naturales (${contribuyentes.filter(c => c.tipoPersona === 'natural').length})`} 
-              icon={<PersonIcon sx={{ fontSize: 20 }} />} 
-              iconPosition="start"
-            />
-            <Tab 
-              label={`Personas Jurídicas (${contribuyentes.filter(c => c.tipoPersona === 'juridica').length})`} 
-              icon={<BusinessIcon sx={{ fontSize: 20 }} />} 
-              iconPosition="start"
-            />
-          </Tabs>
-        </Box>
-
-        {/* Tabla de contribuyentes */}
-        <TableContainer sx={{ maxHeight: 400 }}>
+        {/* Tabla de contribuyentes mejorada */}
+        <TableContainer sx={{ maxHeight: 380 }}>
           <Table stickyHeader size="small">
             <TableHead>
-              <TableRow>
-                <TableCell padding="checkbox" sx={{ width: 50 }} />
-                <TableCell>Código</TableCell>
-                <TableCell>Tipo</TableCell>
-                <TableCell>Documento</TableCell>
-                <TableCell>Contribuyente</TableCell>
-                <TableCell>Dirección</TableCell>
-                <TableCell>Teléfono</TableCell>
+              <TableRow sx={{ 
+                '& .MuiTableCell-head': { 
+                  backgroundColor: 'grey.50',
+                  fontWeight: 600
+                }
+              }}>
+                <TableCell padding="checkbox" sx={{ width: 50 }}>Sel.</TableCell>
+                <TableCell sx={{ minWidth: 80 }}>Código</TableCell>
+                <TableCell sx={{ minWidth: 90 }}>Tipo</TableCell>
+                <TableCell sx={{ minWidth: 120 }}>Documento</TableCell>
+                <TableCell sx={{ minWidth: 200 }}>Contribuyente</TableCell>
+                <TableCell sx={{ minWidth: 180 }}>Dirección</TableCell>
+                <TableCell sx={{ minWidth: 100 }}>Teléfono</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -348,49 +496,81 @@ const SelectorContribuyente: React.FC<SelectorContribuyenteProps> = ({
                         />
                       </TableCell>
                       <TableCell>
+                        <Chip
+                          label={contribuyente.codigo}
+                          size="small"
+                          variant={isSelected ? "filled" : "outlined"}
+                          color={isPreviouslySelected ? "success" : "primary"}
+                          icon={isPreviouslySelected ? <CheckCircleIcon sx={{ fontSize: 14 }} /> : undefined}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={contribuyente.tipoPersona === 'juridica' ? 'Jurídica' : 'Natural'}
+                          size="small"
+                          color={contribuyente.tipoPersona === 'juridica' ? 'primary' : 'info'}
+                          variant="outlined"
+                          icon={contribuyente.tipoPersona === 'juridica' ? <BusinessIcon sx={{ fontSize: 14 }} /> : <PersonIcon sx={{ fontSize: 14 }} />}
+                        />
+                      </TableCell>
+                      <TableCell>
                         <Stack direction="row" alignItems="center" spacing={1}>
-                          <Typography variant="body2" fontWeight={500}>
-                            {contribuyente.codigo}
-                          </Typography>
-                          {isPreviouslySelected && (
-                            <Tooltip title="Contribuyente actualmente seleccionado">
-                              <CheckCircleIcon sx={{ fontSize: 16, color: 'success.main' }} />
-                            </Tooltip>
-                          )}
-                        </Stack>
-                      </TableCell>
-                      <TableCell>
-                        {getPersonTypeChip(contribuyente.tipoPersona)}
-                      </TableCell>
-                      <TableCell>
-                        <Stack direction="row" alignItems="center" spacing={0.5}>
-                          {getDocumentTypeIcon(contribuyente.documento)}
+                          <BadgeIcon sx={{ fontSize: 16, color: 'action.active' }} />
                           <Typography variant="body2">
                             {contribuyente.documento}
                           </Typography>
                         </Stack>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" fontWeight={isSelected ? 600 : 400}>
-                          {contribuyente.contribuyente}
-                        </Typography>
+                        <Stack direction="row" alignItems="center" spacing={1.5}>
+                          <Avatar sx={{ width: 28, height: 28, bgcolor: alpha(theme.palette.primary.main, 0.1) }}>
+                            {contribuyente.tipoPersona === 'juridica' ? 
+                              <BusinessIcon sx={{ fontSize: 16, color: 'primary.main' }} /> : 
+                              <PersonIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+                            }
+                          </Avatar>
+                          <Typography 
+                            variant="body2" 
+                            fontWeight={isSelected ? 600 : 500}
+                            sx={{ 
+                              color: isSelected ? 'primary.main' : 'text.primary'
+                            }}
+                          >
+                            {contribuyente.contribuyente}
+                          </Typography>
+                        </Stack>
                       </TableCell>
                       <TableCell>
-                        <Stack direction="row" alignItems="center" spacing={0.5}>
-                          <LocationIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                          <Typography variant="body2" color="text.secondary">
+                        <Stack direction="row" alignItems="flex-start" spacing={1}>
+                          <LocationIcon sx={{ fontSize: 16, color: 'action.active', mt: 0.2, flexShrink: 0 }} />
+                          <Typography 
+                            variant="body2" 
+                            color="text.secondary"
+                            sx={{ 
+                              wordWrap: 'break-word',
+                              lineHeight: 1.4,
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden'
+                            }}
+                          >
                             {contribuyente.direccion}
                           </Typography>
                         </Stack>
                       </TableCell>
                       <TableCell>
-                        {contribuyente.telefono && (
-                          <Stack direction="row" alignItems="center" spacing={0.5}>
-                            <PhoneIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                        {contribuyente.telefono ? (
+                          <Stack direction="row" alignItems="center" spacing={1}>
+                            <PhoneIcon sx={{ fontSize: 16, color: 'action.active' }} />
                             <Typography variant="body2" color="text.secondary">
                               {contribuyente.telefono}
                             </Typography>
                           </Stack>
+                        ) : (
+                          <Typography variant="body2" color="text.disabled">
+                            Sin teléfono
+                          </Typography>
                         )}
                       </TableCell>
                     </TableRow>
@@ -414,26 +594,84 @@ const SelectorContribuyente: React.FC<SelectorContribuyenteProps> = ({
           rowsPerPageOptions={[5, 10, 25, 50]}
         />
 
-        {/* Información del contribuyente seleccionado */}
+        {/* Información del contribuyente seleccionado - Estilo mejorado */}
         {selectedContribuyente && (
-          <Box sx={{ p: 2, bgcolor: alpha(theme.palette.primary.main, 0.04), borderTop: 1, borderColor: 'divider' }}>
-            <Typography variant="subtitle2" gutterBottom>
-              Contribuyente seleccionado:
-            </Typography>
+          <Paper 
+            elevation={0}
+            sx={{ 
+              p: 2.5, 
+              bgcolor: alpha(theme.palette.primary.main, 0.04), 
+              borderTop: `2px solid ${theme.palette.primary.main}`,
+              borderRadius: 0
+            }}
+          >
+            <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
+              <CheckCircleIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+              <Typography variant="subtitle2" fontWeight={600} color="primary.main">
+                CONTRIBUYENTE SELECCIONADO
+              </Typography>
+            </Stack>
+            
             <Stack direction="row" spacing={2} alignItems="center">
-              <Avatar sx={{ bgcolor: 'primary.main' }}>
-                {selectedContribuyente.tipoPersona === 'juridica' ? <BusinessIcon /> : <PersonIcon />}
+              <Avatar 
+                sx={{ 
+                  width: 48,
+                  height: 48,
+                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                  border: `2px solid ${theme.palette.primary.main}`
+                }}
+              >
+                {selectedContribuyente.tipoPersona === 'juridica' ? 
+                  <BusinessIcon sx={{ color: 'primary.main' }} /> : 
+                  <PersonIcon sx={{ color: 'primary.main' }} />
+                }
               </Avatar>
+              
               <Box flex={1}>
-                <Typography variant="body1" fontWeight={600}>
-                  {selectedContribuyente.contribuyente}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {selectedContribuyente.documento} • {selectedContribuyente.direccion}
-                </Typography>
+                <Stack direction="row" alignItems="center" spacing={1} mb={0.5}>
+                  <Typography variant="body1" fontWeight={700} color="text.primary">
+                    {selectedContribuyente.contribuyente}
+                  </Typography>
+                  <Chip 
+                    size="small" 
+                    label={`Código: ${selectedContribuyente.codigo}`}
+                    color="primary"
+                    variant="outlined"
+                  />
+                </Stack>
+                
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Stack direction="row" alignItems="center" spacing={0.5}>
+                    <BadgeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                    <Typography variant="body2" color="text.secondary">
+                      {selectedContribuyente.documento}
+                    </Typography>
+                  </Stack>
+                  
+                  <Stack direction="row" alignItems="center" spacing={0.5}>
+                    <LocationIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                    <Typography variant="body2" color="text.secondary" sx={{ 
+                      maxWidth: 300,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {selectedContribuyente.direccion}
+                    </Typography>
+                  </Stack>
+                  
+                  {selectedContribuyente.telefono && (
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <PhoneIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                      <Typography variant="body2" color="text.secondary">
+                        {selectedContribuyente.telefono}
+                      </Typography>
+                    </Stack>
+                  )}
+                </Stack>
               </Box>
             </Stack>
-          </Box>
+          </Paper>
         )}
       </DialogContent>
 

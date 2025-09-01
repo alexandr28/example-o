@@ -8,24 +8,22 @@ import {
   Button,
   Stack,
   Divider,
-  IconButton,
-  FormControlLabel,
-  Checkbox,
   Alert,
   CircularProgress,
   Chip,
   useTheme,
   alpha,
-  InputAdornment,
   Autocomplete
 } from '@mui/material';
+import { predioService, CreatePredioDTO } from '../../services/predioService';
+import { NotificationService } from '../utils/Notification';
+import uploadService from '../../services/uploadService';
 import {
-  CalendarMonth as CalendarIcon,
   Home as HomeIcon,
   LocationOn as LocationIcon,
   PhotoCamera as PhotoIcon,
-  Delete as DeleteIcon,
-  Save as SaveIcon
+  Save as SaveIcon,
+  Add as AddIcon
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers';
@@ -34,6 +32,7 @@ import { es } from 'date-fns/locale';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useNavigate } from 'react-router-dom';
 
 // Componentes
 import SelectorDireccionArancel from '../modal/SelectorDireccionArancel';
@@ -121,6 +120,7 @@ const PredioForm: React.FC<PredioFormProps> = ({
   loading = false
 }) => {
   const theme = useTheme();
+  const navigate = useNavigate();
   const [showSelectorDireccionArancel, setShowSelectorDireccionArancel] = useState(false);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
 
@@ -129,6 +129,7 @@ const PredioForm: React.FC<PredioFormProps> = ({
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors, isSubmitting }
   } = useForm<PredioFormData>({
     resolver: zodResolver(predioSchema),
@@ -229,7 +230,7 @@ const PredioForm: React.FC<PredioFormProps> = ({
   }, []);
 
   // Usar años de la API si están disponibles, sino usar fallback
-  const aniosFinales = React.useMemo(() => {
+  React.useMemo(() => {
     if (aniosData && aniosData.length > 0) {
       return aniosData;
     }
@@ -280,13 +281,89 @@ const PredioForm: React.FC<PredioFormProps> = ({
     }
   }, [numeroFincaValue, otroNumeroValue, direccionValue, setValue]);
 
-  const onFormSubmit = (data: PredioFormData) => {
+  const onFormSubmit = async (data: PredioFormData) => {
     console.log('Datos del formulario:', data);
-    if (onSubmit) {
-      onSubmit({
-        ...data,
-        imagenes: selectedImages
-      });
+    
+    try {
+      // Preparar datos según la estructura exacta del API
+      const createPredioDTO: CreatePredioDTO = {
+        anio: data.anio || new Date().getFullYear(),
+        codPredio: null, // Siempre null, se asigna automáticamente
+        numeroFinca: parseInt(data.numeroFinca || '0'),
+        otroNumero: data.otroNumero || '',
+        codClasificacion: data.clasificacionPredio || '0502',
+        estPredio: data.estadoPredio || '2503',
+        codTipoPredio: data.tipoPredio || '2601',
+        codCondicionPropiedad: data.condicionPropiedad || '2701',
+        codDireccion: data.direccion?.codigo || data.direccion?.id || 2,
+        codUsoPredio: parseInt(data.usoPredio || '1'),
+        fechaAdquisicion: data.fechaAdquisicion ? 
+          new Date(data.fechaAdquisicion).toISOString().split('T')[0] : 
+          new Date().toISOString().split('T')[0],
+        numeroCondominos: data.numeroCondominos ? parseInt(data.numeroCondominos.toString()) : 2,
+        codListaConductor: data.conductor || '1401',
+        codUbicacionAreaVerde: 1, // Valor por defecto
+        areaTerreno: parseFloat(data.areaTerreno?.toString() || '0'),
+        numeroPisos: parseInt(data.numeroPisos?.toString() || '1'),
+        totalAreaConstruccion: null,
+        valorTotalConstruccion: null,
+        valorTerreno: null,
+        autoavaluo: null,
+        codEstado: '0201', // Estado activo por defecto
+        codUsuario: 1 // Usuario por defecto
+      };
+
+      console.log('📡 Enviando datos al API:', createPredioDTO);
+      
+      // Preparar promesas para ejecución simultánea
+      const promises: Promise<any>[] = [
+        predioService.crearPredio(createPredioDTO)
+      ];
+      
+      // Si hay imágenes seleccionadas, agregar la promesa de upload
+      if (selectedImages.length > 0) {
+        console.log(`🖼️ Subiendo ${selectedImages.length} imágenes...`);
+        promises.push(uploadService.uploadMultipleFiles(selectedImages));
+      }
+      
+      // Ejecutar ambas operaciones en simultáneo
+      const [predioResult, uploadResults] = await Promise.all(promises);
+      
+      console.log('✅ Predio creado exitosamente:', predioResult);
+      if (uploadResults) {
+        console.log('✅ Imágenes subidas exitosamente:', uploadResults);
+      }
+      
+      // Mensaje de éxito según lo que se haya hecho
+      const successMessage = selectedImages.length > 0 
+        ? `Predio registrado y ${selectedImages.length} imagen(es) subida(s) exitosamente`
+        : 'Predio registrado exitosamente';
+      NotificationService.success(successMessage);
+      
+      // Limpiar el formulario y las imágenes después del éxito
+      reset();
+      setSelectedImages([]);
+      
+      // Llamar al callback si existe
+      if (onSubmit) {
+        onSubmit({
+          ...data,
+          imagenes: selectedImages
+        });
+      }
+      
+      // Redireccionar a la página de consulta de predios con el predio recién creado
+      setTimeout(() => {
+        navigate('/predio/consulta', { 
+          state: { 
+            predioRecienCreado: predioResult,
+            mensaje: successMessage 
+          } 
+        });
+      }, 1500); // Pequeño delay para que el usuario vea el mensaje de éxito
+    } catch (error: any) {
+      console.error('❌ Error al crear predio o subir imágenes:', error);
+      NotificationService.error(error.message || 'Error al registrar el predio o subir imágenes');
     }
   };
 
@@ -294,7 +371,10 @@ const PredioForm: React.FC<PredioFormProps> = ({
   const buildDireccionCompleta = (direccion: any, numeroFinca?: string, otroNumero?: string) => {
     if (!direccion) return '';
     
-    let descripcion = `Año: ${direccion.anio} - Código Dirección: ${direccion.codigo}`;
+    // Si tiene direccionCompleta, usar esa en lugar del formato anterior
+    let descripcion = direccion.direccionCompleta 
+      ? `${direccion.direccionCompleta}` 
+      : `Año: ${direccion.anio} - Código Dirección: ${direccion.codigo}`;
     
     // Agregar N° Finca si existe
     if (numeroFinca && numeroFinca.trim()) {
@@ -309,6 +389,11 @@ const PredioForm: React.FC<PredioFormProps> = ({
     return descripcion;
   };
 
+  // Función para obtener el texto completo de la dirección
+  const getDireccionTextoCompleto = (direccion: any, numeroFinca?: string, otroNumero?: string) => {
+    return buildDireccionCompleta(direccion, numeroFinca, otroNumero);
+  };
+
   // Manejar selección de arancel
   const handleSelectArancel = (arancel: ArancelData) => {
     console.log('🎯 [PredioForm] Arancel seleccionado:', arancel);
@@ -318,8 +403,13 @@ const PredioForm: React.FC<PredioFormProps> = ({
       id: arancel.codDireccion,
       codigo: arancel.codDireccion,
       anio: arancel.anio,
+      direccionCompleta: arancel.direccionCompleta, // Agregar el campo direccionCompleta
       descripcion: buildDireccionCompleta(
-        { anio: arancel.anio, codigo: arancel.codDireccion },
+        { 
+          anio: arancel.anio, 
+          codigo: arancel.codDireccion,
+          direccionCompleta: arancel.direccionCompleta 
+        },
         numeroFincaValue,
         otroNumeroValue
       ),
@@ -397,41 +487,77 @@ const PredioForm: React.FC<PredioFormProps> = ({
     <Paper sx={{ p: 3 }}>
       <form onSubmit={handleSubmit(onFormSubmit)}>
         <Stack spacing={3}>
-          {/* Header */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <HomeIcon color="primary" />
-            <Typography variant="h6" component="h2">
-              {predioExistente ? 'Editar Predio' : 'Registrar Nuevo Predio'}
-            </Typography>
-          </Box>
-
-          {/* Datos del predio */}
-              <Typography
-                variant="subtitle1"
+          {/* Header mejorado */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.primary.main, 0.03)} 100%)`,
+              borderRadius: 2,
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+            }}
+          >
+            <Stack direction="row" alignItems="center" spacing={2}>
+              <Box
                 sx={{
-                  fontWeight: 600,
-                  color: 'text.primary'
+                  width: 48,
+                  height: 48,
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'primary.main'
                 }}
               >
-                Datos del predio
-              </Typography>
+                {predioExistente ? <HomeIcon fontSize="medium" /> : <AddIcon fontSize="medium" />}
+              </Box>
+              <Box>
+                <Typography variant="h5" fontWeight="bold" color="text.primary">
+                  {predioExistente ? 'Editar Predio' : 'Registrar Nuevo Predio'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {predioExistente ? 'Modifique los datos del predio seleccionado' : 'Complete la información para registrar un nuevo predio en el sistema'}
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
 
-              <Stack spacing={2}>
+          {/* Datos del predio */}
+                <Stack spacing={2}>
                 {/* Primera fila */}
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                  <Box sx={{ flex: '0 0 100px' }}>
-                    {renderAutocomplete(
-                      'anio',
-                      'Año',
-                      aniosFinales,
-                      loadingAnios,
-                      errorAnios,
-                      false,
-                      'Seleccione año'
-                    )}
+                  {/* Selector Año */}
+                  <Box sx={{ 
+                    flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '0 0 120px' },
+                    minWidth: { xs: '100%', md: '120px' }
+                  }}>
+                    <Controller
+                      name="anio"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          fullWidth
+                          size="small"
+                          label="Año"
+                          type="number"
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || null)}
+                          error={!!errors.anio}
+                          helperText={errors.anio?.message}
+                          InputProps={{
+                            inputProps: { 
+                              min: 1900, 
+                              max: new Date().getFullYear() 
+                            }
+                          }}
+                        />
+                      )}
+                    />
                   </Box>
-                  
-                  <Box sx={{ flex: '0 0 140px', maxWidth:'140px' }}>
+                  {/* Fecha Adquisicion */}
+                  <Box sx={{ flex: '0 0 160px', maxWidth:'160px' }}>
                     <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
                       <Controller
                         name="fechaAdquisicion"
@@ -453,6 +579,7 @@ const PredioForm: React.FC<PredioFormProps> = ({
                       />
                     </LocalizationProvider>
                   </Box>
+                  {/* Modo Declaracion */}
                   <Box sx={{ flex: '0 0 150px' }}>
                     {renderAutocomplete(
                       'modoDeclaracion',
@@ -463,7 +590,8 @@ const PredioForm: React.FC<PredioFormProps> = ({
                       false
                     )}
                   </Box>
-                  <Box sx={{ flex: '0 0 150px' }}>
+                  {/* Condicion de Propiedad */}
+                  <Box sx={{ flex: '0 0 200px' }}>
                     {renderAutocomplete(
                       'condicionPropiedad',
                       'CondicionPropiedad',
@@ -473,7 +601,8 @@ const PredioForm: React.FC<PredioFormProps> = ({
                       true
                     )}
                   </Box>
-                  <Box sx={{ flex: '0 0 150px' }}>
+                  {/* Tipo Predio */}
+                  <Box sx={{ flex: '0 0 230px' }}>
                     {renderAutocomplete(
                       'tipoPredio',
                       'Tipo Predio',
@@ -483,36 +612,154 @@ const PredioForm: React.FC<PredioFormProps> = ({
                       false
                     )}
                   </Box>
-                  <Box sx={{ flex: '0 0 150px' }}>
+                  
+                </Box>
+
+                {/* Segunda fila */}
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  {/* Uso Predio */}
+                  <Box sx={{ flex: '0 0 200px' }}>
                     {renderAutocomplete(
                       'usoPredio',
-                      'Usos Predio',
+                      'Uso Predio',
                       usoPredioData || [],
                       loadingUsoPredio,
                       errorUsoPredio,
                       false
                     )}
                   </Box>
-                  
-                  <Box sx={{ flex: '0 0 150px' }}>
+                  {/* Clasificacion Predio */}
+                  <Box sx={{ flex: '0 0 350px' }}>
                     {renderAutocomplete(
                       'clasificacionPredio',
-                      'Clasificación Predio',
+                      'ClasificacionPredio',
                       clasificacionPredioData || [],
                       loadingClasificacionPredio,
                       errorClasificacionPredio,
                       false
                     )}
                   </Box>
-                  
+                  {/* Estado del  Predio */}
+                  <Box sx={{ flex: '0 0 220px' }}>
+                    {renderAutocomplete(
+                      'estadoPredio',
+                      'EstadoPredio',
+                      estadoPredioData || [],
+                      loadingEstadoPredio,
+                      errorEstadoPredio,
+                      false
+                    )}
+                  </Box>
+                   {/* Lista Conductor*/}
+                  <Box sx={{ flex: '0 0 150px' }}>
+                    {renderAutocomplete(
+                      'conductor',
+                      'Conductor',
+                      conductorData || [],
+                      loadingConductor,
+                      errorConductor,
+                      true
+                    )}
+                  </Box>
                 </Box>
 
-                {/* Segunda fila */}
+                {/* Tercera fila */}
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                  
-                  
-                  <Box sx={{ flex: '0 0 820px' }}>
-                    <Stack direction="row" spacing={1} alignItems="flex-start">
+                   {/* Area m2*/}
+                  <Box sx={{ flex: '0 0 80px' }}>
+                    <Controller
+                      name="areaTerreno"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          label="Área m2"
+                          type="number"
+                          fullWidth
+                          size="small"
+                          value={field.value || ''}
+                          InputProps={{
+                            inputProps: { min: 0, step: 0.01 }
+                          }}
+                          error={!!errors.areaTerreno}
+                          helperText={errors.areaTerreno?.message}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '' || value === undefined) {
+                              field.onChange(undefined);
+                            } else {
+                              const numValue = parseFloat(value);
+                              field.onChange(numValue >= 0 ? numValue : undefined);
+                            }
+                          }}
+                        />
+                      )}
+                    />
+                  </Box>
+                   {/* N de Pisos*/}
+                  <Box sx={{ flex: '0 0 80px' }}>
+                    <Controller
+                      name="numeroPisos"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          label="N° Pisos"
+                          type="number"
+                          fullWidth
+                          size="small"
+                          value={field.value || ''}
+                          InputProps={{
+                            inputProps: { min: 0 }
+                          }}
+                          error={!!errors.numeroPisos}
+                          helperText={errors.numeroPisos?.message}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '' || value === undefined) {
+                              field.onChange(undefined);
+                            } else {
+                              const numValue = parseInt(value);
+                              field.onChange(numValue >= 0 ? numValue : undefined);
+                            }
+                          }}
+                        />
+                      )}
+                    />
+                  </Box>
+                  {/* N de condominos*/}
+                  <Box sx={{ flex: '0 0 85px' }}>
+                    <Controller
+                      name="numeroCondominos"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          label="N° Condóminos"
+                          type="number"
+                          fullWidth
+                          size="small"
+                          value={field.value || ''}
+                          InputProps={{
+                            inputProps: { min: 0 }
+                          }}
+                          error={!!errors.numeroCondominos}
+                          helperText={errors.numeroCondominos?.message}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '' || value === undefined) {
+                              field.onChange(undefined);
+                            } else {
+                              const numValue = parseInt(value);
+                              field.onChange(numValue >= 0 ? numValue : undefined);
+                            }
+                          }}
+                        />
+                      )}
+                    />
+                  </Box>
+                   {/* Buscar Direcccion */}
+                  <Box sx={{ flex: '0 0 auto' }}>
                       <Button
                         variant="contained"
                         onClick={() => setShowSelectorDireccionArancel(true)}
@@ -525,28 +772,10 @@ const PredioForm: React.FC<PredioFormProps> = ({
                           whiteSpace: 'nowrap'
                         }}
                       >
-                        Buscar dirección
+                        Seleccionar dirección
                       </Button>
-                      <TextField
-                        label="Dirección seleccionada"
-                        value={direccionValue?.descripcion || ''}
-                        fullWidth
-                        size="small"
-                        inputProps={{
-                          readOnly: true
-                        }}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <LocationIcon color="action" />
-                            </InputAdornment>
-                          )
-                        }}
-                        error={!!errors.direccion}
-                        helperText={String(errors.direccion?.message || '') || (!direccionValue ? 'Seleccione una dirección' : '')}
-                      />
-                    </Stack>
                   </Box>
+                   {/* N finca */}
                   <Box sx={{ flex: '0 0 70px' }}>
                     <Controller
                       name="numeroFinca"
@@ -563,6 +792,7 @@ const PredioForm: React.FC<PredioFormProps> = ({
                       )}
                     />
                   </Box>
+                   {/* Otro N */}
                   <Box sx={{ flex: '0 0 65px' }}>
                     <Controller
                       name="otroNumero"
@@ -579,7 +809,7 @@ const PredioForm: React.FC<PredioFormProps> = ({
                       )}
                     />
                   </Box>
-                  
+                   {/* arancel*/}
                   <Box sx={{ flex: '0 0 70px' }}>
                     <Controller
                       name="arancel"
@@ -602,88 +832,43 @@ const PredioForm: React.FC<PredioFormProps> = ({
                   </Box>
                 </Box>
 
-                {/* Tercera fila */}
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                  <Box sx={{ flex: '0 0 150px' }}>
-                    {renderAutocomplete(
-                      'estadoPredio',
-                      'EstadoPredio',
-                      estadoPredioData || [],
-                      loadingEstadoPredio,
-                      errorEstadoPredio,
-                      false
-                    )}
-                  </Box>
-                  <Box sx={{ flex: '0 0 150px' }}>
-                    {renderAutocomplete(
-                      'conductor',
-                      'Conductor',
-                      conductorData || [],
-                      loadingConductor,
-                      errorConductor,
-                      true
-                    )}
-                  </Box>
-                  <Box sx={{ flex: '0 0 80px' }}>
-                    <Controller
-                      name="areaTerreno"
-                      control={control}
-                      render={({ field }) => (
-                        <TextField
-                          {...field}
-                          label="Área m2"
-                          type="number"
-                          fullWidth
-                          size="small"
-                        
-                          error={!!errors.areaTerreno}
-                          helperText={errors.areaTerreno?.message}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                        />
-                      )}
-                    />
-                  </Box>
-                  <Box sx={{ flex: '0 0 80px' }}>
-                    <Controller
-                      name="numeroPisos"
-                      control={control}
-                      render={({ field }) => (
-                        <TextField
-                          {...field}
-                          label="N° Pisos"
-                          type="number"
-                          fullWidth
-                          size="small"
-                          error={!!errors.numeroPisos}
-                          helperText={errors.numeroPisos?.message}
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                        />
-                      )}
-                    />
-                  </Box>
-                  <Box sx={{ flex: '0 0 85px' }}>
-                    <Controller
-                      name="numeroCondominos"
-                      control={control}
-                      render={({ field }) => (
-                        <TextField
-                          {...field}
-                          label="N° Condóminos"
-                          type="number"
-                          fullWidth
-                          size="small"
-                          error={!!errors.numeroCondominos}
-                          helperText={errors.numeroCondominos?.message}
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                        />
-                      )}
-                    />
-                  </Box>
-                </Box>
-
                 {/* Cuarta fila */}
+                 {/* Direcccion Select*/}
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-               
+                  {/* Dirección seleccionada */}
+                  {direccionValue && (
+                    <Box sx={{ 
+                      flex: { xs: '1 1 100%', sm: '1 1 auto' },
+                      minWidth: { xs: '100%', sm: '300px' },
+                      width: { xs: '100%', sm: 'auto' }
+                    }}> 
+                      <Alert 
+                        severity="info" 
+                        sx={{ 
+                          py: 0.5,
+                          px: 1,
+                          minHeight: 'auto',
+                          height: '32px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          '& .MuiAlert-message': { 
+                            py: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            fontSize: '0.75rem'
+                          },
+                          '& .MuiAlert-icon': {
+                            fontSize: '1rem',
+                            paddingTop: 0,
+                            marginRight: 0.5
+                          }}}
+                      >
+                        <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 500 }}>
+                          📍 {getDireccionTextoCompleto(direccionValue, numeroFincaValue || '', otroNumeroValue)}
+                        </Typography>
+                      </Alert>
+                    </Box>
+                  )}
                 </Box>
 
                 {/* Quinta fila */}
@@ -751,8 +936,16 @@ const PredioForm: React.FC<PredioFormProps> = ({
 
               <Divider />
 
-              {/* Botón de envío */}
+              {/* Botón Registrar */}
               <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+                <Button
+                  type="button"
+                  variant="outlined"
+                  onClick={() => reset()}
+                  size="large"
+                >
+                  Nuevo
+                </Button>
                 <Button
                   type="submit"
                   variant="contained"

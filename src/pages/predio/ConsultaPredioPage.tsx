@@ -1,5 +1,5 @@
 // src/pages/predio/ConsultaPredioPage.tsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Container,
@@ -10,7 +10,8 @@ import {
   Chip,
   Stack,
   useTheme,
-  alpha
+  alpha,
+  Alert
 } from '@mui/material';
 import {
   NavigateNext as NavigateNextIcon,
@@ -18,15 +19,27 @@ import {
   Domain as DomainIcon,
   Search as SearchIcon
 } from '@mui/icons-material';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useLocation } from 'react-router-dom';
 import MainLayout from '../../layout/MainLayout';
 import ConsultaPredios from '../../components/predio/ConsultaPredios';
+import { NotificationService } from '../../components/utils/Notification';
 
 /**
  * Página de consulta de predios con Material-UI
  */
 const ConsultaPredioPage: React.FC = () => {
   const theme = useTheme();
+  const location = useLocation();
+  const { predioRecienCreado, mensaje } = location.state || {};
+  const [mostrarAlerta, setMostrarAlerta] = useState(!!predioRecienCreado);
+
+  useEffect(() => {
+    // Si hay un predio recién creado, mostrar notificación
+    if (predioRecienCreado && mensaje) {
+      NotificationService.success(`${mensaje} - Código: ${predioRecienCreado.codPredio || predioRecienCreado.codigo || 'Nuevo'}`);
+      setMostrarAlerta(true);
+    }
+  }, [predioRecienCreado, mensaje]);
 
   // Items del breadcrumb
   const breadcrumbItems = [
@@ -126,6 +139,24 @@ const ConsultaPredioPage: React.FC = () => {
               </Box>
             </Stack>
           </Paper>
+
+          {/* Mostrar alerta si hay un predio recién creado */}
+          {predioRecienCreado && mostrarAlerta && (
+            <Alert 
+              severity="success" 
+              sx={{ mb: 3 }}
+              onClose={() => setMostrarAlerta(false)}
+            >
+              <Typography variant="subtitle2" fontWeight="bold">
+                ¡Predio registrado exitosamente!
+              </Typography>
+              <Typography variant="body2">
+                Código: {predioRecienCreado.codPredio || 'Nuevo'} | 
+                Área: {predioRecienCreado.areaTerreno} m² | 
+                N° Finca: {predioRecienCreado.numeroFinca}
+              </Typography>
+            </Alert>
+          )}
 
           {/* Componente de consulta */}
           <ConsultaPredios />

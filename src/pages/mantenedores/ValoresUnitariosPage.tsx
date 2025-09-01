@@ -7,16 +7,12 @@ import {
   Typography,
   Alert,
   Paper,
-  Divider,
-  CircularProgress,
   useTheme,
   alpha,
   Tabs,
   Tab
 } from '@mui/material';
 import {
-  Save as SaveIcon,
-  Delete as DeleteIcon,
   Refresh as RefreshIcon,
   Construction as ConstructionIcon,
   Add as AddIcon,
@@ -64,10 +60,8 @@ const ValoresUnitariosPage: React.FC = () => {
     loading,
     error,
     cargarValoresUnitarios,
-    buscarValoresUnitarios,
     registrarValorUnitario,
     eliminarValorUnitario,
-    obtenerValoresUnitariosPorCategoria,
     añoSeleccionado,
     categoriaSeleccionada,
     subcategoriaSeleccionada,
@@ -80,25 +74,15 @@ const ValoresUnitariosPage: React.FC = () => {
 
   // Estados locales
   const [costo, setCosto] = useState<string>('0.00');
-  const [isFormValid, setIsFormValid] = useState(false);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [tabValue, setTabValue] = useState(0);
+  const [isEditMode, setIsEditMode] = useState(false);
 
-  // Validar formulario
-  useEffect(() => {
-    const valid = añoSeleccionado !== null && 
-                  categoriaSeleccionada !== null && 
-                  subcategoriaSeleccionada !== null && 
-                  letraSeleccionada !== null && 
-                  costo !== '' && 
-                  parseFloat(costo) > 0;
-    setIsFormValid(valid);
-  }, [añoSeleccionado, categoriaSeleccionada, subcategoriaSeleccionada, letraSeleccionada, costo]);
 
   // Cargar valores unitarios al montar con el año seleccionado
   useEffect(() => {
     if (añoSeleccionado) {
-      cargarValoresUnitarios({ año: añoSeleccionado });
+      cargarValoresUnitarios({ anio: añoSeleccionado });
     }
   }, [cargarValoresUnitarios, añoSeleccionado]);
 
@@ -118,20 +102,6 @@ const ValoresUnitariosPage: React.FC = () => {
     { label: 'Valores Unitarios', active: true }
   ];
 
-  // Mapear subcategorías del API a categorías del formulario - CORREGIDO según especificación
-  const mapearSubcategoriaACategoria = (subcategoria: string) => {
-    const mapa: Record<string, string> = {
-      'MUROS Y COLUMNAS': 'ESTRUCTURAS',
-      'TECHOS': 'ESTRUCTURAS', 
-      'PISOS': 'ACABADOS',                    // Movido a ACABADOS
-      'PUERTAS Y VENTANAS': 'ACABADOS',
-      'REVESTIMIENTOS': 'ACABADOS',
-      'BAÑOS': 'ACABADOS',                    // Confirmado en ACABADOS
-      'INSTALACIONES ELECTRICAS Y SANITARIAS': 'INSTALACIONES'
-    };
-    console.log('🗺️ [ValoresUnitariosPage] Mapeando subcategoría:', subcategoria, 'a categoría:', mapa[subcategoria]);
-    return mapa[subcategoria] || 'ACABADOS';  // Default a ACABADOS en lugar de ESTRUCTURAS
-  };
 
   // Handler para selección de valor desde la tabla
   const handleValorSeleccionado = (datos: {
@@ -146,12 +116,18 @@ const ValoresUnitariosPage: React.FC = () => {
     // Llenar el formulario con los datos seleccionados
     setAñoSeleccionado(datos.año);
     
-    // Mapear subcategoria del API a categoria del formulario
-    const categoria = mapearSubcategoriaACategoria(datos.subcategoria);
-    setCategoriaSeleccionada(categoria as any);
-    setSubcategoriaSeleccionada(datos.subcategoria as any);
-    setLetraSeleccionada(datos.letra as any);
-    setCosto(datos.costo.toString());
+    // Usar la categoría que ya viene mapeada desde ValorUnitarioList
+    setCategoriaSeleccionada(datos.categoria as any);
+    
+    // Establecer subcategoría, letra y costo con un pequeño delay para asegurar que la categoría se procese primero
+    setTimeout(() => {
+      setSubcategoriaSeleccionada(datos.subcategoria as any);
+      setLetraSeleccionada(datos.letra as any);
+      setCosto(datos.costo.toString());
+    }, 100);
+    
+    // Activar modo edición
+    setIsEditMode(true);
     
     // Cambiar al tab de formulario al seleccionar un valor
     setTabValue(0);
@@ -188,13 +164,14 @@ const ValoresUnitariosPage: React.FC = () => {
       // Limpiar formulario después de registrar
       setCosto('0.00');
       setLetraSeleccionada(null);
+      setIsEditMode(false); // Desactivar modo edición después de guardar
       
       console.log('✅ [ValoresUnitariosPage] Registro completado exitosamente');
       
       // Forzar actualización inmediata de la tabla recargando datos del año
       if (añoSeleccionado) {
         console.log('🔄 [ValoresUnitariosPage] Forzando recarga de datos para actualizar tabla...');
-        await cargarValoresUnitarios({ año: añoSeleccionado });
+        await cargarValoresUnitarios({ anio: añoSeleccionado });
         // Incrementar clave para forzar re-render de la tabla
         setRefreshKey(prev => prev + 1);
       }
@@ -231,6 +208,17 @@ const ValoresUnitariosPage: React.FC = () => {
         NotificationService.error('Error al eliminar los valores');
       }
     }
+  };
+
+  const handleNuevo = () => {
+    // Limpiar el formulario
+    setAñoSeleccionado(null);
+    setCategoriaSeleccionada(null);
+    setSubcategoriaSeleccionada(null);
+    setLetraSeleccionada(null);
+    setCosto('0.00');
+    setIsEditMode(false); // Desactivar modo edición
+    console.log('🆕 [ValoresUnitariosPage] Formulario limpiado para nuevo registro');
   };
 
   const handleRefresh = () => {
@@ -366,59 +354,14 @@ const ValoresUnitariosPage: React.FC = () => {
                     onCostoChange={handleCostoChange}
                     costoValue={costo}
                     onRegistrar={handleRegistrar}
+                    onNuevo={handleNuevo}
+                    onEliminar={handleEliminar}
                     isSubmitting={loading}
+                    isEditMode={isEditMode}
                   />
                 </Box>
                 
-                {/* Botones de acción */}
-                <Stack 
-                  spacing={2} 
-                  sx={{ 
-                    minWidth: { xs: '100%', sm: 200 },
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    size="large"
-                    onClick={handleRegistrar}
-                    disabled={loading || !isFormValid}
-                    startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-                    fullWidth
-                    sx={{
-                      height: 48,
-                      fontWeight: 600,
-                      boxShadow: theme.shadows[2],
-                      '&:hover': {
-                        boxShadow: theme.shadows[4]
-                      }
-                    }}
-                  >
-                    {loading ? 'Registrando...' : 'Registrar'}
-                  </Button>
-                  
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    size="large"
-                    onClick={handleEliminar}
-                    disabled={loading || !añoSeleccionado}
-                    startIcon={<DeleteIcon />}
-                    fullWidth
-                    sx={{
-                      height: 48,
-                      fontWeight: 600,
-                      borderWidth: 2,
-                      '&:hover': {
-                        borderWidth: 2,
-                        bgcolor: alpha(theme.palette.error.main, 0.08)
-                      }
-                    }}
-                  >
-                    Eliminar
-                  </Button>
-                </Stack>
+            
               </Stack>
             </Box>
           </TabPanel>

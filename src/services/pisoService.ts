@@ -7,7 +7,7 @@ import { API_CONFIG, buildApiUrl } from '../config/api.unified.config';
  */
 export interface PisoData {
   id: number;
-  codigoPredio: number;
+  codigoPredio: number | string;
   numeroPiso: number;
   areaConstruida: number;
   clasificacion?: string;
@@ -24,6 +24,36 @@ export interface PisoData {
   fechaRegistro?: string;
   fechaModificacion?: string;
   codUsuario?: number;
+  // Campos adicionales del API
+  anio?: number;
+  codPredio?: string;
+  codPiso?: number;
+  fechaConstruccion?: number | string;
+  fechaConstruccionStr?: string;
+  codLetraMurosColumnas?: string | null;
+  murosColumnas?: string | null;
+  codLetraTechos?: string | null;
+  techos?: string | null;
+  codLetraPisos?: string | null;
+  pisos?: string | null;
+  codLetraPuertasVentanas?: string | null;
+  puertasVentanas?: string | null;
+  codLetraRevestimiento?: string | null;
+  revestimiento?: string | null;
+  codLetraBanios?: string | null;
+  banios?: string | null;
+  codLetraInstalacionesElectricas?: string | null;
+  instalacionesElectricas?: string | null;
+  codEstadoConservacion?: string | null;
+  codMaterialEstructural?: string | null;
+  valorUnitario?: number;
+  incremento?: number;
+  depreciacion?: number;
+  montoDepreciacion?: number | null;
+  valorUnitarioDepreciado?: number | null;
+  valorAreaConstruida?: number | null;
+  valorAreasComunes?: number | null;
+  valorConstruccion?: number | null;
 }
 
 export interface CreatePisoDTO {
@@ -68,7 +98,7 @@ export interface CreatePisoApiDTO {
   instalacionesElectricas: string;
   codEstadoConservacion: string;
   codMaterialEstructural: string;
-  areaConstruida: number;
+  areaConstruida: string;
 }
 
 export interface UpdatePisoDTO extends Partial<CreatePisoDTO> {
@@ -192,6 +222,7 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
    * Consulta pisos usando el API específico con GET y query params
    * URL: GET http://26.161.18.122:8080/api/piso?codPiso=1&anio=2023&codPredio=20231&numeroPiso=1
    * NO requiere autenticación
+   * IMPORTANTE: El API requiere TODOS los parámetros
    */
   async consultarPisos(params: {
     codPiso?: number;
@@ -202,15 +233,31 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
     try {
       console.log('🔍 [PisoService] Consultando pisos con parámetros:', params);
       
-      // Construir URL con query params
-      const queryParams: Record<string, string> = {};
-      if (params.codPiso) queryParams.codPiso = params.codPiso.toString();
-      if (params.anio) queryParams.anio = params.anio.toString();
-      if (params.codPredio) queryParams.codPredio = params.codPredio;
-      if (params.numeroPiso) queryParams.numeroPiso = params.numeroPiso.toString();
+      // Función para limpiar y validar parámetros
+      const limpiarParametro = (valor: any): string => {
+        return String(valor).trim().replace(/\s+/g, '');
+      };
+      
+      // El API requiere TODOS los parámetros - usar valores por defecto si no se proporcionan
+      const queryParams: Record<string, string> = {
+        codPiso: limpiarParametro(params.codPiso || 1),
+        anio: limpiarParametro(params.anio || new Date().getFullYear()),
+        codPredio: limpiarParametro(params.codPredio || '20231'),
+        numeroPiso: limpiarParametro(params.numeroPiso || 1)
+      };
+      
+      console.log('📡 [PisoService] Parámetros finales enviados al API:', queryParams);
       
       const url = buildApiUrl('/api/piso', queryParams);
-      console.log('📡 [PisoService] GET request:', url);
+      console.log('📡 [PisoService] URL construida:', url);
+      console.log('📡 [PisoService] Parámetros query individuales:', queryParams);
+      
+      // Verificar si hay caracteres problemáticos
+      Object.entries(queryParams).forEach(([key, value]) => {
+        if (value.includes(' ') || value.includes('+')) {
+          console.warn(`⚠️ [PisoService] Parámetro ${key} contiene caracteres problemáticos: '${value}'`);
+        }
+      });
       
       const response = await fetch(url, {
         method: 'GET',
@@ -221,58 +268,101 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
       });
       
       if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
-      }
-      
-      const responseData = await response.json();
-      console.log('📡 [PisoService] Respuesta del API:', responseData);
-      
-      if (responseData.success && responseData.data) {
-        // Normalizar los datos del API
-        const pisosData = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+        let errorMessage = `Error HTTP: ${response.status} - ${response.statusText}`;
         
-        const pisosFormateados = pisosData.map((item: any, index: number) => {
-          console.log(`🔍 [PisoService] Procesando item ${index + 1}:`, item);
-          
-          const pisoFormateado = {
-            id: item.codPiso || item.id || index + 1,
-            item: index + 1,
-            descripcion: item.descripcion || `Piso ${item.numeroPiso || index + 1}`,
-            valorUnitario: parseFloat(item.valorUnitario?.toString() || '0'),
-            incremento: parseFloat(item.incremento?.toString() || '0'),
-            porcentajeDepreciacion: parseFloat(item.porcentajeDepreciacion?.toString() || '0'),
-            valorUnicoDepreciado: parseFloat(item.valorUnicoDepreciado?.toString() || '0'),
-            valorAreaConstruida: parseFloat(item.valorAreaConstruida?.toString() || '0'),
-            // Campos adicionales de la interface original
-            codigoPredio: parseInt(item.codPredio?.toString() || '0'),
-            numeroPiso: parseInt(item.numeroPiso?.toString() || '1'),
-            areaConstruida: parseFloat(item.areaConstruida?.toString() || '0'),
-            clasificacion: item.clasificacion,
-            materialEstructural: item.materialEstructural,
-            estadoConservacion: item.estadoConservacion,
-            estadoConstruccion: item.estadoConstruccion,
-            categoriaValorUnitario: item.categoriaValorUnitario,
-            añoConstruccion: parseInt(item.anioConstruccion?.toString() || item.añoConstruccion?.toString() || new Date().getFullYear().toString()),
-            mesTermino: parseInt(item.mesTermino?.toString() || '12'),
-            unidadesUso: parseInt(item.unidadesUso?.toString() || '1'),
-            porcentajeAreaComun: parseFloat(item.porcentajeAreaComun?.toString() || '0'),
-            observaciones: item.observaciones || '',
-            estado: item.estado || 'ACTIVO',
-            fechaRegistro: item.fechaRegistro,
-            fechaModificacion: item.fechaModificacion,
-            codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario
-          };
-          
-          console.log(`✅ [PisoService] Item ${index + 1} formateado:`, pisoFormateado);
-          return pisoFormateado;
+        // Proporcionar información más detallada para errores comunes
+        if (response.status === 403) {
+          errorMessage += '. El servidor rechazó la petición (posible problema de CORS o permisos)';
+        } else if (response.status === 404) {
+          errorMessage += '. Endpoint no encontrado';
+        } else if (response.status === 500) {
+          errorMessage += '. Error interno del servidor';
+        }
+        
+        console.error('❌ [PisoService] Error detallado:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: url,
+          headers: Object.fromEntries(response.headers.entries())
         });
         
-        console.log('✅ [PisoService] Pisos formateados:', pisosFormateados);
-        return pisosFormateados;
-      } else {
-        console.log('⚠️ [PisoService] No se encontraron pisos en la respuesta');
-        return [];
+        throw new Error(errorMessage);
       }
+      
+      const data = await response.json();
+      console.log('📡 [PisoService] Respuesta del API:', data);
+      
+      // El API puede devolver un objeto directo o un array
+      const pisosData = Array.isArray(data) ? data : [data];
+      
+      const pisosFormateados = pisosData.map((item: any, index: number) => {
+        console.log(`🔍 [PisoService] Procesando piso ${index + 1}:`, item);
+        
+        // Formatear fecha de construcción
+        let fechaConstruccionStr = item.fechaConstruccionStr;
+        if (!fechaConstruccionStr && item.fechaConstruccion) {
+          const fecha = new Date(item.fechaConstruccion);
+          fechaConstruccionStr = fecha.toISOString().split('T')[0];
+        }
+        
+        const pisoFormateado: PisoData = {
+          // IDs
+          id: item.codPiso || index + 1,
+          codPiso: item.codPiso,
+          
+          // Información básica
+          anio: item.anio,
+          codigoPredio: item.codPredio,
+          codPredio: item.codPredio,
+          numeroPiso: item.numeroPiso,
+          
+          // Fechas
+          fechaConstruccion: item.fechaConstruccion,
+          fechaConstruccionStr: fechaConstruccionStr,
+          
+          // Componentes estructurales
+          codLetraMurosColumnas: item.codLetraMurosColumnas,
+          murosColumnas: item.murosColumnas,
+          codLetraTechos: item.codLetraTechos,
+          techos: item.techos,
+          codLetraPisos: item.codLetraPisos,
+          pisos: item.pisos,
+          codLetraPuertasVentanas: item.codLetraPuertasVentanas,
+          puertasVentanas: item.puertasVentanas,
+          codLetraRevestimiento: item.codLetraRevestimiento,
+          revestimiento: item.revestimiento,
+          codLetraBanios: item.codLetraBanios,
+          banios: item.banios,
+          codLetraInstalacionesElectricas: item.codLetraInstalacionesElectricas,
+          instalacionesElectricas: item.instalacionesElectricas,
+          
+          // Estados y materiales
+          codEstadoConservacion: item.codEstadoConservacion,
+          codMaterialEstructural: item.codMaterialEstructural,
+          
+          // Valores
+          valorUnitario: item.valorUnitario || 0,
+          areaConstruida: item.areaConstruida || 0,
+          incremento: item.incremento || 0,
+          depreciacion: item.depreciacion || 0,
+          montoDepreciacion: item.montoDepreciacion,
+          valorUnitarioDepreciado: item.valorUnitarioDepreciado,
+          valorAreaConstruida: item.valorAreaConstruida,
+          valorAreasComunes: item.valorAreasComunes,
+          valorConstruccion: item.valorConstruccion,
+          
+          // Campos adicionales para compatibilidad
+          estado: item.estado || 'ACTIVO',
+          fechaRegistro: item.fechaRegistro,
+          fechaModificacion: item.fechaModificacion
+        };
+        
+        console.log(`✅ [PisoService] Piso ${index + 1} formateado:`, pisoFormateado);
+        return pisoFormateado;
+      });
+      
+      console.log('✅ [PisoService] Total pisos formateados:', pisosFormateados.length);
+      return pisosFormateados;
       
     } catch (error: any) {
       console.error('❌ [PisoService] Error consultando pisos:', error);
@@ -443,66 +533,40 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
         throw new Error('numeroPiso es requerido y debe ser mayor a 0');
       }
       
-      if (!datos.areaConstruida || datos.areaConstruida <= 0) {
+      if (!datos.areaConstruida || parseFloat(datos.areaConstruida) <= 0) {
         throw new Error('areaConstruida es requerido y debe ser mayor a 0');
       }
       
       // Asegurar que los datos coincidan EXACTAMENTE con el JSON esperado
       const datosParaEnviar: CreatePisoApiDTO = {
         anio: Number(datos.anio),
-        codPredio: String(datos.codPredio),
+        codPredio: String(datos.codPredio).trim(),
         numeroPiso: Number(datos.numeroPiso),
         fechaConstruccion: String(datos.fechaConstruccion || "1990-01-01"),
-        codLetraMurosColumnas: String(datos.codLetraMurosColumnas || "1101"),
+        codLetraMurosColumnas: String(datos.codLetraMurosColumnas || "1101").trim(),
         murosColumnas: String(datos.murosColumnas || "100101"),
-        codLetraTechos: String(datos.codLetraTechos || "1101"),
+        codLetraTechos: String(datos.codLetraTechos || "1101").trim(),
         techos: String(datos.techos || "100102"),
-        codLetraPisos: String(datos.codLetraPisos || "1101"),
+        codLetraPisos: String(datos.codLetraPisos || "1101").trim(),
         pisos: String(datos.pisos || "100201"),
-        codLetraPuertasVentanas: String(datos.codLetraPuertasVentanas || "1101"),
-        puertasVentanas: String(datos.puertasVentanas || "100202"),
-        codLetraRevestimiento: String(datos.codLetraRevestimiento || "1101"),
-        revestimiento: String(datos.revestimiento || "100203"),
-        codLetraBanios: String(datos.codLetraBanios || "1101"),
-        banios: String(datos.banios || "100204"),
-        codLetraInstalacionesElectricas: String(datos.codLetraInstalacionesElectricas || "1101"),
-        instalacionesElectricas: String(datos.instalacionesElectricas || "100301"),
-        codEstadoConservacion: String(datos.codEstadoConservacion || "9402"),
-        codMaterialEstructural: String(datos.codMaterialEstructural || "0703"),
-        areaConstruida: Number(datos.areaConstruida)
+        codLetraPuertasVentanas: String(datos.codLetraPuertasVentanas || "1101").trim(),
+        puertasVentanas: String(datos.puertasVentanas || "100202").trim(),
+        codLetraRevestimiento: String(datos.codLetraRevestimiento || "1101").trim(),
+        revestimiento: String(datos.revestimiento || "100203").trim(),
+        codLetraBanios: String(datos.codLetraBanios || "1101").trim(),
+        banios: String(datos.banios || "100204").trim(),
+        codLetraInstalacionesElectricas: String(datos.codLetraInstalacionesElectricas || "1101").trim(),
+        instalacionesElectricas: String(datos.instalacionesElectricas || "100301").trim(),
+        codEstadoConservacion: String(datos.codEstadoConservacion || "9402").trim(),
+        codMaterialEstructural: String(datos.codMaterialEstructural || "0703").trim(),
+        areaConstruida: String(datos.areaConstruida)
       };
       
-      // Construir URL completa
-      const url = `${API_CONFIG.baseURL}${this.endpoint}`;
+      // URL específica del API
+      const url = 'http://26.161.18.122:8080/api/piso';
       
       console.log('📡 [PisoService] URL para crear:', url);
       console.log('📤 [PisoService] JSON exacto a enviar:', JSON.stringify(datosParaEnviar, null, 2));
-      
-      // Ejemplo de JSON válido para comparar con Postman:
-      console.log('📋 [PisoService] Ejemplo JSON para Postman:');
-      console.log(`{
-  "anio": ${datosParaEnviar.anio},
-  "codPredio": "${datosParaEnviar.codPredio}",
-  "numeroPiso": ${datosParaEnviar.numeroPiso},
-  "fechaConstruccion": "${datosParaEnviar.fechaConstruccion}",
-  "codLetraMurosColumnas": "${datosParaEnviar.codLetraMurosColumnas}",
-  "murosColumnas": "${datosParaEnviar.murosColumnas}",
-  "codLetraTechos": "${datosParaEnviar.codLetraTechos}",
-  "techos": "${datosParaEnviar.techos}",
-  "codLetraPisos": "${datosParaEnviar.codLetraPisos}",
-  "pisos": "${datosParaEnviar.pisos}",
-  "codLetraPuertasVentanas": "${datosParaEnviar.codLetraPuertasVentanas}",
-  "puertasVentanas": "${datosParaEnviar.puertasVentanas}",
-  "codLetraRevestimiento": "${datosParaEnviar.codLetraRevestimiento}",
-  "revestimiento": "${datosParaEnviar.revestimiento}",
-  "codLetraBanios": "${datosParaEnviar.codLetraBanios}",
-  "banios": "${datosParaEnviar.banios}",
-  "codLetraInstalacionesElectricas": "${datosParaEnviar.codLetraInstalacionesElectricas}",
-  "instalacionesElectricas": "${datosParaEnviar.instalacionesElectricas}",
-  "codEstadoConservacion": "${datosParaEnviar.codEstadoConservacion}",
-  "codMaterialEstructural": "${datosParaEnviar.codMaterialEstructural}",
-  "areaConstruida": ${datosParaEnviar.areaConstruida}
-}`);
       
       // Petición POST sin autenticación usando JSON
       const response = await fetch(url, {
@@ -534,15 +598,35 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
       const responseData = await response.json();
       console.log('✅ [PisoService] Piso creado exitosamente:', responseData);
       
-      // Normalizar la respuesta
+      // Normalizar la respuesta usando los datos del responseData
       const pisoCreado: PisoData = {
         id: responseData.codPiso || responseData.id || 0,
+        codPiso: responseData.codPiso,
         codigoPredio: parseInt(datosParaEnviar.codPredio),
+        codPredio: datosParaEnviar.codPredio,
+        anio: datosParaEnviar.anio,
         numeroPiso: datosParaEnviar.numeroPiso,
+        fechaConstruccion: datosParaEnviar.fechaConstruccion,
         areaConstruida: datosParaEnviar.areaConstruida,
+        codLetraMurosColumnas: datosParaEnviar.codLetraMurosColumnas,
+        murosColumnas: datosParaEnviar.murosColumnas,
+        codLetraTechos: datosParaEnviar.codLetraTechos,
+        techos: datosParaEnviar.techos,
+        codLetraPisos: datosParaEnviar.codLetraPisos,
+        pisos: datosParaEnviar.pisos,
+        codLetraPuertasVentanas: datosParaEnviar.codLetraPuertasVentanas,
+        puertasVentanas: datosParaEnviar.puertasVentanas,
+        codLetraRevestimiento: datosParaEnviar.codLetraRevestimiento,
+        revestimiento: datosParaEnviar.revestimiento,
+        codLetraBanios: datosParaEnviar.codLetraBanios,
+        banios: datosParaEnviar.banios,
+        codLetraInstalacionesElectricas: datosParaEnviar.codLetraInstalacionesElectricas,
+        instalacionesElectricas: datosParaEnviar.instalacionesElectricas,
+        codEstadoConservacion: datosParaEnviar.codEstadoConservacion,
+        codMaterialEstructural: datosParaEnviar.codMaterialEstructural,
         clasificacion: responseData.clasificacion || 'PRIMER_PISO',
-        materialEstructural: responseData.codMaterialEstructural || datosParaEnviar.codMaterialEstructural,
-        estadoConservacion: responseData.codEstadoConservacion || datosParaEnviar.codEstadoConservacion,
+        materialEstructural: responseData.materialEstructural,
+        estadoConservacion: responseData.estadoConservacion,
         estadoConstruccion: responseData.estadoConstruccion || 'TERMINADO',
         categoriaValorUnitario: responseData.categoriaValorUnitario || '',
         añoConstruccion: responseData.anioConstruccion || parseInt(datosParaEnviar.fechaConstruccion.split('-')[0]),

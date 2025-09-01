@@ -76,6 +76,7 @@ const DireccionesPage: React.FC = () => {
     crearDireccion,
     actualizarDireccion,
     eliminarDireccion,
+    buscarPorNombreVia,
     
     // Handlers
     handleSectorChange,
@@ -172,16 +173,27 @@ const DireccionesPage: React.FC = () => {
     }
   }, [eliminarDireccion, cargarDirecciones, showMessage]);
 
-  // Manejo de búsqueda
+  // Manejo de búsqueda con query params para la nueva API
   const handleBuscar = useCallback(async (searchValue: string) => {
-    if (searchValue.trim()) {
-      // Por ahora solo filtramos localmente
-      // TODO: Implementar búsqueda en el servidor cuando esté disponible
-      console.log('Buscando:', searchValue);
-    } else {
-      await cargarDirecciones();
+    try {
+      if (searchValue.trim()) {
+        console.log('🔍 Buscando direcciones con API listarDireccionPorNombreVia:', searchValue);
+        
+        // Usar la nueva función de búsqueda por nombre de vía
+        await buscarPorNombreVia(searchValue.trim());
+        
+        console.log('✅ Búsqueda completada');
+        showMessage(`🔍 Búsqueda completada: "${searchValue}"`, 'success');
+      } else {
+        // Si no hay término de búsqueda, cargar todas las direcciones
+        await cargarDirecciones();
+        showMessage('📋 Mostrando todas las direcciones', 'success');
+      }
+    } catch (error) {
+      console.error('❌ Error en búsqueda:', error);
+      showMessage('Error al realizar la búsqueda', 'error');
     }
-  }, [cargarDirecciones]);
+  }, [buscarPorNombreVia, cargarDirecciones, showMessage]);
 
   // Wrapper síncrono para la búsqueda del componente
   const handleBuscarSync = useCallback((searchTerm: string) => {
@@ -203,6 +215,8 @@ const DireccionesPage: React.FC = () => {
 
   // Función para manejar la selección desde la lista
   const handleSeleccionarDireccion = useCallback((direccion: any) => {
+    console.log('🎯 [DireccionesPage] Dirección seleccionada desde lista:', direccion);
+    console.log('🎯 [DireccionesPage] Estableciendo modo edición a true');
     setDireccionSeleccionada(direccion);
     setModoEdicion(true);
     setTabValue(0); // Cambiar al tab de formulario al seleccionar
@@ -211,37 +225,98 @@ const DireccionesPage: React.FC = () => {
   return (
     <MainLayout title="Gestión de Direcciones">
       <Box sx={{ p: 3 }}>
-        {/* Breadcrumb */}
-        <Box sx={{ mb: 3 }}>
-          <Breadcrumb items={breadcrumbItems} />
-        </Box>
-
-        {/* Header */}
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          justifyContent="space-between"
-          alignItems={{ xs: 'stretch', sm: 'center' }}
-          spacing={2}
-          sx={{ mb: 3 }}
+        {/* Header mejorado con Material UI */}
+        <Paper 
+          elevation={0}
+          sx={{ 
+            p: { xs: 2, sm: 3 },
+            mb: 3,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)`,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+            borderRadius: 2
+          }}
         >
-          <Box>
-            <Typography variant="h4" component="h1" gutterBottom>
-              Gestión de Direcciones
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Administre las direcciones del sistema
-            </Typography>
+          <Breadcrumb items={breadcrumbItems} />
+          
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            gap: { xs: 2, sm: 3 },
+            mt: 2
+          }}>
+            {/* Icono principal */}
+            <Box sx={{
+              p: 1.5,
+              borderRadius: 2,
+              background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
+            }}>
+              <LocationIcon sx={{ fontSize: { xs: 28, sm: 32 } }} />
+            </Box>
+            
+            {/* Título y descripción */}
+            <Box sx={{ flex: 1 }}>
+              <Typography 
+                variant="h4" 
+                component="h1" 
+                sx={{ 
+                  fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' },
+                  fontWeight: 700,
+                  color: theme.palette.primary.dark,
+                  mb: 0.5
+                }}
+              >
+                Gestión de Direcciones
+              </Typography>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  color: theme.palette.text.secondary,
+                  fontSize: { xs: '0.875rem', sm: '1rem' }
+                }}
+              >
+                Administra las direcciones del sistema tributario municipal
+              </Typography>
+            </Box>
+            
+            {/* Estadísticas */}
+            <Stack 
+              direction="row" 
+              spacing={2}
+              sx={{ display: { xs: 'none', md: 'flex' } }}
+            >
+              <Chip
+                label={`Total: ${direcciones.length}`}
+                color="primary"
+                variant="filled"
+                size="medium"
+                sx={{ fontWeight: 600 }}
+              />
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={handleRecargar}
+                disabled={loading}
+                size="small"
+                sx={{
+                  borderColor: theme.palette.primary.main,
+                  color: theme.palette.primary.main,
+                  '&:hover': {
+                    borderColor: theme.palette.primary.dark,
+                    backgroundColor: alpha(theme.palette.primary.main, 0.04)
+                  }
+                }}
+              >
+                Recargar
+              </Button>
+            </Stack>
           </Box>
-
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={handleRecargar}
-            disabled={loading}
-          >
-            Recargar
-          </Button>
-        </Stack>
+        </Paper>
 
         {/* Progress bar */}
         {loading && (
@@ -274,14 +349,18 @@ const DireccionesPage: React.FC = () => {
         </Collapse>
 
         {/* Contenedor principal con tabs */}
-        <Paper 
-          elevation={2}
-          sx={{ 
-            borderRadius: 2,
-            overflow: 'hidden',
-            border: `1px solid ${theme.palette.divider}`,
-          }}
-        >
+        <Box sx={{ 
+          maxWidth: { xs: '100%', sm: '100%', md: '90%', lg: '1200px' }, 
+          mx: 'auto' 
+        }}>
+          <Paper 
+            elevation={2}
+            sx={{ 
+              borderRadius: 2,
+              overflow: 'hidden',
+              border: `1px solid ${theme.palette.divider}`,
+            }}
+          >
           {/* Header con tabs */}
           <Box sx={{ 
             bgcolor: alpha(theme.palette.primary.main, 0.04),
@@ -291,7 +370,12 @@ const DireccionesPage: React.FC = () => {
               value={tabValue}
               onChange={handleTabChange}
               aria-label="direccion tabs"
+              variant="standard"
               sx={{
+                '& .MuiTabs-flexContainer': {
+                  justifyContent: 'flex-start',
+                  gap: 0
+                },
                 '& .MuiTab-root': {
                   minHeight: 64,
                   textTransform: 'none',
@@ -313,6 +397,14 @@ const DireccionesPage: React.FC = () => {
                 label={modoEdicion ? 'Editar Dirección' : 'Nueva Dirección'}
                 id="direccion-tab-0"
                 aria-controls="direccion-tabpanel-0"
+                sx={{
+                  minWidth: { xs: 'auto', sm: 'auto' },
+                  padding: { xs: '12px 8px', sm: '12px 10px' },
+                  fontSize: { xs: '0.875rem', sm: '0.875rem' },
+                  '& .MuiTab-iconWrapper': {
+                    marginRight: { xs: 0.3, sm: 0.4 }
+                  }
+                }}
               />
               <Tab 
                 icon={<ListIcon />} 
@@ -320,6 +412,14 @@ const DireccionesPage: React.FC = () => {
                 label="Lista de Direcciones" 
                 id="direccion-tab-1"
                 aria-controls="direccion-tabpanel-1"
+                sx={{
+                  minWidth: { xs: 'auto', sm: 'auto' },
+                  padding: { xs: '12px 8px', sm: '12px 10px' },
+                  fontSize: { xs: '0.875rem', sm: '0.875rem' },
+                  '& .MuiTab-iconWrapper': {
+                    marginRight: { xs: 0.3, sm: 0.4 }
+                  }
+                }}
               />
             </Tabs>
           </Box>
@@ -337,6 +437,7 @@ const DireccionesPage: React.FC = () => {
                 onSubmit={handleGuardar}
                 onNuevo={handleNuevo}
                 onEditar={handleEditar}
+                onDelete={handleEliminar}
                 onSectorChange={handleSectorChange}
                 onBarrioChange={handleBarrioChange}
                 loading={loading}
@@ -363,6 +464,7 @@ const DireccionesPage: React.FC = () => {
             </Box>
           </TabPanel>
         </Paper>
+        </Box>
 
         {/* Contenedor de notificaciones */}
         <NotificationContainer />

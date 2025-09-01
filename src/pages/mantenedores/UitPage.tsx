@@ -4,32 +4,18 @@ import {
   Box,
   Typography,
   Stack,
-  Alert,
-  Button,
   Paper,
   useTheme,
   alpha,
-  Grid,
-  Card,
-  CardContent,
-  Chip,
   CircularProgress,
-  Divider,
-  Fade,
   Container,
   Tabs,
   Tab
 } from '@mui/material';
 import {
-  Refresh as RefreshIcon,
   AccountBalance as AccountBalanceIcon,
   Calculate as CalculateIcon,
-  TrendingUp as TrendingUpIcon,
-  AttachMoney as MoneyIcon,
-  Info as InfoIcon,
-  CalendarToday as CalendarIcon,
-  List as ListIcon,
-  Assignment as AssignmentIcon
+  List as ListIcon
 } from '@mui/icons-material';
 import { MainLayout } from '../../layout';
 import { Breadcrumb, NotificationContainer } from '../../components';
@@ -45,29 +31,24 @@ import { UITData } from '../../services/uitService';
  */
 const UitPage: React.FC = () => {
   const theme = useTheme();
-  const [showInfo, setShowInfo] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
   
   // Usar el hook personalizado para acceder a toda la lógica de UIT
   const {
     uits,
     uitSeleccionada,
-    uitVigente,
     loading,
-    error,
     cargarUITs,
     crearUIT,
     actualizarUIT,
     eliminarUIT,
     seleccionarUIT,
-    calcularMontoUIT,
     obtenerEstadisticas,
     anioSeleccionado,
     setAnioSeleccionado
   } = useUIT();
 
-  const [estadisticas, setEstadisticas] = useState<any>(null);
-  const [loadingStats, setLoadingStats] = useState(false);
+  const [setEstadisticas] = useState<any>(null);
   const [modoEdicion, setModoEdicion] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
 
@@ -113,26 +94,6 @@ const UitPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [obtenerEstadisticas, isInitialized]);
 
-  // Manejar actualización
-  const handleRefresh = async () => {
-    try {
-      await cargarUITs();
-      const stats = await obtenerEstadisticas();
-      setEstadisticas(stats);
-      NotificationService.success('Datos actualizados correctamente');
-    } catch (err) {
-      NotificationService.info('Mostrando datos de demostración');
-    }
-  };
-
-  // Formatear moneda
-  const formatCurrency = (value: number): string => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-      minimumFractionDigits: 2
-    }).format(value);
-  };
 
   // Manejar guardado
   const handleGuardar = async (datos: any) => {
@@ -158,22 +119,33 @@ const UitPage: React.FC = () => {
 
   // Manejar edición
   const handleEditar = (uit: UITData) => {
+    console.log('🎯 [UitPage] Editando UIT:', uit);
     seleccionarUIT(uit);
     setModoEdicion(true);
+    setActiveTab(0); // Cambiar al tab del formulario UIT-EPA
+    NotificationService.info('UIT seleccionada para edición');
   };
 
-  // Manejar eliminación - Funcionalidad disponible pero no expuesta en la UI de lista
-  // const handleEliminar = async (id: number) => {
-  //   if (window.confirm('¿Está seguro de eliminar este valor UIT?')) {
-  //     try {
-  //       await eliminarUIT(id);
-  //       NotificationService.success('UIT eliminada correctamente');
-  //     } catch (error) {
-  //       console.error('Error al eliminar:', error);
-  //       NotificationService.error('Error al eliminar la UIT');
-  //     }
-  //   }
-  // };
+  // Manejar eliminación
+  const handleEliminar = async (id: number) => {
+    try {
+      console.log('🗑️ [UitPage] Eliminando UIT con ID:', id);
+      await eliminarUIT(id);
+      
+      // Limpiar selección después de eliminar
+      seleccionarUIT(null);
+      setModoEdicion(false);
+      
+      // Recargar estadísticas
+      const stats = await obtenerEstadisticas();
+      setEstadisticas(stats);
+      
+      NotificationService.success('UIT eliminada correctamente');
+    } catch (error) {
+      console.error('❌ [UitPage] Error al eliminar:', error);
+      NotificationService.error('Error al eliminar la UIT');
+    }
+  };
 
   // Manejar nuevo
   const handleNuevo = () => {
@@ -182,7 +154,7 @@ const UitPage: React.FC = () => {
   };
 
   // Manejar cambio de tab
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
 
@@ -311,6 +283,7 @@ const UitPage: React.FC = () => {
                 uitSeleccionada={uitSeleccionada}
                 onGuardar={handleGuardar}
                 onNuevo={handleNuevo}
+                onEliminar={handleEliminar}
                 modoEdicion={modoEdicion}
                 loading={loading}
                 anioSeleccionado={anioSeleccionado || new Date().getFullYear()}

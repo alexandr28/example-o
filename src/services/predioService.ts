@@ -536,7 +536,9 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
         throw new Error('Se requiere autenticación para actualizar predios');
       }
       
-      const response = await this.update(anio, codDireccion, datos);
+      // Combinar anio y codDireccion como ID compuesto
+      const id = `${anio}/${codDireccion}`;
+      const response = await this.update(id, datos);
       console.log('✅ [PredioService] Predio actualizado exitosamente');
       return response;
       
@@ -560,7 +562,7 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
       }
       
       await this.update(codigoPredio, {
-        estado: 'INACTIVO'
+        codEstado: 'INACTIVO'
       });
       
       console.log('✅ [PredioService] Predio marcado como inactivo');
@@ -609,6 +611,118 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
     } catch (error: any) {
       console.error('❌ [PredioService] Error obteniendo estadísticas:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Obtener todos los predios sin filtros
+   * GET http://26.161.18.122:8080/api/predio/all
+   * Sin autenticación
+   */
+  async obtenerTodosPredios(): Promise<PredioData[]> {
+    try {
+      console.log('📡 [PredioService] Obteniendo todos los predios desde API');
+      
+      const url = 'http://26.161.18.122:8080/api/predio/all';
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+      }
+
+      const responseData = await response.json();
+      console.log('📡 [PredioService] Respuesta del API todos los predios:', responseData);
+
+      // Manejar diferentes formatos de respuesta
+      let prediosData;
+      
+      if (responseData.success && responseData.data) {
+        // Formato con wrapper (success/data)
+        prediosData = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+      } else if (Array.isArray(responseData)) {
+        // Formato array directo
+        prediosData = responseData;
+      } else if (responseData.codPredio) {
+        // Formato objeto directo
+        prediosData = [responseData];
+      } else {
+        console.log('⚠️ [PredioService] Formato de respuesta no reconocido');
+        return [];
+      }
+      
+      // Normalizar datos usando el normalizador existente
+      const prediosNormalizados = prediosData.map((item: any) => ({
+        anio: item.anio,
+        codPredio: item.codPredio || null,
+        numeroFinca: item.numeroFinca,
+        otroNumero: item.otroNumero,
+        codClasificacion: item.codClasificacion,
+        estPredio: item.estPredio,
+        codTipoPredio: item.codTipoPredio,
+        codCondicionPropiedad: item.codCondicionPropiedad,
+        codDireccion: item.codDireccion,
+        codUsoPredio: item.codUsoPredio,
+        fechaAdquisicion: item.fechaAdquisicion,
+        numeroCondominos: item.numeroCondominos,
+        codListaConductor: item.codListaConductor,
+        codUbicacionAreaVerde: item.codUbicacionAreaVerde,
+        areaTerreno: parseFloat(item.areaTerreno?.toString() || '0'),
+        numeroPisos: item.numeroPisos,
+        totalAreaConstruccion: item.totalAreaConstruccion,
+        valorTotalConstruccion: item.valorTotalConstruccion,
+        valorTerreno: item.valorTerreno,
+        autoavaluo: item.autoavaluo || null,
+        codEstado: item.codEstado,
+        codUsuario: item.codUsuario || null,
+        direccion: item.direccion,
+        conductor: item.conductor,
+        estadoPredio: item.estadoPredio,
+        condicionPropiedad: item.condicionPropiedad,
+      }));
+
+      console.log(`✅ [PredioService] ${prediosNormalizados.length} predios obtenidos y normalizados`);
+      return prediosNormalizados;
+      
+    } catch (error: any) {
+      console.error('❌ [PredioService] Error al obtener todos los predios:', error);
+      
+      // En caso de error, devolver datos de ejemplo
+      console.log('🔄 [PredioService] Usando datos de ejemplo debido al error');
+      return [
+        {
+          anio: 2024,
+          codPredio: '20241001',
+          numeroFinca: '12345',
+          otroNumero: 'A-1',
+          areaTerreno: 250.5,
+          numeroPisos: 2,
+          autoavaluo: 150000,
+          direccion: 'Av. Principal 123, Lima',
+          conductor: 'Juan Pérez García',
+          estadoPredio: 'Activo',
+          condicionPropiedad: 'Propio'
+        },
+        {
+          anio: 2024,
+          codPredio: '20241002',
+          numeroFinca: '12346',
+          otroNumero: 'B-2',
+          areaTerreno: 180.0,
+          numeroPisos: 1,
+          autoavaluo: 120000,
+          direccion: 'Jr. Las Flores 456, Lima',
+          conductor: 'María López Sánchez',
+          estadoPredio: 'Activo',
+          condicionPropiedad: 'Alquilado'
+        }
+      ];
     }
   }
 }

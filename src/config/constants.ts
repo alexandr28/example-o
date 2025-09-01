@@ -1,6 +1,6 @@
 // src/config/constants.ts
 // URL base de la API - mantenemos por compatibilidad con código existente
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://26.161.18.122:8080';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://26.161.18.122:8085';
 export const API_PREFIX = '';
 
 // Definir explícitamente AUTH_ENDPOINTS

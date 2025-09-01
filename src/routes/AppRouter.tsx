@@ -29,6 +29,9 @@ import {
   ConsultaAsignacionPage
 } from '../pages';
 
+// Importar página de cuenta corriente
+import CuentaConsultaPage from '../pages/cuenta/CuentaConsultaPage';
+
 // Providers y contextos
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
@@ -155,7 +158,7 @@ const AppRouter: React.FC = () => {
                   } />
                   <Route path="/cuenta-corriente/consulta" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <CuentaConsultaPage />
                     </ProtectedRoute>
                   } />
 
@@ -209,11 +212,7 @@ const AppRouter: React.FC = () => {
                       <SectoresPage />
                     </ProtectedRoute>
                   } />
-                  <Route path="/mantenedores/calles" element={
-                    <ProtectedRoute>
-                      <CallePage />
-                    </ProtectedRoute>
-                  } />
+                  
                   <Route path="/mantenedores/barrios" element={
                     <ProtectedRoute>
                       <BarriosPage />
@@ -222,6 +221,11 @@ const AppRouter: React.FC = () => {
                   <Route path="/mantenedores/direcciones" element={
                     <ProtectedRoute>
                       <DireccionesPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/mantenedores/calles" element={
+                    <ProtectedRoute>
+                      <CallePage />
                     </ProtectedRoute>
                   } />
                   

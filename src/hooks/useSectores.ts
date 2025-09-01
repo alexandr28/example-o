@@ -5,21 +5,23 @@ import sectorService from '../services/sectorService';
 import { NotificationService } from '../components/utils/Notification';
 
 // Tipos del servicio
-import type { SectorData, CreateSectorDTO } from '../services/sectorService';
+import type { SectorData, CuadranteData } from '../services/sectorService';
 
 /**
  * Adaptador para convertir SectorData (servicio) a Sector (modelo)
  */
 const adaptSectorDataToModel = (data: SectorData): Sector => {
   return {
-    id: data.codigo,  // Mapear codigo a id
-    nombre: data.nombre,
-    descripcion: data.descripcion,
-    estado: data.estado || 'ACTIVO',
-    fechaRegistro: data.fechaRegistro,
-    fechaModificacion: data.fechaModificacion,
-    usuarioCreacion: data.codUsuario?.toString(),
-    usuarioModificacion: data.codUsuario?.toString()
+    id: data.codSector,  // Mapear codSector a id
+    nombre: data.nombreSector,
+    cuadrante: data.cuadrante,
+    nombreCuadrante: data.nombreCuadrante || (data.cuadrante ? `Cuadrante ${data.cuadrante}` : undefined),
+    descripcion: '',
+    estado: 'ACTIVO', // Por defecto activo ya que no hay estado en API
+    fechaCreacion: new Date().toISOString(),
+    fechaModificacion: undefined,
+    usuarioCreacion: undefined,
+    usuarioModificacion: undefined
   };
 };
 
@@ -34,6 +36,8 @@ export const useSectores = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [modoEdicion, setModoEdicion] = useState(false);
+  const [cuadrantes, setCuadrantes] = useState<CuadranteData[]>([]);
+  const [loadingCuadrantes, setLoadingCuadrantes] = useState(false);
   
   // Estado para modo offline
   const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
@@ -113,7 +117,7 @@ export const useSectores = () => {
       // Usar búsqueda local por ahora
       const todosSectores = await sectorService.getAll();
       const filtrados = todosSectores.filter(sector => 
-        sector.nombre.toLowerCase().includes(term.toLowerCase())
+        sector.nombreSector.toLowerCase().includes(term.toLowerCase())
       );
       
       const sectoresAdaptados = filtrados.map(adaptSectorDataToModel);
@@ -163,8 +167,8 @@ export const useSectores = () => {
         const resultado = await sectorService.actualizarSector(
           sectorSeleccionado.id, 
           {
-            nombre: data.nombre.trim(),
-            descripcion: data.descripcion?.trim() || ''
+            nombreSector: data.nombre.trim(),
+            cuadrante: data.cuadrante || null
           }
         );
         
@@ -176,14 +180,14 @@ export const useSectores = () => {
         console.log('➕ [useSectores] Creando nuevo sector');
         
         const resultado = await sectorService.crearSector({
-          nombre: data.nombre.trim(),
-          descripcion: data.descripcion?.trim() || ''
+          nombreSector: data.nombre.trim(),
+          cuadrante: data.cuadrante || null
         });
         
         console.log('✅ [useSectores] Sector creado:', resultado);
         
         // Verificar si se creó con éxito (incluso con ID temporal)
-        if (resultado && resultado.codigo) {
+        if (resultado && resultado.codSector) {
           NotificationService.success('Sector creado correctamente');
         }
       }
@@ -241,8 +245,10 @@ export const useSectores = () => {
       
       setLoading(true);
       
-      // Cambiar estado a INACTIVO en lugar de eliminar
-      await sectorService.update(id, { estado: 'INACTIVO' });
+      // Nota: La nueva API no tiene eliminación lógica
+      // Por ahora solo mostramos el mensaje
+      console.log('Eliminación no implementada en la nueva API');
+      throw new Error('La eliminación de sectores no está disponible en la nueva versión del API');
       
       NotificationService.success('Sector eliminado correctamente');
       
@@ -281,6 +287,33 @@ export const useSectores = () => {
   }, [cargarSectores]);
 
   /**
+   * Cargar todos los cuadrantes
+   */
+  const cargarCuadrantes = useCallback(async () => {
+    try {
+      setLoadingCuadrantes(true);
+      
+      console.log('📋 [useSectores] Cargando cuadrantes...');
+      
+      const cuadrantesData = await sectorService.obtenerCuadrantes();
+      
+      setCuadrantes(cuadrantesData);
+      
+      console.log(`✅ [useSectores] ${cuadrantesData.length} cuadrantes cargados`);
+      
+    } catch (error: any) {
+      console.error('❌ [useSectores] Error al cargar cuadrantes:', error);
+      
+      if (!isOfflineMode) {
+        NotificationService.error('Error al cargar cuadrantes');
+      }
+      
+    } finally {
+      setLoadingCuadrantes(false);
+    }
+  }, [isOfflineMode]);
+
+  /**
    * Forzar modo online (para testing)
    */
   const forzarModoOnline = useCallback(async () => {
@@ -288,10 +321,11 @@ export const useSectores = () => {
     await cargarSectores();
   }, [cargarSectores]);
 
-  // Cargar sectores al montar
+  // Cargar sectores y cuadrantes al montar
   useEffect(() => {
     cargarSectores();
-  }, [cargarSectores]);
+    cargarCuadrantes();
+  }, [cargarSectores, cargarCuadrantes]);
 
   return {
     // Estados
@@ -303,9 +337,12 @@ export const useSectores = () => {
     isOfflineMode,
     searchTerm,
     lastSyncTime,
+    cuadrantes,
+    loadingCuadrantes,
     
     // Funciones
     cargarSectores,
+    cargarCuadrantes,
     buscarSectores,
     seleccionarSector,
     limpiarSeleccion,

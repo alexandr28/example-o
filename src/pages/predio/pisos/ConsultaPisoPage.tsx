@@ -92,6 +92,43 @@ const ConsultaPisoPage: React.FC = () => {
             </Breadcrumbs>
           </Box>
 
+          {/* Header opcional */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              mb: 3,
+              background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.primary.main, 0.03)} 100%)`,
+              borderRadius: 2,
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+            }}
+          >
+            <Stack direction="row" alignItems="center" spacing={2}>
+              <Box
+                sx={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'primary.main'
+                }}
+              >
+                <LayersIcon fontSize="medium" />
+              </Box>
+              <Box>
+                <Typography variant="h5" fontWeight="bold" color="text.primary">
+                  Consulta de Pisos
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Consulte y gestione los pisos registrados usando filtros avanzados
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+
           {/* Componente de consulta */}
           <ConsultaPisos />
         </Box>

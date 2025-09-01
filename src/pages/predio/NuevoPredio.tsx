@@ -85,10 +85,8 @@ const NuevoPredio: FC = memo(() => {
     if (predioCreado) {
       console.log('✅ [NuevoPredio] Predio creado exitosamente:', predioCreado);
       
-      // Opcionalmente redirigir después de un pequeño delay
-      setTimeout(() => {
-        navigate('/predio');
-      }, 2000);
+      // La redirección se maneja en PredioForm después de guardar exitosamente
+      // No es necesario redirigir aquí
     }
   };
 

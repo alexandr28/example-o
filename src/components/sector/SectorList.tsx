@@ -14,8 +14,6 @@ import {
   InputAdornment,
   IconButton,
   Typography,
-  Chip,
-  CircularProgress,
   TableSortLabel,
   Menu,
   alpha,
@@ -57,6 +55,7 @@ interface HeadCell {
 const headCells: HeadCell[] = [
   { id: 'id', label: 'N°', sortable: true, align: 'center' },
   { id: 'nombre', label: 'Nombre del Sector', sortable: true },
+  { id: 'nombreCuadrante', label: 'Cuadrante', sortable: true },
   { id: 'acciones', label: 'Acciones', align: 'center' }
 ];
 
@@ -85,7 +84,7 @@ const SectorList: React.FC<SectorListProps> = ({
   // Estado para la columna por la que se ordena
   const [orderBy, setOrderBy] = useState<string>('nombre');
   // Estado para los sectores seleccionados
-  const [selected, setSelected] = useState<number[]>([]);
+  const [, setSelected] = useState<number[]>([]);
   // Estado para el menú contextual
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   // Estado para el sector seleccionado en el menú
@@ -192,14 +191,13 @@ const SectorList: React.FC<SectorListProps> = ({
     setAnchorEl(null);
   };
 
-  // Verificar si un sector está seleccionado
-  const isSelected = (id: number) => selected.indexOf(id) !== -1;
 
   // Skeleton rows para loading
   const renderSkeletonRows = () => {
     return Array.from({ length: 5 }).map((_, index) => (
       <TableRow key={`skeleton-${index}`}>
         <TableCell align="center"><Skeleton width={40} /></TableCell>
+        <TableCell><Skeleton /></TableCell>
         <TableCell><Skeleton /></TableCell>
         <TableCell align="center"><Skeleton width={40} /></TableCell>
       </TableRow>
@@ -208,69 +206,27 @@ const SectorList: React.FC<SectorListProps> = ({
 
   return (
     <Paper 
-      elevation={3} 
+      elevation={0} 
       sx={{ 
-        width: '100%',
-        minWidth: '800px',
+        width: { xs: '100%', sm: '100%', md: '90%', lg: '80%' },
+        minWidth: { xs: '100%', sm: '100%', md: '700px' },
         borderRadius: 2,
         background: 'linear-gradient(to bottom, #ffffff, #fafafa)',
         border: '1px solid',
-        borderColor: 'divider'
+        borderColor: 'divider',
+        mx: 'auto'
       }}
     >
-      <Stack spacing={2} sx={{ p: 2 }}>
+      <Stack spacing={2} sx={{ p: { xs: 1, sm: 2 } }}>
         {/* Header */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 2, 
-          pb: 2,
-          borderBottom: '2px solid',
-          borderColor: 'primary.main'
-        }}>
-          <Box sx={{
-            p: 1,
-            borderRadius: 1,
-            backgroundColor: 'primary.main',
-            color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <BusinessIcon />
-          </Box>
-          <Typography variant="h6" fontWeight={600}>
-            Lista de Sectores
-          </Typography>
-          <Box sx={{ flex: 1 }} />
-          <Chip
-            label={`Total: ${sectores.length}`}
-            color="primary"
-            variant="filled"
-            size="small"
-          />
-          <Chip
-            label={`Filtrados: ${filteredAndSortedSectores.length}`}
-            color="secondary"
-            variant="outlined"
-            size="small"
-          />
-          {isOfflineMode && (
-            <Chip
-              icon={<CloudOffIcon />}
-              label="Datos locales"
-              size="small"
-              color="warning"
-              variant="outlined"
-            />
-          )}
-        </Box>
+        
 
         {/* Barra de búsqueda expandida horizontalmente */}
         <Box sx={{ 
           display: 'flex', 
-          gap: 2,
-          alignItems: 'center',
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: { xs: 1, sm: 2 },
+          alignItems: { xs: 'stretch', sm: 'center' },
           width: '100%'
         }}>
           <TextField
@@ -320,21 +276,22 @@ const SectorList: React.FC<SectorListProps> = ({
         {/* Tabla expandida horizontalmente */}
         <TableContainer 
           component={Paper}
-          elevation={2}
+          elevation={0}
           sx={{ 
             width: '100%',
-            height: 400,
-            maxHeight: 400,
+            height: { xs: 300, sm: 350, md: 400 },
+            maxHeight: { xs: 300, sm: 350, md: 400 },
             borderRadius: 2,
             border: `1px solid ${theme.palette.divider}`,
-            overflow: 'auto',
+            overflowY: 'auto',
+            overflowX: 'hidden',
             position: 'relative',
             '& .MuiTable-root': {
-              minWidth: 750
+              minWidth: '100%',
+              width: '100%'
             },
             '&::-webkit-scrollbar': {
               width: 8,
-              height: 8,
             },
             '&::-webkit-scrollbar-track': {
               bgcolor: alpha(theme.palette.grey[200], 0.5),
@@ -350,24 +307,33 @@ const SectorList: React.FC<SectorListProps> = ({
           }}
         >
           <Table stickyHeader size="medium">
-            <TableHead>
-              <TableRow>
+            <TableHead sx={{ 
+              backgroundColor: '#f0f7ff',
+              opacity: 1
+            }}>
+              <TableRow sx={{ 
+                backgroundColor: '#f0f7ff'
+              }}>
                 {headCells.map((headCell) => (
                   <TableCell
                     key={headCell.id}
                     align={headCell.align || 'left'}
                     sx={{ 
                       fontWeight: 700,
-                      fontSize: '0.875rem',
-                      bgcolor: alpha(theme.palette.primary.main, 0.08),
+                      fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                      bgcolor: alpha(theme.palette.primary.main, 0.15),
+                      backgroundColor: '#f0f7ff',
                       color: theme.palette.primary.main,
                       borderBottom: `2px solid ${theme.palette.primary.main}`,
                       textTransform: 'uppercase',
-                      letterSpacing: 0.5,
-                      py: 2,
+                      letterSpacing: { xs: 0.3, sm: 0.5 },
+                      py: { xs: 1, sm: 1.5 },
+                      px: { xs: 0.5, sm: 1 },
                       position: 'sticky',
                       top: 0,
-                      zIndex: 1
+                      zIndex: 100,
+                      opacity: 1,
+                      display: 'table-cell'
                     }}
                   >
                     {headCell.sortable ? (
@@ -402,7 +368,7 @@ const SectorList: React.FC<SectorListProps> = ({
                 renderSkeletonRows()
               ) : paginatedSectores.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
                     <Box sx={{ 
                       display: 'flex', 
                       flexDirection: 'column', 
@@ -437,18 +403,11 @@ const SectorList: React.FC<SectorListProps> = ({
                     <Fade in={true} key={sector.id} timeout={300 + (index * 100)}>
                       <TableRow
                         hover
-                        onClick={() => {
-                          handleClick({} as React.MouseEvent<unknown>, sector.id);
-                          onSelectSector(sector);
-                        }}
                         selected={isItemSelected}
                         sx={{ 
-                          cursor: 'pointer',
                           transition: 'all 0.2s ease-in-out',
                           '&:hover': {
                             bgcolor: alpha(theme.palette.primary.main, 0.04),
-                            transform: 'translateY(-1px)',
-                            boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.15)}`,
                           },
                           '&.Mui-selected': {
                             bgcolor: alpha(theme.palette.primary.main, 0.12),
@@ -464,44 +423,44 @@ const SectorList: React.FC<SectorListProps> = ({
                       >
                         <TableCell 
                           align="center"
-                          sx={{ py: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}
+                          sx={{ py: 1.5, px: 1, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}
                         >
                           <Box
                             sx={{
                               display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              minWidth: 32,
-                              height: 32,
+                              minWidth: { xs: 28, sm: 32 },
+                              height: { xs: 28, sm: 32 },
                               borderRadius: '50%',
                               bgcolor: alpha(theme.palette.primary.main, 0.1),
                               color: theme.palette.primary.main,
                               fontWeight: 600,
-                              fontSize: '0.875rem'
+                              fontSize: { xs: '0.75rem', sm: '0.875rem' }
                             }}
                           >
                             {sector.id}
                           </Box>
                         </TableCell>
-                        <TableCell sx={{ py: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}>
+                        <TableCell sx={{ py: 1.5, px: 1, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}>
                           <Box sx={{ 
                             display: 'flex', 
                             alignItems: 'center', 
-                            gap: 1.5
+                            gap: 1
                           }}>
                             <Box
                               sx={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                width: 40,
-                                height: 40,
+                                width: 32,
+                                height: 32,
                                 borderRadius: 2,
                                 bgcolor: alpha(theme.palette.secondary.main, 0.1),
                                 color: theme.palette.secondary.main,
                               }}
                             >
-                              <BusinessIcon sx={{ fontSize: 20 }} />
+                              <BusinessIcon sx={{ fontSize: 18 }} />
                             </Box>
                             <Box>
                               <Typography 
@@ -526,24 +485,51 @@ const SectorList: React.FC<SectorListProps> = ({
                             </Box>
                           </Box>
                         </TableCell>
+                        <TableCell sx={{ py: 1.5, px: 1, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}>
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              color: theme.palette.text.secondary,
+                              fontStyle: sector.nombreCuadrante ? 'normal' : 'italic'
+                            }}
+                          >
+                            {sector.nombreCuadrante || 'Sin cuadrante'}
+                          </Typography>
+                        </TableCell>
                         <TableCell 
                           align="center"
-                          sx={{ py: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}
+                          sx={{ py: 1.5, px: 1, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}
                         >
                           {onEdit && (
                             <Tooltip title="Editar sector" arrow>
                               <IconButton
                                 size="small"
                                 color="primary"
+                                disabled={loading}
                                 onClick={(e) => {
+                                  e.preventDefault();
                                   e.stopPropagation();
-                                  onEdit(sector);
+                                  
+                                  // Ejecutar selección local para feedback visual inmediato
+                                  handleClick(e, sector.id);
+                                  
+                                  // Ejecutar edición pasando directamente el sector
+                                  // Esto evita cualquier dependencia del estado del padre
+                                  if (onEdit) {
+                                    onEdit(sector);
+                                  }
+                                  
+                                  // Actualizar selección en el padre para sincronización
+                                  onSelectSector(sector);
                                 }}
                                 sx={{
                                   bgcolor: alpha(theme.palette.primary.main, 0.08),
                                   '&:hover': {
                                     bgcolor: alpha(theme.palette.primary.main, 0.16),
                                     transform: 'scale(1.1)',
+                                  },
+                                  '&:disabled': {
+                                    bgcolor: alpha(theme.palette.grey[500], 0.08),
                                   },
                                   transition: 'all 0.2s ease-in-out'
                                 }}

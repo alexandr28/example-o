@@ -3,25 +3,21 @@ import React from 'react';
 import {
   Paper,
   Box,
-  Typography,
   TextField,
   InputAdornment,
-  Stack,
   useTheme,
   alpha,
-  Divider,
   Autocomplete,
   Button,
   CircularProgress
 } from '@mui/material';
 import {
-  AttachMoney as MoneyIcon,
   Category as CategoryIcon,
-  CalendarToday as CalendarIcon,
   Title as TitleIcon,
   Layers as LayersIcon,
   Save as SaveIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  Add as AddIcon
 } from '@mui/icons-material';
 import { CategoriaValorUnitario, SubcategoriaValorUnitario, LetraValorUnitario } from '../../models';
 
@@ -43,7 +39,9 @@ interface ValorUnitarioFormProps {
   costoValue: string;
   onRegistrar?: () => void;
   onEliminar?: () => void;
+  onNuevo?: () => void;
   isSubmitting?: boolean;
+  isEditMode?: boolean;
 }
 
 const ValorUnitarioForm: React.FC<ValorUnitarioFormProps> = ({
@@ -64,53 +62,17 @@ const ValorUnitarioForm: React.FC<ValorUnitarioFormProps> = ({
   costoValue,
   onRegistrar,
   onEliminar,
-  isSubmitting = false
+  onNuevo,
+  isSubmitting = false,
+  isEditMode = false
 }) => {
   const theme = useTheme();
 
-  // Convertir las opciones al formato esperado por SearchableSelect (solo value y label)
-  const añoOptions = años.map(año => ({
-    value: parseInt(año.value),
-    label: año.label
-  }));
 
-  const categoriaOptions = categorias.map(cat => ({
-    value: cat.value,
-    label: cat.label
-  }));
 
-  const subcategoriaOptions = subcategoriasDisponibles.map(sub => ({
-    value: sub.value,
-    label: sub.label
-  }));
 
-  const letraOptions = letras.map(letra => ({
-    value: letra.value,
-    label: letra.label
-  }));
 
   // Helpers para descripciones
-  function getCategoriaDescription(categoria: string): string {
-    switch (categoria) {
-      case 'Estructuras': return 'Componentes estructurales del inmueble';
-      case 'Acabados': return 'Elementos de terminación y acabado';
-      case 'Instalaciones Eléctricas y Sanitarias': return 'Sistemas eléctricos y sanitarios';
-      default: return '';
-    }
-  }
-
-  function getSubcategoriaDescription(subcategoria: string): string {
-    switch (subcategoria) {
-      case 'Muros y Columnas': return 'Elementos verticales estructurales';
-      case 'Techos': return 'Cubiertas y techumbres';
-      case 'Pisos': return 'Pavimentos y contrapisos';
-      case 'Puertas y Ventanas': return 'Aberturas y cerramientos';
-      case 'Revestimientos': return 'Acabados de superficies';
-      case 'Baños': return 'Aparatos y accesorios sanitarios';
-      case 'Instalaciones Eléctricas y Sanitarias': return 'Redes eléctricas y de agua';
-      default: return '';
-    }
-  }
 
   function getLetraDescription(letra: string): string {
     const descripciones: Record<string, string> = {
@@ -138,74 +100,34 @@ const ValorUnitarioForm: React.FC<ValorUnitarioFormProps> = ({
         borderColor: 'divider'
       }}
     >
-      {/* Header */}
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: 2, 
-        mb: 2,
-        pb: 2,
-        borderBottom: '2px solid',
-        borderColor: 'primary.main'
-      }}>
-        <Box sx={{
-          p: 1,
-          borderRadius: 1,
-          backgroundColor: 'primary.main',
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <CategoryIcon />
-        </Box>
-        <Typography variant="h6" fontWeight={600}>
-          Formulario de Valores Unitarios
-        </Typography>
-      </Box>
+      
 
-      {/* Fila única con todos los campos */}
+      {/* Primera fila con los campos del formulario */}
       <Box sx={{ 
         display: 'flex', 
         flexWrap: 'wrap', 
         gap: 2,
-        mb: 3,
+        mb: 2,
         alignItems: 'center'
       }}>
-        {/* Año */}
-        <Box sx={{ flex: '1 1 120px', minWidth: '120px' }}>
-          <Autocomplete
-            options={años}
-            getOptionLabel={(option) => option.label}
-            value={años.find(a => parseInt(a.value) === añoSeleccionado) || null}
-            onChange={(_, newValue) => {
-              onAñoChange(newValue ? parseInt(newValue.value) : null);
+        {/* Selector Año */}
+        <Box sx={{ 
+          flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '0 0 120px' },
+          minWidth: { xs: '100%', md: '120px' }
+        }}>
+          <TextField
+            fullWidth
+            size="small"
+            label="Año"
+            type="number"
+            value={añoSeleccionado || ''}
+            onChange={(e) => onAñoChange(parseInt(e.target.value) || null)}
+            InputProps={{
+              inputProps: { 
+                min: 1900, 
+                max: new Date().getFullYear() 
+              }
             }}
-            loading={loading}
-            disabled={loading}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Año *"
-                size="small"
-                placeholder="Seleccione año"
-                InputProps={{
-                  ...params.InputProps,
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <CalendarIcon sx={{ fontSize: 16 }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <>
-                      {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                      {params.InputProps.endAdornment}
-                    </>
-                  ),
-                  sx: { height: 40 }
-                }}
-              />
-            )}
           />
         </Box>
 
@@ -332,10 +254,10 @@ const ValorUnitarioForm: React.FC<ValorUnitarioFormProps> = ({
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <MoneyIcon sx={{ fontSize: 16 }} />
+                 S./
                 </InputAdornment>
               ),
-              endAdornment: <InputAdornment position="end">S/</InputAdornment>,
+             
               sx: { height: 40 }
             }}
             inputProps={{
@@ -345,55 +267,81 @@ const ValorUnitarioForm: React.FC<ValorUnitarioFormProps> = ({
             fullWidth
           />
         </Box>
+      </Box>
 
-        {/* Botones en la misma fila */}
-        <Box sx={{ 
-          display: 'flex', 
-
-         
-          flex: '0 0 100px',
-          maxWidth: '100px',
-        }}>
-          {onRegistrar && (
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-              onClick={onRegistrar}
-              disabled={loading || isSubmitting || !letraSeleccionada || !costoValue}
-              sx={{ 
-         
-                maxWidth: 100,
-                height: 40,
-                borderRadius: 2,
-                textTransform: 'none',
-                fontWeight: 600
-              }}
-            >
-              {isSubmitting ? 'Registrando...' : 'Registrar'}
-            </Button>
-          )}
-          
-          {onEliminar && (
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<DeleteIcon />}
-              onClick={onEliminar}
-              disabled={loading || isSubmitting}
-              sx={{ 
-                minWidth: 70,
-                maxWidth: 90,
-                height: 40,
-                borderRadius: 2,
-                textTransform: 'none',
-                fontWeight: 600
-              }}
-            >
-              Eliminar
-            </Button>
-          )}
-        </Box>
+      {/* Tercera fila: Botones */}
+      <Box sx={{ 
+        display: 'flex', 
+        gap: 1,
+        mt: 2,
+        justifyContent: 'flex-start',
+        alignItems: 'center'
+      }}>
+        {/* Botón Registrar */}
+        {onRegistrar && (
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+            onClick={onRegistrar}
+            disabled={loading || isSubmitting || !letraSeleccionada || !costoValue}
+            sx={{ 
+              minWidth: 100,
+              height: 40,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600
+            }}
+          >
+            {isSubmitting ? 'Guardando...' : 'Guardar'}
+          </Button>
+        )}
+        
+        {/* Botón Nuevo */}
+        {onNuevo && (
+          <Button
+            variant="outlined"
+            color="secondary"
+            startIcon={<AddIcon />}
+            onClick={onNuevo}
+            disabled={loading || isSubmitting}
+            sx={{ 
+              minWidth: 90,
+              height: 40,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600
+            }}
+          >
+            Nuevo
+          </Button>
+        )}
+        
+        {/* Botón Eliminar - Solo visible en modo edición */}
+        {isEditMode && onEliminar && (
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={onEliminar}
+            disabled={loading || isSubmitting}
+            sx={{ 
+              minWidth: 100,
+              height: 40,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              borderColor: 'error.main',
+              color: 'error.main',
+              '&:hover': {
+                borderColor: 'error.dark',
+                backgroundColor: alpha(theme.palette.error.main, 0.04)
+              }
+            }}
+          >
+            Eliminar
+          </Button>
+        )}
       </Box>
     </Paper>
   );

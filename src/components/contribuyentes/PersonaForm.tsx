@@ -1,5 +1,5 @@
 // src/components/contribuyentes/PersonaForm.tsx - ACTUALIZADO CON CONSTANTES DINÁMICAS
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Controller, UseFormReturn } from 'react-hook-form';
 import {
   Box,
@@ -7,18 +7,10 @@ import {
   Button,
   Typography,
   InputAdornment,
-  IconButton,
   Alert,
   useTheme,
   Paper,
-  Divider,
-  FormControl,
-  FormLabel,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
   Stack,
-  Tooltip,
   Skeleton,
   CircularProgress,
   Autocomplete
@@ -30,13 +22,9 @@ import {
   Business as BusinessIcon,
   Phone as PhoneIcon,
   LocationOn as LocationIcon,
-  Home as HomeIcon,
-  Clear as ClearIcon,
   CalendarMonth as CalendarIcon,
   FamilyRestroom as FamilyRestroomIcon,
-  AccountBalance as AccountBalanceIcon,
-  Warning as WarningIcon,
-  Save as SaveIcon
+  Warning as WarningIcon
 } from '@mui/icons-material';
 // import SearchableSelect from '../ui/SearchableSelect'; // Reemplazado por Autocomplete
 import { 
@@ -53,7 +41,7 @@ interface PersonaFormProps {
   isRepresentante?: boolean;
   onOpenDireccionModal: () => void;
   direccion: any;
-  getDireccionTextoCompleto: (direccion: any, nFinca: string, otroNumero?: string) => string;
+  getDireccionTextoCompleto: (direccion: any, nFinca?: string, otroNumero?: string) => string;
   disablePersonaFields?: boolean;
   onGuardar?: (data: { persona: any; contribuyente?: any }) => void | Promise<void>;
   showGuardarButton?: boolean;
@@ -62,28 +50,23 @@ interface PersonaFormProps {
 const PersonaFormMUI: React.FC<PersonaFormProps> = ({
   form,
   isJuridica = false,
-  isRepresentante = false,
   onOpenDireccionModal,
   direccion,
   getDireccionTextoCompleto,
   disablePersonaFields = false,
-  onGuardar,
-  showGuardarButton = true
 }) => {
   const theme = useTheme();
-  const { control, watch, setValue, formState: { errors }, handleSubmit } = form;
+  const { control, watch, formState: { errors } } = form;
 
   const nFinca = watch('nFinca');
   const otroNumero = watch('otroNumero');
   const tipoDocumento = watch('tipoDocumento');
 
   // Hook para gestión de personas
-  const { crearPersonaDesdeFormulario, loadingCrear, error: errorPersona } = usePersonas();
+  const { error: errorPersona } = usePersonas();
   
   // Hook para gestión de contribuyentes
   const { 
-    crearContribuyenteDesdePersona, 
-    loading: loadingContribuyente, 
     error: errorContribuyente 
   } = useContribuyentes();
 
@@ -176,76 +159,14 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
     }
   };
 
-  // Función para manejar el guardado (persona + contribuyente)
-  const handleGuardar = async (datosFormulario: any) => {
-    try {
-      console.log('💾 [PersonaForm] Iniciando guardado:', datosFormulario);
-
-      // Validar datos requeridos
-      if (!datosFormulario.numeroDocumento || !datosFormulario.tipoDocumento) {
-        throw new Error('Número de documento y tipo de documento son requeridos');
-      }
-
-      if (!isJuridica && !datosFormulario.nombres) {
-        throw new Error('El nombre es requerido para personas naturales');
-      }
-
-      if (isJuridica && !datosFormulario.razonSocial) {
-        throw new Error('La razón social es requerida para personas jurídicas');
-      }
-
-      if (!direccion) {
-        throw new Error('Debe seleccionar una dirección');
-      }
-
-      // Agregar datos adicionales al formulario
-      const datosCompletos = {
-        ...datosFormulario,
-        isJuridica,
-        direccion,
-        nFinca,
-        otroNumero
-      };
-
-      console.log('📋 [PersonaForm] Datos completos para enviar:', datosCompletos);
-
-      // PASO 1: Crear la persona
-      const personaCreada = await crearPersonaDesdeFormulario(datosCompletos);
-
-      if (personaCreada) {
-        console.log('✅ [PersonaForm] Persona creada exitosamente:', personaCreada);
-        
-        // PASO 2: Crear contribuyente automáticamente
-        console.log('🔄 [PersonaForm] Creando contribuyente automáticamente...');
-        
-        const contribuyenteCreado = await crearContribuyenteDesdePersona(personaCreada, datosCompletos);
-        
-        if (contribuyenteCreado) {
-          console.log('✅ [PersonaForm] Contribuyente creado exitosamente:', contribuyenteCreado);
-        }
-        
-        // PASO 3: Llamar al callback con ambos objetos
-        if (onGuardar) {
-          await onGuardar({
-            persona: personaCreada,
-            contribuyente: contribuyenteCreado
-          });
-        }
-      }
-
-    } catch (error: any) {
-      console.error('❌ [PersonaForm] Error al guardar:', error);
-      // El error ya se maneja en los hooks con NotificationService
-    }
-  };
 
   return (
     <Box sx={{ Width: '100%' }}>
       <Paper 
         elevation={0} 
         sx={{ 
-          p: 1.5, 
-          borderRadius: 2,
+          p: { xs: 1, sm: 1.5 }, 
+          borderRadius: { xs: 1, sm: 2 },
           border: `1px solid ${theme.palette.divider}`,
           backgroundColor: theme.palette.background.paper
         }}
@@ -258,17 +179,27 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
           </Alert>
         )}
 
-        <Stack spacing={1.5}>
+        <Stack spacing={{ xs: 1, sm: 1.5 }}>
           {/* Primera fila - Tipo Doc, Número Doc, Nombres/Razón Social */}
-          <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <Box sx={{ 
+            display: 'flex', 
+            gap: { xs: 1, sm: 1.5 }, 
+            flexWrap: 'wrap', 
+            alignItems: 'flex-start',
+            flexDirection: { xs: 'column', sm: 'row' }
+          }}>
             {/* Tipo de Documento */}
-            <Box sx={{ flex: '0 0 120px' }}>
+            <Box sx={{ 
+              flex: { xs: '1 1 100%', sm: '0 0 205px' },
+              width: { xs: '100%', sm: 'auto' }
+            }}>
               {loadingTipoDoc ? (
                 <Skeleton variant="rounded" height={40} />
               ) : (
                 <Controller
                   name="tipoDocumento"
                   control={control}
+                  rules={{ required: 'Tipo de documento es requerido' }}
                   render={({ field }) => (
                     <Autocomplete
                       {...field}
@@ -283,7 +214,6 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
                           {...params}
                           label="Tipo Documento"
                           placeholder="Seleccione tipo"
-                          required
                           error={!!errors.tipoDocumento || !!errorTipoDoc}
                           helperText={
                             (errors.tipoDocumento?.message as string) ||
@@ -307,7 +237,10 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
             </Box>
 
             {/* Número de Documento */}
-            <Box sx={{ flex: '0 0 120px' }}>
+            <Box sx={{ 
+              flex: { xs: '1 1 100%', sm: '0 0 120px' },
+              width: { xs: '100%', sm: 'auto' }
+            }}>
               <Controller
                 name="numeroDocumento"
                 control={control}
@@ -329,8 +262,18 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
                     error={!!errors.numeroDocumento}
                     helperText={String(errors.numeroDocumento?.message || '')}
                     sx={fieldStyles}
+                    onChange={(e) => {
+                      // Solo permitir números
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      // Limitar a 8 dígitos para DNI, 11 para RUC
+                      const maxLength = tipoDocumento === '4102' ? 11 : 8;
+                      const truncatedValue = value.slice(0, maxLength);
+                      field.onChange(truncatedValue);
+                    }}
                     inputProps={{
-                      maxLength: getDocumentoMaxLength()
+                      maxLength: getDocumentoMaxLength(),
+                      inputMode: 'numeric',
+                      pattern: '[0-9]*'
                     }}
                     InputProps={{
                       startAdornment: (
@@ -345,11 +288,21 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
             </Box>
 
             {/* Nombres o Razón Social */}
-            <Box sx={{ flex: '1 1 160px', maxWidth: '200px' }}>
+            <Box sx={{ 
+              flex: { xs: '1 1 100%', sm: '1 1 160px' },
+              maxWidth: { xs: '100%', sm: '200px' },
+              width: { xs: '100%', sm: 'auto' }
+            }}>
               <Controller
                 name={isJuridica ? 'razonSocial' : 'nombres'}
                 control={control}
-                rules={{ required: 'Este campo es requerido' }}
+                rules={{ 
+                  required: 'Este campo es requerido',
+                  pattern: isJuridica ? undefined : {
+                    value: /^[a-zA-ZÁÉÍÓÚáéíóúÑñ\s]*$/,
+                    message: 'Solo se permiten letras'
+                  }
+                }}
                 render={({ field }) => (
                   <TextField
                     {...field}
@@ -361,6 +314,16 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
                     error={!!errors[isJuridica ? 'razonSocial' : 'nombres']}
                     helperText={String((errors as any)[isJuridica ? 'razonSocial' : 'nombres']?.message || '')}
                     sx={fieldStyles}
+                    onChange={(e) => {
+                      if (!isJuridica) {
+                        // Solo permitir letras para nombres de persona natural
+                        const value = e.target.value.replace(/[^a-zA-ZÁÉÍÓÚáéíóúÑñ\s]/g, '');
+                        field.onChange(value);
+                      } else {
+                        // Para razón social permitir letras, números y algunos caracteres especiales
+                        field.onChange(e.target.value);
+                      }
+                    }}
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
@@ -376,14 +339,23 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
               />
             </Box>
 
-            {/* Para Persona Jurídica: mostrar campos adicionales en primera fila */}
+            {/* Para Persona Jurídica: mostrar teléfono en primera fila */}
             {isJuridica && (
               <>
                 {/* Teléfono */}
-                <Box sx={{ flex: '0 0 120px' }}>
+                <Box sx={{ 
+                  flex: { xs: '1 1 100%', sm: '0 0 120px' },
+                  width: { xs: '100%', sm: 'auto' }
+                }}>
                   <Controller
                     name="telefono"
                     control={control}
+                    rules={{
+                      pattern: {
+                        value: /^[0-9]{0,9}$/,
+                        message: 'Teléfono inválido (máximo 9 dígitos)'
+                      }
+                    }}
                     render={({ field }) => (
                       <TextField
                         {...field}
@@ -395,6 +367,18 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
                         error={!!errors.telefono}
                         helperText={String(errors.telefono?.message || '')}
                         sx={fieldStyles}
+                        onChange={(e) => {
+                          // Solo permitir números
+                          const value = e.target.value.replace(/[^0-9]/g, '');
+                          // Limitar a 9 dígitos (formato celular peruano)
+                          const truncatedValue = value.slice(0, 9);
+                          field.onChange(truncatedValue);
+                        }}
+                        inputProps={{
+                          maxLength: 9,
+                          inputMode: 'tel',
+                          pattern: '[0-9]*'
+                        }}
                         InputProps={{
                           startAdornment: (
                             <InputAdornment position="start">
@@ -406,65 +390,6 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
                     )}
                   />
                 </Box>
-
-                {/* Botón Seleccionar/Cambiar */}
-                <Box sx={{ display: 'flex', alignItems: 'flex-end', height: '100%' }}>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={onOpenDireccionModal}
-                    disabled={disablePersonaFields}
-                    startIcon={<LocationIcon sx={{ fontSize: 16 }} />}
-                    sx={{ 
-                      fontSize: '0.75rem',
-                      height: '32px',
-                      minHeight: '32px',
-                      minWidth: '120px',
-                      px: 2,
-                      marginTop: '5px'
-                    }}
-                  >
-                    {direccion ? 'Cambiar' : 'Seleccionar'}
-                  </Button>
-                </Box>
-
-                {/* N° Finca */}
-                <Box sx={{ flex: '0 0 100px' }}>
-                  <Controller
-                    name="nFinca"
-                    control={control}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        size="small"
-                        label="N° Finca"
-                        placeholder="123"
-                        disabled={disablePersonaFields || !direccion}
-                        fullWidth
-                        sx={fieldStyles}
-                      />
-                    )}
-                  />
-                </Box>
-
-                {/* Otro N° */}
-                <Box sx={{ flex: '0 0 120px' }}>
-                  <Controller
-                    name="otroNumero"
-                    control={control}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        size="small"
-                        label="Otro N°"
-                        placeholder="Dpto, Int"
-                        disabled={disablePersonaFields || !direccion}
-                        fullWidth
-                        sx={fieldStyles}
-                      />
-                    )}
-                  />
-                </Box>
               </>
             )}
 
@@ -472,10 +397,20 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
             {!isJuridica && (
               <>
                 {/* Apellido Paterno */}
-                <Box sx={{ flex: '0 0 120px', maxWidth: '120px' }}>
+                <Box sx={{ 
+                  flex: { xs: '1 1 100%', sm: '0 0 120px' },
+                  maxWidth: { xs: '100%', sm: '120px' },
+                  width: { xs: '100%', sm: 'auto' }
+                }}>
                   <Controller
                     name="apellidoPaterno"
                     control={control}
+                    rules={{
+                      pattern: {
+                        value: /^[a-zA-ZÁÉÍÓÚáéíóúÑñ\s]*$/,
+                        message: 'Solo se permiten letras'
+                      }
+                    }}
                     render={({ field }) => (
                       <TextField
                         {...field}
@@ -487,16 +422,31 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
                         error={!!errors.apellidoPaterno}
                         helperText={String(errors.apellidoPaterno?.message || '')}
                         sx={fieldStyles}
+                        onChange={(e) => {
+                          // Solo permitir letras, espacios y caracteres especiales españoles
+                          const value = e.target.value.replace(/[^a-zA-ZÁÉÍÓÚáéíóúÑñ\s]/g, '');
+                          field.onChange(value);
+                        }}
                       />
                     )}
                   />
                 </Box>
 
                 {/* Apellido Materno */}
-                <Box sx={{ flex: '0 0 120px', maxWidth: '120px' }}>
+                <Box sx={{ 
+                  flex: { xs: '1 1 100%', sm: '0 0 120px' },
+                  maxWidth: { xs: '100%', sm: '120px' },
+                  width: { xs: '100%', sm: 'auto' }
+                }}>
                   <Controller
                     name="apellidoMaterno"
                     control={control}
+                    rules={{
+                      pattern: {
+                        value: /^[a-zA-ZÁÉÍÓÚáéíóúÑñ\s]*$/,
+                        message: 'Solo se permiten letras'
+                      }
+                    }}
                     render={({ field }) => (
                       <TextField
                         {...field}
@@ -508,108 +458,246 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
                         error={!!errors.apellidoMaterno}
                         helperText={String(errors.apellidoMaterno?.message || '')}
                         sx={fieldStyles}
-                      />
-                    )}
-                  />
-                </Box>
-
-                {/* Fecha de Nacimiento */}
-                <Box sx={{ flex: '0 0 140px', maxWidth: '140px' }}>
-                  <Controller
-                    name="fechaNacimiento"
-                    control={control}
-                    render={({ field }) => (
-                      <DatePicker
-                        {...field}
-                        label="Fecha Nac."
-                        disabled={disablePersonaFields}
-                        format="dd/MM/yyyy"
-                        slotProps={{
-                          textField: {
-                            size: 'small',
-                            fullWidth: true,
-                            error: !!errors.fechaNacimiento,
-                            helperText: String(errors.fechaNacimiento?.message || ''),
-                            sx: {
-                              ...fieldStyles,
-                              '& .MuiInputBase-input': {
-                                fontSize: '0.75rem',
-                                padding: '6px 10px'
-                              }
-                            },
-                            InputProps: {
-                              startAdornment: (
-                                <InputAdornment position="start">
-                                  <CalendarIcon sx={{ fontSize: 14 }} />
-                                </InputAdornment>
-                              ),
-                            }
-                          },
-                          popper: {
-                            placement: 'bottom-start'
-                          }
+                        onChange={(e) => {
+                          // Solo permitir letras, espacios y caracteres especiales españoles
+                          const value = e.target.value.replace(/[^a-zA-ZÁÉÍÓÚáéíóúÑñ\s]/g, '');
+                          field.onChange(value);
                         }}
                       />
                     )}
                   />
                 </Box>
-
-                {/* Sexo */}
-                <Box sx={{ flex: '0 0 120px' }}>
-                  {loadingSexo ? (
-                    <Skeleton variant="rounded" height={40} />
-                  ) : (
-                    <Controller
-                      name="sexo"
-                      control={control}
-                      render={({ field }) => (
-                        <Autocomplete
-                          {...field}
-                          options={sexoOptions}
-                          getOptionLabel={(option) => option?.label || ''}
-                          value={sexoOptions.find(opt => opt.value === field.value) || null}
-                          onChange={(_, newValue) => field.onChange(newValue?.value || '')}
-                          disabled={disablePersonaFields || loadingSexo}
-                          size="small"
-                          renderInput={(params) => (
-                            <TextField
-                              {...params}
-                              label="Sexo"
-                              placeholder="Seleccione"
-                              error={!!errors.sexo || !!errorSexo}
-                              helperText={
-                                (errors.sexo?.message as string) ||
-                                (errorSexo ? 'Error al cargar opciones' : '')
-                              }
-                              sx={fieldStyles}
-                              InputProps={{
-                                ...params.InputProps,
-                                startAdornment: (
-                                  <InputAdornment position="start">
-                                    <FamilyRestroomIcon sx={{ fontSize: 16 }} />
-                                  </InputAdornment>
-                                ),
-                              }}
-                            />
-                          )}
-                        />
-                      )}
-                    />
-                  )}
-                </Box>
               </>
             )}
           </Box>
 
-          {/* Segunda fila - Solo para personas naturales */}
-          {!isJuridica && (
-            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'stretch' }}>
-             
+          {/* Segunda fila para Persona Jurídica: Button Seleccionar, N° Finca, Otro N° */}
+          {isJuridica && (
+            <Box sx={{ 
+              display: 'flex', 
+              gap: { xs: 1, sm: 1.5 }, 
+              flexWrap: 'wrap', 
+              alignItems: { xs: 'stretch', sm: 'stretch' },
+              flexDirection: { xs: 'column', sm: 'row' }
+            }}>
+              {/* Botón Seleccionar/Cambiar */}
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: { xs: 'stretch', sm: 'flex-end' }, 
+                height: '100%',
+                width: { xs: '100%', sm: 'auto' }
+              }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={(e) => {
+                    e.currentTarget.blur(); // Quitar foco del botón
+                    onOpenDireccionModal();
+                  }}
+                  disabled={disablePersonaFields}
+                  startIcon={<LocationIcon sx={{ fontSize: 16 }} />}
+                  sx={{ 
+                    fontSize: '0.75rem',
+                    height: '32px',
+                    minHeight: '32px',
+                    minWidth: { xs: '100%', sm: '120px' },
+                    width: { xs: '100%', sm: 'auto' },
+                    px: 2,
+                    marginTop: { xs: 0, sm: '5px' }
+                  }}
+                >
+                  {direccion ? 'Cambiar' : 'Seleccionar Direccion'}
+                </Button>
+              </Box>
 
-             
+              {/* N° Finca */}
+              <Box sx={{ 
+                flex: { xs: '1 1 100%', sm: '0 0 100px' },
+                width: { xs: '100%', sm: 'auto' }
+              }}>
+                <Controller
+                  name="nFinca"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      size="small"
+                      label="N° Finca"
+                      placeholder="123"
+                      disabled={disablePersonaFields || !direccion}
+                      fullWidth
+                      sx={fieldStyles}
+                    />
+                  )}
+                />
+              </Box>
+
+              {/* Otro N° */}
+              <Box sx={{ 
+                flex: { xs: '1 1 100%', sm: '0 0 120px' },
+                width: { xs: '100%', sm: 'auto' }
+              }}>
+                <Controller
+                  name="otroNumero"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      size="small"
+                      label="Otro N°"
+                      placeholder="Dpto, Int"
+                      disabled={disablePersonaFields || !direccion}
+                      fullWidth
+                      sx={fieldStyles}
+                    />
+                  )}
+                />
+              </Box>
+
+              {/* Dirección seleccionada compacta */}
+              {direccion && (
+                <Box sx={{ 
+                  flex: { xs: '1 1 100%', sm: '1 1 auto' },
+                  minWidth: { xs: '100%', sm: '300px' },
+                  width: { xs: '100%', sm: 'auto' }
+                }}>
+                  <Alert 
+                    severity="info" 
+                    sx={{ 
+                      py: 0.5,
+                      px: 1,
+                      minHeight: 'auto',
+                      height: '32px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      '& .MuiAlert-message': { 
+                        py: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        fontSize: '0.75rem'
+                      },
+                      '& .MuiAlert-icon': {
+                        fontSize: '1rem',
+                        paddingTop: 0,
+                        marginRight: 0.5
+                      }
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 500 }}>
+                      📍 {getDireccionTextoCompleto(direccion, nFinca || '', otroNumero)}
+                    </Typography>
+                  </Alert>
+                </Box>
+              )}
+            </Box>
+          )}
+
+          {/* Segunda fila - Solo para personas naturales: Fecha Nacimiento y Sexo */}
+          {!isJuridica && (
+            <Box sx={{ 
+              display: 'flex', 
+              gap: { xs: 1, sm: 1.5 }, 
+              flexWrap: 'wrap', 
+              alignItems: 'stretch',
+              flexDirection: { xs: 'column', sm: 'row' }
+            }}>
+              {/* Fecha de Nacimiento */}
+              <Box sx={{ 
+                flex: { xs: '1 1 100%', sm: '0 0 140px' },
+                maxWidth: { xs: '100%', sm: '140px' },
+                width: { xs: '100%', sm: 'auto' }
+              }}>
+                <Controller
+                  name="fechaNacimiento"
+                  control={control}
+                  render={({ field }) => (
+                    <DatePicker
+                      {...field}
+                      label="Fecha Nac."
+                      disabled={disablePersonaFields}
+                      format="dd/MM/yyyy"
+                      slotProps={{
+                        textField: {
+                          size: 'small',
+                          fullWidth: true,
+                          error: !!errors.fechaNacimiento,
+                          helperText: String(errors.fechaNacimiento?.message || ''),
+                          sx: {
+                            ...fieldStyles,
+                            '& .MuiInputBase-input': {
+                              fontSize: '0.75rem',
+                              padding: '6px 10px'
+                            }
+                          },
+                          InputProps: {
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <CalendarIcon sx={{ fontSize: 14 }} />
+                              </InputAdornment>
+                            ),
+                          }
+                        },
+                        popper: {
+                          placement: 'bottom-start'
+                        }
+                      }}
+                    />
+                  )}
+                />
+              </Box>
+
+              {/* Sexo */}
+              <Box sx={{ 
+                flex: { xs: '1 1 100%', sm: '0 0 160px' },
+                width: { xs: '100%', sm: 'auto' }
+              }}>
+                {loadingSexo ? (
+                  <Skeleton variant="rounded" height={40} />
+                ) : (
+                  <Controller
+                    name="sexo"
+                    control={control}
+                    render={({ field }) => (
+                      <Autocomplete
+                        {...field}
+                        options={sexoOptions}
+                        getOptionLabel={(option) => option?.label || ''}
+                        value={sexoOptions.find(opt => opt.value === field.value) || null}
+                        onChange={(_, newValue) => field.onChange(newValue?.value || '')}
+                        disabled={disablePersonaFields || loadingSexo}
+                        size="small"
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Sexo"
+                            placeholder="Seleccione"
+                            error={!!errors.sexo || !!errorSexo}
+                            helperText={
+                              (errors.sexo?.message as string) ||
+                              (errorSexo ? 'Error al cargar opciones' : '')
+                            }
+                            sx={fieldStyles}
+                            InputProps={{
+                              ...params.InputProps,
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <FamilyRestroomIcon sx={{ fontSize: 16 }} />
+                                </InputAdornment>
+                              ),
+                            }}
+                          />
+                        )}
+                      />
+                    )}
+                  />
+                )}
+              </Box>
 
               {/* Estado Civil */}
-              <Box sx={{ flex: '0 0 120px' }}>
+              <Box sx={{ 
+                flex: { xs: '1 1 100%', sm: '0 0 180px' },
+                width: { xs: '100%', sm: 'auto' }
+              }}>
                 {loadingEstadoCivil ? (
                   <Skeleton variant="rounded" height={40} />
                 ) : (
@@ -660,10 +748,19 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
               </Box>
 
               {/* Teléfono */}
-              <Box sx={{ flex: '0 0 120px' }}>
+              <Box sx={{ 
+                flex: { xs: '1 1 100%', sm: '0 0 150px' },
+                width: { xs: '100%', sm: 'auto' }
+              }}>
                 <Controller
                   name="telefono"
                   control={control}
+                  rules={{
+                    pattern: {
+                      value: /^[0-9]{0,9}$/,
+                      message: 'Teléfono inválido (máximo 9 dígitos)'
+                    }
+                  }}
                   render={({ field }) => (
                     <TextField
                       {...field}
@@ -672,9 +769,21 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
                       label="Teléfono"
                       placeholder="999 999 999"
                       disabled={disablePersonaFields}
-                    error={!!errors.telefono}
-                    helperText={String(errors.telefono?.message || '')}
+                      error={!!errors.telefono}
+                      helperText={String(errors.telefono?.message || '')}
                       sx={fieldStyles}
+                      onChange={(e) => {
+                        // Solo permitir números
+                        const value = e.target.value.replace(/[^0-9]/g, '');
+                        // Limitar a 9 dígitos (formato celular peruano)
+                        const truncatedValue = value.slice(0, 9);
+                        field.onChange(truncatedValue);
+                      }}
+                      inputProps={{
+                        maxLength: 9,
+                        inputMode: 'tel',
+                        pattern: '[0-9]*'
+                      }}
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
@@ -686,22 +795,42 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
                   )}
                 />
               </Box>
+            </Box>
+          )}
 
-               {/* Botón Seleccionar/Cambiar */}
-               <Box sx={{ display: 'flex', alignItems: 'flex-end', height: '100%' }}>
+          {/* Tercera fila - Solo para personas naturales: Button Seleccionar, N° Finca, Otro Número y Dirección */}
+          {!isJuridica && (
+            <Box sx={{ 
+              display: 'flex', 
+              gap: { xs: 1, sm: 1.5 }, 
+              flexWrap: 'wrap', 
+              alignItems: { xs: 'stretch', sm: 'stretch' },
+              flexDirection: { xs: 'column', sm: 'row' }
+            }}>
+              {/* Botón Seleccionar/Cambiar */}
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: { xs: 'stretch', sm: 'flex-end' }, 
+                height: '100%',
+                width: { xs: '100%', sm: 'auto' }
+              }}>
                 <Button
                   size="small"
                   variant="outlined"
-                  onClick={onOpenDireccionModal}
+                  onClick={(e) => {
+                    e.currentTarget.blur(); // Quitar foco del botón
+                    onOpenDireccionModal();
+                  }}
                   disabled={disablePersonaFields}
                   startIcon={<LocationIcon sx={{ fontSize: 16 }} />}
                   sx={{ 
                     fontSize: '0.75rem',
                     height: '32px',
                     minHeight: '32px',
-                    minWidth: '120px',
+                    minWidth: { xs: '100%', sm: '120px' },
+                    width: { xs: '100%', sm: 'auto' },
                     px: 2,
-                    marginTop: '5px'
+                    marginTop: { xs: 0, sm: '5px' }
                   }}
                 >
                   {direccion ? 'Cambiar' : 'Seleccionar'}
@@ -709,7 +838,10 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
               </Box>
 
               {/* N° Finca */}
-              <Box sx={{ flex: '0 0 100px' }}>
+              <Box sx={{ 
+                flex: { xs: '1 1 100%', sm: '0 0 100px' },
+                width: { xs: '100%', sm: 'auto' }
+              }}>
                 <Controller
                   name="nFinca"
                   control={control}
@@ -728,7 +860,10 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
               </Box>
 
               {/* Otro N° */}
-              <Box sx={{ flex: '0 0 120px' }}>
+              <Box sx={{ 
+                flex: { xs: '1 1 100%', sm: '0 0 120px' },
+                width: { xs: '100%', sm: 'auto' }
+              }}>
                 <Controller
                   name="otroNumero"
                   control={control}
@@ -746,110 +881,44 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
                 />
               </Box>
 
-             
-            </Box>
-          )}
-         
-       
-
-          {/* Tercera fila - Dirección seleccionada (ancho completo) */}
-          {direccion && (
-            <Box sx={{ width: '100%' }}>
-              <Alert 
-                severity="info" 
-                sx={{ 
-                  py: 1,
-                  px: 1.5,
-                  minHeight: 'auto',
-                  '& .MuiAlert-message': { 
-                    width: '100%',
-                    py: 0
-                  },
-                  '& .MuiAlert-icon': {
-                    fontSize: '1rem',
-                    paddingTop: 0
-                  }
-                }}
-              >
-                <Typography variant="caption" component="div" sx={{ fontWeight: 600, fontSize: '0.75rem', mb: 0.5 }}>
-                  📍 Dirección Fiscal seleccionada:
-                </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-                  {/* Sector */}
-                  {direccion.sector && (
+              {/* Dirección seleccionada */}
+              {direccion && (
+                <Box sx={{ 
+                  flex: { xs: '1 1 100%', sm: '1 1 auto' },
+                  minWidth: { xs: '100%', sm: '300px' },
+                  width: { xs: '100%', sm: 'auto' }
+                }}>
+                  <Alert 
+                    severity="info" 
+                    sx={{ 
+                      py: 0.5,
+                      px: 1,
+                      minHeight: 'auto',
+                      height: '32px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      '& .MuiAlert-message': { 
+                        py: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        fontSize: '0.75rem'
+                      },
+                      '& .MuiAlert-icon': {
+                        fontSize: '1rem',
+                        paddingTop: 0,
+                        marginRight: 0.5
+                      }
+                    }}
+                  >
                     <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 500 }}>
-                      <strong>Sector:</strong> {direccion.sector}
+                      📍 {getDireccionTextoCompleto(direccion, nFinca || '', otroNumero)}
                     </Typography>
-                  )}
-                  
-                  {/* Barrio */}
-                  {direccion.barrio && (
-                    <>
-                      <Typography variant="caption" sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>•</Typography>
-                      <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 500 }}>
-                        <strong>Barrio:</strong> {direccion.barrio}
-                      </Typography>
-                    </>
-                  )}
-                  
-                  {/* Tipo de Vía y Nombre */}
-                  <Typography variant="caption" sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>•</Typography>
-                  <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 500 }}>
-                    <strong>{direccion.tipoVia || 'CALLE'}:</strong> {direccion.nombreVia}
-                  </Typography>
-                  
-                  {/* Cuadra */}
-                  {direccion.cuadra && (
-                    <>
-                      <Typography variant="caption" sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>•</Typography>
-                      <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 500 }}>
-                        <strong>Cuadra:</strong> {direccion.cuadra}
-                      </Typography>
-                    </>
-                  )}
-                  
-                  {/* Lado */}
-                  {direccion.lado && direccion.lado !== '-' && (
-                    <>
-                      <Typography variant="caption" sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>•</Typography>
-                      <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 500 }}>
-                        <strong>Lado:</strong> {direccion.lado}
-                      </Typography>
-                    </>
-                  )}
-                  
-                  {/* Lotes */}
-                  {(direccion.loteInicial || direccion.loteFinal) && (
-                    <>
-                      <Typography variant="caption" sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>•</Typography>
-                      <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 500 }}>
-                        <strong>Lotes:</strong> {direccion.loteInicial || 1} - {direccion.loteFinal || 1}
-                      </Typography>
-                    </>
-                  )}
-
-                  {/* N° Finca y Otro N° si existen */}
-                  {nFinca && (
-                    <>
-                      <Typography variant="caption" sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>•</Typography>
-                      <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'primary.main' }}>
-                        <strong>N° Finca:</strong> {nFinca}
-                      </Typography>
-                    </>
-                  )}
-                  
-                  {otroNumero && (
-                    <>
-                      <Typography variant="caption" sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>•</Typography>
-                      <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'primary.main' }}>
-                        <strong>Otro N°:</strong> {otroNumero}
-                      </Typography>
-                    </>
-                  )}
+                  </Alert>
                 </Box>
-              </Alert>
+              )}
             </Box>
           )}
+
 
           {/* Errores si existen */}
           {errorPersona && (
@@ -864,29 +933,6 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
             </Alert>
           )}
 
-          {/* Botón de Guardar */}
-          {showGuardarButton && (
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleSubmit(handleGuardar)}
-                disabled={disablePersonaFields || loadingCrear || loadingContribuyente || !direccion}
-                startIcon={(loadingCrear || loadingContribuyente) ? <CircularProgress size={16} /> : <SaveIcon />}
-                sx={{ 
-                  minWidth: '100px',
-                  height: '36px'
-                }}
-              >
-                {loadingCrear 
-                  ? 'Guardando...' 
-                  : loadingContribuyente 
-                    ? 'Procesando...'
-                    : 'Guardar'
-                }
-              </Button>
-            </Box>
-          )}
 
           {/* Indicador de carga general */}
           {(loadingTipoDoc || loadingEstadoCivil || loadingSexo) && (

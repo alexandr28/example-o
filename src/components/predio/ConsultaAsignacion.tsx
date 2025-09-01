@@ -1,5 +1,6 @@
 // src/components/predio/ConsultaAsignacion.tsx
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Paper,
@@ -7,8 +8,6 @@ import {
   TextField,
   Button,
   Stack,
-  Card,
-  CardContent,
   Table,
   TableBody,
   TableCell,
@@ -20,7 +19,6 @@ import {
   Tooltip,
   useTheme,
   alpha,
-  Autocomplete,
   Divider,
   CircularProgress,
   Fade,
@@ -30,37 +28,32 @@ import {
   Search as SearchIcon,
   Print as PrintIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon,
   Person as PersonIcon,
   Assignment as AssignmentIcon,
   Home as HomeIcon,
-  LocationOn as LocationIcon,
-  CheckCircle as ActiveIcon,
   Error as ErrorIcon
 } from '@mui/icons-material';
 import SelectorContribuyente from '../modal/SelectorContribuyente';
 import { NotificationService } from '../utils/Notification';
-import { useAnioOptions } from '../../hooks/useConstantesOptions';
 import { useAsignacion } from '../../hooks/useAsignacion';
 import { AsignacionPredio } from '../../services/asignacionService';
 
 interface ConsultaAsignacionData {
-  año: number;
-  contribuyente: any;
+  codigoPredio: string;
+  codigoContribuyente: string;
 }
 
 const ConsultaAsignacion: React.FC = () => {
   const theme = useTheme();
-  const currentYear = new Date().getFullYear();
+  const navigate = useNavigate();
   
   // Hooks personalizados
-  const { options: aniosOptions } = useAnioOptions(2020);
-  const { asignaciones, loading, error, buscarAsignaciones, limpiarAsignaciones, limpiarError } = useAsignacion();
+  const { asignaciones, loading, error, buscarAsignaciones, limpiarError } = useAsignacion();
   
   // Estados locales
   const [filtros, setFiltros] = useState<ConsultaAsignacionData>({
-    año: currentYear,
-    contribuyente: null
+    codigoPredio: '',
+    codigoContribuyente: ''
   });
   
   const [showContribuyenteModal, setShowContribuyenteModal] = useState(false);
@@ -81,25 +74,20 @@ const ConsultaAsignacion: React.FC = () => {
   // Handlers
   const handleSelectContribuyente = async (contribuyente: any) => {
     console.log('🔍 [ConsultaAsignacion] Contribuyente seleccionado:', contribuyente);
-    setFiltros({ ...filtros, contribuyente });
+    setFiltros({ ...filtros, codigoContribuyente: contribuyente?.codigo || '' });
     setShowContribuyenteModal(false);
-    
-    // Buscar asignaciones automáticamente al seleccionar contribuyente
-    if (contribuyente?.codigo) {
-      await realizarBusqueda(contribuyente.codigo, filtros.año);
-    }
   };
 
-  const realizarBusqueda = async (codContribuyente?: string, anio?: number) => {
+  const realizarBusqueda = async () => {
     const params = {
-      codContribuyente: codContribuyente || filtros.contribuyente?.codigo,
-      anio: anio || filtros.año
+      codPredio: filtros.codigoPredio || undefined,
+      codContribuyente: filtros.codigoContribuyente || undefined
     };
 
     console.log('🔍 [ConsultaAsignacion] Realizando búsqueda con parámetros:', params);
 
-    if (!params.codContribuyente) {
-      NotificationService.error('Debe seleccionar un contribuyente');
+    if (!params.codContribuyente && !params.codPredio) {
+      NotificationService.error('Debe ingresar al menos un código de predio o contribuyente');
       return;
     }
 
@@ -122,22 +110,58 @@ const ConsultaAsignacion: React.FC = () => {
   };
 
   const handleImprimirPU = () => {
-    if (!filtros.contribuyente) {
-      NotificationService.error('Debe seleccionar un contribuyente');
+    if (!filtros.codigoContribuyente) {
+      NotificationService.error('Debe ingresar un código de contribuyente');
       return;
     }
     NotificationService.success('Generando PU...');
   };
 
   const handleEditar = (asignacion: AsignacionPredio) => {
-    console.log('Editar asignación:', asignacion);
-    NotificationService.info('Función de edición pendiente');
+    console.log('🔄 [ConsultaAsignacion] Editando asignación:', asignacion);
+    
+    try {
+      // Validar que tenemos los datos necesarios
+      if (!asignacion.codPredio || !asignacion.codContribuyente) {
+        NotificationService.error('Datos de asignación incompletos para editar');
+        return;
+      }
+
+      // Preparar los datos para navegación
+      const datosAsignacion = {
+        codPredio: asignacion.codPredio?.trim(),
+        codContribuyente: asignacion.codContribuyente,
+        anio: asignacion.anio,
+        nombreContribuyente: asignacion.nombreContribuyente,
+        fechaDeclaracionStr: asignacion.fechaDeclaracionStr,
+        porcentajeCondominio: asignacion.porcentajeCondominio,
+        // Datos adicionales para la edición
+        codModoDeclaracion: asignacion.codModoDeclaracion,
+        fechaVentaStr: asignacion.fechaVentaStr,
+        pensionista: asignacion.pensionista,
+        codEstado: asignacion.codEstado,
+        codUsuario: asignacion.codUsuario
+      };
+
+      console.log('📋 [ConsultaAsignacion] Datos preparados para edición:', datosAsignacion);
+
+      // Navegar a la página de edición de asignación pasando los datos completos
+      navigate('/predio/asignacion/nuevo', {
+        state: {
+          editMode: true,
+          asignacionData: datosAsignacion,
+          fromConsulta: true
+        }
+      });
+      
+      NotificationService.success(`Navegando a edición de asignación del predio ${asignacion.codPredio}`);
+      
+    } catch (error: any) {
+      console.error('❌ [ConsultaAsignacion] Error al preparar edición:', error);
+      NotificationService.error('Error al preparar la edición de la asignación');
+    }
   };
 
-  const handleEliminar = (asignacion: AsignacionPredio) => {
-    console.log('Eliminar asignación:', asignacion);
-    NotificationService.info('Función de eliminación pendiente');
-  };
 
   return (
     <Box sx={{ p: 0 }}>
@@ -221,29 +245,25 @@ const ConsultaAsignacion: React.FC = () => {
             borderRadius: 2,
             border: `1px solid ${alpha(theme.palette.divider, 0.3)}`
           }}>
-            {/* Año */}
+            {/* Código Predio */}
             <Box sx={{ 
-              flex: { xs: '1 1 100%', md: '0 0 100px' },
-              minWidth: { xs: '100%', md: '100px' }
+              flex: { xs: '1 1 100%', md: '0 0 180px' },
+              minWidth: { xs: '100%', md: '180px' }
             }}>
-              <Autocomplete
-                options={aniosOptions}
-                getOptionLabel={(option) => option?.label || ''}
-                value={aniosOptions.find(opt => opt.value === filtros.año.toString()) || null}
-                onChange={(_, newValue) => setFiltros({
-                  ...filtros,
-                  año: parseInt(newValue?.value?.toString() || currentYear.toString())
-                })}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Año"
-                    placeholder="Seleccione"
-                  />
-                )}
+              <TextField
                 fullWidth
                 size="small"
-                sx={{ 
+                label="Código Predio"
+                value={filtros.codigoPredio}
+                onChange={(e) => setFiltros({
+                  ...filtros,
+                  codigoPredio: e.target.value
+                })}
+                InputProps={{
+                  startAdornment: <HomeIcon sx={{ mr: 1, color: 'action.active' }} />
+                }}
+                placeholder="Ej: 20256"
+                sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: 2,
                     '&:hover fieldset': {
@@ -254,86 +274,47 @@ const ConsultaAsignacion: React.FC = () => {
               />
             </Box>
             
-            {/* Botón Contribuyente */}
+            {/* Código Contribuyente */}
             <Box sx={{ 
-              flex: { xs: '1 1 100%', md: '0 0 100px' },
-              minWidth: { xs: '100%', md: '100px' }
-            }}>
-              <Button
-                fullWidth
-                variant="outlined"
-                onClick={() => setShowContribuyenteModal(true)}
-                startIcon={<PersonIcon />}
-                sx={{ 
-                  height: 40,
-                  borderRadius: 2,
-                  borderWidth: 2,
-                  '&:hover': {
-                    borderWidth: 2,
-                    bgcolor: alpha(theme.palette.primary.main, 0.04)
-                  }
-                }}
-              >
-                Contribuyente
-              </Button>
-            </Box>
-            
-            {/* Código */}
-            <Box sx={{ 
-              flex: { xs: '1 1 100%', md: '0 0 100px' },
-              minWidth: { xs: '100%', md: '100px' }
+              flex: { xs: '1 1 100%', md: '0 0 180px' },
+              minWidth: { xs: '100%', md: '180px' }
             }}>
               <TextField
                 fullWidth
                 size="small"
-                label="Código"
-                value={filtros.contribuyente?.codigo || ''}
-                InputProps={{ 
-                  readOnly: true,
-                  startAdornment: <SearchIcon sx={{ mr: 1, color: 'action.active' }} />
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    bgcolor: alpha(theme.palette.grey[100], 0.5)
-                  }
-                }}
-              />
-            </Box>
-            
-            {/* Nombre del contribuyente */}
-            <Box sx={{ 
-              flex: { xs: '0 0 100%', md: '0 0 280px' },
-              minWidth: { xs: '100%', md: '280px' }
-            }}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Nombre del contribuyente"
-                value={filtros.contribuyente?.contribuyente || ''}
-                InputProps={{ 
-                  readOnly: true,
+                label="Código Contribuyente"
+                value={filtros.codigoContribuyente}
+                onChange={(e) => setFiltros({
+                  ...filtros,
+                  codigoContribuyente: e.target.value
+                })}
+                InputProps={{
                   startAdornment: <PersonIcon sx={{ mr: 1, color: 'action.active' }} />
                 }}
+                placeholder="Ej: 43906"
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: 2,
-                    bgcolor: alpha(theme.palette.grey[100], 0.5)
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
                   }
                 }}
               />
             </Box>
+            
+          
 
             {/* Botón Buscar */}
             <Box sx={{ 
-              flex: { xs: '1 1 100%', md: '0 0 100px' },
-              minWidth: { xs: '100%', md: '100px' }
+              flex: { xs: '1 1 100%', md: '0 0 120px' },
+              minWidth: { xs: '100%', md: '120px' }
             }}>
               <Button
                 fullWidth
                 variant="contained"
                 onClick={handleBuscar}
-                disabled={loading || !filtros.contribuyente}
+                disabled={loading || (!filtros.codigoPredio && !filtros.codigoContribuyente)}
                 startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SearchIcon />}
                 sx={{ 
                   height: 40,
@@ -446,11 +427,11 @@ const ConsultaAsignacion: React.FC = () => {
                     py: 2
                   }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <LocationIcon fontSize="small" />
-                      DIRECCIÓN
+                      <PersonIcon fontSize="small" />
+                      NOMBRE CONTRIBUYENTE
                     </Box>
                   </TableCell>
-                  <TableCell sx={{
+                  <TableCell align="center" sx={{
                     bgcolor: alpha(theme.palette.primary.main, 0.08),
                     color: theme.palette.primary.main,
                     fontWeight: 700,
@@ -460,11 +441,20 @@ const ConsultaAsignacion: React.FC = () => {
                     borderBottom: `2px solid ${theme.palette.primary.main}`,
                     py: 2
                   }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <ActiveIcon fontSize="small" />
-                        ESTADO
-                      </Box>
-                    </TableCell>
+                    F. DECLARACIÓN
+                  </TableCell>
+                  <TableCell align="center" sx={{
+                    bgcolor: alpha(theme.palette.primary.main, 0.08),
+                    color: theme.palette.primary.main,
+                    fontWeight: 700,
+                    fontSize: '0.875rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                    borderBottom: `2px solid ${theme.palette.primary.main}`,
+                    py: 2
+                  }}>
+                    % CONDOMINIO
+                  </TableCell>
                     <TableCell align="center" sx={{
                       bgcolor: alpha(theme.palette.primary.main, 0.08),
                       color: theme.palette.primary.main,
@@ -482,7 +472,7 @@ const ConsultaAsignacion: React.FC = () => {
               <TableBody>
                 {asignaciones.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} align="center" sx={{ py: 8 }}>
+                    <TableCell colSpan={5} align="center" sx={{ py: 8 }}>
                       <Stack alignItems="center" spacing={3}>
                           <Box sx={{
                             p: 3,
@@ -497,15 +487,15 @@ const ConsultaAsignacion: React.FC = () => {
                           </Box>
                           <Box sx={{ textAlign: 'center' }}>
                             <Typography variant="h6" color="text.secondary" gutterBottom>
-                              {filtros.contribuyente 
+                              {(filtros.codigoContribuyente || filtros.codigoPredio)
                                 ? 'No se encontraron asignaciones'
-                                : 'Seleccione un contribuyente'
+                                : 'Ingrese criterios de búsqueda'
                               }
                             </Typography>
                             <Typography variant="body2" color="text.disabled">
-                              {filtros.contribuyente 
-                                ? 'Este contribuyente no tiene predios asignados'
-                                : 'Seleccione un contribuyente para ver sus asignaciones de predios'
+                              {(filtros.codigoContribuyente || filtros.codigoPredio)
+                                ? 'No hay predios asignados con los criterios especificados'
+                                : 'Ingrese un código de predio o contribuyente para buscar asignaciones'
                               }
                             </Typography>
                           </Box>
@@ -530,6 +520,7 @@ const ConsultaAsignacion: React.FC = () => {
                             }
                           }}
                         >
+                          {/* Código Predio */}
                           <TableCell sx={{ 
                             borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
                             py: 2,
@@ -549,37 +540,52 @@ const ConsultaAsignacion: React.FC = () => {
                               />
                             </Box>
                           </TableCell>
+                          
+                          {/* Nombre Contribuyente */}
                           <TableCell sx={{ 
                             borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
                             py: 2,
-                            verticalAlign: 'middle'
+                            verticalAlign: 'middle',
+                            maxWidth: '250px'
                           }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <LocationIcon fontSize="small" color="action" />
-                              <Typography variant="body2" fontWeight={500} sx={{ lineHeight: 1.43 }}>
-                                {asignacion.direccionPredio || 'Sin dirección'}
-                              </Typography>
-                            </Box>
+                            <Typography 
+                              variant="body2" 
+                              sx={{ 
+                                fontWeight: 500,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {asignacion.nombreContribuyente || 'N/A'}
+                            </Typography>
                           </TableCell>
-                          <TableCell sx={{ 
+                          
+                          {/* Fecha Declaración */}
+                          <TableCell align="center" sx={{ 
                             borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
                             py: 2,
                             verticalAlign: 'middle'
                           }}>
-                            <Chip 
-                              icon={<ActiveIcon fontSize="small" />}
-                              label={asignacion.estado} 
-                              color={asignacion.estado === 'Activo' ? 'success' : 'warning'} 
-                              size="small" 
+                            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                              {asignacion.fechaDeclaracionStr || 'N/A'}
+                            </Typography>
+                          </TableCell>
+                          
+                          {/* % Condominio */}
+                          <TableCell align="center" sx={{ 
+                            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+                            py: 2,
+                            verticalAlign: 'middle'
+                          }}>
+                            <Chip
+                              label={`${asignacion.porcentajeCondominio}%`}
+                              size="small"
                               variant="filled"
                               sx={{
-                                fontWeight: 500,
-                                bgcolor: asignacion.estado === 'Activo' 
-                                  ? alpha(theme.palette.success.main, 0.1) 
-                                  : alpha(theme.palette.warning.main, 0.1),
-                                color: asignacion.estado === 'Activo' 
-                                  ? theme.palette.success.main 
-                                  : theme.palette.warning.main
+                                bgcolor: alpha(theme.palette.info.main, 0.1),
+                                color: theme.palette.info.main,
+                                fontWeight: 600
                               }}
                             />
                           </TableCell>
@@ -589,20 +595,43 @@ const ConsultaAsignacion: React.FC = () => {
                             verticalAlign: 'middle'
                           }}>
                             <Stack direction="row" spacing={0.5} justifyContent="center">
-                              <Tooltip title="Editar asignación" arrow>
+                              <Tooltip 
+                                title={`Editar asignación del predio ${asignacion.codPredio}`} 
+                                arrow
+                                placement="top"
+                              >
                                 <IconButton 
                                   size="small" 
                                   onClick={() => handleEditar(asignacion)}
+                                  disabled={loading}
                                   sx={{
                                     bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                    border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
                                     '&:hover': {
                                       bgcolor: alpha(theme.palette.primary.main, 0.16),
                                       transform: 'scale(1.1)',
+                                      boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+                                      borderColor: theme.palette.primary.main,
                                     },
-                                    transition: 'all 0.2s ease-in-out'
+                                    '&:active': {
+                                      transform: 'scale(1.05)',
+                                    },
+                                    '&:disabled': {
+                                      bgcolor: alpha(theme.palette.grey[400], 0.1),
+                                      color: theme.palette.grey[400],
+                                    },
+                                    transition: 'all 0.2s ease-in-out',
+                                    minWidth: '32px',
+                                    minHeight: '32px'
                                   }}
                                 >
-                                  <EditIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
+                                  <EditIcon 
+                                    fontSize="small" 
+                                    sx={{ 
+                                      color: loading ? theme.palette.grey[400] : theme.palette.primary.main,
+                                      transition: 'color 0.2s ease-in-out'
+                                    }} 
+                                  />
                                 </IconButton>
                               </Tooltip>
                               
@@ -627,7 +656,7 @@ const ConsultaAsignacion: React.FC = () => {
                 variant="contained"
                 startIcon={<PrintIcon />}
                 onClick={handleImprimirPU}
-                disabled={!filtros.contribuyente || asignaciones.length === 0}
+                disabled={!filtros.codigoContribuyente || asignaciones.length === 0}
                 sx={{ 
                   bgcolor: theme.palette.success.main,
                   color: 'white',

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Depreciacion, Material, Antiguedad, FiltroDepreciacion, DepreciacionPaginacionOptions } from '../models/Depreciacion';
+import { Depreciacion, Material, Antiguedad, DepreciacionPaginacionOptions } from '../models/Depreciacion';
 import { depreciacionService, DepreciacionFormattedData, CrearDepreciacionDTO } from '../services/depreciacionService';
 import { NotificationService } from '../components/utils/Notification';
 
@@ -65,7 +65,7 @@ export const useDepreciacion = () => {
       // Usar el servicio real para consultar depreciaciones
       const depreciacionesData = await depreciacionService.consultarDepreciaciones({
         anio: params?.anio || anioSeleccionado || undefined,
-        codTipoCasa: params?.codTipoCasa || tipoCasaSeleccionado || undefined
+        codTipoCasa: params?.codTipoCasa || tipoCasaSeleccionado || undefined || undefined
       });
       
       // Convertir los datos del servicio al modelo local
@@ -87,7 +87,7 @@ export const useDepreciacion = () => {
     } finally {
       setLoading(false);
     }
-  }, [anioSeleccionado, tipoCasaSeleccionado]);
+  }, [anioSeleccionado || undefined, tipoCasaSeleccionado || undefined]);
 
   // Cargar años disponibles desde el servicio
   const cargarAniosDisponibles = useCallback(async () => {
@@ -121,7 +121,7 @@ export const useDepreciacion = () => {
 
   // Registrar nueva depreciación usando la API real
   const registrarDepreciacion = useCallback(async (datosFormulario?: any) => {
-    if (!anioSeleccionado || !tipoCasaSeleccionado) {
+    if (!anioSeleccionado || !tipoCasaSeleccionado || undefined) {
       const mensaje = 'Debe seleccionar un año y un tipo de casa';
       setError(mensaje);
       NotificationService.error(mensaje);
@@ -156,8 +156,8 @@ export const useDepreciacion = () => {
       setError(null);
       
       console.log('➕ [useDepreciacion] Registrando depreciación:', {
-        anio: anioSeleccionado,
-        codTipoCasa: tipoCasaSeleccionado,
+        anio: anioSeleccionado || undefined,
+        codTipoCasa: tipoCasaSeleccionado || undefined,
         datos: datosFormulario
       });
       
@@ -166,7 +166,7 @@ export const useDepreciacion = () => {
         codDepreciacion: null, // Se asigna por SQL
         codDepreciacionAnterior: null, // Se asigna por SQL
         anio: anioSeleccionado.toString(),
-        codTipoCasa: tipoCasaSeleccionado,
+        codTipoCasa: tipoCasaSeleccionado || undefined,
         codNivelAntiguedad: datosFormulario.nivelAntiguedad, // Valor real del formulario
         codMaterialEstructural: datosFormulario.materialEstructural, // Valor real del formulario
         muyBueno: datosFormulario.estadosConservacion.porcMuyBueno || 0,
@@ -186,8 +186,8 @@ export const useDepreciacion = () => {
       
       // Recargar las depreciaciones después de registrar
       await cargarDepreciaciones({
-        anio: anioSeleccionado,
-        codTipoCasa: tipoCasaSeleccionado
+        anio: anioSeleccionado || undefined,
+        codTipoCasa: tipoCasaSeleccionado || undefined
       });
       
       console.log('✅ [useDepreciacion] Depreciación registrada exitosamente');
@@ -200,11 +200,11 @@ export const useDepreciacion = () => {
     } finally {
       setLoading(false);
     }
-  }, [anioSeleccionado, tipoCasaSeleccionado, cargarDepreciaciones]);
+  }, [anioSeleccionado || undefined, tipoCasaSeleccionado || undefined, cargarDepreciaciones]);
 
   // Buscar depreciaciones usando la API real
   const buscarDepreciaciones = useCallback(async () => {
-    if (!anioSeleccionado || !tipoCasaSeleccionado) {
+    if (!anioSeleccionado || !tipoCasaSeleccionado || undefined) {
       const mensaje = 'Debe seleccionar un año y un tipo de casa para buscar';
       setError(mensaje);
       NotificationService.warning(mensaje);
@@ -214,13 +214,13 @@ export const useDepreciacion = () => {
     try {
       console.log('🔍 [useDepreciacion] Buscando depreciaciones');
       console.log('📊 [useDepreciacion] Parámetros de búsqueda:', {
-        anio: anioSeleccionado,
-        codTipoCasa: tipoCasaSeleccionado
+        anio: anioSeleccionado || undefined,
+        codTipoCasa: tipoCasaSeleccionado || undefined
       });
       
       await cargarDepreciaciones({
-        anio: anioSeleccionado,
-        codTipoCasa: tipoCasaSeleccionado
+        anio: anioSeleccionado || undefined,
+        codTipoCasa: tipoCasaSeleccionado || undefined
       });
       
     } catch (err: any) {
@@ -229,7 +229,7 @@ export const useDepreciacion = () => {
       console.error('❌ [useDepreciacion] Error buscando:', err);
       NotificationService.error(mensaje);
     }
-  }, [anioSeleccionado, tipoCasaSeleccionado, cargarDepreciaciones]);
+  }, [anioSeleccionado || undefined, tipoCasaSeleccionado || undefined, cargarDepreciaciones]);
 
   // Actualizar depreciación usando la API real
   const actualizarDepreciacion = useCallback(async (id: number, datos: any) => {
@@ -245,8 +245,8 @@ export const useDepreciacion = () => {
       
       // Recargar las depreciaciones después de actualizar
       await cargarDepreciaciones({
-        anio: anioSeleccionado,
-        codTipoCasa: tipoCasaSeleccionado
+        anio: anioSeleccionado || undefined,
+        codTipoCasa: tipoCasaSeleccionado || undefined
       });
       
       console.log('✅ [useDepreciacion] Depreciación actualizada exitosamente');
@@ -259,7 +259,7 @@ export const useDepreciacion = () => {
     } finally {
       setLoading(false);
     }
-  }, [anioSeleccionado, tipoCasaSeleccionado, cargarDepreciaciones]);
+  }, [anioSeleccionado || undefined, tipoCasaSeleccionado || undefined, cargarDepreciaciones]);
 
   // Eliminar depreciación usando la API real
   const eliminarDepreciacion = useCallback(async (id: number) => {
@@ -275,8 +275,8 @@ export const useDepreciacion = () => {
       
       // Recargar las depreciaciones después de eliminar
       await cargarDepreciaciones({
-        anio: anioSeleccionado,
-        codTipoCasa: tipoCasaSeleccionado
+        anio: anioSeleccionado || undefined,
+        codTipoCasa: tipoCasaSeleccionado || undefined
       });
       
       console.log('✅ [useDepreciacion] Depreciación eliminada exitosamente');
@@ -289,7 +289,7 @@ export const useDepreciacion = () => {
     } finally {
       setLoading(false);
     }
-  }, [anioSeleccionado, tipoCasaSeleccionado, cargarDepreciaciones]);
+  }, [anioSeleccionado || undefined, tipoCasaSeleccionado || undefined, cargarDepreciaciones]);
 
   // Cambiar página de la lista
   const cambiarPagina = useCallback((nuevaPagina: number) => {

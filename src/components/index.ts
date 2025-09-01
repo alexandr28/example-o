@@ -33,8 +33,8 @@ export { default as BarrioList } from './barrio/BarrioList';
 export { default as DireccionForm } from './direcciones/DireccionForm';
 export { default as DireccionList } from './direcciones/DireccionList';
 // Aranceles Asignacion
-export {  AsignacionArancelForm } from './aranceles/AsignacionArancelForm';
-export {  ListaArancelesPorDireccion } from './aranceles/ListaArancelesPorDireccion';
+export {  AsignacionArancelForm } from './aranceles/ArancelForm';
+export {  ListaArancelesPorDireccion } from './aranceles/ArancelList';
 // Valores Unitarios
 export { default as ValorUnitarioForm } from './unitarios/ValorUnitarioForm';
 export { default as ValorUnitarioList } from './unitarios/ValorUnitarioList';

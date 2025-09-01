@@ -22,7 +22,8 @@ import {
   Stack,
   useTheme,
   alpha,
-  Fade
+  Fade,
+  Button
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -31,21 +32,20 @@ import {
   Home as HomeIcon,
   Route as RouteIcon,
   Map as MapIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  Add as AddIcon
 } from '@mui/icons-material';
 import { Calle } from '../../models/Calle';
 
 interface CalleListProps {
   calles: Calle[];
   onSelectCalle: (calle: Calle) => void;
-  onEliminar?: (id: number) => void;
   loading?: boolean;
   onSearch?: (term: string) => void;
   searchTerm?: string;
   obtenerNombreSector?: (sectorId: number) => string;
   obtenerNombreBarrio?: (barrioId: number) => string;
+  onNuevaCalle?: () => void;
 }
 
 type Order = 'asc' | 'desc';
@@ -66,13 +66,27 @@ const headCells: HeadCell[] = [
 const CalleListMUI: React.FC<CalleListProps> = ({
   calles,
   onSelectCalle,
-  onEliminar,
   loading = false,
   onSearch,
   searchTerm = '',
   obtenerNombreSector,
-  obtenerNombreBarrio
+  obtenerNombreBarrio,
+  onNuevaCalle
 }) => {
+  // Debug: Log de datos recibidos
+  console.log('📊 [CalleList] Datos recibidos:', {
+    totalCalles: calles.length,
+    loading,
+    searchTerm,
+    primerasCincoCalles: calles.slice(0, 5)
+  });
+
+  // Debug: Verificar keys únicas
+  const keys = calles.map((calle, index) => calle.codVia || calle.id || `calle-${index}`);
+  const uniqueKeys = new Set(keys);
+  if (keys.length !== uniqueKeys.size) {
+    console.warn('⚠️ [CalleList] Keys duplicadas detectadas:', keys);
+  }
   const theme = useTheme();
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -92,29 +106,29 @@ const CalleListMUI: React.FC<CalleListProps> = ({
     setOrderBy(property);
   };
 
-  // Manejo de búsqueda
+  // Manejo de cambio de texto (sin búsqueda automática)
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setLocalSearchTerm(value);
-    if (onSearch) {
-      // Debounce la búsqueda
-      const timeoutId = setTimeout(() => {
-        onSearch(value);
-      }, 300);
-      return () => clearTimeout(timeoutId);
-    }
+    // NO ejecutar búsqueda automáticamente - solo actualizar el estado local
+  };
+
+  // Ejecutar búsqueda local manual
+  const handleSearchClick = () => {
+    console.log('🔍 [CalleList] Ejecutando búsqueda local:', localSearchTerm);
+    // La búsqueda se ejecuta automáticamente a través del useMemo en sortedAndFilteredCalles
+    // Solo necesitamos forzar un re-render si es necesario
+    setPage(0); // Resetear a la primera página al buscar
   };
 
   // Limpiar búsqueda
   const handleClearSearch = () => {
     setLocalSearchTerm('');
-    if (onSearch) {
-      onSearch('');
-    }
+    setPage(0); // Resetear a la primera página
   };
 
   // Cambio de página
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
   };
 
@@ -124,8 +138,19 @@ const CalleListMUI: React.FC<CalleListProps> = ({
     setPage(0);
   };
 
-  // Selección de calle
+  // Selección de calle para edición
   const handleSelectCalle = (calle: Calle) => {
+    console.log('📝 [CalleList] Seleccionando calle para edición:', calle);
+    console.log('📝 [CalleList] Datos completos de la calle:', {
+      codVia: calle.codVia,
+      codTipoVia: calle.codTipoVia,
+      nombreVia: calle.nombreVia,
+      codBarrio: calle.codBarrio,
+      codSector: calle.codSector,
+      nombreBarrio: calle.nombreBarrio,
+      descTipoVia: calle.descTipoVia
+    });
+    
     setSelectedId(calle.codVia ?? calle.id ?? 0);
     onSelectCalle(calle);
   };
@@ -154,8 +179,8 @@ const CalleListMUI: React.FC<CalleListProps> = ({
       console.log('🔍 [CalleList] nombreBarrio en primera calle:', filteredData[0].nombreBarrio);
     }
 
-    // Aplicar filtro de búsqueda local si no hay función de búsqueda externa
-    if (!onSearch && localSearchTerm) {
+    // Aplicar filtro de búsqueda local siempre
+    if (localSearchTerm) {
       filteredData = filteredData.filter(calle => {
         const nombreCompleto = getNombreCompleto(calle).toLowerCase();
         const ubicacion = getUbicacion(calle).toLowerCase();
@@ -235,44 +260,7 @@ const CalleListMUI: React.FC<CalleListProps> = ({
       }}
     >
       <Stack spacing={2} sx={{ p: 2 }}>
-        {/* Header */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 2, 
-          pb: 2,
-          borderBottom: '2px solid',
-          borderColor: 'primary.main'
-        }}>
-          <Box sx={{
-            p: 1,
-            borderRadius: 1,
-            backgroundColor: 'primary.main',
-            color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <MapIcon />
-          </Box>
-          <Typography variant="h6" fontWeight={600}>
-            Lista de Calles
-          </Typography>
-          <Box sx={{ flex: 1 }} />
-          <Chip
-            label={`Total: ${calles.length}`}
-            color="primary"
-            variant="filled"
-            size="small"
-          />
-          <Chip
-            label={`Filtradas: ${sortedAndFilteredCalles.length}`}
-            color="secondary"
-            variant="outlined"
-            size="small"
-          />
-        </Box>
-
+       
         {/* Barra de búsqueda expandida horizontalmente */}
         <Box sx={{ 
           display: 'flex', 
@@ -315,6 +303,53 @@ const CalleListMUI: React.FC<CalleListProps> = ({
             }}
             sx={{ maxWidth: '400px' }}
           />
+          
+          {/* Botón Buscar */}
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<SearchIcon />}
+            onClick={handleSearchClick}
+            disabled={!localSearchTerm.trim()}
+            sx={{
+              minWidth: 100,
+              height: 40,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Buscar
+          </Button>
+
+          {/* Botón Nuevo */}
+          <Button
+            variant="outlined"
+            color="secondary"
+            startIcon={<AddIcon />}
+            onClick={() => {
+              console.log('➕ [CalleList] Botón Nuevo clickeado');
+              // Limpiar búsquedas
+              setLocalSearchTerm('');
+              setPage(0);
+              // Ejecutar función de nuevo si existe
+              if (onNuevaCalle) {
+                console.log('📝 [CalleList] Ejecutando función onNuevaCalle');
+                onNuevaCalle();
+              }
+            }}
+            sx={{
+              minWidth: 100,
+              height: 40,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Nuevo
+          </Button>
         </Box>
 
         {/* Tabla con scroll interno */}
@@ -359,7 +394,8 @@ const CalleListMUI: React.FC<CalleListProps> = ({
                     sx={{ 
                       fontWeight: 700,
                       fontSize: '0.875rem',
-                      bgcolor: alpha(theme.palette.primary.main, 0.08),
+                      bgcolor: theme.palette.background.paper, // Fondo sólido primero
+                      backgroundImage: `linear-gradient(${alpha(theme.palette.primary.main, 0.08)}, ${alpha(theme.palette.primary.main, 0.08)})`, // Luego el color
                       color: theme.palette.primary.main,
                       borderBottom: `2px solid ${theme.palette.primary.main}`,
                       textTransform: 'uppercase',
@@ -367,7 +403,7 @@ const CalleListMUI: React.FC<CalleListProps> = ({
                       py: 2,
                       position: 'sticky',
                       top: 0,
-                      zIndex: 1
+                      zIndex: 10 // Aumentar z-index para asegurar que esté encima
                     }}
                   >
                     {headCell.sortable ? (
@@ -432,13 +468,11 @@ const CalleListMUI: React.FC<CalleListProps> = ({
                 </TableRow>
               ) : (
                 paginatedCalles.map((calle, index) => (
-                  <Fade in={true} key={calle.id} timeout={300 + (index * 100)}>
+                  <Fade in={true} key={calle.codVia || calle.id || `calle-${index}`} timeout={300 + (index * 100)}>
                     <TableRow
                       hover
-                      onClick={() => handleSelectCalle(calle)}
-                      selected={selectedId === calle.id}
+                      selected={selectedId === (calle.codVia || calle.id)}
                       sx={{ 
-                        cursor: 'pointer',
                         transition: 'all 0.2s ease-in-out',
                         '&:hover': {
                           bgcolor: alpha(theme.palette.primary.main, 0.04),
@@ -501,10 +535,16 @@ const CalleListMUI: React.FC<CalleListProps> = ({
                         </Box>
                       </TableCell>
                       <TableCell sx={{ py: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}>
-                        <Stack direction="column" spacing={0.5}>
+                        <Box sx={{ 
+                          display: 'flex', 
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 1,
+                          flexWrap: 'wrap'
+                        }}>
                           <Chip
                             icon={<LocationCityIcon fontSize="small" />}
-                            label={obtenerNombreSector && calle.codSector ? obtenerNombreSector(calle.codSector) : `Sector ${calle.codSector ?? 'N/A'}`}
+                            label={calle.nombreSector || (obtenerNombreSector && calle.codSector ? obtenerNombreSector(calle.codSector) : `Sector ${calle.codSector ?? 'N/A'}`)}
                             size="small"
                             variant="outlined"
                             sx={{
@@ -512,8 +552,24 @@ const CalleListMUI: React.FC<CalleListProps> = ({
                               color: theme.palette.info.dark,
                               borderColor: alpha(theme.palette.info.main, 0.3),
                               fontWeight: 500,
+                              height: 28, // Altura aumentada
+                              minHeight: 28, // Altura mínima
+                              display: 'flex',
+                              alignItems: 'center',
+                              '& .MuiChip-root': {
+                                alignItems: 'center'
+                              },
                               '& .MuiChip-icon': {
-                                color: theme.palette.info.main
+                                color: theme.palette.info.main,
+                                marginLeft: '5px',
+                                marginRight: '-2px'
+                              },
+                              '& .MuiChip-label': {
+                                paddingLeft: '8px',
+                                paddingRight: '12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                lineHeight: 1
                               }
                             }}
                           />
@@ -527,12 +583,28 @@ const CalleListMUI: React.FC<CalleListProps> = ({
                               color: theme.palette.success.dark,
                               borderColor: alpha(theme.palette.success.main, 0.3),
                               fontWeight: 500,
+                              height: 28, // Altura aumentada
+                              minHeight: 28, // Altura mínima
+                              display: 'flex',
+                              alignItems: 'center',
+                              '& .MuiChip-root': {
+                                alignItems: 'center'
+                              },
                               '& .MuiChip-icon': {
-                                color: theme.palette.success.main
+                                color: theme.palette.success.main,
+                                marginLeft: '5px',
+                                marginRight: '-2px'
+                              },
+                              '& .MuiChip-label': {
+                                paddingLeft: '8px',
+                                paddingRight: '12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                lineHeight: 1
                               }
                             }}
                           />
-                        </Stack>
+                        </Box>
                       </TableCell>
                       <TableCell 
                         align="center"
@@ -544,7 +616,7 @@ const CalleListMUI: React.FC<CalleListProps> = ({
                             color="primary"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onSelectCalle(calle);
+                              handleSelectCalle(calle);
                             }}
                             sx={{
                               bgcolor: alpha(theme.palette.primary.main, 0.08),

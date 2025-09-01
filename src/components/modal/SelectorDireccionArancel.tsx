@@ -2,25 +2,20 @@
 import React, { useState } from 'react';
 import {
   Dialog,
-  DialogTitle,
   DialogContent,
   DialogActions,
   Button,
   Box,
   Typography,
-  IconButton,
   useTheme,
   alpha,
   Stack,
-  Divider
 } from '@mui/material';
 import {
-  Close as CloseIcon,
-  LocationOn as LocationIcon,
   Assignment as AssignmentIcon
 } from '@mui/icons-material';
 
-import { ListaArancelesPorDireccion } from '../aranceles/ListaArancelesPorDireccion';
+import { ListaArancelesPorDireccion } from '../aranceles/ArancelList';
 import { ArancelData } from '../../services/arancelService';
 
 interface SelectorDireccionArancelProps {
@@ -28,13 +23,14 @@ interface SelectorDireccionArancelProps {
   onClose: () => void;
   onSelectArancel?: (arancel: ArancelData) => void;
   title?: string;
+  useGeneralApi?: boolean;
 }
 
 const SelectorDireccionArancel: React.FC<SelectorDireccionArancelProps> = ({
   open,
   onClose,
   onSelectArancel,
-  title = "Selector de Dirección con Arancel"
+  useGeneralApi = true
 }) => {
   const theme = useTheme();
   const [selectedArancel, setSelectedArancel] = useState<ArancelData | null>(null);
@@ -107,10 +103,13 @@ const SelectorDireccionArancel: React.FC<SelectorDireccionArancelProps> = ({
             </Box>
             <Box>
               <Typography variant="subtitle2" fontWeight={600} color="primary.main">
-                Lista de Aranceles
+                {useGeneralApi ? 'Lista de Aranceles - API General' : 'Lista de Aranceles'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Los aranceles se cargan por año y muestran los costos por dirección
+                {useGeneralApi 
+                  ? 'Búsqueda avanzada por sector, barrio, calle y dirección completa'
+                  : 'Los aranceles se cargan por año y muestran los costos por dirección'
+                }
               </Typography>
             </Box>
           </Stack>
@@ -126,6 +125,7 @@ const SelectorDireccionArancel: React.FC<SelectorDireccionArancelProps> = ({
             onSelectArancel={handleSelectArancel}
             selectedArancelId={selectedArancel?.codArancel || null}
             selectionMode={true}
+            useGeneralApi={useGeneralApi}
           />
         </Box>
       </DialogContent>
@@ -141,7 +141,10 @@ const SelectorDireccionArancel: React.FC<SelectorDireccionArancelProps> = ({
         }}
       >
         <Typography variant="body2" color="text.secondary">
-          Tip: Seleccione un a�o para ver los aranceles disponibles
+          {useGeneralApi 
+            ? 'Tip: Use la búsqueda general para encontrar aranceles por cualquier criterio'
+            : 'Tip: Seleccione un año para ver los aranceles disponibles'
+          }
         </Typography>
         
         <Stack direction="row" spacing={2}>

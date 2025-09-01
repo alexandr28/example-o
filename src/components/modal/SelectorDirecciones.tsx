@@ -99,6 +99,21 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
     }
   }, [open, cargarDirecciones, direcciones.length]);
 
+  // Aplicar filtro de búsqueda
+  const aplicarFiltroBusqueda = useCallback((termino: string) => {
+    const terminoLower = termino.toLowerCase();
+    const filtradas = direcciones.filter(dir => 
+      dir.nombreVia?.toLowerCase().includes(terminoLower) ||
+      dir.nombreBarrio?.toLowerCase().includes(terminoLower) ||
+      dir.nombreSector?.toLowerCase().includes(terminoLower) ||
+      dir.descripcion?.toLowerCase().includes(terminoLower) ||
+      dir.cuadra?.toLowerCase().includes(terminoLower) ||
+      dir.nombreTipoVia?.toLowerCase().includes(terminoLower)
+    );
+    setDireccionesFiltradas(filtradas);
+    setPage(0);
+  }, [direcciones]);
+
   // Aplicar filtro cuando cambie la búsqueda
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -123,22 +138,6 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
   // Inicializar direcciones filtradas cuando cambien las direcciones
   useEffect(() => {
     setDireccionesFiltradas(direcciones);
-  }, [direcciones]);
-
-
-  // Aplicar filtro de búsqueda
-  const aplicarFiltroBusqueda = useCallback((termino: string) => {
-    const terminoLower = termino.toLowerCase();
-    const filtradas = direcciones.filter(dir => 
-      dir.nombreVia?.toLowerCase().includes(terminoLower) ||
-      dir.nombreBarrio?.toLowerCase().includes(terminoLower) ||
-      dir.nombreSector?.toLowerCase().includes(terminoLower) ||
-      dir.descripcion?.toLowerCase().includes(terminoLower) ||
-      dir.cuadra?.toLowerCase().includes(terminoLower) ||
-      dir.nombreTipoVia?.toLowerCase().includes(terminoLower)
-    );
-    setDireccionesFiltradas(filtradas);
-    setPage(0);
   }, [direcciones]);
 
   // Manejar selección
@@ -182,7 +181,7 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
   };
 
   // Paginación
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (_: unknown, newPage: number) => {
     setPage(newPage);
   };
 
@@ -206,6 +205,10 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
       fullWidth
       TransitionComponent={Fade}
       TransitionProps={{ timeout: 300 }}
+      keepMounted={false}
+      disableEnforceFocus={true}
+      disableAutoFocus={true}
+      disableRestoreFocus={true}
     >
       <DialogTitle>
         <Stack direction="row" alignItems="center" justifyContent="space-between">

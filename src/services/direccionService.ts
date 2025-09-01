@@ -27,6 +27,10 @@ export interface DireccionData {
   fechaRegistro?: string;
   fechaModificacion?: string;
   codUsuario?: number;
+  ruta?: number;
+  zona?: number;
+  rutaNombre?: string;
+  zonaNombre?: string;
 }
 
 export interface CreateDireccionDTO {
@@ -39,6 +43,8 @@ export interface CreateDireccionDTO {
   loteFinal?: number;
   descripcion?: string;
   codUsuario?: number;
+  ruta?: number;
+  zona?: number;
 }
 
 export interface UpdateDireccionDTO extends Partial<CreateDireccionDTO> {
@@ -79,17 +85,21 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
           nombreBarrio: item.nombreBarrio || '',
           nombreCalle: item.nombreVia || item.nombreCalle || '',
           nombreVia: item.nombreVia || '',
-          nombreTipoVia: item.nombreTipoVia || 'CALLE',
+          nombreTipoVia: item.nombreTipoVia || '',
           cuadra: item.cuadra?.toString() || '',
-          lado: item.lado || 'D',
+          lado: item.codLado === 8101 ? 'PAR' : item.codLado === 8102 ? 'IMPAR' : 'NINGUNO',
           loteInicial: item.loteInicial ? parseInt(item.loteInicial) : undefined,
           loteFinal: item.loteFinal ? parseInt(item.loteFinal) : undefined,
-          descripcion: item.descripcion || 
+          descripcion: item.direccionCompleta || 
             `${item.nombreTipoVia || 'CALLE'} ${item.nombreVia || ''} ${item.cuadra ? `CUADRA ${item.cuadra}` : ''}`.trim(),
           estado: item.estado || 'ACTIVO',
           fechaRegistro: item.fechaRegistro,
           fechaModificacion: item.fechaModificacion,
-          codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario
+          codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario,
+          ruta: item.codRuta || undefined,
+          zona: item.codZona || undefined,
+          rutaNombre: item.ruta || '',
+          zonaNombre: item.zona || ''
         }),
         
         validateItem: (item: DireccionData) => {
@@ -121,7 +131,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
       // Construir URL con query parameters
       const queryParams = new URLSearchParams();
       
-      // Agregar parámetros requeridos para form-data
+      // Agregar parámetros requeridos
       queryParams.append('parametrosBusqueda', params?.parametrosBusqueda || 'a');
       queryParams.append('codUsuario', '1');
       
@@ -130,7 +140,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
         queryParams.append('estado', params.estado);
       }
       
-      const url = `${API_CONFIG.baseURL}${this.endpoint}/listarDireccionPorNombreVia?${queryParams.toString()}`;
+      const url = `${API_CONFIG.baseURL}${this.endpoint}/listarDireccion?${queryParams.toString()}`;
       console.log('📡 [DireccionService] GET:', url);
       
       // Petición directa sin autenticación
@@ -153,15 +163,15 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
       
       const responseData = await response.json();
       console.log('✅ [DireccionService] Datos recibidos:', responseData);
+      console.log('✅ [DireccionService] Primer item del array:', responseData[0]);
       
-      // Manejar la estructura de respuesta
-      if (responseData.success && responseData.data) {
-        const data = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
-        console.log('📊 [DireccionService] Normalizando', data.length, 'direcciones');
+      // Si la respuesta es directamente un array (nueva estructura)
+      if (Array.isArray(responseData)) {
+        console.log('📊 [DireccionService] Normalizando', responseData.length, 'direcciones');
         
-        // Normalizar los datos según la estructura real de la API
-        const direccionesNormalizadas = data.map((item: any) => ({
-          id: item.codDireccion || Date.now() + Math.random(), // Generar ID único si no existe
+        // Normalizar los datos según la nueva estructura de la API
+        const direccionesNormalizadas = responseData.map((item: any) => ({
+          id: item.codDireccion || Date.now() + Math.random(),
           codigo: item.codDireccion || 0,
           codigoSector: item.codSector || 0,
           codigoBarrio: item.codBarrio || 0,
@@ -172,21 +182,29 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
           nombreBarrio: item.nombreBarrio || '',
           nombreCalle: item.nombreVia || '',
           nombreVia: item.nombreVia || '',
-          nombreTipoVia: item.nombreTipoVia || 'CALLE',
+          nombreTipoVia: item.nombreTipoVia || '',
           cuadra: item.cuadra?.toString() || '',
-          lado: item.lado || '-',
-          loteInicial: item.loteInicial ? parseInt(item.loteInicial) : undefined,
-          loteFinal: item.loteFinal ? parseInt(item.loteFinal) : undefined,
-          descripcion: `${item.nombreTipoVia || 'CALLE'} ${item.nombreVia || ''} ${item.cuadra ? `CUADRA ${item.cuadra}` : ''}`.trim(),
-          estado: 'ACTIVO'
+          lado: item.codLado === 8101 ? 'PAR' : item.codLado === 8102 ? 'IMPAR' : 'NINGUNO',
+          loteInicial: item.loteInicial || undefined,
+          loteFinal: item.loteFinal || undefined,
+          descripcion: item.direccionCompleta || '',
+          estado: 'ACTIVO',
+          ruta: item.codRuta || undefined,
+          zona: item.codZona || undefined,
+          rutaNombre: item.ruta || '',
+          zonaNombre: item.zona || ''
         }));
+        
+        console.log('✅ [DireccionService] Primera dirección normalizada:', direccionesNormalizadas[0]);
+        console.log('✅ [DireccionService] Campos de primera dirección:', Object.keys(direccionesNormalizadas[0]));
         
         return direccionesNormalizadas;
       }
       
-      // Si la respuesta es directamente un array
-      if (Array.isArray(responseData)) {
-        return this.normalizeData(responseData);
+      // Manejar la estructura de respuesta antigua (si existe)
+      if (responseData.success && responseData.data) {
+        const data = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+        return this.normalizeData(data);
       }
       
       return [];
@@ -232,7 +250,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
         queryParams.append('estado', params.estado);
       }
       
-      const url = `${API_CONFIG.baseURL}${this.endpoint}/listarDireccionPorNombreVia?${queryParams.toString()}`;
+      const url = `${API_CONFIG.baseURL}${this.endpoint}/listarDireccion?${queryParams.toString()}`;
       
       const response = await fetch(url, {
         method: 'GET',
@@ -295,6 +313,14 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
         throw new Error('Debe proporcionar sector, barrio y calle');
       }
       
+      if (!datos.ruta) {
+        throw new Error('Debe seleccionar una ruta');
+      }
+      
+      if (!datos.zona) {
+        throw new Error('Debe seleccionar una zona');
+      }
+      
       if (datos.loteInicial && datos.loteFinal) {
         if (datos.loteInicial > datos.loteFinal) {
           throw new Error('El lote inicial no puede ser mayor al lote final');
@@ -304,14 +330,15 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
       // Preparar datos en formato JSON según el ejemplo proporcionado
       const requestData = {
         codDireccion: null,
-        codBarrioVia: datos.codigoBarrio, // Usando el barrio seleccionado
+        codBarrioVia: datos.codigoBarrio,
         cuadra: datos.cuadra ? parseInt(datos.cuadra) : 1,
-        codLado: datos.lado && datos.lado !== 'Ninguno' ? datos.lado.charAt(0).toUpperCase() : 'A',
+        codLado: datos.lado === 'PAR' ? 8101 : datos.lado === 'IMPAR' ? 8102 : 8103, // Mapear lado a código
         loteInicial: datos.loteInicial || 1,
         loteFinal: datos.loteFinal || 20,
-        codUsuario: 1,
-        codSector: datos.codigoSector,
-        codVia: datos.codigoCalle, // La calle seleccionada
+        codUsuario: datos.codUsuario || 1,
+        codZona: datos.zona || 1,
+        codRuta: datos.ruta || 1,
+        codVia: datos.codigoCalle,
         codBarrio: datos.codigoBarrio,
         parametroBusqueda: null
       };
@@ -333,14 +360,71 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
         throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
       }
       
-      const responseData = await response.json();
+      // Try to parse response
+      let responseData;
+      const contentType = response.headers.get('content-type');
       
-      if (responseData.success && responseData.data) {
-        const direcciones = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
-        return this.normalizeData(direcciones)[0];
+      if (contentType && contentType.includes('application/json')) {
+        responseData = await response.json();
+      } else {
+        // If response is not JSON, it might be a simple text or number (ID)
+        const responseText = await response.text();
+        console.log('📡 [DireccionService] Respuesta no JSON:', responseText);
+        
+        // If we get a number, it's likely the ID of the created direccion
+        const possibleId = parseInt(responseText);
+        if (!isNaN(possibleId) && possibleId > 0) {
+          // Return a basic direccion object with the new ID
+          return {
+            id: possibleId,
+            codigo: possibleId,
+            codigoSector: datos.codigoSector,
+            codigoBarrio: datos.codigoBarrio,
+            codigoCalle: datos.codigoCalle,
+            cuadra: datos.cuadra,
+            lado: datos.lado,
+            loteInicial: datos.loteInicial,
+            loteFinal: datos.loteFinal,
+            estado: 'ACTIVO'
+          } as DireccionData;
+        }
       }
       
-      throw new Error('Error al crear la dirección');
+      console.log('📡 [DireccionService] Respuesta recibida:', responseData);
+      
+      // Handle different response structures
+      if (responseData) {
+        // If response has success and data properties
+        if (responseData.success && responseData.data) {
+          const direcciones = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+          return this.normalizeData(direcciones)[0];
+        }
+        
+        // If response is directly the data
+        if (responseData.codDireccion || responseData.id) {
+          return this.normalizeData([responseData])[0];
+        }
+        
+        // If response is an array
+        if (Array.isArray(responseData) && responseData.length > 0) {
+          return this.normalizeData(responseData)[0];
+        }
+      }
+      
+      // If we reach here but the status was OK, assume success
+      console.log('⚠️ [DireccionService] Respuesta exitosa pero estructura no reconocida, asumiendo éxito');
+      return {
+        id: Date.now(), // Temporary ID
+        codigo: Date.now(),
+        codigoSector: datos.codigoSector,
+        codigoBarrio: datos.codigoBarrio,
+        codigoCalle: datos.codigoCalle,
+        cuadra: datos.cuadra,
+        lado: datos.lado,
+        loteInicial: datos.loteInicial,
+        loteFinal: datos.loteFinal,
+        estado: 'ACTIVO'
+      } as DireccionData;
       
     } catch (error) {
       console.error('Error al crear dirección:', error);

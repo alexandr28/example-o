@@ -127,8 +127,8 @@ export function useCrudEntity<T extends { id?: number; codigo?: number }, Create
   });
 
   // Referencias
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
-  const abortControllerRef = useRef<AbortController>();
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Verificar conexión
   useEffect(() => {
