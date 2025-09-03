@@ -246,8 +246,8 @@ const sistemaMenuItems: MenuItem[] = [
       // Tarifas
       { id: 'uit-epa', label: 'UIT - EPA', path: '/mantenedores/uit' },
       { id: 'depreciacion', label: 'Depreciación', path: '/mantenedores/depreciacion' },
-      { id: 'alcabala', label: 'Alcabala', path: '/mantenedores/alcabala' },
       { id: 'arbitrios', label: 'Arbitrios', path: '/mantenedores/arbitrios' },
+      { id: 'alcabala', label: 'Alcabala', path: '/mantenedores/alcabala' },
       { id: 'escala', label: 'Escala', path: '/mantenedores/escala' },
     ],
   },

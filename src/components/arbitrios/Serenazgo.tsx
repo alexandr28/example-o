@@ -32,11 +32,12 @@ interface CuadranteOption {
 }
 
 interface TasaSerenazgoData {
-  grupoUso: string;
-  cuadrante1: number | '';
-  cuadrante2: number | '';
-  cuadrante3: number | '';
-  cuadrante4: number | '';
+  cuadrante: string;
+  casaHabitacion: number | '';
+  comercio: number | '';
+  servicios: number | '';
+  industrias: number | '';
+  otros: number | '';
 }
 
 const Serenazgo: React.FC = () => {
@@ -59,58 +60,45 @@ const Serenazgo: React.FC = () => {
   const [mostrarTabla, setMostrarTabla] = useState(false);
 
   // Datos de ejemplo para los Autocomplete
-  const gruposUso: GrupoUsoOption[] = [
-    { id: 1, label: 'Vivienda' },
-    { id: 2, label: 'Comercial' },
-    { id: 3, label: 'Industrial' },
-    { id: 4, label: 'Institucional' },
-    { id: 5, label: 'Otros Usos' },
+  // 1. Actualizar los grupos de uso para que coincidan con la tabla
+const gruposUso: GrupoUsoOption[] = [
+    { id: 1, label: 'Casa Habitación' },
+    { id: 2, label: 'Comercio' },
+    { id: 3, label: 'Servicios' },
+    { id: 4, label: 'Industrias' },
+    { id: 5, label: 'Otros' },
   ];
-
+  
+  // 2. Actualizar los cuadrantes para tener 12 en lugar de 4
   const cuadrantes: CuadranteOption[] = [
-    { id: 1, label: 'Cuadrante 1 - Centro' },
-    { id: 2, label: 'Cuadrante 2 - Norte' },
-    { id: 3, label: 'Cuadrante 3 - Sur' },
-    { id: 4, label: 'Cuadrante 4 - Periferia' },
+    { id: 1, label: 'Cuadrante 1' },
+    { id: 2, label: 'Cuadrante 2' },
+    { id: 3, label: 'Cuadrante 3' },
+    { id: 4, label: 'Cuadrante 4' },
+    { id: 5, label: 'Cuadrante 5' },
+    { id: 6, label: 'Cuadrante 6' },
+    { id: 7, label: 'Cuadrante 7' },
+    { id: 8, label: 'Cuadrante 8' },
+    { id: 9, label: 'Cuadrante 9' },
+    { id: 10, label: 'Cuadrante 10' },
+    { id: 11, label: 'Cuadrante 11' },
+    { id: 12, label: 'Cuadrante 12' },
   ];
 
-  // Datos de ejemplo para la tabla de tasas de serenazgo
+  // Datos de ejemplo para la tabla de tasas de serenazgo con 12 cuadrantes
   const datosTasasSerenazgo: TasaSerenazgoData[] = [
-    {
-      grupoUso: 'Vivienda',
-      cuadrante1: 25.50,
-      cuadrante2: 22.75,
-      cuadrante3: 20.30,
-      cuadrante4: 18.80
-    },
-    {
-      grupoUso: 'Comercial',
-      cuadrante1: 45.30,
-      cuadrante2: 42.60,
-      cuadrante3: 38.85,
-      cuadrante4: 35.90
-    },
-    {
-      grupoUso: 'Industrial',
-      cuadrante1: 65.75,
-      cuadrante2: 62.40,
-      cuadrante3: 58.60,
-      cuadrante4: 54.85
-    },
-    {
-      grupoUso: 'Institucional',
-      cuadrante1: 35.50,
-      cuadrante2: 32.80,
-      cuadrante3: 29.20,
-      cuadrante4: 26.15
-    },
-    {
-      grupoUso: 'Otros Usos',
-      cuadrante1: 30.25,
-      cuadrante2: 28.45,
-      cuadrante3: 25.95,
-      cuadrante4: 23.60
-    }
+    { cuadrante: 'Cuadrante 1', casaHabitacion: 25.50, comercio: 45.30, servicios: 55.75, industrias: 75.75, otros: 30.25 },
+    { cuadrante: 'Cuadrante 2', casaHabitacion: 22.75, comercio: 42.60, servicios: 52.40, industrias: 72.40, otros: 28.45 },
+    { cuadrante: 'Cuadrante 3', casaHabitacion: 20.30, comercio: 38.85, servicios: 48.60, industrias: 68.60, otros: 25.95 },
+    { cuadrante: 'Cuadrante 4', casaHabitacion: 18.80, comercio: 35.90, servicios: 44.85, industrias: 64.85, otros: 23.60 },
+    { cuadrante: 'Cuadrante 5', casaHabitacion: 24.20, comercio: 44.10, servicios: 54.20, industrias: 74.20, otros: 29.80 },
+    { cuadrante: 'Cuadrante 6', casaHabitacion: 21.45, comercio: 41.25, servicios: 50.90, industrias: 70.90, otros: 27.95 },
+    { cuadrante: 'Cuadrante 7', casaHabitacion: 19.60, comercio: 37.50, servicios: 47.15, industrias: 67.15, otros: 25.40 },
+    { cuadrante: 'Cuadrante 8', casaHabitacion: 17.85, comercio: 34.75, servicios: 43.40, industrias: 63.40, otros: 23.10 },
+    { cuadrante: 'Cuadrante 9', casaHabitacion: 23.10, comercio: 42.80, servicios: 52.65, industrias: 72.65, otros: 29.35 },
+    { cuadrante: 'Cuadrante 10', casaHabitacion: 20.35, comercio: 39.95, servicios: 49.30, industrias: 69.30, otros: 27.50 },
+    { cuadrante: 'Cuadrante 11', casaHabitacion: 18.70, comercio: 36.20, servicios: 45.55, industrias: 65.55, otros: 24.95 },
+    { cuadrante: 'Cuadrante 12', casaHabitacion: 16.95, comercio: 33.45, servicios: 41.80, industrias: 61.80, otros: 22.65 }
   ];
 
   // Handler para cambio de año
@@ -125,12 +113,12 @@ const Serenazgo: React.FC = () => {
   };
 
   // Handler para click en celda de tasa
-  const handleTasaClick = (grupoUsoLabel: string, cuadranteIndex: number, tasaValue: number) => {
+  const handleTasaClick = (grupoUsoLabel: string, cuadranteNumber: number, tasaValue: number) => {
     // Encontrar el grupo de uso correspondiente
     const grupoSeleccionado = gruposUso.find(gu => gu.label === grupoUsoLabel);
     
-    // Encontrar el cuadrante correspondiente (cuadranteIndex + 1 porque el array empieza en 0 pero los cuadrantes en 1)
-    const cuadranteSeleccionado = cuadrantes.find(c => c.id === cuadranteIndex + 1);
+    // Encontrar el cuadrante correspondiente (cuadranteNumber es el número real del cuadrante)
+    const cuadranteSeleccionado = cuadrantes.find(c => c.id === cuadranteNumber);
     
     // Actualizar los campos del formulario
     setFormData({ ...formData, anio: parseInt(anioConsulta) });
@@ -153,7 +141,7 @@ const Serenazgo: React.FC = () => {
       cuadrante,
       tasaNueva
     });
-    // Aqu� ir�a la l�gica para registrar la tasa
+    // Aquí iría la lógica para registrar la tasa
   };
 
   const handleNuevo = () => {
@@ -178,7 +166,7 @@ const Serenazgo: React.FC = () => {
 
   return (
     <Box sx={{ width: '100%' }}>
-      {/* Secci�n Registro de Tasas */}
+      {/* Sección Registro de Tasas */}
       <Paper 
         elevation={2} 
         sx={{ 
@@ -338,7 +326,7 @@ const Serenazgo: React.FC = () => {
 
       <Divider sx={{ my: 3 }} />
 
-      {/* Secci�n Consulta de Tasas */}
+      {/* Seccion Consulta de Tasas */}
       <Paper 
         elevation={2} 
         sx={{ 
@@ -362,7 +350,7 @@ const Serenazgo: React.FC = () => {
           Consulta de Tasas
         </Typography>
 
-        {/* Filtro de b�squeda */}
+        {/* Filtro de búsqueda */}
         <Box sx={{ 
           display: 'flex',
           gap: 2,
@@ -407,7 +395,7 @@ const Serenazgo: React.FC = () => {
           </Button>
         </Box>
 
-        {/* �rea para mostrar resultados - TABLA DE TASAS SERENAZGO */}
+        {/* area para mostrar resultados - TABLA DE TASAS SERENAZGO */}
         {mostrarTabla ? (
           <Box sx={{ mt: 3 }}>
             {/* Header mejorado con chip */}
@@ -451,10 +439,27 @@ const Serenazgo: React.FC = () => {
                 borderRadius: 3,
                 border: '2px solid',
                 borderColor: 'primary.main',
-                overflow: 'hidden'
+                overflow: 'auto',
+                maxHeight: 500,
+                maxWidth: '100%',
+                '&::-webkit-scrollbar': {
+                  width: 8,
+                  height: 8,
+                },
+                '&::-webkit-scrollbar-track': {
+                  backgroundColor: 'grey.200',
+                  borderRadius: 4,
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  backgroundColor: 'grey.400',
+                  borderRadius: 4,
+                  '&:hover': {
+                    backgroundColor: 'grey.500',
+                  },
+                },
               }}
             >
-              <Table sx={{ minWidth: 650 }}>
+              <Table sx={{ minWidth: 1200 }}>
                 <TableHead>
                   <TableRow sx={{ 
                     backgroundColor: 'primary.main',
@@ -469,14 +474,18 @@ const Serenazgo: React.FC = () => {
                         textAlign: 'center',
                         verticalAlign: 'middle',
                         minWidth: 200,
-                        borderRight: '2px solid rgba(255,255,255,0.3)'
+                        borderRight: '2px solid rgba(255,255,255,0.3)',
+                        position: 'sticky',
+                        left: 0,
+                        zIndex: 2,
+                        backgroundColor: 'primary.main'
                       }}
                       rowSpan={2}
                     >
-                      🏢 Grupo de Uso
+                      🏙️ Zona de Servicios
                     </TableCell>
                     <TableCell 
-                      colSpan={4}
+                      colSpan={5}
                       sx={{ 
                         fontSize: '1rem',
                         textAlign: 'center',
@@ -484,7 +493,7 @@ const Serenazgo: React.FC = () => {
                         pb: 1
                       }}
                     >
-                      🛡️ Tasa Mensual (S/)
+                      📍 Cuadrantes - Tasa Mensual (S/)
                     </TableCell>
                   </TableRow>
                   <TableRow sx={{ 
@@ -494,18 +503,18 @@ const Serenazgo: React.FC = () => {
                       fontWeight: 600
                     }
                   }}>
-                    {[1, 2, 3, 4].map((cuadrante) => (
+                    {gruposUso.map((grupo, index) => (
                       <TableCell 
-                        key={cuadrante}
+                        key={grupo.id}
                         sx={{ 
-                          fontSize: '0.9rem',
+                          fontSize: '0.8rem',
                           textAlign: 'center',
-                          borderRight: cuadrante < 4 ? '1px solid rgba(255,255,255,0.2)' : 'none',
+                          borderRight: index < gruposUso.length - 1 ? '1px solid rgba(255,255,255,0.2)' : 'none',
                           minWidth: 120,
                           py: 1.5
                         }}
                       >
-                        🛡️ Cuadrante {cuadrante}
+                        🏢 {grupo.label}
                       </TableCell>
                     ))}
                   </TableRow>
@@ -534,19 +543,23 @@ const Serenazgo: React.FC = () => {
                           borderRight: '2px solid',
                           borderColor: 'divider',
                           backgroundColor: index % 2 === 0 ? 'grey.100' : 'grey.50',
-                          py: 2
+                          py: 2,
+                          cursor: 'default',
+                          position: 'sticky',
+                          left: 0,
+                          zIndex: 1
                         }}
                       >
-                        {fila.grupoUso}
+                        {fila.cuadrante}
                       </TableCell>
-                      {[fila.cuadrante1, fila.cuadrante2, fila.cuadrante3, fila.cuadrante4].map((tasa, cuadranteIndex) => (
+                      {[fila.casaHabitacion, fila.comercio, fila.servicios, fila.industrias, fila.otros].map((tasa, grupoIndex) => (
                         <TableCell 
-                          key={cuadranteIndex}
+                          key={grupoIndex}
                           sx={{ 
                             textAlign: 'center',
-                            fontSize: '0.9rem',
+                            fontSize: '0.8rem',
                             fontWeight: 500,
-                            borderRight: cuadranteIndex < 3 ? '1px solid' : 'none',
+                            borderRight: grupoIndex < 4 ? '1px solid' : 'none',
                             borderColor: 'divider',
                             py: 2,
                             color: tasa ? 'success.main' : 'text.secondary',
@@ -555,12 +568,12 @@ const Serenazgo: React.FC = () => {
                         >
                           {tasa ? (
                             <Tooltip 
-                              title={`Clic para editar: ${fila.grupoUso} - Cuadrante ${cuadranteIndex + 1}`}
+                              title={`Clic para editar: ${fila.cuadrante} - ${gruposUso[grupoIndex].label}`}
                               arrow
                               placement="top"
                             >
                               <Box 
-                                onClick={() => handleTasaClick(fila.grupoUso, cuadranteIndex, tasa)}
+                                onClick={() => handleTasaClick(gruposUso[grupoIndex].label, parseInt(fila.cuadrante.split(' ')[1]), tasa)}
                                 sx={{
                                   backgroundColor: 'success.light',
                                   color: 'success.contrastText',
@@ -600,7 +613,7 @@ const Serenazgo: React.FC = () => {
               </Table>
             </TableContainer>
 
-            {/* Informaci�n adicional mejorada */}
+            {/* Información adicional mejorada */}
             <Box sx={{ 
               mt: 3, 
               p: 3, 
@@ -620,7 +633,7 @@ const Serenazgo: React.FC = () => {
                   gap: 1
                 }}
               >
-                🛡️ Informaci�n sobre las Tasas de Serenazgo
+                🛡️ Información sobre las Tasas de Serenazgo
               </Typography>
               <Typography 
                 variant="body2" 

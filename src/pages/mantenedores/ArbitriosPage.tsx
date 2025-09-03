@@ -12,6 +12,7 @@ import {
   Park as ParkIcon
 } from '@mui/icons-material';
 import MainLayout from '../../layout/MainLayout';
+import LimpiezaPublica from '../../components/arbitrios/LimpiezaPublica';
 import ParquesJardines from '../../components/arbitrios/ParquesJardines';
 import Serenazgo from '../../components/arbitrios/Serenazgo';
 
@@ -133,21 +134,7 @@ const ArbitriosPage: React.FC = () => {
 
         {/* Tab Panels */}
         <TabPanel value={tabValue} index={0}>
-          <Box sx={{ 
-            minHeight: 400, 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            flexDirection: 'column'
-          }}>
-            <CleaningIcon sx={{ fontSize: 80, color: 'action.disabled', mb: 2 }} />
-            <Typography variant="h6" color="text.secondary">
-              Limpieza Pública
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Contenido próximamente disponible
-            </Typography>
-          </Box>
+          <LimpiezaPublica />
         </TabPanel>
 
         <TabPanel value={tabValue} index={1}>
