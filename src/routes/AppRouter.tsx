@@ -21,6 +21,7 @@ import {
   UitPage,
   AlcabalaPage,
   DepreciacionPage,
+  ArbitriosPage,
   NuevoPredio,
   ConsultaPredioPage,
   RegistroPisoPage,
@@ -259,7 +260,7 @@ const AppRouter: React.FC = () => {
                   } />
                   <Route path="/mantenedores/arbitrios" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <ArbitriosPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/mantenedores/escala" element={
