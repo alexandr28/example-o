@@ -301,7 +301,7 @@ const ValorUnitarioForm: React.FC<ValorUnitarioFormProps> = ({
         {onNuevo && (
           <Button
             variant="outlined"
-            color="secondary"
+            color="primary"
             startIcon={<AddIcon />}
             onClick={onNuevo}
             disabled={loading || isSubmitting}

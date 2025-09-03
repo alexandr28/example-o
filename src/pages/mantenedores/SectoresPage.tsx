@@ -360,7 +360,7 @@ const SectoresPage: React.FC = () => {
 
           {/* Panel de Lista */}
           <TabPanel value={tabValue} index={1}>
-            <Box sx={{ p: 3 }}>
+            
               <SectorList
                 sectores={sectores}
                 onSelectSector={seleccionarSector}
@@ -371,7 +371,7 @@ const SectoresPage: React.FC = () => {
                 searchTerm={searchTerm}
                 selectedSector={sectorSeleccionado}
               />
-            </Box>
+         
           </TabPanel>
           </Paper>
         </Box>

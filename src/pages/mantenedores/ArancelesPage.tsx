@@ -99,16 +99,7 @@ const ArancelesPage: React.FC = () => {
             </Button>
           </Stack>
 
-          {/* Alert informativo */}
-          <Alert severity="info" icon={<InfoIcon />} sx={{ mb: 3 }}>
-            <Typography variant="body2">
-              Los aranceles se gestionan usando la nueva API general con búsqueda avanzada por sector, barrio y calle.
-              El sistema utiliza GET con query params para consultas y POST JSON para creación, sin autenticación.
-            </Typography>
-            <Typography variant="caption" sx={{ mt: 1, display: 'block', opacity: 0.7 }}>
-              Nueva API General: http://26.161.18.122:8080/api/arancel/listaGeneral?parametroBusqueda=a&anio=2025&codUsuario=1
-            </Typography>
-          </Alert>
+ 
 
           {/* Tabs */}
           <Paper sx={{ width: '100%%' }}>

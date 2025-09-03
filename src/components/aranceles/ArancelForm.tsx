@@ -377,7 +377,7 @@ export const AsignacionArancelForm: React.FC<AsignacionArancelFormProps> = ({
           
           <Button
             variant="outlined"
-            color="secondary"
+            color="primary"
             startIcon={<AddIcon />}
             onClick={handleNuevo}
             disabled={loading}

@@ -27,7 +27,7 @@ import { DireccionData, CreateDireccionDTO } from '../../services/direccionServi
 import { SectorData } from '../../services/sectorService';
 import { BarrioData } from '../../services/barrioService';
 import { CalleData } from '../../services/calleApiService';
-import { useTiposLadosDireccion, useRutasOptions, useZonasOptions } from '../../hooks/useConstantesOptions';
+import { useTiposLadosDireccion, useRutasOptions, useZonasOptions, useUbicacionAreaVerdeOptions } from '../../hooks/useConstantesOptions';
 
 // Tipo para las opciones de lado
 interface LadoOption {
@@ -85,6 +85,11 @@ const direccionSchema = z.object({
     required_error: 'La zona es requerida', 
     invalid_type_error: 'Seleccione una zona válida'
   }).min(1, 'Debe seleccionar una zona'),
+  
+  ubicacionAreaVerde: z.number({
+    required_error: 'La ubicación área verde es requerida',
+    invalid_type_error: 'Seleccione una ubicación válida'
+  }).optional(),
 });
 
 type DireccionFormData = z.infer<typeof direccionSchema>;
@@ -135,6 +140,9 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
   
   // Hook para zonas
   const { options: zonaOptions, loading: loadingZonas } = useZonasOptions();
+  
+  // Hook para ubicación área verde
+  const { options: ubicacionAreaVerdeOptions, loading: loadingUbicacionAreaVerde } = useUbicacionAreaVerdeOptions();
   
   // Use fallback if no options and not loading - ensure consistent typing
   const effectiveLadoOptions: LadoOption[] = React.useMemo(() => {
@@ -361,9 +369,9 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
         }}>
           {/* Sector */}
           <Box sx={{ 
-            flex: { xs: '1 1 100%', sm: '1 1 280px', md: '0 0 230px' }, 
-            minWidth: { xs: '100%', sm: '280px', md: '230px' },
-            maxWidth: { xs: '100%', sm: '100%', md: '230px' }
+            flex: { xs: '1 1 100%', sm: '1 1 280px', md: '0 0 300px' }, 
+            minWidth: { xs: '100%', sm: '280px', md: '300px' },
+            maxWidth: { xs: '100%', sm: '100%', md: '300px' }
           }}>
               <Controller
                 name="codigoSector"
@@ -417,9 +425,9 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
 
           {/* Barrio */}
           <Box sx={{ 
-            flex: { xs: '1 1 100%', sm: '1 1 220px', md: '0 0 150px' }, 
-            minWidth: { xs: '100%', sm: '220px', md: '150px' },
-            maxWidth: { xs: '100%', sm: '100%', md: '150px' }
+            flex: { xs: '1 1 100%', sm: '1 1 220px', md: '0 0 200px' }, 
+            minWidth: { xs: '100%', sm: '220px', md: '200px' },
+            maxWidth: { xs: '100%', sm: '100%', md: '200px' }
           }}>
             <Controller
               name="codigoBarrio"
@@ -472,9 +480,9 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
 
           {/* Calle/Mz */}
           <Box sx={{ 
-            flex: { xs: '1 1 100%', sm: '1 1 240px', md: '0 0 170px' }, 
-            minWidth: { xs: '100%', sm: '240px', md: '170px' },
-            maxWidth: { xs: '100%', sm: '100%', md: '170px' }
+            flex: { xs: '1 1 100%', sm: '1 1 240px', md: '0 0 300px' }, 
+            minWidth: { xs: '100%', sm: '240px', md: '300px' },
+            maxWidth: { xs: '100%', sm: '100%', md: '300px' }
           }}>
             <Controller
               name="codigoCalle"
@@ -813,6 +821,70 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                           endAdornment: (
                             <>
                               {loadingZonas ? <CircularProgress color="inherit" size={20} /> : null}
+                              {params.InputProps.endAdornment}
+                            </>
+                          ),
+                        }}
+                      />
+                    )}
+                    renderOption={(props, option) => (
+                      <Box component="li" {...props}>
+                        <Box>
+                          <strong>{option.abreviatura}</strong>
+                          {option.descripcion && (
+                            <Box component="span" sx={{ ml: 1, color: 'text.secondary' }}>
+                              - {option.descripcion}
+                            </Box>
+                          )}
+                        </Box>
+                      </Box>
+                    )}
+                  />
+                </FormControl>
+              )}
+            />
+          </Box>
+
+          {/* Ubicación Área Verde */}
+          <Box sx={{ 
+            flex: { xs: '1 1 48%', sm: '0 0 250px', md: '0 0 250px' }, 
+            minWidth: { xs: '48%', sm: '250px', md: '250px' }
+          }}>
+            <Controller
+              name="ubicacionAreaVerde"
+              control={control}
+              render={({ field }) => (
+                <FormControl fullWidth>
+                  <Autocomplete
+                    {...field}
+                    options={ubicacionAreaVerdeOptions || []}
+                    getOptionKey={(option) => `ubicacion-${typeof option === 'number' ? option : option.value}`}
+                    getOptionLabel={(option) => 
+                      typeof option === 'number' 
+                        ? ubicacionAreaVerdeOptions?.find(u => u.value === option)?.label || `Ubicación ${option}`
+                        : option.label || ''
+                    }
+                    value={ubicacionAreaVerdeOptions?.find(u => u.value === field.value) || null}
+                    onChange={(_, newValue) => {
+                      field.onChange(newValue?.value || null);
+                    }}
+                    loading={loadingUbicacionAreaVerde}
+                    disabled={loading || loadingUbicacionAreaVerde}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Ubicación Área Verde"
+                        placeholder="Seleccione una ubicación"
+                        sx={{
+                          '& .MuiInputBase-root': {
+                            height: '40px'
+                          }
+                        }}
+                        InputProps={{
+                          ...params.InputProps,
+                          endAdornment: (
+                            <>
+                              {loadingUbicacionAreaVerde ? <CircularProgress color="inherit" size={20} /> : null}
                               {params.InputProps.endAdornment}
                             </>
                           ),

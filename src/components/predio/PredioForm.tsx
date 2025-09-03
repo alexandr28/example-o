@@ -23,7 +23,8 @@ import {
   LocationOn as LocationIcon,
   PhotoCamera as PhotoIcon,
   Save as SaveIcon,
-  Add as AddIcon
+  Add as AddIcon,
+  Description as DescriptionIcon
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers';
@@ -46,7 +47,8 @@ import {
   useTipoPredioOptions,
   useConstantesOptions,
   useClasificacionPredio,
-  useListaConductorOptions
+  useListaConductorOptions,
+  useGrupoUsoOptions
 } from '../../hooks/useConstantesOptions';
 
 // Services
@@ -67,6 +69,7 @@ interface PredioFormData {
   estadoPredio?: string;
   modoDeclaracion?: string;
   clasificacionPredio?: string;
+  criterioUso?: string;
   
   // Ubicación
   direccionId?: number;
@@ -103,12 +106,13 @@ const predioSchema = z.object({
   estadoPredio: z.string().optional(),
   modoDeclaracion: z.string().optional(),
   clasificacionPredio: z.string().optional(),
+  criterioUso: z.string().optional(),
   direccionId: z.number().optional(),
   direccion: z.any().optional(),
   numeroFinca: z.string().optional(),
   otroNumero: z.string().optional(),
   arancel: z.string().optional(),
-  areaTerreno: z.number().min(0, 'El área debe ser mayor a 0'),
+  areaTerreno: z.number().min(0, 'El área no puede ser negativa'),
   numeroPisos: z.number().min(0).optional(),
   numeroCondominos: z.number().min(0).optional()
 });
@@ -144,6 +148,7 @@ const PredioForm: React.FC<PredioFormProps> = ({
       estadoPredio: '',
       modoDeclaracion: '',
       clasificacionPredio: '',
+      criterioUso: '',
       direccion: null,
       numeroFinca: '',
       otroNumero: '',
@@ -185,6 +190,10 @@ const PredioForm: React.FC<PredioFormProps> = ({
   
   const { options: clasificacionPredioData, loading: loadingClasificacionPredio, error: errorClasificacionPredio } = 
     useClasificacionPredio();
+  
+  // Hook para criterio uso (grupo uso)
+  const { options: criterioUsoData, loading: loadingCriterioUso, error: errorCriterioUso } = 
+    useGrupoUsoOptions();
   
    
  
@@ -242,13 +251,13 @@ const PredioForm: React.FC<PredioFormProps> = ({
   const isLoadingOptions = loadingCondicion || loadingTipoPredio || 
                           loadingConductor || loadingUsoPredio || 
                           loadingEstadoPredio || loadingModoDeclaracion || 
-                          loadingAnios || loadingClasificacionPredio;
+                          loadingAnios || loadingClasificacionPredio || loadingCriterioUso;
 
   // Verificar si hay errores en la carga
   const hasLoadingErrors = errorCondicion || errorTipoPredio || 
                           errorConductor || errorUsoPredio || 
                           errorEstadoPredio || errorModoDeclaracion ||
-                          errorAnios || errorClasificacionPredio;
+                          errorAnios || errorClasificacionPredio || errorCriterioUso;
 
   // Efecto para establecer el código del contribuyente
   useEffect(() => {
@@ -579,19 +588,8 @@ const PredioForm: React.FC<PredioFormProps> = ({
                       />
                     </LocalizationProvider>
                   </Box>
-                  {/* Modo Declaracion */}
-                  <Box sx={{ flex: '0 0 150px' }}>
-                    {renderAutocomplete(
-                      'modoDeclaracion',
-                      'ModoDeclaracion',
-                      modoDeclaracionData || [],
-                      loadingModoDeclaracion,
-                      errorModoDeclaracion,
-                      false
-                    )}
-                  </Box>
                   {/* Condicion de Propiedad */}
-                  <Box sx={{ flex: '0 0 200px' }}>
+                  <Box sx={{ flex: '0 0 280px' }}>
                     {renderAutocomplete(
                       'condicionPropiedad',
                       'CondicionPropiedad',
@@ -599,44 +597,6 @@ const PredioForm: React.FC<PredioFormProps> = ({
                       loadingCondicion,
                       errorCondicion,
                       true
-                    )}
-                  </Box>
-                  {/* Tipo Predio */}
-                  <Box sx={{ flex: '0 0 230px' }}>
-                    {renderAutocomplete(
-                      'tipoPredio',
-                      'Tipo Predio',
-                      tipoPredioData || [],
-                      loadingTipoPredio,
-                      errorTipoPredio,
-                      false
-                    )}
-                  </Box>
-                  
-                </Box>
-
-                {/* Segunda fila */}
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                  {/* Uso Predio */}
-                  <Box sx={{ flex: '0 0 200px' }}>
-                    {renderAutocomplete(
-                      'usoPredio',
-                      'Uso Predio',
-                      usoPredioData || [],
-                      loadingUsoPredio,
-                      errorUsoPredio,
-                      false
-                    )}
-                  </Box>
-                  {/* Clasificacion Predio */}
-                  <Box sx={{ flex: '0 0 350px' }}>
-                    {renderAutocomplete(
-                      'clasificacionPredio',
-                      'ClasificacionPredio',
-                      clasificacionPredioData || [],
-                      loadingClasificacionPredio,
-                      errorClasificacionPredio,
-                      false
                     )}
                   </Box>
                   {/* Estado del  Predio */}
@@ -650,21 +610,76 @@ const PredioForm: React.FC<PredioFormProps> = ({
                       false
                     )}
                   </Box>
-                   {/* Lista Conductor*/}
-                  <Box sx={{ flex: '0 0 150px' }}>
+                
+                  
+                </Box>
+
+                {/* Segunda fila */}
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  {/* Tipo Predio */}
+                  <Box sx={{ flex: '0 0 250px' }}>
                     {renderAutocomplete(
-                      'conductor',
-                      'Conductor',
-                      conductorData || [],
-                      loadingConductor,
-                      errorConductor,
-                      true
+                      'tipoPredio',
+                      'Tipo Predio',
+                      tipoPredioData || [],
+                      loadingTipoPredio,
+                      errorTipoPredio,
+                      false
+                    )}
+                  </Box>
+                  {/* Clasificacion Predio */}
+                  <Box sx={{ flex: '0 0 600px' }}>
+                    {renderAutocomplete(
+                      'clasificacionPredio',
+                      'ClasificacionPredio',
+                      clasificacionPredioData || [],
+                      loadingClasificacionPredio,
+                      errorClasificacionPredio,
+                      false
                     )}
                   </Box>
                 </Box>
 
                 {/* Tercera fila */}
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  {/* Criterio Uso */}
+                  <Box sx={{ flex: '0 0 600px' }}>
+                    {renderAutocomplete(
+                      'criterioUso',
+                      'Criterio Uso',
+                      criterioUsoData || [],
+                      loadingCriterioUso,
+                      errorCriterioUso,
+                      false
+                    )}
+                  </Box>
+                  
+                  {/* Uso Predio */}
+                  <Box sx={{ flex: '0 0 250px' }}>
+                    {renderAutocomplete(
+                      'usoPredio',
+                      'Uso Predio',
+                      usoPredioData || [],
+                      loadingUsoPredio,
+                      errorUsoPredio,
+                      false
+                    )}
+                  </Box>
+                </Box>
+
+                {/* Cuarta fila */}
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                   {/* Lista Conductor*/}
+                  <Box sx={{ flex: '0 0 150px' }}>
+                    {renderAutocomplete(
+                      'conductor',
+                      'Lista Conductor',
+                      conductorData || [],
+                      loadingConductor,
+                      errorConductor,
+                      true
+                    )}
+                  </Box>
                    {/* Area m2*/}
                   <Box sx={{ flex: '0 0 80px' }}>
                     <Controller
@@ -689,75 +704,17 @@ const PredioForm: React.FC<PredioFormProps> = ({
                               field.onChange(undefined);
                             } else {
                               const numValue = parseFloat(value);
-                              field.onChange(numValue >= 0 ? numValue : undefined);
+                              field.onChange(numValue >= 0 ? numValue : 0);
                             }
                           }}
                         />
                       )}
                     />
                   </Box>
-                   {/* N de Pisos*/}
-                  <Box sx={{ flex: '0 0 80px' }}>
-                    <Controller
-                      name="numeroPisos"
-                      control={control}
-                      render={({ field }) => (
-                        <TextField
-                          {...field}
-                          label="N° Pisos"
-                          type="number"
-                          fullWidth
-                          size="small"
-                          value={field.value || ''}
-                          InputProps={{
-                            inputProps: { min: 0 }
-                          }}
-                          error={!!errors.numeroPisos}
-                          helperText={errors.numeroPisos?.message}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (value === '' || value === undefined) {
-                              field.onChange(undefined);
-                            } else {
-                              const numValue = parseInt(value);
-                              field.onChange(numValue >= 0 ? numValue : undefined);
-                            }
-                          }}
-                        />
-                      )}
-                    />
-                  </Box>
-                  {/* N de condominos*/}
-                  <Box sx={{ flex: '0 0 85px' }}>
-                    <Controller
-                      name="numeroCondominos"
-                      control={control}
-                      render={({ field }) => (
-                        <TextField
-                          {...field}
-                          label="N° Condóminos"
-                          type="number"
-                          fullWidth
-                          size="small"
-                          value={field.value || ''}
-                          InputProps={{
-                            inputProps: { min: 0 }
-                          }}
-                          error={!!errors.numeroCondominos}
-                          helperText={errors.numeroCondominos?.message}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (value === '' || value === undefined) {
-                              field.onChange(undefined);
-                            } else {
-                              const numValue = parseInt(value);
-                              field.onChange(numValue >= 0 ? numValue : undefined);
-                            }
-                          }}
-                        />
-                      )}
-                    />
-                  </Box>
+                </Box>
+
+                {/* Quinta fila */}
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                    {/* Buscar Direcccion */}
                   <Box sx={{ flex: '0 0 auto' }}>
                       <Button
@@ -776,7 +733,7 @@ const PredioForm: React.FC<PredioFormProps> = ({
                       </Button>
                   </Box>
                    {/* N finca */}
-                  <Box sx={{ flex: '0 0 70px' }}>
+                  <Box sx={{ flex: '0 0 100px' }}>
                     <Controller
                       name="numeroFinca"
                       control={control}
@@ -793,7 +750,7 @@ const PredioForm: React.FC<PredioFormProps> = ({
                     />
                   </Box>
                    {/* Otro N */}
-                  <Box sx={{ flex: '0 0 65px' }}>
+                  <Box sx={{ flex: '0 0 100px' }}>
                     <Controller
                       name="otroNumero"
                       control={control}
@@ -832,8 +789,7 @@ const PredioForm: React.FC<PredioFormProps> = ({
                   </Box>
                 </Box>
 
-                {/* Cuarta fila */}
-                 {/* Direcccion Select*/}
+                {/* Sexta fila */}
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                   {/* Dirección seleccionada */}
                   {direccionValue && (
@@ -870,11 +826,6 @@ const PredioForm: React.FC<PredioFormProps> = ({
                     </Box>
                   )}
                 </Box>
-
-                {/* Quinta fila */}
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                 
-                </Box>
               </Stack>
 
               <Divider />
@@ -898,12 +849,27 @@ const PredioForm: React.FC<PredioFormProps> = ({
                     component="label"
                     startIcon={<PhotoIcon />}
                   >
-                    Seleccionar archivo
+                    Seleccionar foto
                     <input
                       type="file"
                       hidden
                       multiple
                       accept="image/*"
+                      onChange={handleImageUpload}
+                    />
+                  </Button>
+                  
+                  <Button
+                    variant="outlined"
+                    component="label"
+                    startIcon={<DescriptionIcon />}
+                  >
+                    Seleccionar Plano
+                    <input
+                      type="file"
+                      hidden
+                      multiple
+                      accept=".pdf,.dwg,.dxf,.png,.jpg,.jpeg"
                       onChange={handleImageUpload}
                     />
                   </Button>

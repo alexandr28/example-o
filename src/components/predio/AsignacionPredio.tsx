@@ -56,8 +56,6 @@ interface AsignacionData {
   fechaVenta: Date | null;
   fechaDeclaracion: Date | null;
   esPensionista: boolean;
-  porcentajeCondominio: number;
-  porcentajeLibre: number;
   estado: string;
 }
 
@@ -94,8 +92,6 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
     fechaVenta: null,
     fechaDeclaracion: null,
     esPensionista: false,
-    porcentajeCondominio: 100,
-    porcentajeLibre: 100,
     estado: 'Activo'
   });
   
@@ -162,7 +158,7 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
         codPredio: codigoPredio,
         codContribuyente: codigoContribuyente,
         codAsignacion: null,
-        porcentajeCondomino: asignacionData.porcentajeCondominio || null,
+        porcentajeCondomino: 100,
         fechaDeclaracion: asignacionData.fechaDeclaracion.toISOString().split('T')[0],
         fechaVenta: asignacionData.fechaVenta.toISOString().split('T')[0],
         codModoDeclaracion: asignacionData.modoDeclaracion,
@@ -199,8 +195,6 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
       fechaVenta: null,
       fechaDeclaracion: null,
       esPensionista: false,
-      porcentajeCondominio: 100,
-      porcentajeLibre: 100,
       estado: 'Activo'
     });
     NotificationService.info('Formulario limpiado');
@@ -343,7 +337,7 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
 
                 {/* Modo Declaracion - Usando datos del API */}
-                <Box sx={{ flex: '0 0 250px' }}>
+                <Box sx={{ flex: '0 0 280px' }}>
                   <Autocomplete
                     options={modoDeclaracionOptions}
                     getOptionLabel={(option) => option?.label || ''}
@@ -384,7 +378,7 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
                   />
                 </Box>
                 {/* Fecha de Venta */}
-                <Box sx={{ flex: '0 0 100px', maxWidth:'110px' }}>
+                <Box sx={{ flex: '0 0 100px', maxWidth:'150px' }}>
                   <DatePicker
                     label="Fecha venta"
                     value={asignacionData.fechaVenta}
@@ -407,7 +401,7 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
                   />
                 </Box>
 
-                <Box sx={{ flex: '0 0 100px', maxWidth:'145px' }}>
+                <Box sx={{ flex: '0 0 100px', maxWidth:'200px' }}>
                   <DatePicker
                     label="Fecha declaración"
                     value={asignacionData.fechaDeclaracion}
@@ -458,52 +452,6 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
                   />
                 </Box>
 
-                <Box sx={{ flex: '0 0 100px' }}>
-                  <TextField
-                    fullWidth
-                    size='small'
-                    label="% Condominos"
-                    value={asignacionData.porcentajeCondominio}
-                    onChange={(e) => setAsignacionData({
-                      ...asignacionData,
-                      porcentajeCondominio: Number(e.target.value)
-                    })}
-                    type="number"
-                    InputProps={{
-                      endAdornment: '%',
-                      inputProps: { min: 0, max: 100 }
-                    }}
-                    helperText=""
-                    sx={{ 
-                      '& .MuiInputBase-root': { 
-                        height: '33px' 
-                      }
-                    }}
-                  />
-                </Box>
-
-                <Box sx={{ flex: '0 0 100px' }}>
-                  <TextField
-                    fullWidth
-                    size='small'
-                    label="% Libre"
-                    value={asignacionData.porcentajeLibre}
-                    onChange={(e) => setAsignacionData({
-                      ...asignacionData,
-                      porcentajeLibre: Number(e.target.value)
-                    })}
-                    type="number"
-                    InputProps={{
-                      endAdornment: '%',
-                      inputProps: { min: 0, max: 100 }
-                    }}
-                    sx={{ 
-                      '& .MuiInputBase-root': { 
-                        height: '33px' 
-                      }
-                    }}
-                  />
-                </Box>
 
                 <Box sx={{ flex: '0 0 140px' }}>
                   <Paper sx={{ p: 2, bgcolor: alpha(theme.palette.grey[100], 0.5) }}>

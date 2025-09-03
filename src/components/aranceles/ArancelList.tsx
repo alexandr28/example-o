@@ -415,9 +415,7 @@ export const ListaArancelesPorDireccion: React.FC<ListaArancelesPorDireccionProp
                 }}
               >
                 Use la búsqueda general para encontrar aranceles por sector, barrio, calle o deje vacío para ver todos.
-                <Typography variant="caption" sx={{ display: 'block', mt: 0.5, opacity: 0.8 }}>
-                  API General: GET /api/arancel/listaGeneral?parametroBusqueda=X&anio=YYYY&codUsuario=1
-                </Typography>
+         
               </Alert>
             )
           ) : (
@@ -433,63 +431,12 @@ export const ListaArancelesPorDireccion: React.FC<ListaArancelesPorDireccionProp
                 }}
               >
                 Ingrese el año y código de dirección para buscar aranceles específicos.
-                <Typography variant="caption" sx={{ display: 'block', mt: 0.5, opacity: 0.8 }}>
-                  API: GET /api/arancel?codDireccion=X&anio=YYYY&codUsuario=1
-                </Typography>
+            
               </Alert>
             )
           )}
 
-          {/* Resumen de resultados mejorado */}
-          {((useGeneralApi && !loadingBusqueda) || (anioSeleccionado && codDireccionBusqueda && !loadingBusqueda)) && (
-            <Box sx={{
-              p: 2,
-              borderRadius: 2,
-              bgcolor: alpha(theme.palette.primary.main, 0.05),
-              border: '1px solid',
-              borderColor: alpha(theme.palette.primary.main, 0.2)
-            }}>
-              <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-                {useGeneralApi ? (
-                  <>
-                    <Chip
-                      label={`Búsqueda: ${parametroBusqueda || 'Todos'}`}
-                      color="primary"
-                      icon={<SearchIcon />}
-                      sx={{ fontWeight: 600 }}
-                    />
-                    {anioSeleccionado && (
-                      <Chip
-                        label={`Año: ${anioSeleccionado}`}
-                        color="secondary"
-                        icon={<CalendarIcon />}
-                        sx={{ fontWeight: 600 }}
-                      />
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <Chip
-                      label={`Año: ${anioSeleccionado}`}
-                      color="primary"
-                      icon={<CalendarIcon />}
-                      sx={{ fontWeight: 600 }}
-                    />
-                    <Chip
-                      label={`Dirección: ${codDireccionBusqueda}`}
-                      color="secondary"
-                      icon={<LocationIcon />}
-                      sx={{ fontWeight: 600 }}
-                    />
-                  </>
-                )}
-                <Divider orientation="vertical" flexItem />
-                <Typography variant="body2" color="text.secondary">
-                  Registros encontrados: <strong>{arancelesFiltrados.length}</strong>
-                </Typography>
-              </Stack>
-            </Box>
-          )}
+        
         </Stack>
       </Box>
 

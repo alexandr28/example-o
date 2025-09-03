@@ -527,8 +527,8 @@ const CalleForm: React.FC<CalleFormProps> = ({
            {/* Seccion Buttons */}
           <Button
             type="button"
-            variant="contained"
-            color="secondary"
+            variant="outlined"
+            color="primary"
             startIcon={<AddIcon />}
             onClick={handleNew}
             disabled={isSubmitting}
@@ -537,7 +537,11 @@ const CalleForm: React.FC<CalleFormProps> = ({
               height: 40,
               borderRadius: 2,
               textTransform: 'none',
-              fontWeight: 600
+              fontWeight: 600,
+              backgroundColor: 'white',
+              '&:hover': {
+                backgroundColor: '#f5f5f5'
+              }
             }}
           >
             Nuevo

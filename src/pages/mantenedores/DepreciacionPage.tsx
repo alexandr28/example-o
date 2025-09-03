@@ -96,7 +96,7 @@ const DepreciacionPage: React.FC = () => {
 
   return (
     <MainLayout>
-      <Box sx={{ width: '80%' }}>
+      <Box sx={{ width: '100%' }}>
         {/* Navegación de migas de pan */}
         <Breadcrumb items={breadcrumbItems} />
 

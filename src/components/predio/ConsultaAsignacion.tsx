@@ -39,7 +39,7 @@ import { useAsignacion } from '../../hooks/useAsignacion';
 import { AsignacionPredio } from '../../services/asignacionService';
 
 interface ConsultaAsignacionData {
-  codigoPredio: string;
+  anio: string;
   codigoContribuyente: string;
 }
 
@@ -52,7 +52,7 @@ const ConsultaAsignacion: React.FC = () => {
   
   // Estados locales
   const [filtros, setFiltros] = useState<ConsultaAsignacionData>({
-    codigoPredio: '',
+    anio: new Date().getFullYear().toString(),
     codigoContribuyente: ''
   });
   
@@ -80,14 +80,14 @@ const ConsultaAsignacion: React.FC = () => {
 
   const realizarBusqueda = async () => {
     const params = {
-      codPredio: filtros.codigoPredio || undefined,
+      anio: filtros.anio ? parseInt(filtros.anio) : undefined,
       codContribuyente: filtros.codigoContribuyente || undefined
     };
 
     console.log('🔍 [ConsultaAsignacion] Realizando búsqueda con parámetros:', params);
 
-    if (!params.codContribuyente && !params.codPredio) {
-      NotificationService.error('Debe ingresar al menos un código de predio o contribuyente');
+    if (!params.codContribuyente && !params.anio) {
+      NotificationService.error('Debe ingresar al menos un año o contribuyente');
       return;
     }
 
@@ -253,16 +253,21 @@ const ConsultaAsignacion: React.FC = () => {
               <TextField
                 fullWidth
                 size="small"
-                label="Código Predio"
-                value={filtros.codigoPredio}
+                label="Año"
+                type="number"
+                value={filtros.anio}
                 onChange={(e) => setFiltros({
                   ...filtros,
-                  codigoPredio: e.target.value
+                  anio: e.target.value
                 })}
                 InputProps={{
-                  startAdornment: <HomeIcon sx={{ mr: 1, color: 'action.active' }} />
+                  startAdornment: <HomeIcon sx={{ mr: 1, color: 'action.active' }} />,
+                  inputProps: { 
+                    min: 1900, 
+                    max: new Date().getFullYear() + 10 
+                  }
                 }}
-                placeholder="Ej: 20256"
+                placeholder={`Ej: ${new Date().getFullYear()}`}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: 2,
@@ -314,7 +319,7 @@ const ConsultaAsignacion: React.FC = () => {
                 fullWidth
                 variant="contained"
                 onClick={handleBuscar}
-                disabled={loading || (!filtros.codigoPredio && !filtros.codigoContribuyente)}
+                disabled={loading || (!filtros.anio && !filtros.codigoContribuyente)}
                 startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SearchIcon />}
                 sx={{ 
                   height: 40,
@@ -487,15 +492,15 @@ const ConsultaAsignacion: React.FC = () => {
                           </Box>
                           <Box sx={{ textAlign: 'center' }}>
                             <Typography variant="h6" color="text.secondary" gutterBottom>
-                              {(filtros.codigoContribuyente || filtros.codigoPredio)
+                              {(filtros.codigoContribuyente || filtros.anio)
                                 ? 'No se encontraron asignaciones'
                                 : 'Ingrese criterios de búsqueda'
                               }
                             </Typography>
                             <Typography variant="body2" color="text.disabled">
-                              {(filtros.codigoContribuyente || filtros.codigoPredio)
+                              {(filtros.codigoContribuyente || filtros.anio)
                                 ? 'No hay predios asignados con los criterios especificados'
-                                : 'Ingrese un código de predio o contribuyente para buscar asignaciones'
+                                : 'Ingrese un año o contribuyente para buscar asignaciones'
                               }
                             </Typography>
                           </Box>

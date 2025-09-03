@@ -208,7 +208,7 @@ const SectorList: React.FC<SectorListProps> = ({
     <Paper 
       elevation={0} 
       sx={{ 
-        width: { xs: '100%', sm: '100%', md: '90%', lg: '80%' },
+        width: { xs: '100%', sm: '100%', md: '90%', lg: '100%' },
         minWidth: { xs: '100%', sm: '100%', md: '700px' },
         borderRadius: 2,
         background: 'linear-gradient(to bottom, #ffffff, #fafafa)',

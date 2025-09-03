@@ -196,7 +196,7 @@ const BarrioPage: React.FC = () => {
 
         {/* Contenedor principal con tabs */}
         <Box sx={{ 
-          maxWidth: { xs: '100%', sm: '100%', md: '90%', lg: '80%' }, 
+          maxWidth: { xs: '100%', sm: '100%', md: '90%', lg: '100%' }, 
           mx: 'auto' 
         }}>
           <Paper 
@@ -267,7 +267,7 @@ const BarrioPage: React.FC = () => {
 
             {/* Panel de Lista */}
             <TabPanel value={tabValue} index={1}>
-              <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 } }}>
+             
                 <BarrioList
                   barrios={barrios || []}
                   sectores={sectores || []}
@@ -277,7 +277,7 @@ const BarrioPage: React.FC = () => {
                   searchTerm={searchTerm}
                   selectedBarrio={barrioSeleccionado}
                 />
-              </Box>
+            
             </TabPanel>
           </Paper>
         </Box>

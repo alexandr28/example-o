@@ -385,7 +385,7 @@ const CallePage: React.FC = () => {
 
         {/* Contenedor principal con tabs */}
         <Box sx={{ 
-          maxWidth: { xs: '100%', sm: '100%', md: '90%', lg: '1000px' }, 
+          maxWidth: { xs: '100%', sm: '100%', md: '90%', lg: '100%' }, 
           mx: 'auto' 
         }}>
           <Paper 
