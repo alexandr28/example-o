@@ -13,6 +13,7 @@ import {
 } from '@mui/icons-material';
 import MainLayout from '../../layout/MainLayout';
 import ParquesJardines from '../../components/arbitrios/ParquesJardines';
+import Serenazgo from '../../components/arbitrios/Serenazgo';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -150,21 +151,7 @@ const ArbitriosPage: React.FC = () => {
         </TabPanel>
 
         <TabPanel value={tabValue} index={1}>
-          <Box sx={{ 
-            minHeight: 400, 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            flexDirection: 'column'
-          }}>
-            <SecurityIcon sx={{ fontSize: 80, color: 'action.disabled', mb: 2 }} />
-            <Typography variant="h6" color="text.secondary">
-              Serenazgo
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Contenido próximamente disponible
-            </Typography>
-          </Box>
+          <Serenazgo />
         </TabPanel>
 
         <TabPanel value={tabValue} index={2}>
