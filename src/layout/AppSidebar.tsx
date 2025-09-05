@@ -201,9 +201,10 @@ const menuItems: MenuItem[] = [
     label: 'Caja',
     icon: <ReceiptIcon />,
     subMenuItems: [
-      { id: 'apertura-caja', label: 'Apertura de Caja', path: '/caja/apertura' },
-      { id: 'cierre-caja', label: 'Cierre de Caja', path: '/caja/cierre' },
-      { id: 'movimientos', label: 'Movimientos', path: '/caja/movimientos' },
+      { id: 'asignacion-caja', label: 'Asignacion de Caja', path: '/caja/asignacion' },
+      { id: 'caja', label: 'Caja', path: '/caja/cierre' },
+      { id: 'consultas', label: 'Consultas', path: '/caja/consultas' },
+      { id: 'Reportes', label: 'Reportes', path: '/caja/reportes' },
     ],
   },
   {

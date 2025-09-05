@@ -191,7 +191,8 @@ const ParquesJardines: React.FC = () => {
           p: 3,
           mb: 3,
           borderRadius: 2,
-          background: 'linear-gradient(to bottom, #ffffff, #fafafa)'
+          background: 'linear-gradient(to bottom, #ffffff, #fafafa)',
+          width:'74%'
         }}
       >
         <Typography 
@@ -228,7 +229,12 @@ const ParquesJardines: React.FC = () => {
             }}
             error={!!errors.anio}
             helperText={errors.anio}
-            sx={{ width: '120px' }}
+            sx={{ 
+              width: '120px' ,
+              '& .MuiInputBase-root': {
+                height: '37px'
+              }
+            }}
             InputProps={{
               inputProps: { 
                 min: 1900, 
@@ -243,7 +249,7 @@ const ParquesJardines: React.FC = () => {
             options={ubicaciones}
             getOptionLabel={(option) => option.label}
             size="small"
-            sx={{ minWidth: 200, flex: 1 }}
+            sx={{ minWidth: 190, flex: 0 }}
             renderInput={(params) => (
               <TextField
                 {...params}
@@ -259,7 +265,7 @@ const ParquesJardines: React.FC = () => {
             options={rutas}
             getOptionLabel={(option) => option.label}
             size="small"
-            sx={{ minWidth: 250, flex: 1 }}
+            sx={{ minWidth: 140, flex: 0 }}
             renderInput={(params) => (
               <TextField
                 {...params}
@@ -287,6 +293,9 @@ const ParquesJardines: React.FC = () => {
               '& input[type=number]::-webkit-inner-spin-button': {
                 WebkitAppearance: 'none',
                 margin: 0,
+              },
+              '& .MuiInputBase-root': {
+                height: '37px'
               }
             }}
             InputProps={{

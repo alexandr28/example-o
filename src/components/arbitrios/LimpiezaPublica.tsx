@@ -273,7 +273,8 @@ const LimpiezaPublica: React.FC = () => {
             sx={{ 
               p: 3,
               mb: 3,
-              backgroundColor: 'background.paper'
+              backgroundColor: 'background.paper',
+              width: '55%'
             }}
           >
             <Typography 
@@ -297,13 +298,19 @@ const LimpiezaPublica: React.FC = () => {
               gap: 2,
               mb: 2
             }}>
+              {/* Año  */}
               <TextField
                 size="small"
                 label="Año"
                 type="number"
                 value={anioCasa}
                 onChange={(e) => setAnioCasa(parseInt(e.target.value))}
-                sx={{ width: '120px' }}
+                sx={{ 
+                  width: '120px',
+                  '& .MuiInputBase-root': {
+                    height: '35px'
+                  }
+                }}
                 InputProps={{
                   inputProps: { 
                     min: 1900, 
@@ -311,14 +318,14 @@ const LimpiezaPublica: React.FC = () => {
                   }
                 }}
               />
-              
+              {/* Zona */}
               <Autocomplete
                 value={zonaCasa}
                 onChange={(_, newValue) => setZonaCasa(newValue)}
                 options={zonas}
                 getOptionLabel={(option) => option.label}
                 size="small"
-                sx={{ minWidth: 200, flex: 1 }}
+                sx={{ minWidth: 150, flex: 0 }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -327,14 +334,19 @@ const LimpiezaPublica: React.FC = () => {
                   />
                 )}
               />
-              
+              {/* Tasa Mensual */}
               <TextField
                 label="Tasa Mensual"
                 value={tasaCasa}
                 onChange={(e) => setTasaCasa(e.target.value)}
                 size="small"
                 type="number"
-                sx={{ width: '180px' }}
+                sx={{ 
+                  width: '120px' ,
+                  '& .MuiInputBase-root': {
+                    height: '35px'
+                  }
+                }}
                 InputProps={{
                   startAdornment: <Box sx={{ mr: 0.5, color: 'text.secondary' }}>S/ x m²</Box>
                 }}
@@ -521,7 +533,8 @@ const LimpiezaPublica: React.FC = () => {
             sx={{ 
               p: 3,
               mb: 3,
-              backgroundColor: 'background.paper'
+              backgroundColor: 'background.paper',
+              width:'60%'
             }}
           >
             <Typography 
@@ -545,13 +558,19 @@ const LimpiezaPublica: React.FC = () => {
               gap: 2,
               mb: 2
             }}>
+
               <TextField
                 size="small"
                 label="Año"
                 type="number"
                 value={anioOtros}
                 onChange={(e) => setAnioOtros(parseInt(e.target.value))}
-                sx={{ width: '120px' }}
+                sx={{ 
+                  width: '120px' ,
+                  '& .MuiInputBase-root': {
+                    height: '37px'
+                  }
+                }}
                 InputProps={{
                   inputProps: { 
                     min: 1900, 
@@ -566,7 +585,7 @@ const LimpiezaPublica: React.FC = () => {
                 options={criterios}
                 getOptionLabel={(option) => option.label}
                 size="small"
-                sx={{ minWidth: 200, flex: 1 }}
+                sx={{ minWidth: 180, flex: 0 }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -582,7 +601,12 @@ const LimpiezaPublica: React.FC = () => {
                 onChange={(e) => setTasaOtros(e.target.value)}
                 size="small"
                 type="number"
-                sx={{ width: '180px' }}
+                sx={{ 
+                  width: '120px' ,
+                  '& .MuiInputBase-root': {
+                    height: '37px'
+                  }
+                }}
                 InputProps={{
                   startAdornment: <Box sx={{ mr: 0.5, color: 'text.secondary' }}>S/ x m²</Box>
                 }}

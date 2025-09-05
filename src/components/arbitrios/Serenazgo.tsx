@@ -173,7 +173,8 @@ const gruposUso: GrupoUsoOption[] = [
           p: 3,
           mb: 3,
           borderRadius: 2,
-          background: 'linear-gradient(to bottom, #ffffff, #fafafa)'
+          background: 'linear-gradient(to bottom, #ffffff, #fafafa)',
+          width:'77%'
         }}
       >
         <Typography 
@@ -210,7 +211,12 @@ const gruposUso: GrupoUsoOption[] = [
             }}
             error={!!errors.anio}
             helperText={errors.anio}
-            sx={{ width: '120px' }}
+            sx={{ 
+              width: '120px' ,
+              '& .MuiInputBase-root': {
+                height: '38px'
+              }
+            }}
             InputProps={{
               inputProps: { 
                 min: 1900, 
@@ -226,7 +232,7 @@ const gruposUso: GrupoUsoOption[] = [
             options={gruposUso}
             getOptionLabel={(option) => option.label}
             size="small"
-            sx={{ minWidth: 200, flex: 1 }}
+            sx={{ minWidth: 200, flex: 0 }}
             renderInput={(params) => (
               <TextField
                 {...params}
@@ -243,7 +249,7 @@ const gruposUso: GrupoUsoOption[] = [
             options={cuadrantes}
             getOptionLabel={(option) => option.label}
             size="small"
-            sx={{ minWidth: 250, flex: 1 }}
+            sx={{ minWidth: 150, flex: 0 }}
             renderInput={(params) => (
               <TextField
                 {...params}
@@ -272,6 +278,9 @@ const gruposUso: GrupoUsoOption[] = [
               '& input[type=number]::-webkit-inner-spin-button': {
                 WebkitAppearance: 'none',
                 margin: 0,
+              },
+              '& .MuiInputBase-root': {
+                height: '38px'
               }
             }}
             InputProps={{

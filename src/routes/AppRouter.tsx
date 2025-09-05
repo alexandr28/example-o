@@ -33,6 +33,9 @@ import {
 // Importar página de cuenta corriente
 import CuentaConsultaPage from '../pages/cuenta/CuentaConsultaPage';
 
+// Importar página de asignación de caja
+import AsignacionCajaPage from '../pages/caja/AsignacionCajaPage';
+
 // Providers y contextos
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
@@ -143,6 +146,11 @@ const AppRouter: React.FC = () => {
                   <Route path="/caja/movimiento" element={
                     <ProtectedRoute>
                       <DemoPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/caja/asignacion" element={
+                    <ProtectedRoute>
+                      <AsignacionCajaPage />
                     </ProtectedRoute>
                   } />
 
