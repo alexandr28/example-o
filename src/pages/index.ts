@@ -22,3 +22,7 @@ export { default as ConsultaPisosPage } from './predio/pisos/ConsultaPisoPage';
 export { default as AsignacionPredioPage } from './predio/AsignacionPredioPage';
 export { default as ConsultaAsignacionPage } from './predio/ConsultaAsignacionPage';
 
+
+// 🎯 NUEVAS PÁGINAS DE CAJA
+export { default as CajaPage } from './caja/CajaPage';
+export { default as ConsultasCaja } from './caja/ConsultasCaja';

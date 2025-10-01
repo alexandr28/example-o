@@ -27,7 +27,9 @@ import {
   RegistroPisoPage,
   ConsultaPisosPage,
   AsignacionPredioPage,
-  ConsultaAsignacionPage
+  ConsultaAsignacionPage,
+  CajaPage,
+  ConsultasCaja,
 } from '../pages';
 
 // Importar página de cuenta corriente
@@ -130,7 +132,7 @@ const AppRouter: React.FC = () => {
                   {/* Rutas de Caja */}
                   <Route path="/caja/apertura" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <CajaPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/caja/cierre" element={
@@ -151,6 +153,11 @@ const AppRouter: React.FC = () => {
                   <Route path="/caja/asignacion" element={
                     <ProtectedRoute>
                       <AsignacionCajaPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/caja/consultas" element={
+                    <ProtectedRoute>
+                      <ConsultasCaja />
                     </ProtectedRoute>
                   } />
 

@@ -202,7 +202,7 @@ const menuItems: MenuItem[] = [
     icon: <ReceiptIcon />,
     subMenuItems: [
       { id: 'asignacion-caja', label: 'Asignacion de Caja', path: '/caja/asignacion' },
-      { id: 'caja', label: 'Caja', path: '/caja/cierre' },
+      { id: 'caja', label: 'Caja', path: '/caja/apertura' },
       { id: 'consultas', label: 'Consultas', path: '/caja/consultas' },
       { id: 'Reportes', label: 'Reportes', path: '/caja/reportes' },
     ],

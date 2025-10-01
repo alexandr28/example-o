@@ -72,3 +72,14 @@ export {default as  SelectorPredios} from './predio/pisos/SelectorPredios'
 
 export {default as navigationGuard } from './utils/navigationGuard'
 
+// 🎯 NUEVOS COMPONENTES DE CAJA
+export { default as AperturaCaja } from './caja/AperturaCaja';
+export { default as Pagos } from './caja/Pagos';
+
+// Componentes de Consultas de Caja
+export { default as PorFecha } from './caja/consultas/PorFecha';
+export { default as PorContribuyente } from './caja/consultas/PorContribuyente';
+export { default as PorNumeroRecibo } from './caja/consultas/PorNumeroRecibo';
+
+// También exportar los tipos para uso externo
+export type { AperturaCajaData } from './caja/AperturaCaja';
