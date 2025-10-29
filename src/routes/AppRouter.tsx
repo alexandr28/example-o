@@ -8,16 +8,17 @@ import { es } from 'date-fns/locale';
 
 
 // Páginas
-import { 
+import {
   DemoPage,
   CallePage,
-  NuevoContribuyente, 
+  NuevoContribuyente,
   SectoresPage,
-  BarriosPage, 
+  BarriosPage,
   DireccionesPage,
   ArancelesPage,
   ValoresUnitariosPage,
   ConsultaContribuyente,
+  DeduccionBeneficioPage,
   UitPage,
   AlcabalaPage,
   DepreciacionPage,
@@ -30,6 +31,16 @@ import {
   ConsultaAsignacionPage,
   CajaPage,
   ConsultasCaja,
+  ReportesCajaPage,
+  RegistroTIMPage,
+  RegResolucionTIMPage,
+  VencimientoPage,
+  ReportesPage,
+  SolicitudFraccionamientoPage,
+  ConsultaFraccionamientoPage,
+  AprobacionFraccionamientoPage,
+  CronogramaPage,
+  ReportesFraccionamientoPage,
 } from '../pages';
 
 // Importar página de cuenta corriente
@@ -42,6 +53,7 @@ import AsignacionCajaPage from '../pages/caja/AsignacionCajaPage';
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import { SidebarProvider } from '../context/SidebarContext';
+import { CommandProvider } from '../context/CommandContext';
 import MuiThemeProviderWrapper from '../providers/MuiThemeProvider';
 
 
@@ -59,15 +71,14 @@ const AppRouter: React.FC = () => {
       <ThemeProvider>
         <MuiThemeProviderWrapper>
           <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
-     
-            <SidebarProvider>
-          
-              <Router>
-                {/* Manejador de autenticación automática y notificaciones */}
-                <AuthHandler />
-                
-                {/* Container de notificaciones global */}
-                <NotificationContainer />
+            <CommandProvider>
+              <SidebarProvider>
+                <Router>
+                  {/* Manejador de autenticación automática y notificaciones */}
+                  <AuthHandler />
+
+                  {/* Container de notificaciones global */}
+                  <NotificationContainer />
                 
                 <Routes>
                   {/* Ruta pública - Login */}
@@ -92,6 +103,11 @@ const AppRouter: React.FC = () => {
                   <Route path="/contribuyente/consulta" element={
                     <ProtectedRoute>
                       <ConsultaContribuyente />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/contribuyente/deduccion-beneficio" element={
+                    <ProtectedRoute>
+                      <DeduccionBeneficioPage />
                     </ProtectedRoute>
                   } />
 
@@ -160,6 +176,11 @@ const AppRouter: React.FC = () => {
                       <ConsultasCaja />
                     </ProtectedRoute>
                   } />
+                  <Route path="/caja/reportes" element={
+                    <ProtectedRoute>
+                      <ReportesCajaPage />
+                    </ProtectedRoute>
+                  } />
 
                   {/* Rutas de Cuenta Corriente */}
                   <Route path="/cuenta-corriente/cargo/nuevo" element={
@@ -181,22 +202,54 @@ const AppRouter: React.FC = () => {
                   {/* Rutas de Reportes */}
                   <Route path="/reportes/contribuyentes" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <ReportesPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/reportes/predios" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <ReportesPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/reportes/cuentas" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <ReportesPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/reportes/recaudacion" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <ReportesPage />
+                    </ProtectedRoute>
+                  } />
+
+                  {/* Rutas de Fraccionamiento */}
+                  <Route path="/fraccionamiento/solicitud" element={
+                    <ProtectedRoute>
+                      <SolicitudFraccionamientoPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/fraccionamiento/nuevo" element={
+                    <ProtectedRoute>
+                      <SolicitudFraccionamientoPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/fraccionamiento/consulta" element={
+                    <ProtectedRoute>
+                      <ConsultaFraccionamientoPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/fraccionamiento/aprobacion" element={
+                    <ProtectedRoute>
+                      <AprobacionFraccionamientoPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/fraccionamiento/cronograma/:id" element={
+                    <ProtectedRoute>
+                      <CronogramaPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/fraccionamiento/reportes" element={
+                    <ProtectedRoute>
+                      <ReportesFraccionamientoPage />
                     </ProtectedRoute>
                   } />
 
@@ -278,9 +331,21 @@ const AppRouter: React.FC = () => {
                       <ArbitriosPage />
                     </ProtectedRoute>
                   } />
-                  <Route path="/mantenedores/escala" element={
+
+                  {/* Rutas de Escalas */}
+                  <Route path="/mantenedores/escalas/registro-tim" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <RegistroTIMPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/mantenedores/escalas/reg-resolucion-tim" element={
+                    <ProtectedRoute>
+                      <RegResolucionTIMPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/mantenedores/escalas/vencimiento" element={
+                    <ProtectedRoute>
+                      <VencimientoPage />
                     </ProtectedRoute>
                   } />
                   
@@ -369,12 +434,12 @@ const AppRouter: React.FC = () => {
                 </Routes>
               </Router>
             </SidebarProvider>
-   
-          </LocalizationProvider>
-        </MuiThemeProviderWrapper>
-      </ThemeProvider>
-    </AuthProvider>
-  );
+          </CommandProvider>
+        </LocalizationProvider>
+      </MuiThemeProviderWrapper>
+    </ThemeProvider>
+  </AuthProvider>
+);
 };
 
 export default AppRouter;

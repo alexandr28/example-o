@@ -55,7 +55,6 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
   const location = useLocation();
   const navigate = useNavigate();
   const { isExpanded, openSubmenus, setActiveItem, toggleSubmenu, expandSidebar } = useSidebar();
-  const [hovered, setHovered] = useState(false);
 
   // Determina si un elemento del menú está activo
   const isActiveRoute = useCallback((itemPath?: string): boolean => {
@@ -78,7 +77,7 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
 
   const shouldBeOpen = hasActiveSubmenuItem(subMenuItems);
   const isMenuActive = isActive || shouldBeOpen || isActiveRoute(path);
-  const hasSubMenu = subMenuItems.length > 0;
+  const hasSubMenu = subMenuItems && subMenuItems.length > 0;
   const isSubMenuOpen = openSubmenus.includes(id) || (hasSubMenu && shouldBeOpen);
 
   // Manejar navegación con confirmación
@@ -164,7 +163,7 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
         label={item.label}
         path={item.path}
         isActive={isActiveRoute(item.path)}
-        subMenuItems={item.subMenuItems}
+        subMenuItems={item.subMenuItems || []}
         level={currentLevel + 1}
         onCustomToggle={onCustomToggle}
       />
@@ -279,10 +278,7 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
   );
 
   return (
-    <Box
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
+    <Box>
       <ListItem
         disablePadding
         sx={{
@@ -341,7 +337,7 @@ const SidebarWidget: FC<SidebarWidgetProps> = memo(({
 
       {hasSubMenu && (
         <Collapse
-          in={isSubMenuOpen && isExpanded}
+          in={isSubMenuOpen && (isExpanded || level > 0)}
           timeout="auto"
           unmountOnExit
         >

@@ -11,34 +11,41 @@ import { NotificationService } from '../components/utils/Notification';
 export interface PredioData {
   anio?: number;
   codPredio?: string;
-  numeroFinca?: string;
-  otroNumero?: string;
-  codClasificacion?: string;
-  estPredio?: string;
-  codTipoPredio?: string;
-  codCondicionPropiedad?: string;
-  codDireccion?: string;
-  codUsoPredio?: string;
-  fechaAdquisicion?: string;
+  codPredioBase?: string;
+  numeroFinca?: string | null;
+  otroNumero?: string | null;
+  codClasificacion?: string | null;
+  estPredio?: string | null;
+  codTipoPredio?: string | null;
+  codCondicionPropiedad?: string | null;
+  codDireccion?: string | null;
+  codUsoPredio?: string | null;
+  fechaAdquisicion?: string | null;
   numeroCondominos?: string;
   codListaConductor?: string;
-  codUbicacionAreaVerde?: string;
-  areaTerreno: number;
+  codUbicacionAreaVerde?: string | null;
+  areaTerreno?: number;
   numeroPisos?: number;
-  totalAreaConstruccion?: number;
-  valorTotalConstruccion?: number;
-  valorTerreno?: number;
+  totalAreaConstruccion?: number | null;
+  valorTotalConstruccion?: number | null;
+  valorTerreno?: number | null;
+  valorOtrasInstalaciones?: number | null;
   autoavaluo?: number;
-  codEstado?: string;
-  codUsuario?: number;
+  codEstado?: string | null;
+  rutaImagenPlano?: string | null;
+  codUsuario?: number | null;
   direccion?: string;
   conductor?: string;
   estadoPredio?: string;
   condicionPropiedad?: string;
+  codGrupoUso?: number | null;
+  descripcionUso?: string | null;
+  parametroBusqueda?: string | null;
+  nombreSectorCompleto?: string;
 }
 /**
  * DTO para crear predios según la estructura exacta del API
- * URL: POST http://26.161.18.122:8080/api/predio
+ * URL: POST http://26.161.18.122:8085/api/predio
  */
 export interface CreatePredioDTO {
   anio: number;
@@ -56,7 +63,6 @@ export interface CreatePredioDTO {
   codListaConductor: string;
   codUbicacionAreaVerde: number;
   areaTerreno: number;
-  numeroPisos: number;
   totalAreaConstruccion: number | null;
   valorTotalConstruccion: number | null;
   valorTerreno: number | null;
@@ -71,6 +77,8 @@ export interface BusquedaPredioParams {
   codPredio?: string;
   anio?: number;
   direccion?: number;
+  codPredioBase?: string;
+  parametroBusqueda?: string;
 }
 
 /**
@@ -97,9 +105,9 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
       '/api/predio',
       {
         normalizeItem: (item: any) => ({
-         
             anio: item.anio,
             codPredio: item.codPredio || null,
+            codPredioBase: item.codPredioBase,
             numeroFinca: item.numeroFinca,
             otroNumero: item.otroNumero,
             codClasificacion: item.codClasificacion,
@@ -117,13 +125,19 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
             totalAreaConstruccion: item.totalAreaConstruccion,
             valorTotalConstruccion: item.valorTotalConstruccion,
             valorTerreno: item.valorTerreno,
+            valorOtrasInstalaciones: item.valorOtrasInstalaciones,
             autoavaluo: item.autoavaluo || null,
             codEstado: item.codEstado,
+            rutaImagenPlano: item.rutaImagenPlano,
             codUsuario: item.codUsuario || null,
             direccion: item.direccion,
             conductor: item.conductor,
             estadoPredio: item.estadoPredio,
             condicionPropiedad: item.condicionPropiedad,
+            codGrupoUso: item.codGrupoUso,
+            descripcionUso: item.descripcionUso,
+            parametroBusqueda: item.parametroBusqueda,
+            nombreSectorCompleto: item.nombreSectorCompleto,
           }),
 
           validateItem: (item: PredioData) => {
@@ -146,6 +160,127 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
 
 
   
+  /**
+   * Obtiene todos los predios usando el endpoint /all
+   * GET: http://26.161.18.122:8085/api/predio/all
+   * NO requiere autenticación
+   */
+  async obtenerTodosPredios(): Promise<PredioData[]> {
+    try {
+      console.log('📋 [PredioService] Obteniendo todos los predios desde /all');
+
+      const url = `${API_CONFIG.baseURL}/api/predio/all`;
+      console.log('📡 [PredioService] GET:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      console.log('📡 [PredioService] Response Status:', response.status);
+
+      if (!response.ok) {
+        console.error('❌ [PredioService] Error Response:', {
+          status: response.status,
+          statusText: response.statusText
+        });
+        throw new Error(`Error HTTP: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+      console.log('✅ [PredioService] Datos recibidos:', responseData);
+
+      // La respuesta puede ser un array directo o un objeto con data
+      let predios: PredioData[] = [];
+
+      if (Array.isArray(responseData)) {
+        predios = responseData;
+      } else if (responseData.success && Array.isArray(responseData.data)) {
+        predios = responseData.data;
+      } else if (responseData.data) {
+        predios = [responseData.data];
+      }
+
+      console.log(`✅ [PredioService] ${predios.length} predios obtenidos`);
+      return this.normalizeData(predios);
+
+    } catch (error: any) {
+      console.error('❌ [PredioService] Error al obtener todos los predios:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Busca predios con filtros específicos
+   * GET: http://26.161.18.122:8085/api/predio?anio=2024&codPredioBase=4&parametroBusqueda=
+   * NO requiere autenticación
+   * IMPORTANTE: La API requiere SIEMPRE los 3 parámetros (anio, codPredioBase, parametroBusqueda)
+   */
+  async buscarPrediosConFiltros(params: BusquedaPredioParams): Promise<PredioData[]> {
+    try {
+      console.log('🔍 [PredioService] Buscando predios con filtros:', params);
+
+      // La API requiere SIEMPRE los 3 parámetros, usar valores por defecto si no se proporcionan
+      const queryParams = new URLSearchParams();
+      queryParams.append('anio', (params.anio || new Date().getFullYear()).toString());
+      queryParams.append('codPredioBase', params.codPredioBase || '');
+      queryParams.append('parametroBusqueda', params.parametroBusqueda || '');
+
+      const url = `${API_CONFIG.baseURL}/api/predio?${queryParams.toString()}`;
+      console.log('📡 [PredioService] GET:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      console.log('📡 [PredioService] Response Status:', response.status);
+
+      if (!response.ok) {
+        console.error('❌ [PredioService] Error Response:', {
+          status: response.status,
+          statusText: response.statusText
+        });
+        throw new Error(`Error HTTP: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+      console.log('✅ [PredioService] Datos recibidos:', responseData);
+      console.log('✅ [PredioService] Tipo de respuesta:', typeof responseData);
+      console.log('✅ [PredioService] Es array:', Array.isArray(responseData));
+
+      // La respuesta puede ser un array directo o un objeto con data
+      let predios: PredioData[] = [];
+
+      if (Array.isArray(responseData)) {
+        console.log('📋 [PredioService] Respuesta es array directo');
+        predios = responseData;
+      } else if (responseData.success && Array.isArray(responseData.data)) {
+        console.log('📋 [PredioService] Respuesta tiene success y data array');
+        predios = responseData.data;
+      } else if (responseData.data && Array.isArray(responseData.data)) {
+        console.log('📋 [PredioService] Respuesta tiene data array');
+        predios = responseData.data;
+      } else if (responseData.data) {
+        console.log('📋 [PredioService] Respuesta tiene data no-array');
+        predios = [responseData.data];
+      } else {
+        console.warn('⚠️ [PredioService] Estructura de respuesta no reconocida:', responseData);
+      }
+
+      console.log(`✅ [PredioService] ${predios.length} predios encontrados`);
+      return this.normalizeData(predios);
+
+    } catch (error: any) {
+      console.error('❌ [PredioService] Error al buscar predios:', error);
+      throw error;
+    }
+  }
+
   /**
    * Obtiene todos los predios
    * La API requiere parámetros específicos incluso para listar todos
@@ -359,7 +494,6 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
         codListaConductor: String(datos.codListaConductor || "1401"),
         codUbicacionAreaVerde: Number(datos.codUbicacionAreaVerde || 1),
         areaTerreno: Number(datos.areaTerreno),
-        numeroPisos: Number(datos.numeroPisos || 1),
         totalAreaConstruccion: datos.totalAreaConstruccion ? Number(datos.totalAreaConstruccion) : null,
         valorTotalConstruccion: datos.valorTotalConstruccion ? Number(datos.valorTotalConstruccion) : null,
         valorTerreno: datos.valorTerreno ? Number(datos.valorTerreno) : null,
@@ -392,7 +526,6 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
   "codListaConductor": "${datosParaEnviar.codListaConductor}",
   "codUbicacionAreaVerde": ${datosParaEnviar.codUbicacionAreaVerde},
   "areaTerreno": ${datosParaEnviar.areaTerreno},
-  "numeroPisos": ${datosParaEnviar.numeroPisos},
   "totalAreaConstruccion": ${datosParaEnviar.totalAreaConstruccion},
   "valorTotalConstruccion": ${datosParaEnviar.valorTotalConstruccion},
   "valorTerreno": ${datosParaEnviar.valorTerreno},
@@ -448,7 +581,6 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
         codListaConductor: responseData.codListaConductor || datosParaEnviar.codListaConductor,
         codUbicacionAreaVerde: responseData.codUbicacionAreaVerde?.toString() || datosParaEnviar.codUbicacionAreaVerde.toString(),
         areaTerreno: responseData.areaTerreno || datosParaEnviar.areaTerreno,
-        numeroPisos: responseData.numeroPisos || datosParaEnviar.numeroPisos,
         totalAreaConstruccion: responseData.totalAreaConstruccion || datosParaEnviar.totalAreaConstruccion,
         valorTotalConstruccion: responseData.valorTotalConstruccion || datosParaEnviar.valorTotalConstruccion,
         valorTerreno: responseData.valorTerreno || datosParaEnviar.valorTerreno,
@@ -487,7 +619,6 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
     numeroCondominos?: number;
     codListaConductor?: string;
     codUbicacionAreaVerde?: number;
-    numeroPisos?: number;
     totalAreaConstruccion?: number | null;
     valorTotalConstruccion?: number | null;
     valorTerreno?: number | null;
@@ -507,11 +638,10 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
       codDireccion: datos.codDireccion,
       codUsoPredio: datos.codUsoPredio || 1,
       fechaAdquisicion: datos.fechaAdquisicion || new Date().toISOString().split('T')[0],
-      numeroCondominos: datos.numeroCondominos || 1,
+      numeroCondominos: datos.numeroCondominos || 2,
       codListaConductor: datos.codListaConductor || "1401",
       codUbicacionAreaVerde: datos.codUbicacionAreaVerde || 1,
       areaTerreno: datos.areaTerreno,
-      numeroPisos: datos.numeroPisos || 1,
       totalAreaConstruccion: datos.totalAreaConstruccion || null,
       valorTotalConstruccion: datos.valorTotalConstruccion || null,
       valorTerreno: datos.valorTerreno || null,
@@ -615,16 +745,20 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
   }
 
   /**
-   * Obtener todos los predios sin filtros
-   * GET http://26.161.18.122:8080/api/predio/all
+   * Obtener todos los usos de predios
+   * GET http://26.161.18.122:8085/api/predio/usos
    * Sin autenticación
    */
-  async obtenerTodosPredios(): Promise<PredioData[]> {
+  async obtenerUsosPredio(): Promise<Array<{
+    codUsoPredio: number;
+    codGrupoUso: number;
+    descripcionUso: string;
+  }>> {
     try {
-      console.log('📡 [PredioService] Obteniendo todos los predios desde API');
-      
-      const url = 'http://26.161.18.122:8080/api/predio/all';
-      
+      console.log('📡 [PredioService] Obteniendo usos de predios desde API');
+
+      const url = `${API_CONFIG.baseURL}/api/predio/usos`;
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -638,93 +772,36 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
       }
 
       const responseData = await response.json();
-      console.log('📡 [PredioService] Respuesta del API todos los predios:', responseData);
+      console.log('📡 [PredioService] Respuesta del API usos:', responseData);
 
       // Manejar diferentes formatos de respuesta
-      let prediosData;
-      
+      let usosData;
+
       if (responseData.success && responseData.data) {
-        // Formato con wrapper (success/data)
-        prediosData = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+        usosData = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
       } else if (Array.isArray(responseData)) {
-        // Formato array directo
-        prediosData = responseData;
-      } else if (responseData.codPredio) {
-        // Formato objeto directo
-        prediosData = [responseData];
+        usosData = responseData;
       } else {
         console.log('⚠️ [PredioService] Formato de respuesta no reconocido');
         return [];
       }
-      
-      // Normalizar datos usando el normalizador existente
-      const prediosNormalizados = prediosData.map((item: any) => ({
-        anio: item.anio,
-        codPredio: item.codPredio || null,
-        numeroFinca: item.numeroFinca,
-        otroNumero: item.otroNumero,
-        codClasificacion: item.codClasificacion,
-        estPredio: item.estPredio,
-        codTipoPredio: item.codTipoPredio,
-        codCondicionPropiedad: item.codCondicionPropiedad,
-        codDireccion: item.codDireccion,
+
+      // Mapear los datos
+      const usosMapeados = usosData.map((item: any) => ({
         codUsoPredio: item.codUsoPredio,
-        fechaAdquisicion: item.fechaAdquisicion,
-        numeroCondominos: item.numeroCondominos,
-        codListaConductor: item.codListaConductor,
-        codUbicacionAreaVerde: item.codUbicacionAreaVerde,
-        areaTerreno: parseFloat(item.areaTerreno?.toString() || '0'),
-        numeroPisos: item.numeroPisos,
-        totalAreaConstruccion: item.totalAreaConstruccion,
-        valorTotalConstruccion: item.valorTotalConstruccion,
-        valorTerreno: item.valorTerreno,
-        autoavaluo: item.autoavaluo || null,
-        codEstado: item.codEstado,
-        codUsuario: item.codUsuario || null,
-        direccion: item.direccion,
-        conductor: item.conductor,
-        estadoPredio: item.estadoPredio,
-        condicionPropiedad: item.condicionPropiedad,
+        codGrupoUso: item.codGrupoUso,
+        descripcionUso: item.descripcionUso
       }));
 
-      console.log(`✅ [PredioService] ${prediosNormalizados.length} predios obtenidos y normalizados`);
-      return prediosNormalizados;
-      
+      console.log(`✅ [PredioService] ${usosMapeados.length} usos obtenidos`);
+      return usosMapeados;
+
     } catch (error: any) {
-      console.error('❌ [PredioService] Error al obtener todos los predios:', error);
-      
-      // En caso de error, devolver datos de ejemplo
-      console.log('🔄 [PredioService] Usando datos de ejemplo debido al error');
-      return [
-        {
-          anio: 2024,
-          codPredio: '20241001',
-          numeroFinca: '12345',
-          otroNumero: 'A-1',
-          areaTerreno: 250.5,
-          numeroPisos: 2,
-          autoavaluo: 150000,
-          direccion: 'Av. Principal 123, Lima',
-          conductor: 'Juan Pérez García',
-          estadoPredio: 'Activo',
-          condicionPropiedad: 'Propio'
-        },
-        {
-          anio: 2024,
-          codPredio: '20241002',
-          numeroFinca: '12346',
-          otroNumero: 'B-2',
-          areaTerreno: 180.0,
-          numeroPisos: 1,
-          autoavaluo: 120000,
-          direccion: 'Jr. Las Flores 456, Lima',
-          conductor: 'María López Sánchez',
-          estadoPredio: 'Activo',
-          condicionPropiedad: 'Alquilado'
-        }
-      ];
+      console.error('❌ [PredioService] Error al obtener usos de predios:', error);
+      return [];
     }
   }
+
 }
 
 // Exportar instancia única del servicio

@@ -152,25 +152,26 @@ const CallePage: React.FC = () => {
       if (!codSector || codSector <= 0) {
         throw new Error('Debe seleccionar un sector válido');
       }
-      
-      if (!codBarrio || codBarrio <= 0) {
-        throw new Error('Debe seleccionar un barrio válido');
-      }
-      
+
+      // El barrio ahora es opcional
+      // if (!codBarrio || codBarrio <= 0) {
+      //   throw new Error('Debe seleccionar un barrio válido');
+      // }
+
       if (!tipoVia || Number(tipoVia) <= 0) {
         throw new Error('Debe seleccionar un tipo de vía');
       }
-      
-      if (!nombreCalle || nombreCalle.trim().length < 3) {
-        throw new Error('El nombre de la calle debe tener al menos 3 caracteres');
+
+      if (!nombreCalle || nombreCalle.trim().length === 0) {
+        throw new Error('El nombre de la calle es requerido');
       }
-      
+
       // Convertir al formato esperado por guardarCalle (CreateCalleDTO)
       const calleData = {
         codTipoVia: Number(tipoVia),
         nombreVia: nombreCalle.trim(),
         codSector: Number(codSector),
-        codBarrio: Number(codBarrio)
+        codBarrio: codBarrio ? Number(codBarrio) : 0
       };
       
       await guardarCalle(calleData);

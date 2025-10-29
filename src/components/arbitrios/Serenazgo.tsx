@@ -20,6 +20,7 @@ import {
   Search as SearchIcon,
   Save as SaveIcon
 } from '@mui/icons-material';
+import { useSerenazgo } from '../../hooks/useSerenazgo';
 
 interface GrupoUsoOption {
   id: number;
@@ -41,20 +42,29 @@ interface TasaSerenazgoData {
 }
 
 const Serenazgo: React.FC = () => {
+  // Hook de serenazgo
+  const {
+    serenazgos,
+    loading: loadingSerenazgo,
+    listarSerenazgo,
+    crearSerenazgo,
+    actualizarSerenazgo
+  } = useSerenazgo();
+
   // Estados para Registro de Tasas
   const [grupoUso, setGrupoUso] = useState<GrupoUsoOption | null>(null);
   const [cuadrante, setCuadrante] = useState<CuadranteOption | null>(null);
   const [tasaNueva, setTasaNueva] = useState<string>('');
-  
+
   // Estado para formData y errors
   const [formData, setFormData] = useState<{ anio: number | '' }>({
     anio: new Date().getFullYear()
   });
   const [errors, setErrors] = useState<{ anio?: string }>({});
-  
+
   // Estados para Consulta de Tasas
   const [anioConsulta, setAnioConsulta] = useState<string>(new Date().getFullYear().toString());
-  
+
   // Estados para loading y datos de tabla
   const [isLoading, setIsLoading] = useState(false);
   const [mostrarTabla, setMostrarTabla] = useState(false);
@@ -85,21 +95,66 @@ const gruposUso: GrupoUsoOption[] = [
     { id: 12, label: 'Cuadrante 12' },
   ];
 
-  // Datos de ejemplo para la tabla de tasas de serenazgo con 12 cuadrantes
-  const datosTasasSerenazgo: TasaSerenazgoData[] = [
-    { cuadrante: 'Cuadrante 1', casaHabitacion: 25.50, comercio: 45.30, servicios: 55.75, industrias: 75.75, otros: 30.25 },
-    { cuadrante: 'Cuadrante 2', casaHabitacion: 22.75, comercio: 42.60, servicios: 52.40, industrias: 72.40, otros: 28.45 },
-    { cuadrante: 'Cuadrante 3', casaHabitacion: 20.30, comercio: 38.85, servicios: 48.60, industrias: 68.60, otros: 25.95 },
-    { cuadrante: 'Cuadrante 4', casaHabitacion: 18.80, comercio: 35.90, servicios: 44.85, industrias: 64.85, otros: 23.60 },
-    { cuadrante: 'Cuadrante 5', casaHabitacion: 24.20, comercio: 44.10, servicios: 54.20, industrias: 74.20, otros: 29.80 },
-    { cuadrante: 'Cuadrante 6', casaHabitacion: 21.45, comercio: 41.25, servicios: 50.90, industrias: 70.90, otros: 27.95 },
-    { cuadrante: 'Cuadrante 7', casaHabitacion: 19.60, comercio: 37.50, servicios: 47.15, industrias: 67.15, otros: 25.40 },
-    { cuadrante: 'Cuadrante 8', casaHabitacion: 17.85, comercio: 34.75, servicios: 43.40, industrias: 63.40, otros: 23.10 },
-    { cuadrante: 'Cuadrante 9', casaHabitacion: 23.10, comercio: 42.80, servicios: 52.65, industrias: 72.65, otros: 29.35 },
-    { cuadrante: 'Cuadrante 10', casaHabitacion: 20.35, comercio: 39.95, servicios: 49.30, industrias: 69.30, otros: 27.50 },
-    { cuadrante: 'Cuadrante 11', casaHabitacion: 18.70, comercio: 36.20, servicios: 45.55, industrias: 65.55, otros: 24.95 },
-    { cuadrante: 'Cuadrante 12', casaHabitacion: 16.95, comercio: 33.45, servicios: 41.80, industrias: 61.80, otros: 22.65 }
-  ];
+  // Transformar datos del hook al formato de la tabla
+  const datosTasasSerenazgo: TasaSerenazgoData[] = React.useMemo(() => {
+    console.log('[Serenazgo] Transformando datos, total registros:', serenazgos.length);
+
+    if (serenazgos.length > 0) {
+      console.log('[Serenazgo] Ejemplo de registro:', serenazgos[0]);
+    }
+
+    return cuadrantes.map(cuad => {
+      // Para cada cuadrante, buscar las tasas de cada grupo de uso
+      const fila: TasaSerenazgoData = {
+        cuadrante: cuad.label,
+        casaHabitacion: '',
+        comercio: '',
+        servicios: '',
+        industrias: '',
+        otros: ''
+      };
+
+      // Buscar todos los registros de este cuadrante - comparar por nombre o por ID
+      const registrosCuadrante = serenazgos.filter(s =>
+        s.nombreCuadrante === cuad.label || s.codCuadrante === cuad.id
+      );
+
+      console.log(`[Serenazgo] ${cuad.label}: encontrados ${registrosCuadrante.length} registros`);
+      if (registrosCuadrante.length > 0) {
+        console.log(`[Serenazgo] Registros encontrados:`, registrosCuadrante);
+      }
+
+      // Mapear cada registro al campo correspondiente según el nombre del grupo
+      registrosCuadrante.forEach(registro => {
+        const grupoNombre = registro.grupoUso?.toLowerCase() || '';
+        const tasa = registro.tasaMensual;
+
+        console.log(`[Serenazgo] Procesando: cuadrante=${registro.nombreCuadrante}, grupo=${registro.grupoUso}, tasa=${tasa}`);
+
+        if (grupoNombre.includes('casa') || grupoNombre.includes('habitacion') || grupoNombre.includes('habitación')) {
+          fila.casaHabitacion = tasa;
+          console.log(`[Serenazgo] ✓ Asignado a casaHabitacion:`, tasa);
+        } else if (grupoNombre.includes('comercio')) {
+          fila.comercio = tasa;
+          console.log(`[Serenazgo] ✓ Asignado a comercio:`, tasa);
+        } else if (grupoNombre.includes('servicio')) {
+          fila.servicios = tasa;
+          console.log(`[Serenazgo] ✓ Asignado a servicios:`, tasa);
+        } else if (grupoNombre.includes('industria')) {
+          fila.industrias = tasa;
+          console.log(`[Serenazgo] ✓ Asignado a industrias:`, tasa);
+        } else if (grupoNombre.includes('otro')) {
+          fila.otros = tasa;
+          console.log(`[Serenazgo] ✓ Asignado a otros:`, tasa);
+        } else {
+          console.log(`[Serenazgo] ✗ No se pudo clasificar grupo: "${registro.grupoUso}"`);
+        }
+      });
+
+      console.log(`[Serenazgo] Fila resultante para ${cuad.label}:`, fila);
+      return fila;
+    });
+  }, [serenazgos]);
 
   // Handler para cambio de año
   const handleAnioChange = (year: number | '') => {
@@ -134,14 +189,47 @@ const gruposUso: GrupoUsoOption[] = [
   };
 
   // Handlers para Registro
-  const handleRegistroTasa = () => {
-    console.log('Registrar Tasa:', {
-      anio: formData.anio,
-      grupoUso,
-      cuadrante,
-      tasaNueva
-    });
-    // Aquí iría la lógica para registrar la tasa
+  const handleRegistroTasa = async () => {
+    if (!formData.anio || !grupoUso || !cuadrante || !tasaNueva) {
+      console.warn('[Serenazgo] Faltan datos requeridos');
+      return;
+    }
+
+    try {
+      const datos = {
+        anio: Number(formData.anio),
+        codGrupoUso: grupoUso.id,
+        codCuadrante: cuadrante.id,
+        tasaMensual: parseFloat(tasaNueva)
+      };
+
+      console.log('[Serenazgo] Registrando tasa con datos:', datos);
+
+      // Verificar si ya existe un registro con esa combinación
+      const existente = serenazgos.find(
+        s => s.anio === datos.anio &&
+             s.codGrupoUso === datos.codGrupoUso &&
+             s.codCuadrante === datos.codCuadrante
+      );
+
+      if (existente) {
+        console.log('[Serenazgo] Actualizando registro existente');
+        await actualizarSerenazgo(datos);
+      } else {
+        console.log('[Serenazgo] Creando nuevo registro');
+        await crearSerenazgo(datos);
+      }
+
+      // Limpiar formulario
+      handleNuevo();
+
+      // Recargar datos
+      await listarSerenazgo({ anio: datos.anio });
+      setMostrarTabla(true);
+
+    } catch (error) {
+      console.error('[Serenazgo] Error registrando tasa:', error);
+    }
   };
 
   const handleNuevo = () => {
@@ -153,15 +241,17 @@ const gruposUso: GrupoUsoOption[] = [
   };
 
   // Handler para Consulta
-  const handleBuscar = () => {
-    console.log('Buscar tasas del año:', anioConsulta);
-    setIsLoading(true);
-    
-    // Simular carga de datos
-    setTimeout(() => {
+  const handleBuscar = async () => {
+    try {
+      setIsLoading(true);
+      console.log('[Serenazgo] Buscando tasas del año:', anioConsulta);
+      await listarSerenazgo({ anio: parseInt(anioConsulta) });
       setMostrarTabla(true);
+    } catch (error) {
+      console.error('[Serenazgo] Error buscando tasas:', error);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -440,7 +530,7 @@ const gruposUso: GrupoUsoOption[] = [
                 Año {anioConsulta}
               </Box>
             </Box>
-            
+            {/* Tabla de tasas de serenazgo */}
             <TableContainer 
               component={Paper} 
               sx={{ 
@@ -530,19 +620,12 @@ const gruposUso: GrupoUsoOption[] = [
                 </TableHead>
                 <TableBody>
                   {datosTasasSerenazgo.map((fila, index) => (
-                    <TableRow 
+                    <TableRow
                       key={index}
-                      sx={{ 
-                        '&:nth-of-type(even)': { 
-                          backgroundColor: 'grey.50' 
-                        },
-                        '&:hover': {
-                          backgroundColor: 'primary.light',
-                          transform: 'scale(1.005)',
-                          transition: 'all 0.2s ease-in-out',
-                          boxShadow: 1
-                        },
-                        transition: 'all 0.2s ease-in-out'
+                      sx={{
+                        '&:nth-of-type(even)': {
+                          backgroundColor: 'grey.50'
+                        }
                       }}
                     >
                       <TableCell 
@@ -564,52 +647,71 @@ const gruposUso: GrupoUsoOption[] = [
                       {[fila.casaHabitacion, fila.comercio, fila.servicios, fila.industrias, fila.otros].map((tasa, grupoIndex) => (
                         <TableCell 
                           key={grupoIndex}
-                          sx={{ 
+                          sx={{
                             textAlign: 'center',
                             fontSize: '0.8rem',
                             fontWeight: 500,
                             borderRight: grupoIndex < 4 ? '1px solid' : 'none',
                             borderColor: 'divider',
                             py: 2,
-                            color: tasa ? 'success.main' : 'text.secondary',
-                            cursor: tasa ? 'pointer' : 'default'
+                            color: typeof tasa === 'number' ? 'success.main' : 'text.secondary',
+                            cursor: typeof tasa === 'number' ? 'pointer' : 'default'
                           }}
                         >
-                          {tasa ? (
-                            <Tooltip 
+                          {typeof tasa === 'number' ? (
+                            <Tooltip
                               title={`Clic para editar: ${fila.cuadrante} - ${gruposUso[grupoIndex].label}`}
                               arrow
                               placement="top"
                             >
-                              <Box 
+                              <Box
                                 onClick={() => handleTasaClick(gruposUso[grupoIndex].label, parseInt(fila.cuadrante.split(' ')[1]), tasa)}
                                 sx={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: 0.5,
                                   backgroundColor: 'success.light',
                                   color: 'success.contrastText',
-                                  px: 1.5,
-                                  py: 0.5,
+                                  px: 2,
+                                  py: 1,
                                   borderRadius: 1,
                                   fontWeight: 600,
                                   fontSize: '0.875rem',
                                   cursor: 'pointer',
                                   transition: 'all 0.2s ease-in-out',
+                                  width: '100%',
+                                  minHeight: '60px',
                                   '&:hover': {
                                     backgroundColor: 'success.main',
-                                    transform: 'scale(1.05)',
+                                    transform: 'scale(1.02)',
                                     boxShadow: 2
                                   },
                                   '&:active': {
-                                    transform: 'scale(0.95)'
+                                    transform: 'scale(0.98)'
                                   }
                                 }}
                               >
-                                S/ {tasa.toFixed(2)}
+                                <Box>Mensual: S/ {tasa.toFixed(2)}</Box>
+                                <Box sx={{
+                                  fontSize: '0.75rem',
+                                  fontWeight: 500,
+                                  opacity: 0.9,
+                                  borderTop: '1px solid rgba(255,255,255,0.3)',
+                                  pt: 0.3,
+                                  width: '100%',
+                                  textAlign: 'center'
+                                }}>
+                                  Anual: S/ {(tasa * 12).toFixed(2)}
+                                </Box>
                               </Box>
                             </Tooltip>
                           ) : (
                             <Box sx={{
                               color: 'text.secondary',
-                              fontStyle: 'italic'
+                              fontStyle: 'italic',
+                              py: 2
                             }}>
                               No aplica
                             </Box>

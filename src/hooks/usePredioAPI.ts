@@ -46,13 +46,20 @@ const mapPredioDataToModel = (data: PredioData): Predio => {
   };
 };
 
+interface UsoPredioOption {
+  codUsoPredio: number;
+  codGrupoUso: number;
+  descripcionUso: string;
+}
+
 interface UsePrediosReturn {
   // Estado
   predios: Predio[];
   predioSeleccionado: Predio | null;
   loading: boolean;
   error: string | null;
-  
+  usosPredio: UsoPredioOption[];
+
   // Estadísticas
   estadisticas: {
     total: number;
@@ -61,11 +68,13 @@ interface UsePrediosReturn {
     areaTerrenoTotal: number;
     areaConstruidaTotal: number;
   } | null;
-  
+
   // Acciones
   cargarPredios: () => Promise<void>;
   cargarTodosPredios: () => Promise<void>;
+  cargarUsosPredio: () => Promise<void>;
   buscarPredios: (filtros: FiltroPredio) => Promise<void>;
+  buscarPrediosConFiltros: (anio?: number, codPredioBase?: string, parametroBusqueda?: string) => Promise<void>;
   buscarPrediosConFormData: (codPredio?: string, anio?: number, direccion?: number) => Promise<void>;
   obtenerPredioPorCodigo: (codigoPredio: string) => Promise<void>;
   obtenerPrediosPorAnio: (anio: number) => Promise<void>;
@@ -87,6 +96,7 @@ export const usePredios = (): UsePrediosReturn => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [estadisticas, setEstadisticas] = useState<UsePrediosReturn['estadisticas']>(null);
+  const [usosPredio, setUsosPredio] = useState<UsoPredioOption[]>([]);
 
   /**
    * Cargar todos los predios
@@ -112,23 +122,84 @@ export const usePredios = (): UsePrediosReturn => {
 
   /**
    * Cargar todos los predios usando API GET /all
-   * GET http://26.161.18.122:8080/api/predio/all
+   * GET http://26.161.18.122:8085/api/predio/all
    */
   const cargarTodosPredios = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       console.log('📡 [usePredios] Cargando todos los predios desde API /all');
-      
+
       const prediosData = await predioService.obtenerTodosPredios();
       const prediosMapeados = prediosData.map(mapPredioDataToModel);
       setPredios(prediosMapeados);
-      
+
       NotificationService.success(`${prediosData.length} predios cargados desde API`);
       console.log(`✅ [usePredios] ${prediosData.length} predios cargados exitosamente`);
     } catch (err: any) {
       const mensaje = err.message || 'Error al cargar todos los predios';
+      console.error('❌ [usePredios] Error:', err);
+      setError(mensaje);
+      NotificationService.error(mensaje);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Cargar todos los usos de predios
+   * GET http://26.161.18.122:8085/api/predio/usos
+   */
+  const cargarUsosPredio = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log('📡 [usePredios] Cargando usos de predios desde API /usos');
+
+      const usosData = await predioService.obtenerUsosPredio();
+      setUsosPredio(usosData);
+
+      console.log(`✅ [usePredios] ${usosData.length} usos cargados exitosamente`);
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al cargar usos de predios';
+      console.error('❌ [usePredios] Error:', err);
+      setError(mensaje);
+      NotificationService.error(mensaje);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Buscar predios con filtros usando query params
+   * GET http://26.161.18.122:8085/api/predio?anio=2024&codPredioBase=4&parametroBusqueda=
+   */
+  const buscarPrediosConFiltros = useCallback(async (
+    anio?: number,
+    codPredioBase?: string,
+    parametroBusqueda?: string
+  ) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log('🔍 [usePredios] Buscando predios con filtros:', { anio, codPredioBase, parametroBusqueda });
+
+      const prediosData = await predioService.buscarPrediosConFiltros({
+        anio,
+        codPredioBase,
+        parametroBusqueda
+      });
+
+      const prediosMapeados = prediosData.map(mapPredioDataToModel);
+      setPredios(prediosMapeados);
+
+      NotificationService.success(`${prediosData.length} predios encontrados`);
+      console.log(`✅ [usePredios] ${prediosData.length} predios cargados`);
+    } catch (err: any) {
+      const mensaje = err.message || 'Error al buscar predios';
       console.error('❌ [usePredios] Error:', err);
       setError(mensaje);
       NotificationService.error(mensaje);
@@ -144,18 +215,18 @@ export const usePredios = (): UsePrediosReturn => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Convertir filtros al formato de la API con form-data
       const parametros = {
         codPredio: filtros.codigoPredio,
         anio: filtros.anio,
         direccion: filtros.direccionId
       };
-      
+
       const prediosData = await predioService.buscarPredios(parametros);
       const prediosMapeados = prediosData.map(mapPredioDataToModel);
       setPredios(prediosMapeados);
-      
+
       NotificationService.info(`${prediosData.length} predios encontrados`);
     } catch (err: any) {
       const mensaje = err.message || 'Error al buscar predios';
@@ -305,27 +376,26 @@ export const usePredios = (): UsePrediosReturn => {
         codPredio: null, // SIEMPRE null - SQL lo asigna automáticamente
         numeroFinca: Number(datos.numeroFinca),
         otroNumero: String(datos.otroNumero || ""),
-        codClasificacion: String("0502"), // Por defecto según el JSON ejemplo
-        estPredio: String(datos.estadoPredio || "2503"), // Por defecto según el JSON ejemplo
-        codTipoPredio: String("2601"), // Por defecto según el JSON ejemplo
-        codCondicionPropiedad: String("2701"), // Por defecto según el JSON ejemplo
+        codClasificacion: String(datos.clasificacionPredio || "0502"),
+        estPredio: String(datos.estadoPredio || "2503"),
+        codTipoPredio: String(datos.tipoPredio || "2601"),
+        codCondicionPropiedad: String(datos.condicionPropiedad || "2701"),
         codDireccion: Number(datos.direccionId),
-        codUsoPredio: Number(1), // Por defecto según el JSON ejemplo
-        fechaAdquisicion: datos.fechaAdquisicion 
-          ? (datos.fechaAdquisicion instanceof Date 
+        codUsoPredio: Number(datos.usoPredio || 1),
+        fechaAdquisicion: datos.fechaAdquisicion
+          ? (datos.fechaAdquisicion instanceof Date
               ? datos.fechaAdquisicion.toISOString().split('T')[0]
               : String(datos.fechaAdquisicion).split('T')[0])
           : new Date().toISOString().split('T')[0],
-        numeroCondominos: Number(datos.numeroCondominos || 2), // Por defecto según el JSON ejemplo
-        codListaConductor: String("1401"), // Por defecto según el JSON ejemplo
-        codUbicacionAreaVerde: Number(1), // Por defecto según el JSON ejemplo
+        numeroCondominos: Number(datos.numeroCondominos || 2),
+        codListaConductor: String(datos.conductor || "1401"),
+        codUbicacionAreaVerde: Number(1),
         areaTerreno: Number(datos.areaTerreno),
-        numeroPisos: Number(datos.numeroPisos || 1),
         totalAreaConstruccion: datos.totalAreaConstruccion ? Number(datos.totalAreaConstruccion) : null,
         valorTotalConstruccion: datos.valorTotalConstruccion ? Number(datos.valorTotalConstruccion) : null,
         valorTerreno: datos.valorTerreno ? Number(datos.valorTerreno) : null,
         autoavaluo: datos.autoavaluo ? Number(datos.autoavaluo) : null,
-        codEstado: String("0201"), // Por defecto según el JSON ejemplo
+        codEstado: String("0201"),
         codUsuario: Number(1)
       };
       
@@ -368,12 +438,11 @@ export const usePredios = (): UsePrediosReturn => {
         numeroFinca: datos.numeroFinca ? Number(datos.numeroFinca) : undefined,
         otroNumero: datos.otroNumero || undefined,
         areaTerreno: datos.areaTerreno,
-        fechaAdquisicion: datos.fechaAdquisicion 
-          ? (datos.fechaAdquisicion instanceof Date 
+        fechaAdquisicion: datos.fechaAdquisicion
+          ? (datos.fechaAdquisicion instanceof Date
               ? datos.fechaAdquisicion.toISOString().split('T')[0]
               : String(datos.fechaAdquisicion).split('T')[0])
           : undefined,
-        numeroPisos: datos.numeroPisos || undefined,
         totalAreaConstruccion: datos.totalAreaConstruccion || undefined,
         valorTerreno: datos.valorTerreno || undefined,
         valorTotalConstruccion: datos.valorTotalConstruccion || undefined,
@@ -444,10 +513,12 @@ export const usePredios = (): UsePrediosReturn => {
     }
   }, []);
 
-  // Cargar predios al montar el componente
-  useEffect(() => {
-    cargarPredios();
-  }, [cargarPredios]);
+  // NO cargar predios automáticamente al montar
+  // Cada componente debe llamar explícitamente a cargarTodosPredios() o buscarPredios()
+  // cuando lo necesite (por ejemplo, en su propio useEffect)
+  // useEffect(() => {
+  //   cargarTodosPredios();
+  // }, [cargarTodosPredios]);
 
   return {
     // Estado
@@ -456,11 +527,14 @@ export const usePredios = (): UsePrediosReturn => {
     loading,
     error,
     estadisticas,
-    
+    usosPredio,
+
     // Acciones
     cargarPredios,
     cargarTodosPredios,
+    cargarUsosPredio,
     buscarPredios,
+    buscarPrediosConFiltros,
     buscarPrediosConFormData,
     obtenerPredioPorCodigo,
     obtenerPrediosPorAnio,

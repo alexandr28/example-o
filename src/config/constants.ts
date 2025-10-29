@@ -14,19 +14,33 @@ export const AUTH_ENDPOINTS = {
 export const API_ENDPOINTS = {
   // Mantenedores (sin autenticación)
   BARRIO: `/api/barrio`,
-  SECTOR: `/api/sector`,
+  sector: {
+    base: '/api/sector',
+    listarCuadrante: '/api/sector/listarCuadrante',
+    listarUnidadUrbana: '/api/sector/listarTipoUnidadUrbana',
+  },
   VIA:{
     base: '/api/via',
     listarVia: `/api/via/listarVia`,
   },
- 
+  SERENAZGO:'/api/arbitrioSerenazgo',
+  LIMPIEZA_PUBLICA:{
+    base: '/api/arbitrioLimpiezaPublica',
+    listarLimpiezaPublicaOtros: '/api/arbitrioLimpiezaPublica/listarArbitrioLimpiezaPublicaOtros',
+    insertarLimpiezaPublicaOtros: '/api/arbitrioLimpiezaPublica/insertarArbitrioLimpiezaPublicaOtros',
+    actualizarLimpiezaPublicaOtros: '/api/arbitrioLimpiezaPublica/actualizarArbitrioLimpiezaPublicaOtros',
+  },
+  PARQUES_JARDINES:'/api/arbitrioParquesjardines',
 
   direccion: {
       base: '/api/direccion',
       listarPorNombreVia: `api/direccion/listarDireccionPorNombreVia`,
       listarPorTipoVia: `api/direccion/listarDireccionPorTipoVia?parametrosBusqueda=a&codUsuario=1`,
     },
-  CONTRIBUYENTE: `/api/contribuyente`,
+  CONTRIBUYENTE: {
+    base: '/api/contribuyente',
+    general: '/api/contribuyente/general',
+  },
   persona: {
       base: '/api/persona',
       listarPorTipoYNombre: '/api/persona/listarPersonaPorTipoPersonaNombreRazon',
@@ -38,7 +52,11 @@ export const API_ENDPOINTS = {
   UIT: `/api/uitEpa`,
   ALCABALA: `/api/alcabala`,
   DEPRECIACION: `/api/depreciacion`,
-  PREDIO: `/api/predio`,
+  PREDIO: {
+    base: '/api/predio',
+    all: '/api/predio/all',
+    usos: '/api/predio/usos',
+  },
   PISO: `/api/piso`,
   ASIGNACION: `/api/asignacionpredio`,
   constante: {
@@ -46,6 +64,13 @@ export const API_ENDPOINTS = {
       listarPadre: '/api/constante/listarConstantePadre',
       listarHijo: '/api/constante/listarConstanteHijo'
   },
+  CUENTA_CORRIENTE: {
+    base: '/api/estadoCuenta',
+    listar: '/api/estadoCuenta/listar',
+    listarDetalle: '/api/estadoCuenta/listarDetalle',
+  },
+  RESOLUCION_INTERES: '/api/resolucionInteres',
+  Vencimiento: '/api/vencimiento',
 
   // Autenticación (referencia a AUTH_ENDPOINTS)
   AUTH: `/auth`,

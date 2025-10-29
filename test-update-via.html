@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test - Actualizar Vía</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button.test {
+            background-color: #2196F3;
+        }
+        button.test:hover {
+            background-color: #0b7dda;
+        }
+        #response {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-left: 4px solid #4CAF50;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .error {
+            border-left-color: #f44336 !important;
+            background-color: #ffebee !important;
+        }
+        .info {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test - Actualizar Vía (PUT)</h1>
+
+        <div class="info">
+            <strong>Endpoint:</strong> http://26.161.18.122:8085/api/via/actualizarVias<br>
+            <strong>Método:</strong> PUT<br>
+            <strong>Propósito:</strong> Verificar si el backend actualiza correctamente el sector y barrio
+        </div>
+
+        <form id="updateForm">
+            <div class="form-group">
+                <label for="codVia">Código de Vía (ID a actualizar):</label>
+                <input type="number" id="codVia" name="codVia" value="7" required>
+            </div>
+
+            <div class="form-group">
+                <label for="nombreVia">Nombre de Vía:</label>
+                <input type="text" id="nombreVia" name="nombreVia" value="Indoamericana" required>
+            </div>
+
+            <div class="form-group">
+                <label for="codTipoVia">Código Tipo Vía:</label>
+                <input type="text" id="codTipoVia" name="codTipoVia" value="3801" required>
+            </div>
+
+            <div class="form-group">
+                <label for="codBarrio">Código Barrio (0 para sin barrio):</label>
+                <input type="number" id="codBarrio" name="codBarrio" value="0" required>
+            </div>
+
+            <div class="form-group">
+                <label for="codSector">Código Sector:</label>
+                <input type="number" id="codSector" name="codSector" value="3" required>
+            </div>
+
+            <button type="submit">Actualizar Vía</button>
+            <button type="button" class="test" onclick="testScenario1()">Test: Cambiar Sector (Central → 3) sin barrio</button>
+        </form>
+
+        <div id="response" style="display:none;"></div>
+    </div>
+
+    <script>
+        const API_URL = 'http://26.161.18.122:8085/api/via/actualizarVias';
+
+        document.getElementById('updateForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const payload = {
+                codVia: parseInt(document.getElementById('codVia').value),
+                nombreVia: document.getElementById('nombreVia').value,
+                codTipoVia: document.getElementById('codTipoVia').value,
+                codBarrio: parseInt(document.getElementById('codBarrio').value),
+                codSector: parseInt(document.getElementById('codSector').value)
+            };
+
+            await sendRequest(payload);
+        });
+
+        async function testScenario1() {
+            console.log('🧪 Test: Actualizar vía del sector Central (1) al sector 3, sin barrio');
+
+            const payload = {
+                codVia: 7,
+                nombreVia: "Indoamericana",
+                codTipoVia: "3801",
+                codBarrio: 0,  // Sin barrio
+                codSector: 3   // Cambiar a sector 3
+            };
+
+            await sendRequest(payload);
+        }
+
+        async function sendRequest(payload) {
+            const responseDiv = document.getElementById('response');
+            responseDiv.style.display = 'block';
+            responseDiv.className = '';
+            responseDiv.textContent = '⏳ Enviando solicitud...\n\nPayload:\n' + JSON.stringify(payload, null, 2);
+
+            try {
+                console.log('📤 Enviando:', payload);
+
+                const response = await fetch(API_URL, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const responseText = await response.text();
+                console.log('📡 Status:', response.status);
+                console.log('📡 Response:', responseText);
+
+                let responseData;
+                try {
+                    responseData = JSON.parse(responseText);
+                } catch (e) {
+                    responseData = responseText;
+                }
+
+                if (response.ok) {
+                    responseDiv.textContent = `✅ Actualización exitosa\n\nStatus: ${response.status}\n\nPayload enviado:\n${JSON.stringify(payload, null, 2)}\n\nRespuesta del servidor:\n${JSON.stringify(responseData, null, 2)}`;
+                } else {
+                    responseDiv.className = 'error';
+                    responseDiv.textContent = `❌ Error en la actualización\n\nStatus: ${response.status}\n\nPayload enviado:\n${JSON.stringify(payload, null, 2)}\n\nRespuesta del servidor:\n${JSON.stringify(responseData, null, 2)}`;
+                }
+            } catch (error) {
+                console.error('❌ Error:', error);
+                responseDiv.className = 'error';
+                responseDiv.textContent = `❌ Error de conexión:\n\n${error.message}\n\nAsegúrate de que el servidor esté accesible y que CORS esté configurado correctamente.`;
+            }
+        }
+    </script>
+</body>
+</html>

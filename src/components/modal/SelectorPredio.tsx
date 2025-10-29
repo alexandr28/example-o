@@ -39,8 +39,55 @@ import {
 } from '@mui/icons-material';
 import { usePredios } from '../../hooks/usePredioAPI';
 import { Predio } from '../../models/Predio';
+import { Direccion } from '../../models/Direcciones';
 import { formatCurrency } from '../../utils/formatters';
 import { NotificationService } from '../utils/Notification';
+
+/**
+ * Función helper para formatear la dirección
+ */
+const formatDireccion = (direccion: string | Direccion | null | undefined): string => {
+  if (!direccion) {
+    return 'Sin dirección';
+  }
+
+  if (typeof direccion === 'string') {
+    return direccion;
+  }
+
+  // Si es un objeto Direccion, construir la dirección formateada
+  const partes: string[] = [];
+
+  if (direccion.nombreTipoVia && direccion.nombreVia) {
+    partes.push(`${direccion.nombreTipoVia} ${direccion.nombreVia}`);
+  } else if (direccion.nombreVia) {
+    partes.push(direccion.nombreVia);
+  }
+
+  if (direccion.cuadra) {
+    partes.push(`Cuadra ${direccion.cuadra}`);
+  }
+
+  if (direccion.loteInicial && direccion.loteFinal) {
+    if (direccion.loteInicial === direccion.loteFinal) {
+      partes.push(`Lote ${direccion.loteInicial}`);
+    } else {
+      partes.push(`Lotes ${direccion.loteInicial}-${direccion.loteFinal}`);
+    }
+  } else if (direccion.loteInicial) {
+    partes.push(`Lote ${direccion.loteInicial}`);
+  }
+
+  if (direccion.nombreBarrio) {
+    partes.push(`${direccion.nombreBarrio}`);
+  }
+
+  if (direccion.nombreSector) {
+    partes.push(`Sector ${direccion.nombreSector}`);
+  }
+
+  return partes.length > 0 ? partes.join(', ') : direccion.descripcion || 'Sin dirección';
+};
 
 interface SelectorPredioProps {
   isOpen: boolean;
@@ -61,34 +108,43 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
   title = 'Selector de predios'
 }) => {
   const theme = useTheme();
-  const { 
-    predios, 
-    loading, 
-    error,
-    cargarPredios,
-    buscarPrediosConFormData
-  } = usePredios();
 
-  // Estados locales - Filtros por códigos
-  const [codigoPredio, setCodigoPredio] = useState('');
+  // Estados locales - Filtros
   const [anio, setAnio] = useState(new Date().getFullYear());
+  const [codPredioBase, setCodPredioBase] = useState('');
+  const [parametroBusqueda, setParametroBusqueda] = useState('');
   const [selectedPredio, setSelectedPredio] = useState<Predio | null>(null);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(8);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // Hook de predios - DEBE estar después de todos los estados
+  const {
+    predios,
+    loading,
+    error,
+    cargarTodosPredios,
+    buscarPrediosConFiltros
+  } = usePredios();
 
   // Cargar predios al abrir el modal
   useEffect(() => {
     if (isOpen) {
-      cargarPredios();
+      console.log('🔓 [SelectorPredio] Modal abierto, cargando todos los predios desde /all');
+      // Llamar explícitamente a cargarTodosPredios que usa GET /api/predio/all
+      cargarTodosPredios().catch(err => {
+        console.error('❌ [SelectorPredio] Error al cargar predios:', err);
+      });
     }
-  }, [isOpen, cargarPredios]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // Resetear estados cuando se cierra el modal
   useEffect(() => {
     if (!isOpen) {
-      setCodigoPredio('');
       setAnio(new Date().getFullYear());
+      setCodPredioBase('');
+      setParametroBusqueda('');
       setSelectedPredio(null);
       setPage(0);
       setHasSearched(false);
@@ -98,6 +154,7 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
   // Mostrar predios según si se ha buscado o no
   const filteredPredios = useMemo(() => {
     // Los resultados ya vienen filtrados de la API o son todos los predios
+    console.log('📊 [SelectorPredio] Predios actuales:', predios.length);
     return predios;
   }, [predios]);
 
@@ -110,50 +167,38 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
 
   // Handlers
   const handleBuscar = async () => {
-    if (!codigoPredio) {
-      NotificationService.warning('Ingrese el código del predio para buscar');
-      return;
-    }
-
     setHasSearched(true);
     setPage(0);
-    
+
     console.log('🔍 [SelectorPredio] Buscando con filtros:', {
-      codigoPredio,
-      anio
+      anio,
+      codPredioBase,
+      parametroBusqueda
     });
 
     try {
-      // Llamar a la API con los parámetros específicos
-      await buscarPrediosConFormData(codigoPredio, anio, 1);
-      
-      console.log('🔍 [SelectorPredio] Predios después de búsqueda:', predios);
-      console.log('🔍 [SelectorPredio] Cantidad de predios:', predios.length);
-      
-      if (predios.length > 0) {
-        console.log('🔍 [SelectorPredio] Primer predio ejemplo:', predios[0]);
-        console.log('🔍 [SelectorPredio] Propiedades del primer predio:', Object.keys(predios[0]));
-      }
-      
-      if (predios.length === 0) {
-        NotificationService.info('No se encontraron predios con los criterios especificados');
-      } else {
-        NotificationService.success(`Se encontraron ${predios.length} predios`);
-      }
+      // Llamar a la nueva API con query params
+      await buscarPrediosConFiltros(
+        anio || undefined,
+        codPredioBase || undefined,
+        parametroBusqueda || undefined
+      );
+
+      console.log('✅ [SelectorPredio] Búsqueda completada');
     } catch (error) {
       console.error('❌ [SelectorPredio] Error en búsqueda:', error);
-      NotificationService.error('Error al buscar predios');
     }
   };
 
   const handleLimpiar = async () => {
-    setCodigoPredio('');
     setAnio(new Date().getFullYear());
+    setCodPredioBase('');
+    setParametroBusqueda('');
     setHasSearched(false);
     setPage(0);
-    
+
     // Recargar todos los predios
-    await cargarPredios();
+    await cargarTodosPredios();
   };
 
   const handleSelectPredio = (predio: Predio) => {
@@ -177,16 +222,17 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
   };
 
   return (
-    <Dialog 
-      open={isOpen} 
+    <Dialog
+      open={isOpen}
       onClose={onClose}
-      maxWidth="md"
+      maxWidth="lg"
       fullWidth
       PaperProps={{
         sx: {
           borderRadius: 2,
-          height: '75vh',
-          maxHeight: 650
+          height: '85vh',
+          maxHeight: 800,
+          width: '90vw'
         }
       }}
     >
@@ -224,26 +270,51 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
               <Typography variant="subtitle1" fontWeight={600}>
                 Búsqueda de Predios
               </Typography>
-              {(codigoPredio || hasSearched) && (
-                <Chip 
+              {(codPredioBase || parametroBusqueda || hasSearched) && (
+                <Chip
                   label={hasSearched ? "Búsqueda activa" : "Filtros ingresados"}
-                  color="primary" 
+                  color="primary"
                   size="small"
                 />
               )}
             </Stack>
 
             {/* Filtros compactos */}
-            <Stack direction="row" spacing={1} alignItems="flex-end">
+            <Stack direction="row" spacing={1} alignItems="flex-end" flexWrap="wrap">
+              {/* Año */}
+              <Box sx={{ flex: '0 0 100px' }}>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  label="Año"
+                  type="number"
+                  value={anio}
+                  onChange={(e) => setAnio(parseInt(e.target.value) || new Date().getFullYear())}
+                  disabled={loading}
+                  size="small"
+                  InputProps={{
+                    inputProps: {
+                      min: 2020,
+                      max: new Date().getFullYear() + 1
+                    }
+                  }}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleBuscar();
+                    }
+                  }}
+                />
+              </Box>
+
               {/* Código Predio */}
-              <Box sx={{ flex: '1 1 200px' }}>
+              <Box sx={{ flex: '0 0 100px' }}>
                 <TextField
                   fullWidth
                   variant="outlined"
                   label="Código Predio"
-                  placeholder="Ej: 20231"
-                  value={codigoPredio}
-                  onChange={(e) => setCodigoPredio(e.target.value)}
+                  placeholder="Ej: 4"
+                  value={codPredioBase}
+                  onChange={(e) => setCodPredioBase(e.target.value)}
                   disabled={loading}
                   size="small"
                   InputProps={{
@@ -252,11 +323,11 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
                         <HomeIcon sx={{ fontSize: 18 }} />
                       </InputAdornment>
                     ),
-                    endAdornment: codigoPredio && (
+                    endAdornment: codPredioBase && (
                       <InputAdornment position="end">
                         <IconButton
                           size="small"
-                          onClick={() => setCodigoPredio('')}
+                          onClick={() => setCodPredioBase('')}
                           disabled={loading}
                         >
                           <CloseIcon sx={{ fontSize: 16 }} />
@@ -272,22 +343,34 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
                 />
               </Box>
 
-              {/* Año */}
-              <Box sx={{ flex: '0 0 120px' }}>
+              {/* Parámetro Búsqueda */}
+              <Box sx={{ flex: '0 0 80px' }}>
                 <TextField
                   fullWidth
                   variant="outlined"
-                  label="Año"
-                  type="number"
-                  value={anio}
-                  onChange={(e) => setAnio(parseInt(e.target.value) || new Date().getFullYear())}
+                  label="Parámetro Búsqueda"
+                  placeholder="Buscar..."
+                  value={parametroBusqueda}
+                  onChange={(e) => setParametroBusqueda(e.target.value)}
                   disabled={loading}
                   size="small"
                   InputProps={{
-                    inputProps: { 
-                      min: 2020, 
-                      max: new Date().getFullYear() + 1
-                    }
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon sx={{ fontSize: 18 }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: parametroBusqueda && (
+                      <InputAdornment position="end">
+                        <IconButton
+                          size="small"
+                          onClick={() => setParametroBusqueda('')}
+                          disabled={loading}
+                        >
+                          <CloseIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </InputAdornment>
+                    )
                   }}
                   onKeyPress={(e) => {
                     if (e.key === 'Enter') {
@@ -338,20 +421,24 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
         <Box>
           {/* Vista de tabla para pantallas medianas y grandes */}
           <Box sx={{ display: { xs: 'none', md: 'block' } }}>
-            <TableContainer sx={{ 
-              maxHeight: 320,
+            <TableContainer sx={{
+              maxHeight: 450,
               borderRadius: 1,
               border: `1px solid ${alpha(theme.palette.grey[300], 0.5)}`,
               '&::-webkit-scrollbar': {
-                width: 6,
-                height: 6
+                width: 8,
+                height: 8
               },
               '&::-webkit-scrollbar-track': {
-                backgroundColor: alpha(theme.palette.grey[300], 0.2)
+                backgroundColor: alpha(theme.palette.grey[200], 0.3),
+                borderRadius: 4
               },
               '&::-webkit-scrollbar-thumb': {
-                backgroundColor: alpha(theme.palette.grey[400], 0.5),
-                borderRadius: 3
+                backgroundColor: alpha(theme.palette.primary.main, 0.4),
+                borderRadius: 4,
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.6)
+                }
               }
             }}>
               <Table stickyHeader size="small">
@@ -399,7 +486,7 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
                     <TableCell align="right" sx={{ minWidth: 120 }}>
                       <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={0.5}>
                         <MoneyIcon sx={{ fontSize: 14, color: 'success.main' }} />
-                        <Typography variant="caption" fontWeight={700}>Autoavalúo</Typography>
+                        <Typography variant="caption" fontWeight={700}>ValorTerreno</Typography>
                       </Stack>
                     </TableCell>
                   </TableRow>
@@ -436,49 +523,54 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
               ) : (
                 paginatedPredios.map((predio, index) => {
                   const predioId = predio.codigoPredio || predio.codPredio || predio.id;
-                  const isSelected = selectedPredio && (
-                    selectedPredio.codigoPredio === predio.codigoPredio ||
-                    selectedPredio.codPredio === predio.codPredio ||
-                    selectedPredio.codPredio === predio.codPredio ||
-                    selectedPredio.id === predio.id
-                  );
 
-                  // Debug: Ver estructura del predio
-                  console.log('🏠 [SelectorPredio] Estructura del predio:', predio);
-                  console.log('🏠 [SelectorPredio] Código disponible:', {
-                    codigoPredio: predio.codigoPredio,
-                    codPredio: predio.codPredio,
-                    codigo: predio.codPredio,
-                    id: predio.id,
-                    predioIdFinal: predioId
-                  });
+                  // Normalizar los valores para comparación (limpiar espacios y convertir a string)
+                  const selectedId = selectedPredio
+                    ? String(selectedPredio.codigoPredio || selectedPredio.codPredio || selectedPredio.id || '').trim()
+                    : null;
+                  const currentId = String(predioId || '').trim();
+
+                  // Comparar solo si ambos IDs existen y coinciden exactamente
+                  const isSelected = selectedId !== null && selectedId !== '' && currentId !== '' && selectedId === currentId;
 
                   return (
                     <TableRow
                       key={predioId || index}
                       hover
                       onClick={() => handleSelectPredio(predio)}
+                      selected={!!isSelected}
                       sx={{
                         cursor: 'pointer',
-                        height: 56,
-                        bgcolor: isSelected 
-                          ? alpha(theme.palette.primary.main, 0.08) 
-                          : index % 2 === 0 
-                            ? 'transparent' 
-                            : alpha(theme.palette.grey[50], 0.3),
+                        height: 60,
+                        bgcolor: isSelected
+                          ? alpha(theme.palette.primary.main, 0.12)
+                          : index % 2 === 0
+                            ? 'transparent'
+                            : alpha(theme.palette.grey[50], 0.4),
+                        borderLeft: isSelected ? `4px solid ${theme.palette.primary.main}` : '4px solid transparent',
                         borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
                         '&:hover': {
-                          bgcolor: isSelected 
-                            ? alpha(theme.palette.primary.main, 0.15) 
-                            : alpha(theme.palette.primary.main, 0.04),
-                          transform: 'scale(1.01)',
-                          boxShadow: `0 2px 8px ${alpha(theme.palette.grey[400], 0.15)}`,
+                          bgcolor: isSelected
+                            ? alpha(theme.palette.primary.main, 0.18)
+                            : alpha(theme.palette.primary.main, 0.06),
+                          borderLeft: `4px solid ${alpha(theme.palette.primary.main, isSelected ? 1 : 0.4)}`,
+                          boxShadow: isSelected
+                            ? `0 4px 12px ${alpha(theme.palette.primary.main, 0.25)}`
+                            : `0 2px 8px ${alpha(theme.palette.grey[400], 0.2)}`,
+                          transform: 'translateX(2px)',
                           zIndex: 1
+                        },
+                        '&.Mui-selected': {
+                          bgcolor: alpha(theme.palette.primary.main, 0.12),
+                          '&:hover': {
+                            bgcolor: alpha(theme.palette.primary.main, 0.18)
+                          }
                         },
                         '&:last-child td': {
                           borderBottom: 'none'
                         },
-                        transition: 'all 0.2s ease-in-out'
+                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                        position: 'relative'
                       }}
                     >
                       <TableCell padding="checkbox" sx={{ textAlign: 'center' }}>
@@ -512,9 +604,9 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
                       </TableCell>
                       <TableCell>
                         <Box>
-                          <Typography 
-                            variant="body2" 
-                            sx={{ 
+                          <Typography
+                            variant="body2"
+                            sx={{
                               fontSize: '0.8rem',
                               fontWeight: isSelected ? 600 : 500,
                               lineHeight: 1.3,
@@ -525,7 +617,11 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
                               color: isSelected ? 'primary.main' : 'text.primary'
                             }}
                           >
-                            {predio.direccion || `Dirección del predio ${predioId}`}
+                            {typeof predio.direccion === 'string'
+                              ? predio.direccion
+                              : predio.direccion
+                              ? formatDireccion(predio.direccion)
+                              : `Dirección del predio ${predioId}`}
                           </Typography>
                         </Box>
                       </TableCell>
@@ -557,15 +653,15 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
                       </TableCell>
                       <TableCell align="right">
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                          <Typography 
-                            variant="body2" 
-                            sx={{ 
+                          <Typography
+                            variant="body2"
+                            sx={{
                               fontSize: '0.8rem',
                               fontWeight: 600,
                               color: 'success.main'
                             }}
                           >
-                            {formatCurrency(predio.autoavaluo || 0)}
+                            {formatCurrency(predio.valorTerreno || 0)}
                           </Typography>
                         </Box>
                       </TableCell>
@@ -577,24 +673,37 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
           </Table>
         </TableContainer>
 
-        {/* Paginación compacta */}
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
+        {/* Paginación mejorada */}
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
-          px: 2, 
-          py: 1,
-          borderTop: 1,
-          borderColor: 'divider',
-          bgcolor: 'grey.50'
+          px: 3,
+          py: 1.5,
+          borderTop: `2px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+          background: `linear-gradient(to right, ${alpha(theme.palette.grey[50], 0.8)}, ${alpha(theme.palette.grey[100], 0.5)})`,
+          boxShadow: `inset 0 1px 3px ${alpha(theme.palette.grey[300], 0.2)}`
         }}>
-          <Typography variant="caption" color="text.secondary">
-            {filteredPredios.length > 0 
-              ? `${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, filteredPredios.length)} de ${filteredPredios.length}` 
-              : 'No hay resultados'
-            }
-          </Typography>
-          
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Chip
+              label={`Total: ${filteredPredios.length}`}
+              size="small"
+              color="primary"
+              variant="outlined"
+              sx={{
+                fontWeight: 600,
+                fontSize: '0.75rem',
+                borderWidth: 1.5
+              }}
+            />
+            <Typography variant="body2" color="text.secondary" fontWeight={500}>
+              {filteredPredios.length > 0
+                ? `Mostrando ${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, filteredPredios.length)}`
+                : 'Sin resultados'
+              }
+            </Typography>
+          </Stack>
+
           <TablePagination
             component="div"
             count={filteredPredios.length}
@@ -602,16 +711,49 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
             onPageChange={handleChangePage}
             rowsPerPage={rowsPerPage}
             onRowsPerPageChange={handleChangeRowsPerPage}
-            labelRowsPerPage=""
+            labelRowsPerPage="Filas:"
             labelDisplayedRows={() => ''}
-            rowsPerPageOptions={[5, 8, 10]}
+            rowsPerPageOptions={[5, 10, 15, 20]}
             sx={{
               '.MuiTablePagination-toolbar': {
-                minHeight: 32,
-                pl: 1
+                minHeight: 40,
+                pl: 2,
+                gap: 2
               },
-              '.MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows': {
-                display: 'none'
+              '.MuiTablePagination-selectLabel': {
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                color: 'text.primary'
+              },
+              '.MuiTablePagination-select': {
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: 'primary.main',
+                borderRadius: 1,
+                px: 1,
+                py: 0.5,
+                border: `1.5px solid ${alpha(theme.palette.primary.main, 0.3)}`,
+                '&:hover': {
+                  bgcolor: alpha(theme.palette.primary.main, 0.05),
+                  borderColor: theme.palette.primary.main
+                }
+              },
+              '.MuiTablePagination-actions': {
+                gap: 0.5,
+                '& .MuiIconButton-root': {
+                  border: `1.5px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                  borderRadius: 1,
+                  width: 36,
+                  height: 36,
+                  '&:hover': {
+                    bgcolor: alpha(theme.palette.primary.main, 0.08),
+                    borderColor: theme.palette.primary.main
+                  },
+                  '&.Mui-disabled': {
+                    borderColor: alpha(theme.palette.grey[300], 0.5),
+                    opacity: 0.4
+                  }
+                }
               }
             }}
           />
@@ -659,12 +801,15 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
                 <Stack spacing={1} sx={{ py: 1 }}>
                   {paginatedPredios.map((predio, index) => {
                     const predioId = predio.codigoPredio || predio.codPredio || predio.id;
-                    const isSelected = selectedPredio && (
-                      selectedPredio.codigoPredio === predio.codigoPredio ||
-                      selectedPredio.codPredio === predio.codPredio ||
-                      selectedPredio.codPredio === predio.codPredio ||
-                      selectedPredio.id === predio.id
-                    );
+
+                    // Normalizar los valores para comparación (limpiar espacios y convertir a string)
+                    const selectedId = selectedPredio
+                      ? String(selectedPredio.codigoPredio || selectedPredio.codPredio || selectedPredio.id || '').trim()
+                      : null;
+                    const currentId = String(predioId || '').trim();
+
+                    // Comparar solo si ambos IDs existen y coinciden exactamente
+                    const isSelected = selectedId !== null && selectedId !== '' && currentId !== '' && selectedId === currentId;
 
                     return (
                       <Paper
@@ -745,16 +890,20 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
                                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', mb: 0.5 }}>
                                   DIRECCIÓN
                                 </Typography>
-                                <Typography 
-                                  variant="body2" 
-                                  sx={{ 
+                                <Typography
+                                  variant="body2"
+                                  sx={{
                                     fontSize: '0.8rem',
                                     fontWeight: isSelected ? 600 : 500,
                                     lineHeight: 1.3,
                                     color: isSelected ? 'primary.main' : 'text.primary'
                                   }}
                                 >
-                                  {predio.direccion || `Dirección del predio ${predioId}`}
+                                  {typeof predio.direccion === 'string'
+                                    ? predio.direccion
+                                    : predio.direccion
+                                    ? formatDireccion(predio.direccion)
+                                    : `Dirección del predio ${predioId}`}
                                 </Typography>
                               </Box>
                             </Stack>

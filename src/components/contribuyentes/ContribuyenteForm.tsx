@@ -150,19 +150,19 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
   }, [conyugeRepresentanteForm, handleCloseConyugeDireccionModal]);
 
   // Obtener texto completo de dirección
-  const getDireccionTextoCompleto = useCallback((direccion: any, nFinca: string, otroNumero?: string) => {
+  const getDireccionTextoCompleto = useCallback((direccion: any, nFinca?: string, otroNumero?: string) => {
     if (!direccion) return '';
-    
+
     let texto = `${direccion.descripcion}`;
-    
+
     if (nFinca) {
       texto += ` - N° Finca: ${nFinca}`;
     }
-    
+
     if (otroNumero) {
       texto += ` - Otro: ${otroNumero}`;
     }
-    
+
     return texto;
   }, []);
 
@@ -223,82 +223,30 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
       // Crear persona principal usando el servicio directamente
       const { personaService } = await import('../../services/personaService');
       const personaPrincipal = await personaService.crearPersonaAPI(personaPrincipalData);
-      
-      if (!personaPrincipal) {
-        throw new Error('Error al crear persona principal');
-      }
-      
-      console.log('✅ [ContribuyenteForm] Persona principal creada:', personaPrincipal);
 
-      // PASO 1.5: Buscar la persona creada para obtener el codPersona
-      // Según tu especificación, necesitamos buscar por tipo y documento
-      const codTipoPersona = esPersonaJuridica ? "0302" : "0301";
-      const numeroDocumento = data.numeroDocumento;
-      
-      console.log('🔍 [ContribuyenteForm] Buscando persona creada con tipo:', codTipoPersona, 'y documento:', numeroDocumento);
-      
-      // Usar el API GET con query params para buscar la persona
-      const urlBusqueda = `/api/persona/listarPersonaPorTipoPersonaNombreVia?codTipoPersona=${codTipoPersona}&parametroBusqueda=a`;
-      
-      const responseBusqueda = await fetch(urlBusqueda, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      
-      let personaEncontrada = null;
-      
-      if (responseBusqueda.ok) {
-        const personas = await responseBusqueda.json();
-        console.log('📋 [ContribuyenteForm] Personas encontradas:', personas);
-        
-        // Filtrar por numero de documento
-        if (Array.isArray(personas)) {
-          personaEncontrada = personas.find((p: any) => p.numerodocumento === numeroDocumento);
-        } else if (personas.data && Array.isArray(personas.data)) {
-          personaEncontrada = personas.data.find((p: any) => p.numerodocumento === numeroDocumento);
-        }
-        
-        console.log('✅ [ContribuyenteForm] Persona encontrada con codPersona:', personaEncontrada);
+      if (!personaPrincipal || !personaPrincipal.codPersona) {
+        throw new Error('Error al crear persona principal - no se recibió código de persona');
       }
-      
-      // Si no se encuentra, usar el codPersona de la respuesta de creación
-      const codPersonaPrincipal = personaEncontrada?.codPersona || personaPrincipal.codPersona;
-      
-      if (!codPersonaPrincipal) {
-        throw new Error('No se pudo obtener el código de persona');
-      }
+
+      console.log('✅ [ContribuyenteForm] Persona principal creada con codPersona:', personaPrincipal.codPersona);
+
+      const codPersonaPrincipal = personaPrincipal.codPersona;
 
       let conyugeRepresentanteId = null;
 
       // PASO 2: Si hay cónyuge/representante, guardarlo también
       if (showConyugeRepresentante) {
         const conyugeData = conyugeRepresentanteForm.getValues();
-        
+
         // Verificar que tiene datos mínimos requeridos
         if (conyugeData.numeroDocumento && conyugeData.nombres) {
           console.log('👫 [ContribuyenteForm] Creando cónyuge/representante:', conyugeData);
-          
+
           const conyugePersonaData = convertirDatosPersona(conyugeData, false);
           const conyugePersona = await personaService.crearPersonaAPI(conyugePersonaData);
-          
-          if (conyugePersona) {
-            // Buscar el cónyuge creado para obtener su codPersona
-            const urlBusquedaConyuge = `/api/persona/listarPersonaPorTipoPersonaNombreVia?codTipoPersona=0301&parametroBusqueda=a`;
-            const responseBusquedaConyuge = await fetch(urlBusquedaConyuge, {
-              method: 'GET',
-              headers: { 'Accept': 'application/json' }
-            });
-            
-            if (responseBusquedaConyuge.ok) {
-              const personasConyuge = await responseBusquedaConyuge.json();
-              const conyugeEncontrado = (Array.isArray(personasConyuge) ? personasConyuge : personasConyuge.data || [])
-                .find((p: any) => p.numerodocumento === conyugeData.numeroDocumento);
-              
-              conyugeRepresentanteId = conyugeEncontrado?.codPersona || conyugePersona.codPersona;
-            }
-            
+
+          if (conyugePersona && conyugePersona.codPersona) {
+            conyugeRepresentanteId = conyugePersona.codPersona;
             console.log('✅ [ContribuyenteForm] Cónyuge/Representante creado con codPersona:', conyugeRepresentanteId);
           }
         }
@@ -311,7 +259,7 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
         codPersona: codPersonaPrincipal,
         codConyuge: conyugeRepresentanteId,
         codRepresentanteLegal: esPersonaJuridica ? conyugeRepresentanteId : null,
-        codestado: "2156", // Estado activo según tu especificación
+        codestado: "0201", // Estado activo según API specification
         codUsuario: 1
       };
       
@@ -450,6 +398,7 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
 
               {/* Botones de acción - Lado derecho */}
               <Stack direction="row" spacing={2} alignItems="center">
+                {/* Botón para nuevo */}
                 <Button
                   variant="outlined"
                   onClick={handleNuevo}
@@ -467,6 +416,7 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
                 >
                   Nuevo
                 </Button>
+                {/* Botón para editar */}
                 <Button
                   variant="outlined"
                   onClick={handleEditar}
@@ -484,6 +434,7 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
                 >
                   Editar
                 </Button>
+                {/* Botón para guardar */}
                 <Button
                   type="submit"
                   variant="contained"

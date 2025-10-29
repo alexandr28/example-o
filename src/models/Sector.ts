@@ -3,6 +3,8 @@ export interface Sector {
   id: number;
   nombre: string;
   cuadrante?: number;
+  codUnidadUrbana?: number;
+  unidadUrbana?: string;
   nombreCuadrante?: string;
   descripcion?: string;
   estado?: boolean | string;  // Puede ser boolean o 'ACTIVO'/'INACTIVO'
@@ -16,6 +18,7 @@ export interface Sector {
 export interface SectorFormData {
   nombre: string;
   cuadrante?: number;
+  codUnidadUrbana?: number;
   descripcion?: string;
 }
 

@@ -9,18 +9,23 @@ import { API_CONFIG } from '../config/api.unified.config';
 export interface SectorData {
   codSector: number;
   nombreSector: string;
-  cuadrante?: number | null;
-  nombreCuadrante?: string | null;
+  codCuadrante: number;
+  nombreCuadrante: string;
+  codUnidadUrbana: number;
+  unidadUrbana: string;
 }
 
 export interface CreateSectorDTO {
+  codUnidadUrbana: number;
   nombreSector: string;
-  cuadrante?: number | null;
+  codCuadrante: number;
 }
 
 export interface UpdateSectorDTO {
-  nombreSector?: string;
-  cuadrante?: number | null;
+  codSector: number;
+  nombreSector: string;
+  codCuadrante: number;
+  codUnidadUrbana: number;
 }
 
 export interface BusquedaSectorParams {
@@ -33,6 +38,11 @@ export interface CuadranteData {
   descripcion?: string | null;
   abreviatura: string;
   referenciaBarrio?: string | null;
+}
+
+export interface UnidadUrbanaData {
+  codUnidadUrbana: number;
+  descripcionUnidadUrbana: string;
 }
 
 /**
@@ -49,10 +59,12 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
         normalizeItem: (item: any) => ({
           codSector: item.codSector || 0,
           nombreSector: item.nombreSector || '',
-          cuadrante: item.cuadrante || null,
-          nombreCuadrante: item.nombreCuadrante || (item.cuadrante ? `Cuadrante ${item.cuadrante}` : null)
+          codCuadrante: item.codCuadrante || 0,
+          nombreCuadrante: item.nombreCuadrante || '',
+          codUnidadUrbana: item.codUnidadUrbana || 0,
+          unidadUrbana: item.unidadUrbana || ''
         }),
-        
+
         validateItem: (item: SectorData) => {
           return !!item.codSector && !!item.nombreSector && item.nombreSector.trim().length > 0;
         }
@@ -96,8 +108,10 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
         return data.map(item => ({
           codSector: item.codSector || 0,
           nombreSector: item.nombreSector || '',
-          cuadrante: typeof item.cuadrante === 'number' ? item.cuadrante : null,
-          nombreCuadrante: item.nombreCuadrante || (item.cuadrante ? `Cuadrante ${item.cuadrante}` : null)
+          codCuadrante: item.codCuadrante || 0,
+          nombreCuadrante: item.nombreCuadrante || '',
+          codUnidadUrbana: item.codUnidadUrbana || 0,
+          unidadUrbana: item.unidadUrbana || ''
         }));
       }
       
@@ -114,38 +128,52 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
    */
   async create(datos: CreateSectorDTO): Promise<SectorData> {
     try {
+      const payload = {
+        codUnidadUrbana: datos.codUnidadUrbana,
+        nombreSector: datos.nombreSector,
+        codCuadrante: datos.codCuadrante
+      };
+
+      console.log('📤 [SectorService] Enviando POST:', payload);
+
       const response = await fetch(`${API_CONFIG.baseURL}/api/sector`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(datos)
+        body: JSON.stringify(payload)
       });
-      
+
       if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
-      
+
       // Manejar diferentes tipos de respuesta
       const contentType = response.headers.get('content-type');
-      
+
       if (contentType && contentType.includes('application/json')) {
         const data = await response.json();
         return {
           codSector: data.codSector || Date.now(),
-          nombreSector: datos.nombreSector,
-          cuadrante: datos.cuadrante
+          nombreSector: data.nombreSector || datos.nombreSector,
+          codCuadrante: data.codCuadrante || datos.codCuadrante,
+          nombreCuadrante: data.nombreCuadrante || '',
+          codUnidadUrbana: data.codUnidadUrbana || datos.codUnidadUrbana,
+          unidadUrbana: data.unidadUrbana || ''
         };
       } else {
         // Si respuesta es texto/número, asumir éxito
         const responseText = await response.text();
         const possibleId = parseInt(responseText);
-        
+
         return {
           codSector: !isNaN(possibleId) ? possibleId : Date.now(),
           nombreSector: datos.nombreSector,
-          cuadrante: datos.cuadrante
+          codCuadrante: datos.codCuadrante,
+          nombreCuadrante: '',
+          codUnidadUrbana: datos.codUnidadUrbana,
+          unidadUrbana: ''
         };
       }
     } catch (error: any) {
@@ -157,28 +185,37 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
   /**
    * Crea un nuevo sector
    */
-  async crearSector(datos: { nombreSector: string; cuadrante?: number }): Promise<SectorData> {
+  async crearSector(datos: { codUnidadUrbana: number; nombreSector: string; codCuadrante: number }): Promise<SectorData> {
     try {
       // Validaciones
       if (!datos.nombreSector || datos.nombreSector.trim().length === 0) {
         throw new Error('El nombre del sector es requerido');
       }
-      
+
       if (datos.nombreSector.trim().length < 3) {
         throw new Error('El nombre del sector debe tener al menos 3 caracteres');
       }
-      
+
+      if (!datos.codUnidadUrbana) {
+        throw new Error('La unidad urbana es requerida');
+      }
+
+      if (!datos.codCuadrante) {
+        throw new Error('El cuadrante es requerido');
+      }
+
       const datosParaAPI: CreateSectorDTO = {
+        codUnidadUrbana: datos.codUnidadUrbana,
         nombreSector: datos.nombreSector.trim(),
-        cuadrante: datos.cuadrante || null
+        codCuadrante: datos.codCuadrante
       };
-      
-      console.log('📤 Enviando al API:', datosParaAPI);
-      
+
+      console.log('📤 [SectorService] Enviando al API:', datosParaAPI);
+
       const resultado = await this.create(datosParaAPI);
-      
+
       return resultado;
-      
+
     } catch (error: any) {
       console.error('❌ [SectorService] Error creando sector:', error);
       throw error;
@@ -190,12 +227,12 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
    */
   async update(id: number, datos: UpdateSectorDTO): Promise<SectorData> {
     try {
-      // Preparar el payload con la estructura completa requerida
+      // Preparar el payload con la estructura requerida
       const payload = {
         codSector: id,
-        nombreSector: datos.nombreSector || '',
-        cuadrante: datos.cuadrante || null,
-        nombreCuadrante: datos.cuadrante ? `Cuadrante ${datos.cuadrante}` : null
+        nombreSector: datos.nombreSector,
+        codCuadrante: datos.codCuadrante,
+        codUnidadUrbana: datos.codUnidadUrbana
       };
 
       console.log('📤 [SectorService] Enviando PUT:', payload);
@@ -208,27 +245,33 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
         },
         body: JSON.stringify(payload)
       });
-      
+
       if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
-      
+
       // Manejar diferentes tipos de respuesta
       const contentType = response.headers.get('content-type');
-      
+
       if (contentType && contentType.includes('application/json')) {
         const data = await response.json();
         return {
           codSector: data.codSector || id,
-          nombreSector: data.nombreSector || datos.nombreSector || '',
-          cuadrante: data.cuadrante || datos.cuadrante || null
+          nombreSector: data.nombreSector || datos.nombreSector,
+          codCuadrante: data.codCuadrante || datos.codCuadrante,
+          nombreCuadrante: data.nombreCuadrante || '',
+          codUnidadUrbana: data.codUnidadUrbana || datos.codUnidadUrbana,
+          unidadUrbana: data.unidadUrbana || ''
         };
       } else {
         // Si respuesta es texto/número, asumir éxito
         return {
           codSector: id,
-          nombreSector: datos.nombreSector || '',
-          cuadrante: datos.cuadrante || null
+          nombreSector: datos.nombreSector,
+          codCuadrante: datos.codCuadrante,
+          nombreCuadrante: '',
+          codUnidadUrbana: datos.codUnidadUrbana,
+          unidadUrbana: ''
         };
       }
     } catch (error: any) {
@@ -240,32 +283,36 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
   /**
    * Actualiza un sector existente
    */
-  async actualizarSector(id: number, datos: { nombreSector?: string; cuadrante?: number }): Promise<SectorData> {
+  async actualizarSector(id: number, datos: { nombreSector: string; codCuadrante: number; codUnidadUrbana: number }): Promise<SectorData> {
     try {
       console.log('📝 [SectorService] Actualizando sector:', id, datos);
-      
+
       // Validaciones
-      if (datos.nombreSector !== undefined) {
-        if (datos.nombreSector.trim().length === 0) {
-          throw new Error('El nombre del sector no puede estar vacío');
-        }
-        
-        if (datos.nombreSector.trim().length < 3) {
-          throw new Error('El nombre del sector debe tener al menos 3 caracteres');
-        }
+      if (datos.nombreSector.trim().length === 0) {
+        throw new Error('El nombre del sector no puede estar vacío');
       }
-      
-      const datosParaAPI: UpdateSectorDTO = {};
-      
-      if (datos.nombreSector !== undefined) {
-        datosParaAPI.nombreSector = datos.nombreSector.trim();
+
+      if (datos.nombreSector.trim().length < 3) {
+        throw new Error('El nombre del sector debe tener al menos 3 caracteres');
       }
-      if (datos.cuadrante !== undefined) {
-        datosParaAPI.cuadrante = datos.cuadrante || null;
+
+      if (!datos.codUnidadUrbana) {
+        throw new Error('La unidad urbana es requerida');
       }
-      
+
+      if (!datos.codCuadrante) {
+        throw new Error('El cuadrante es requerido');
+      }
+
+      const datosParaAPI: UpdateSectorDTO = {
+        codSector: id,
+        nombreSector: datos.nombreSector.trim(),
+        codCuadrante: datos.codCuadrante,
+        codUnidadUrbana: datos.codUnidadUrbana
+      };
+
       return await this.update(id, datosParaAPI);
-      
+
     } catch (error: any) {
       console.error('❌ [SectorService] Error actualizando sector:', error);
       throw error;
@@ -340,6 +387,44 @@ class SectorService extends BaseApiService<SectorData, CreateSectorDTO, UpdateSe
       
     } catch (error: any) {
       console.error('❌ [SectorService] Error obteniendo cuadrantes:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene todas las unidades urbanas disponibles
+   */
+  async obtenerUnidadesUrbanas(): Promise<UnidadUrbanaData[]> {
+    try {
+      console.log('📋 [SectorService] Obteniendo unidades urbanas desde:', `${API_CONFIG.baseURL}/api/sector/listarTipoUnidadUrbana`);
+
+      const response = await fetch(`${API_CONFIG.baseURL}/api/sector/listarTipoUnidadUrbana`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('📡 [SectorService] Unidades urbanas recibidas:', data);
+
+      // Si es un array, procesarlo directamente
+      if (Array.isArray(data)) {
+        return data.map(item => ({
+          codUnidadUrbana: item.codUnidadUrbana || 0,
+          descripcionUnidadUrbana: item.descripcionUnidadUrbana || ''
+        }));
+      }
+
+      throw new Error('La respuesta no es un array válido');
+
+    } catch (error: any) {
+      console.error('❌ [SectorService] Error obteniendo unidades urbanas:', error);
       throw error;
     }
   }

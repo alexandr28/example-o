@@ -198,8 +198,8 @@ const RegistrosPisos: React.FC = () => {
           console.log('🔍 [RegistrosPisos] Cargando valores unitarios para año:', formData.anio);
           
           // Usar el servicio directamente para obtener los valores con el formato correcto
-          const valores = await valorUnitarioService.consultarValoresUnitarios({ 
-            año: formData.anio 
+          const valores = await valorUnitarioService.consultarValoresUnitarios({
+            anio: formData.anio
           });
           
           setValoresUnitarios(valores);

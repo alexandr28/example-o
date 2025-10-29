@@ -28,6 +28,7 @@ import { SectorData } from '../../services/sectorService';
 import { BarrioData } from '../../services/barrioService';
 import { CalleData } from '../../services/calleApiService';
 import { useTiposLadosDireccion, useRutasOptions, useZonasOptions, useUbicacionAreaVerdeOptions } from '../../hooks/useConstantesOptions';
+import { useCalles } from '../../hooks/useCalles';
 
 // Tipo para las opciones de lado
 interface LadoOption {
@@ -53,11 +54,8 @@ const direccionSchema = z.object({
   }),
   
   codigoBarrio: z.number({
-    required_error: 'El barrio es requerido',
     invalid_type_error: 'Seleccione un barrio válido'
-  }).nullable().refine((val) => val !== null && val > 0, {
-    message: 'Seleccione un barrio'
-  }),
+  }).nullable().optional(),
   
   codigoCalle: z.number({
     required_error: 'La calle/Mz es requerida',
@@ -117,21 +115,33 @@ interface DireccionFormProps {
 
 const DireccionFormMUI: React.FC<DireccionFormProps> = ({
   direccionSeleccionada,
-  sectores,
-  barriosFiltrados,
-  callesFiltradas,
+  sectores: sectoresFromProps,
+  barriosFiltrados: barriosFiltradosFromProps,
+  callesFiltradas: callesFitradasFromProps,
   onSubmit,
   onNuevo,
   onEditar,
   onDelete,
-  onSectorChange,
-  onBarrioChange,
+  onSectorChange: onSectorChangeFromProps,
+  onBarrioChange: onBarrioChangeFromProps,
   loading = false,
-  loadingSectores = false,
-  loadingBarrios = false,
-  loadingCalles = false,
+  loadingSectores: loadingSectoresFromProps = false,
+  loadingBarrios: loadingBarriosFromProps = false,
+  loadingCalles: loadingCallesFromProps = false,
   isEditMode = false
 }) => {
+  // Hook para calles, sectores y barrios relacionados
+  const {
+    sectores,
+    barrios,
+    barriosFiltrados,
+    calles,
+    loadingSectores,
+    loadingBarrios,
+    loading: loadingCalles,
+    filtrarBarriosPorSector
+  } = useCalles();
+
   // Hook para tipos de lados direccion
   const { options: ladoOptions, loading: loadingLados } = useTiposLadosDireccion();
   
@@ -202,21 +212,36 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
   const sectorValue = watch('codigoSector');
   const barrioValue = watch('codigoBarrio');
 
+  // Estado local para calles filtradas por barrio
+  const [callesFiltradas, setCallesFiltradas] = React.useState<CalleData[]>([]);
+
+  // Filtrar calles cuando cambia el sector o barrio
+  useEffect(() => {
+    if (sectorValue && sectorValue > 0) {
+      // Filtrar calles por sector
+      let filtered = calles.filter(c => c.codSector === sectorValue);
+
+      // Si hay barrio seleccionado, filtrar también por barrio
+      if (barrioValue && barrioValue > 0) {
+        filtered = filtered.filter(c => c.codBarrio === barrioValue);
+      }
+
+      setCallesFiltradas(filtered);
+    } else {
+      setCallesFiltradas([]);
+    }
+  }, [sectorValue, barrioValue, calles]);
+
   // Efecto para cargar datos cuando se selecciona una dirección
   useEffect(() => {
     if (direccionSeleccionada && isEditMode) {
       console.log('📝 [DireccionForm] Cargando dirección seleccionada:', direccionSeleccionada);
       console.log('📝 [DireccionForm] Modo edición:', isEditMode);
       console.log('📝 [DireccionForm] onDelete disponible:', !!onDelete);
-      
+
       // Primero establecer el sector para que se filtren los barrios
       if (direccionSeleccionada.codigoSector) {
-        onSectorChange(direccionSeleccionada.codigoSector);
-      }
-      
-      // Luego establecer el barrio para que se filtren las calles
-      if (direccionSeleccionada.codigoBarrio) {
-        onBarrioChange(direccionSeleccionada.codigoBarrio);
+        filtrarBarriosPorSector(direccionSeleccionada.codigoSector);
       }
       
       // Pequeño delay para asegurar que los filtrados se actualicen
@@ -257,49 +282,39 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
         zona: null as any
       });
     }
-  }, [direccionSeleccionada, isEditMode, reset, onSectorChange, onBarrioChange, effectiveLadoOptions, onDelete]);
+  }, [direccionSeleccionada, isEditMode, reset, filtrarBarriosPorSector, effectiveLadoOptions, onDelete]);
 
   // Efecto para manejar cambio de sector
   useEffect(() => {
     if (sectorValue && sectorValue > 0) {
-      onSectorChange(sectorValue);
+      filtrarBarriosPorSector(sectorValue);
       // Limpiar barrio y calle solo si cambia manualmente (no en carga inicial)
       if (!isEditMode) {
         setValue('codigoBarrio', 0);
         setValue('codigoCalle', 0);
       }
     }
-  }, [sectorValue, onSectorChange, setValue, isEditMode]);
-
-  // Efecto para manejar cambio de barrio
-  useEffect(() => {
-    if (barrioValue && barrioValue > 0) {
-      onBarrioChange(barrioValue);
-      // Limpiar calle solo si cambia manualmente (no en carga inicial)
-      if (!isEditMode) {
-        setValue('codigoCalle', 0);
-      }
-    }
-  }, [barrioValue, onBarrioChange, setValue, isEditMode]);
+  }, [sectorValue, filtrarBarriosPorSector, setValue, isEditMode]);
 
   const handleFormSubmit = async (data: DireccionFormData) => {
     try {
       // Asegurar que los datos están en el formato correcto para el servicio
       const direccionData: CreateDireccionDTO = {
         codigoSector: data.codigoSector || 0,
-        codigoBarrio: data.codigoBarrio || 0,
+        codigoBarrio: (data.codigoBarrio && data.codigoBarrio > 0) ? data.codigoBarrio : null,
         codigoCalle: data.codigoCalle || 0,
-        cuadra: data.cuadra || '',
+        cuadra: data.cuadra || null,
         lado: data.lado || (effectiveLadoOptions?.find(opt => opt.value === 'NINGUNO')?.value || effectiveLadoOptions?.[0]?.value || 'NINGUNO'),
         loteInicial: data.loteInicial || 0,
         loteFinal: data.loteFinal || 0,
         ruta: data.ruta,
-        zona: data.zona
+        zona: data.zona,
+        ubicacionAreaVerde: data.ubicacionAreaVerde || undefined
       };
-      
+
       console.log('📤 [DireccionForm] Enviando datos:', direccionData);
       await onSubmit(direccionData);
-      
+
       if (!isEditMode) {
         reset();
       }
@@ -368,8 +383,8 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
           mb: 2
         }}>
           {/* Sector */}
-          <Box sx={{ 
-            flex: { xs: '1 1 100%', sm: '1 1 280px', md: '0 0 300px' }, 
+          <Box sx={{
+            flex: { xs: '1 1 100%', sm: '1 1 280px', md: '0 0 300px' },
             minWidth: { xs: '100%', sm: '280px', md: '300px' },
             maxWidth: { xs: '100%', sm: '100%', md: '300px' }
           }}>
@@ -382,8 +397,8 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                     {...field}
                     options={sectores}
                     getOptionKey={(option) => `sector-${option.codSector}`}
-                    getOptionLabel={(option) => 
-                      typeof option === 'number' 
+                    getOptionLabel={(option) =>
+                      typeof option === 'number'
                         ? sectores.find(s => s.codSector === option)?.nombreSector || ''
                         : option.nombreSector
                     }
@@ -402,7 +417,7 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                         sx={{
                           '& .MuiInputBase-root':{
                              height:'40px'
-                          }  
+                          }
                         }}
                         required
                         InputProps={{
@@ -416,7 +431,7 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                         }}
                       />
                     )}
-                    
+
                   />
                 </FormControl>
               )}
@@ -424,8 +439,8 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
           </Box>
 
           {/* Barrio */}
-          <Box sx={{ 
-            flex: { xs: '1 1 100%', sm: '1 1 220px', md: '0 0 200px' }, 
+          <Box sx={{
+            flex: { xs: '1 1 100%', sm: '1 1 220px', md: '0 0 200px' },
             minWidth: { xs: '100%', sm: '220px', md: '200px' },
             maxWidth: { xs: '100%', sm: '100%', md: '200px' }
           }}>
@@ -438,8 +453,8 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                     {...field}
                     options={barriosFiltrados}
                     getOptionKey={(option) => `barrio-${option.codigo}`}
-                    getOptionLabel={(option) => 
-                      typeof option === 'number' 
+                    getOptionLabel={(option) =>
+                      typeof option === 'number'
                         ? barriosFiltrados.find(b => b.codigo === option)?.nombre || ''
                         : option.nombre
                     }
@@ -452,15 +467,14 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        label="Barrio"
+                        label="Barrio (Opcional)"
                         error={!!errors.codigoBarrio}
-                        helperText={errors.codigoBarrio?.message || (!sectorValue ? '' : '')}
+                        helperText={errors.codigoBarrio?.message || (!sectorValue ? 'Seleccione un sector primero' : barriosFiltrados.length === 0 ? 'No hay barrios para este sector' : '')}
                         sx={{
                           '& .MuiInputBase-root':{
                              height:'40px'
-                          }  
+                          }
                         }}
-                        required
                         InputProps={{
                           ...params.InputProps,
                           endAdornment: (
@@ -493,8 +507,8 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                     {...field}
                     options={callesFiltradas}
                     getOptionKey={(option) => `calle-${option.codigo}`}
-                    getOptionLabel={(option) => 
-                      typeof option === 'number' 
+                    getOptionLabel={(option) =>
+                      typeof option === 'number'
                         ? callesFiltradas.find(c => c.codigo === option)?.nombre || ''
                         : option.nombre || ''
                     }
@@ -503,17 +517,17 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                       field.onChange(newValue?.codigo || null);
                     }}
                     loading={loadingCalles}
-                    disabled={loading || loadingCalles || !barrioValue}
+                    disabled={loading || loadingCalles || !sectorValue}
                     renderInput={(params) => (
                       <TextField
                         {...params}
                         label="Calle / Mz"
                         error={!!errors.codigoCalle}
-                        helperText={errors.codigoCalle?.message || (!barrioValue ? '' : '')}
+                        helperText={errors.codigoCalle?.message || (!sectorValue ? 'Seleccione un sector primero' : '')}
                         sx={{
                           '& .MuiInputBase-root':{
                              height:'40px'
-                          }  
+                          }
                         }}
                         required
                         InputProps={{
@@ -760,18 +774,21 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                         }}
                       />
                     )}
-                    renderOption={(props, option) => (
-                      <Box component="li" {...props}>
-                        <Box>
-                          <strong>{option.abreviatura}</strong>
-                          {option.descripcion && (
-                            <Box component="span" sx={{ ml: 1, color: 'text.secondary' }}>
-                              - {option.descripcion}
-                            </Box>
-                          )}
+                    renderOption={(props, option) => {
+                      const { key, ...optionProps } = props as any;
+                      return (
+                        <Box component="li" key={key} {...optionProps}>
+                          <Box>
+                            <strong>{option.abreviatura}</strong>
+                            {option.descripcion && (
+                              <Box component="span" sx={{ ml: 1, color: 'text.secondary' }}>
+                                - {option.descripcion}
+                              </Box>
+                            )}
+                          </Box>
                         </Box>
-                      </Box>
-                    )}
+                      );
+                    }}
                   />
                 </FormControl>
               )}
@@ -827,18 +844,21 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                         }}
                       />
                     )}
-                    renderOption={(props, option) => (
-                      <Box component="li" {...props}>
-                        <Box>
-                          <strong>{option.abreviatura}</strong>
-                          {option.descripcion && (
-                            <Box component="span" sx={{ ml: 1, color: 'text.secondary' }}>
-                              - {option.descripcion}
-                            </Box>
-                          )}
+                    renderOption={(props, option) => {
+                      const { key, ...optionProps } = props as any;
+                      return (
+                        <Box component="li" key={key} {...optionProps}>
+                          <Box>
+                            <strong>{option.abreviatura}</strong>
+                            {option.descripcion && (
+                              <Box component="span" sx={{ ml: 1, color: 'text.secondary' }}>
+                                - {option.descripcion}
+                              </Box>
+                            )}
+                          </Box>
                         </Box>
-                      </Box>
-                    )}
+                      );
+                    }}
                   />
                 </FormControl>
               )}
@@ -891,18 +911,21 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                         }}
                       />
                     )}
-                    renderOption={(props, option) => (
-                      <Box component="li" {...props}>
-                        <Box>
-                          <strong>{option.abreviatura}</strong>
-                          {option.descripcion && (
-                            <Box component="span" sx={{ ml: 1, color: 'text.secondary' }}>
-                              - {option.descripcion}
-                            </Box>
-                          )}
+                    renderOption={(props, option) => {
+                      const { key, ...optionProps } = props as any;
+                      return (
+                        <Box component="li" key={key} {...optionProps}>
+                          <Box>
+                            <strong>{option.abreviatura}</strong>
+                            {option.descripcion && (
+                              <Box component="span" sx={{ ml: 1, color: 'text.secondary' }}>
+                                - {option.descripcion}
+                              </Box>
+                            )}
+                          </Box>
                         </Box>
-                      </Box>
-                    )}
+                      );
+                    }}
                   />
                 </FormControl>
               )}

@@ -56,6 +56,7 @@ const headCells: HeadCell[] = [
   { id: 'id', label: 'N°', sortable: true, align: 'center' },
   { id: 'nombre', label: 'Nombre del Sector', sortable: true },
   { id: 'nombreCuadrante', label: 'Cuadrante', sortable: true },
+  { id: 'unidadUrbana', label: 'UnidUrbana', sortable: true, align: 'center' },
   { id: 'acciones', label: 'Acciones', align: 'center' }
 ];
 
@@ -199,6 +200,7 @@ const SectorList: React.FC<SectorListProps> = ({
         <TableCell align="center"><Skeleton width={40} /></TableCell>
         <TableCell><Skeleton /></TableCell>
         <TableCell><Skeleton /></TableCell>
+        <TableCell align="center"><Skeleton width={60} /></TableCell>
         <TableCell align="center"><Skeleton width={40} /></TableCell>
       </TableRow>
     ));
@@ -368,28 +370,28 @@ const SectorList: React.FC<SectorListProps> = ({
                 renderSkeletonRows()
               ) : paginatedSectores.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
-                    <Box sx={{ 
-                      display: 'flex', 
-                      flexDirection: 'column', 
+                  <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
+                    <Box sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
-                      gap: 2 
+                      gap: 2
                     }}>
-                      <BusinessIcon sx={{ 
-                        fontSize: 48, 
-                        color: 'text.disabled' 
+                      <BusinessIcon sx={{
+                        fontSize: 48,
+                        color: 'text.disabled'
                       }} />
-                      <Alert 
-                        severity="info" 
+                      <Alert
+                        severity="info"
                         variant="outlined"
-                        sx={{ 
+                        sx={{
                           borderRadius: 2,
                           '& .MuiAlert-message': {
                             fontSize: '0.875rem'
                           }
                         }}
                       >
-                        {localSearchTerm 
+                        {localSearchTerm
                           ? `No se encontraron sectores con "${localSearchTerm}"`
                           : 'No hay sectores registrados'}
                       </Alert>
@@ -486,9 +488,9 @@ const SectorList: React.FC<SectorListProps> = ({
                           </Box>
                         </TableCell>
                         <TableCell sx={{ py: 1.5, px: 1, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}>
-                          <Typography 
-                            variant="body2" 
-                            sx={{ 
+                          <Typography
+                            variant="body2"
+                            sx={{
                               color: theme.palette.text.secondary,
                               fontStyle: sector.nombreCuadrante ? 'normal' : 'italic'
                             }}
@@ -496,7 +498,22 @@ const SectorList: React.FC<SectorListProps> = ({
                             {sector.nombreCuadrante || 'Sin cuadrante'}
                           </Typography>
                         </TableCell>
-                        <TableCell 
+                        <TableCell
+                          align="center"
+                          sx={{ py: 1.5, px: 1, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}
+                        >
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: theme.palette.text.primary,
+                              fontWeight: 500,
+                              fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                            }}
+                          >
+                            {sector.unidadUrbana || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell
                           align="center"
                           sx={{ py: 1.5, px: 1, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}
                         >

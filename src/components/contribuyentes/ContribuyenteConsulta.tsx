@@ -27,7 +27,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Autocomplete
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -45,6 +46,8 @@ import {
 } from '@mui/icons-material';
 import PersonaForm from './PersonaForm';
 import { useForm } from 'react-hook-form';
+import { useConstantesOptions } from '../../hooks/useConstantesOptions';
+import { constanteService } from '../../services';
 
 interface Contribuyente {
   codigo: string | number;
@@ -71,9 +74,33 @@ const ContribuyenteConsulta: React.FC<ContribuyenteConsultaProps> = ({
   onEditar,
   loading = false
 }) => {
-  
+
   // Estados del formulario de filtro - Para nueva API general
   const [textoBusqueda, setTextoBusqueda] = useState('');
+  const [tipoContribuyente, setTipoContribuyente] = useState<any>(null);
+
+  // Hook para cargar tipos de contribuyente
+  const {
+    options: tiposContribuyenteOptions,
+    loading: loadingTipos,
+    error: errorTipos
+  } = useConstantesOptions(
+    () => constanteService.obtenerTiposContribuyente(),
+    (item) => ({
+      value: item.codConstante,
+      label: item.nombreCategoria,
+      id: item.codConstante
+    })
+  );
+
+  // Debug: Log tipos de contribuyente
+  React.useEffect(() => {
+    console.log('🔍 [ContribuyenteConsulta] Tipos Contribuyente:', {
+      loading: loadingTipos,
+      error: errorTipos,
+      opciones: tiposContribuyenteOptions
+    });
+  }, [loadingTipos, errorTipos, tiposContribuyenteOptions]);
   
   // Estados para la tabla
   const [page, setPage] = useState(0);
@@ -116,7 +143,8 @@ const ContribuyenteConsulta: React.FC<ContribuyenteConsultaProps> = ({
   // Limpiar filtros
   const handleLimpiar = () => {
     setTextoBusqueda('');
-    
+    setTipoContribuyente(null);
+
     // Buscar sin filtros para obtener todos los contribuyentes
     onBuscar({
       busqueda: ''
@@ -305,14 +333,44 @@ const ContribuyenteConsulta: React.FC<ContribuyenteConsultaProps> = ({
               )}
             </Box>
 
-            <Box sx={{ 
-              display: 'flex', 
+            <Box sx={{
+              display: 'flex',
               flexDirection: { xs: 'column', sm: 'row' },
               gap: 2,
               alignItems: { xs: 'stretch', sm: 'flex-start' }
             }}>
+              {/* AutoComplete Tipo Contribuyente */}
+              <Box sx={{ width: { xs: '100%', sm: 250 } }}>
+                <Autocomplete
+                  value={tipoContribuyente}
+                  onChange={(_event, newValue) => setTipoContribuyente(newValue)}
+                  options={tiposContribuyenteOptions}
+                  getOptionLabel={(option) => option?.label || ''}
+                  isOptionEqualToValue={(option, value) => option?.value === value?.value}
+                  loading={loadingTipos}
+                  disabled={loading}
+                  size="small"
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Tipo Contribuyente"
+                      placeholder="Seleccione tipo"
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            {loadingTipos ? <CircularProgress color="inherit" size={20} /> : null}
+                            {params.InputProps.endAdornment}
+                          </>
+                        ),
+                      }}
+                    />
+                  )}
+                />
+              </Box>
+
               {/* Campo de búsqueda general */}
-              <Box sx={{ 
+              <Box sx={{
                 flex: 1,
                 minWidth: 0
               }}>
@@ -407,20 +465,26 @@ const ContribuyenteConsulta: React.FC<ContribuyenteConsultaProps> = ({
           ) : (
             <>
               {/* Tabla para pantallas medianas y grandes */}
-              <Box sx={{ 
+              <Box sx={{
                 display: { xs: 'none', sm: 'block' },
-                width: '100%',
-                overflow: 'hidden'
+                width: '100%'
               }}>
-                <TableContainer sx={{ 
+                <TableContainer sx={{
                   width: '100%',
                   overflowX: 'auto',
                   '&::-webkit-scrollbar': {
-                    height: 0,
-                    display: 'none'
+                    height: 8
                   },
-                  scrollbarWidth: 'none',
-                  msOverflowStyle: 'none',
+                  '&::-webkit-scrollbar-track': {
+                    backgroundColor: '#f1f1f1'
+                  },
+                  '&::-webkit-scrollbar-thumb': {
+                    backgroundColor: '#888',
+                    borderRadius: '4px'
+                  },
+                  '&::-webkit-scrollbar-thumb:hover': {
+                    backgroundColor: '#555'
+                  },
                   '& .MuiTable-root': {
                     width: '100%',
                     minWidth: 'auto',
@@ -434,9 +498,7 @@ const ContribuyenteConsulta: React.FC<ContribuyenteConsultaProps> = ({
                         <TableCell sx={{ fontWeight: 600, padding: '12px 8px' }}>Contribuyente</TableCell>
                         <TableCell sx={{ fontWeight: 600, padding: '12px 8px' }}>Documento</TableCell>
                         <TableCell sx={{ fontWeight: 600, padding: '12px 8px' }}>Dirección</TableCell>
-                        <TableCell sx={{ fontWeight: 600, padding: '12px 8px', display: { sm: 'none', md: 'table-cell' } }}>Contacto</TableCell>
-                        <TableCell sx={{ fontWeight: 600, padding: '12px 8px', display: { sm: 'none', lg: 'table-cell' } }}>Tipo</TableCell>
-                        <TableCell sx={{ fontWeight: 600, padding: '12px 8px' }}>Estado</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 600, padding: '12px 8px', display: { sm: 'none', lg: 'table-cell' } }}>Tipo</TableCell>
                         <TableCell align="center" sx={{ fontWeight: 600, padding: '12px 8px' }}>Acciones</TableCell>
                       </TableRow>
                     </TableHead>
@@ -493,31 +555,12 @@ const ContribuyenteConsulta: React.FC<ContribuyenteConsultaProps> = ({
                               </Typography>
                             </Stack>
                           </TableCell>
-                          <TableCell sx={{ padding: '8px', display: { sm: 'none', md: 'table-cell' } }}>
-                            {contribuyente.telefono && (
-                              <Stack direction="row" alignItems="center" spacing={0.5}>
-                                <PhoneIcon fontSize="small" color="action" sx={{ display: { md: 'none', lg: 'block' } }} />
-                                <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
-                                  {contribuyente.telefono}
-                                </Typography>
-                              </Stack>
-                            )}
-                          </TableCell>
-                          <TableCell sx={{ padding: '8px', display: { sm: 'none', lg: 'table-cell' } }}>
+                          <TableCell align="center" sx={{ padding: '8px', display: { sm: 'none', lg: 'table-cell' } }}>
                             <Chip
                               label={contribuyente.tipoPersona === 'juridica' ? 'Jurídica' : 'Natural'}
                               size="small"
                               color={getTipoPersonaColor(contribuyente.tipoPersona) as any}
                               variant="outlined"
-                              sx={{ fontSize: '0.7rem' }}
-                            />
-                          </TableCell>
-                          <TableCell sx={{ padding: '8px' }}>
-                            <Chip
-                              label={contribuyente.estado === 'activo' ? 'Activo' : 'Inactivo'}
-                              size="small"
-                              color={contribuyente.estado === 'activo' ? 'success' : 'default'}
-                              variant={contribuyente.estado === 'activo' ? 'filled' : 'outlined'}
                               sx={{ fontSize: '0.7rem' }}
                             />
                           </TableCell>

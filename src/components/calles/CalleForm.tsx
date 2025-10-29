@@ -1,6 +1,6 @@
 // src/components/calles/CalleForm.tsx
 import React, { useEffect, useState, useMemo } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, SubmitHandler, Resolver } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import {
@@ -30,8 +30,8 @@ import { useSectores } from '../../hooks/useSectores';
 import { useBarrios } from '../../hooks/useBarrios';
 import { buildApiUrl } from '../../config/api.unified.config';
 
-// Esquema de validación
-const schema = yup.object().shape({
+// Esquema de validación - SIN restricción de longitud mínima
+const calleValidationSchema = yup.object().shape({
   tipoVia: yup
     .number()
     .transform((value) => (isNaN(value) || value === '' ? undefined : value))
@@ -46,16 +46,13 @@ const schema = yup.object().shape({
     .integer(),
   codBarrio: yup
     .number()
-    .transform((value) => (isNaN(value) || value === '' ? undefined : value))
-    .required('El barrio es requerido')
-    .positive('Debe seleccionar un barrio válido')
-    .integer(),
+    .transform((value) => (isNaN(value) || value === '' ? 0 : value))
+    .optional()
+    .nullable(),
   nombreCalle: yup
     .string()
     .trim()
     .required('El nombre de la calle es requerido')
-    .min(3, 'El nombre debe tener al menos 3 caracteres')
-    .max(100, 'El nombre no puede exceder 100 caracteres')
 });
 
 interface CalleFormProps {
@@ -106,11 +103,11 @@ const CalleForm: React.FC<CalleFormProps> = ({
     setValue,
     formState: { errors }
   } = useForm<CalleFormData>({
-    resolver: yupResolver(schema),
+    resolver: yupResolver(calleValidationSchema) as Resolver<CalleFormData>,
     defaultValues: {
       tipoVia: initialData?.tipoVia || 0,
       codSector: initialData?.codSector || 0,
-      codBarrio: initialData?.codBarrio || 0,
+      codBarrio: initialData?.codBarrio ?? 0,
       nombreCalle: initialData?.nombreCalle || '',
     }
   });
@@ -199,57 +196,49 @@ const CalleForm: React.FC<CalleFormProps> = ({
     }
   }, [initialData, reset]);
 
-  const handleFormSubmit = async (data: CalleFormData) => {
+  const handleFormSubmit: SubmitHandler<CalleFormData> = async (data) => {
     try {
       console.log('📋 [CalleForm] Datos del formulario:', data);
-      
-      // El hook useCalles espera un formato diferente
-      // Vamos a enviar ambos formatos para compatibilidad
+      console.log('📋 [CalleForm] Datos iniciales:', initialData);
+
+      // Preparar datos en formato API
       const datosParaHook = {
-        sectorId: Number(data.codSector),
-        barrioId: Number(data.codBarrio),
-        tipoVia: String(data.tipoVia),
-        nombre: data.nombreCalle.trim(),
-        // También incluir los datos en formato API
-        codTipoVia: Number(data.tipoVia),
         nombreVia: data.nombreCalle.trim(),
-        codSector: Number(data.codSector),
-        codBarrio: Number(data.codBarrio)
+        codTipoVia: String(data.tipoVia),
+        codBarrio: Number(data.codBarrio) || 0,
+        codSector: Number(data.codSector)
       };
-      
+
       console.log('📤 [CalleForm] Enviando datos:', datosParaHook);
-      
+
       // Validar que todos los campos tengan valores válidos
       if (!data.tipoVia || Number(data.tipoVia) === 0) {
         console.error('❌ Tipo de vía no válido:', data.tipoVia);
         return;
       }
-      
+
       if (!data.nombreCalle || data.nombreCalle.trim() === '') {
         console.error('❌ Nombre de vía vacío');
         return;
       }
-      
+
       if (!data.codSector || Number(data.codSector) === 0) {
         console.error('❌ Sector no válido:', data.codSector);
         return;
       }
-      
-      if (!data.codBarrio || Number(data.codBarrio) === 0) {
-        console.error('❌ Barrio no válido:', data.codBarrio);
-        return;
-      }
-      
+
       // Enviar los datos
       await onSubmit(datosParaHook as any);
-      
-      // Limpiar el formulario después de enviar exitosamente
-      reset({
-        tipoVia: 0,
-        codSector: 0,
-        codBarrio: 0,
-        nombreCalle: ''
-      });
+
+      // Solo limpiar el formulario si NO es edición
+      if (!hasInitialData) {
+        reset({
+          tipoVia: 0,
+          codSector: 0,
+          codBarrio: 0,
+          nombreCalle: ''
+        });
+      }
     } catch (error) {
       console.error('❌ Error al enviar formulario:', error);
     }
@@ -354,7 +343,7 @@ const CalleForm: React.FC<CalleFormProps> = ({
       
       
       
-      <form onSubmit={handleSubmit(handleFormSubmit)}>
+      <form onSubmit={handleSubmit(handleFormSubmit as SubmitHandler<CalleFormData>)}>
         {/* Primera fila: Todos los campos del formulario en horizontal */}
         <Box sx={{ 
           display: 'flex', 
@@ -410,29 +399,38 @@ const CalleForm: React.FC<CalleFormProps> = ({
                 <Autocomplete
                   options={sectores || []}
                   getOptionLabel={(option) => option.nombre || 'Sin nombre'}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
                   value={sectores?.find(s => s.id === field.value) || null}
                   onChange={(_, newValue) => {
                     field.onChange(newValue?.id || 0);
                   }}
                   loading={loadingSectores}
                   disabled={loadingSectores || isSubmitting}
-                  renderOption={(props, option) => (
-                    <Box component="li" {...props} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>{option.nombre}</span>
-                      {onUpdateSector && (
-                        <IconButton
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditSector(option);
-                          }}
-                          sx={{ ml: 1 }}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      )}
-                    </Box>
-                  )}
+                  renderOption={(props, option) => {
+                    const { key, ...optionProps } = props as any;
+                    return (
+                      <Box
+                        component="li"
+                        key={option.id}
+                        {...optionProps}
+                        sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                      >
+                        <span>{option.nombre}</span>
+                        {onUpdateSector && (
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditSector(option);
+                            }}
+                            sx={{ ml: 1 }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        )}
+                      </Box>
+                    );
+                  }}
                   renderInput={(params) => (
                     <TextField
                       {...params}
@@ -466,6 +464,8 @@ const CalleForm: React.FC<CalleFormProps> = ({
                 <Autocomplete
                   options={barriosFiltrados || []}
                   getOptionLabel={(option) => option.nombre || 'Sin nombre'}
+                  getOptionKey={(option) => option.id}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
                   value={barriosFiltrados?.find(b => b.id === field.value) || null}
                   onChange={(_, newValue) => {
                     field.onChange(newValue?.id || 0);
@@ -475,15 +475,15 @@ const CalleForm: React.FC<CalleFormProps> = ({
                   renderInput={(params) => (
                     <TextField
                       {...params}
-                      label="Barrio *"
+                      label="Barrio (Opcional)"
                       error={!!errors.codBarrio}
                       helperText={
-                        !selectedSector || selectedSector === 0 
-                          ? "" 
+                        !selectedSector || selectedSector === 0
+                          ? ""
                           : errors.codBarrio?.message || (barriosFiltrados.length === 0 ? "No hay barrios para este sector" : "")
                       }
                       size="small"
-                      placeholder={!selectedSector || selectedSector === 0 ? "Primero seleccione un sector" : "Seleccione un barrio"}
+                      placeholder={!selectedSector || selectedSector === 0 ? "Primero seleccione un sector" : "Seleccione un barrio (opcional)"}
                       InputProps={{
                         ...params.InputProps,
                         endAdornment: (
@@ -511,7 +511,6 @@ const CalleForm: React.FC<CalleFormProps> = ({
               error={!!errors.nombreCalle}
               helperText={errors.nombreCalle?.message}
               disabled={isSubmitting}
-              inputProps={{ maxLength: 100 }}
             />
           </Box>
         </Box>

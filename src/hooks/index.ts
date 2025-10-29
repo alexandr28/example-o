@@ -18,3 +18,18 @@ export { usePisos } from './usePisos';
 export { useConstantesOptions } from './useConstantesOptions';
 export { useCrudEntity } from './useCrudEntity';
 export { useAsignacion } from './useAsignacion';
+export {
+  useVencimientos,
+  useVencimientosPorAnio,
+  useCreateVencimientos,
+  useVencimientosAgrupados,
+  useVencimientosOptions
+} from './useVencimientos';
+export {
+  useResolucionesInteres,
+  useResolucionInteresPorCodigo,
+  useCreateResolucionInteres,
+  useUpdateResolucionInteres,
+  useDeleteResolucionInteres,
+  useResolucionInteresOptions
+} from './useResolucionInteres';

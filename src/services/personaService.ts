@@ -45,6 +45,7 @@ export interface BusquedaPersonaParams {
   codTipoPersona?: string;
   parametroBusqueda?: string;
   numeroDocumento?: string;
+  codTipoDocumento?: string;
   codUsuario?: number;
 }
 
@@ -314,19 +315,36 @@ class PersonaService extends BaseApiService<PersonaData, CreatePersonaDTO, Updat
   async crearPersonaAPI(datos: CreatePersonaAPIDTO): Promise<PersonaData> {
     try {
       console.log('➕ [PersonaService] Creando nueva persona con API directa:', datos);
-      
-      const API_URL = '/api/persona'; // Usar proxy local
-      
+
+      const API_URL = 'http://26.161.18.122:8085/api/persona'; // URL directa sin autenticación
+
       // Validar datos requeridos
       if (!datos.numerodocumento || !datos.nombres) {
         throw new Error('Número de documento y nombres son requeridos');
       }
-      
-      // Asegurar que codPersona no se envía en el request (omitirlo completamente)
-      const { codPersona, ...datosParaEnviar } = datos;
-      
-      console.log('📤 [PersonaService] Enviando datos (codPersona omitido):', JSON.stringify(datosParaEnviar, null, 2));
-      
+
+      // Preparar datos según estructura exacta del API
+      const datosParaEnviar = {
+        codPersona: null,
+        codTipopersona: datos.codTipopersona,
+        codTipoDocumento: datos.codTipoDocumento,
+        numerodocumento: datos.numerodocumento,
+        nombres: datos.nombres,
+        apellidomaterno: datos.apellidomaterno || '',
+        apellidopaterno: datos.apellidopaterno || '',
+        fechanacimiento: datos.fechanacimiento, // formato "YYYY-MM-DD"
+        codestadocivil: datos.codestadocivil,
+        codsexo: datos.codsexo,
+        telefono: datos.telefono || '',
+        codDireccion: datos.codDireccion,
+        lote: datos.lote,
+        otros: datos.otros,
+        parametroBusqueda: null,
+        codUsuario: datos.codUsuario
+      };
+
+      console.log('📤 [PersonaService] Enviando datos:', JSON.stringify(datosParaEnviar, null, 2));
+
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
@@ -344,35 +362,49 @@ class PersonaService extends BaseApiService<PersonaData, CreatePersonaDTO, Updat
         throw new Error(`Error ${response.status}: ${response.statusText} - ${errorText}`);
       }
       
-      const responseData = await response.json();
-      console.log('✅ [PersonaService] Persona creada exitosamente:', responseData);
-      
-      // Normalizar los datos de respuesta usando la función del constructor
+      const responseJson = await response.json();
+      console.log('✅ [PersonaService] Respuesta completa del API:', responseJson);
+
+      // El API devuelve {success: true, message: "...", data: "4"}
+      // donde data es el codPersona como string
+      const codPersona = responseJson.data ? parseInt(responseJson.data, 10) : null;
+      console.log('✅ [PersonaService] CodPersona extraído:', codPersona);
+
+      if (!codPersona) {
+        throw new Error('No se recibió el código de persona del servidor');
+      }
+
+      // Construir objeto de persona con los datos enviados + el codPersona recibido
       const personaNormalizada = {
-        codPersona: responseData.codPersona,
-        codTipopersona: responseData.codTipopersona,
-        codTipoDocumento: responseData.codTipoDocumento,
-        numerodocumento: responseData.numerodocumento || '',
-        nombres: responseData.nombres,
-        apellidomaterno: responseData.apellidomaterno,
-        apellidopaterno: responseData.apellidopaterno,
-        razonSocial: responseData.razonSocial,
-        direccion: responseData.direccion === 'null' ? null : responseData.direccion,
-        fechanacimiento: responseData.fechanacimiento,
-        codestadocivil: responseData.codestadocivil,
-        codsexo: responseData.codsexo,
-        telefono: responseData.telefono,
-        email: responseData.email,
-        codDireccion: responseData.codDireccion,
-        lote: responseData.lote,
-        otros: responseData.otros,
-        parametroBusqueda: responseData.parametroBusqueda,
-        codUsuario: responseData.codUsuario,
-        nombrePersona: responseData.nombrePersona || this.construirNombreCompleto(responseData),
-        estado: responseData.estado || 'ACTIVO',
-        fechaRegistro: responseData.fechaRegistro
+        codPersona: codPersona,
+        codTipopersona: datos.codTipopersona,
+        codTipoDocumento: datos.codTipoDocumento,
+        numerodocumento: datos.numerodocumento || '',
+        nombres: datos.nombres,
+        apellidomaterno: datos.apellidomaterno || '',
+        apellidopaterno: datos.apellidopaterno || '',
+        razonSocial: datos.razonSocial || null,
+        direccion: null,
+        fechanacimiento: datos.fechanacimiento,
+        codestadocivil: datos.codestadocivil,
+        codsexo: datos.codsexo,
+        telefono: datos.telefono || '',
+        email: datos.email || null,
+        codDireccion: datos.codDireccion,
+        lote: datos.lote || null,
+        otros: datos.otros || null,
+        parametroBusqueda: null,
+        codUsuario: datos.codUsuario,
+        nombrePersona: this.construirNombreCompleto({
+          nombres: datos.nombres,
+          apellidopaterno: datos.apellidopaterno,
+          apellidomaterno: datos.apellidomaterno,
+          razonSocial: datos.razonSocial
+        }),
+        estado: 'ACTIVO',
+        fechaRegistro: new Date().toISOString()
       };
-      
+
       return personaNormalizada;
       
     } catch (error: any) {

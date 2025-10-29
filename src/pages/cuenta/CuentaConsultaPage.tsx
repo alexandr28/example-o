@@ -37,7 +37,7 @@ const CuentaConsultaPage: React.FC = () => {
 
   return (
     <MainLayout>
-      <Container maxWidth="xl" sx={{ py: 3 }}>
+      <Container maxWidth="xl" sx={{ py: 3 }}>0
         {/* Breadcrumbs */}
         <Paper
           elevation={0}
@@ -51,39 +51,71 @@ const CuentaConsultaPage: React.FC = () => {
           <Breadcrumbs
             separator={<NavigateNextIcon fontSize="small" />}
             aria-label="breadcrumb"
+            sx={{
+              '& .MuiBreadcrumbs-ol': {
+                alignItems: 'center'
+              },
+              '& .MuiBreadcrumbs-li': {
+                display: 'flex',
+                alignItems: 'center'
+              }
+            }}
           >
             {breadcrumbItems.map((item, index) => {
               const isLast = index === breadcrumbItems.length - 1;
-              
+
               return isLast || item.active ? (
-                <Stack 
+                <Box
                   key={item.label}
-                  direction="row" 
-                  alignItems="center" 
-                  spacing={0.5}
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 0.5
+                  }}
                 >
-                  {item.icon}
-                  <Typography 
-                    variant="body2" 
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      height: 20
+                    }}
+                  >
+                    {item.icon}
+                  </Box>
+                  <Typography
+                    variant="body2"
                     color="text.primary"
                     fontWeight={500}
+                    sx={{
+                      lineHeight: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
                   >
                     {item.label}
                   </Typography>
                   {item.active && (
-                    <Chip 
-                      label="Actual" 
-                      size="small" 
-                      color="primary" 
+                    <Chip
+                      label="Actual"
+                      size="small"
+                      color="primary"
                       variant="filled"
-                      sx={{ 
+                      sx={{
                         height: 20,
                         fontSize: '0.688rem',
-                        fontWeight: 500
+                        fontWeight: 500,
+                        '& .MuiChip-label': {
+                          px: 1,
+                          py: 0,
+                          lineHeight: 1,
+                          display: 'flex',
+                          alignItems: 'center'
+                        }
                       }}
                     />
                   )}
-                </Stack>
+                </Box>
               ) : (
                 <Link
                   key={item.label}
@@ -92,7 +124,7 @@ const CuentaConsultaPage: React.FC = () => {
                   underline="hover"
                   color="inherit"
                   sx={{
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
                     gap: 0.5,
                     textDecoration: 'none',
@@ -101,8 +133,24 @@ const CuentaConsultaPage: React.FC = () => {
                     }
                   }}
                 >
-                  {item.icon}
-                  <Typography variant="body2">
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      height: 20
+                    }}
+                  >
+                    {item.icon}
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      lineHeight: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
                     {item.label}
                   </Typography>
                 </Link>
@@ -113,21 +161,7 @@ const CuentaConsultaPage: React.FC = () => {
 
         {/* Contenido principal */}
         <Box>
-          <CuentaList 
-            showActions={true}
-            onView={(cuenta) => {
-              console.log('Ver cuenta:', cuenta);
-              // TODO: Implementar modal de detalles o navegación
-            }}
-            onEdit={(cuenta) => {
-              console.log('Editar cuenta:', cuenta);
-              // TODO: Implementar navegación a formulario de edición
-            }}
-            onDelete={async (codCuenta) => {
-              console.log('Eliminar cuenta:', codCuenta);
-              // TODO: La eliminación ya está manejada en el componente
-            }}
-          />
+          <CuentaList />
         </Box>
       </Container>
     </MainLayout>

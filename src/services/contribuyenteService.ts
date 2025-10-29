@@ -81,9 +81,9 @@ export interface UpdateContribuyenteDTO extends Partial<CreateContribuyenteDTO> 
 
 export interface CreateContribuyenteAPIDTO {
   codPersona: number;
-  codContribuyente?: null; // Opcional - omitido para que SQL genere el ID
-  codConyuge: number | null;
-  codRepresentanteLegal: number | null;
+  codContribuyente?: null;
+  codConyuge?: number | null;
+  codRepresentanteLegal?: number | null;
   codestado: string;
   codUsuario: number;
 }
@@ -151,7 +151,8 @@ export interface ContribuyenteDetalle {
   repreCoddireccion: string | null;
   repreLote: string | null;
   repreOtros: string | null;
-  // Fecha formateada
+  // Campos adicionales
+  tipoContribuyente: string;
   fechaNacimientoStr: string;
 }
 
@@ -175,45 +176,56 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
     super(
       '/api/contribuyente',
       {
-        normalizeItem: (item: any) => ({
-          codigo: item.codContribuyente || item.codigo,
-          codigoPersona: item.codPersona || item.codigoPersona,
-          tipoPersona: item.tipoPersona || item.codTipopersona || '',
-          tipoDocumento: item.tipoDocumento || item.codTipoDocumento || '',
-          numeroDocumento: item.numeroDocumento || item.numerodocumento || '',
-          nombres: item.nombres || '',
-          apellidoPaterno: item.apellidoPaterno || item.apellidopaterno || '',
-          apellidoMaterno: item.apellidoMaterno || item.apellidomaterno || '',
-          razonSocial: item.razonSocial || '',
-          nombreCompleto: item.nombreCompleto || item.nombrePersona || 
-            ContribuyenteService.construirNombreCompleto(item),
-          direccion: item.direccion === 'null' ? '' : (item.direccion || ''),
-          telefono: item.telefono || '',
-          email: item.email || '',
-          fechaNacimiento: item.fechaNacimiento || item.fechanacimiento,
-          estadoCivil: item.estadoCivil || item.codestadocivil,
-          sexo: item.sexo || item.codsexo,
-          lote: item.lote || '',
-          estado: item.estado || item.codestado || 'ACTIVO',
-          fechaRegistro: item.fechaRegistro,
-          codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario,
-          // Mapear datos del cónyuge si existen
-          conyuge: item.conyugeNombres ? {
-            nombres: item.conyugeNombres,
-            apellidoPaterno: item.conyugeApellidopaterno || '',
-            apellidoMaterno: item.conyugeApellidomaterno || '',
-            numeroDocumento: item.conyugeNumeroDocumento || '',
-            tipoDocumento: item.conyugeTipoDocumento || ''
-          } : undefined,
-          // Mapear datos del representante legal si existen
-          representanteLegal: item.repreNombres ? {
-            nombres: item.repreNombres,
-            apellidoPaterno: item.repreApellidopaterno || '',
-            apellidoMaterno: item.repreApellidomaterno || '',
-            numeroDocumento: item.repreNumeroDocumento || '',
-            tipoDocumento: item.repreTipoDocumento || ''
-          } : undefined
-        }),
+        normalizeItem: (item: any) => {
+          // En la API general, el campo 'nombres' contiene el nombre completo
+          // Ejemplo: "Mantilla Miñano Jhonatan"
+          const nombreCompletoFromAPI = item.nombres || '';
+
+          // Si nombres contiene espacios, es el nombre completo
+          const esNombreCompleto = nombreCompletoFromAPI.includes(' ');
+
+          return {
+            codigo: item.codContribuyente || item.codigo,
+            codigoPersona: item.codPersona || item.codigoPersona,
+            tipoPersona: item.tipoContribuyente === 'NATURAL' ? '0301' :
+                        (item.tipoPersona || item.codTipopersona || ''),
+            tipoDocumento: item.tipoDocumento || item.codTipoDocumento || '',
+            numeroDocumento: item.numeroDocumento || item.numerodocumento || '',
+            nombres: esNombreCompleto ? '' : nombreCompletoFromAPI,
+            apellidoPaterno: item.apellidoPaterno || item.apellidopaterno || '',
+            apellidoMaterno: item.apellidoMaterno || item.apellidomaterno || '',
+            razonSocial: item.razonSocial || '',
+            nombreCompleto: esNombreCompleto ? nombreCompletoFromAPI :
+                          (item.nombreCompleto || item.nombrePersona ||
+                           ContribuyenteService.construirNombreCompleto(item)),
+            direccion: item.direccion === 'null' ? '' : (item.direccion || ''),
+            telefono: item.telefono || '',
+            email: item.email || '',
+            fechaNacimiento: item.fechaNacimiento || item.fechanacimiento,
+            estadoCivil: item.estadoCivil || item.codestadocivil,
+            sexo: item.sexo || item.codsexo,
+            lote: item.lote || '',
+            estado: item.estado || item.codestado || 'ACTIVO',
+            fechaRegistro: item.fechaRegistro || item.fechaNacimientoStr,
+            codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario,
+            // Mapear datos del cónyuge si existen
+            conyuge: item.conyugeNombres ? {
+              nombres: item.conyugeNombres,
+              apellidoPaterno: item.conyugeApellidopaterno || '',
+              apellidoMaterno: item.conyugeApellidomaterno || '',
+              numeroDocumento: item.conyugeNumeroDocumento || '',
+              tipoDocumento: item.conyugeTipoDocumento || ''
+            } : undefined,
+            // Mapear datos del representante legal si existen
+            representanteLegal: item.repreNombres ? {
+              nombres: item.repreNombres,
+              apellidoPaterno: item.repreApellidopaterno || '',
+              apellidoMaterno: item.repreApellidomaterno || '',
+              numeroDocumento: item.repreNumeroDocumento || '',
+              tipoDocumento: item.repreTipoDocumento || ''
+            } : undefined
+          };
+        },
         
         validateItem: (item: ContribuyenteData) => {
           return !!(item.numeroDocumento && (item.codigo || item.codigoPersona));
@@ -339,20 +351,20 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
   
   /**
    * Busca contribuyentes usando la nueva API general
-   * GET http://26.161.18.122:8080/api/contribuyente/general?parametroBusqueda=&codUsuario=1
+   * GET http://26.161.18.122:8085/api/contribuyente/general?parametroBusqueda=a&codUsuario=1
    * NO requiere autenticación
    */
   async buscarContribuyentes(criterios: BusquedaContribuyenteParams): Promise<ContribuyenteData[]> {
     try {
       console.log('🔍 [ContribuyenteService] Buscando contribuyentes con API general:', criterios);
-      
+
       const url = buildApiUrl('/api/contribuyente/general');
-      
+
       // Construir query params
       const queryParams = new URLSearchParams();
-      queryParams.append('parametroBusqueda', criterios.parametroBusqueda || '');
+      queryParams.append('parametroBusqueda', criterios.parametroBusqueda || 'a');
       queryParams.append('codUsuario', String(criterios.codUsuario || 1));
-      
+
       const getUrl = `${url}?${queryParams.toString()}`;
       console.log('📡 [ContribuyenteService] GET URL general:', getUrl);
       
@@ -416,11 +428,11 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
 
   /**
    * Obtiene todos los contribuyentes usando la nueva API general
-   * Para obtener todos, usa parametroBusqueda vacío
+   * Para obtener todos, usa parametroBusqueda = 'a'
    */
   async obtenerTodosContribuyentes(): Promise<ContribuyenteData[]> {
     console.log('📋 [ContribuyenteService] Obteniendo todos los contribuyentes con API general');
-    return this.buscarContribuyentes({ parametroBusqueda: '', codUsuario: 1 });
+    return this.buscarContribuyentes({ parametroBusqueda: 'a', codUsuario: 1 });
   }
 
   /**
@@ -653,7 +665,7 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
     try {
       console.log('➕ [ContribuyenteService] Creando contribuyente con API directa:', datos);
       
-      const API_URL = '/api/contribuyente'; // Usar proxy local
+      const API_URL = 'http://26.161.18.122:8085/api/contribuyente'; // URL directa sin autenticación
       
       // Validar datos requeridos
       if (!datos.codPersona || !datos.codestado) {
@@ -682,9 +694,13 @@ class ContribuyenteService extends BaseApiService<ContribuyenteData, CreateContr
         throw new Error(`Error ${response.status}: ${response.statusText} - ${errorText}`);
       }
       
-      const responseData = await response.json();
-      console.log('✅ [ContribuyenteService] Contribuyente creado exitosamente:', responseData);
-      
+      const responseJson = await response.json();
+      console.log('✅ [ContribuyenteService] Respuesta completa del API:', responseJson);
+
+      // Extraer datos del wrapper si existe
+      const responseData = responseJson.data || responseJson;
+      console.log('✅ [ContribuyenteService] Datos de contribuyente extraídos:', responseData);
+
       // Normalizar los datos de respuesta
       const contribuyenteNormalizado = {
         codigo: responseData.codContribuyente || responseData.codigo,

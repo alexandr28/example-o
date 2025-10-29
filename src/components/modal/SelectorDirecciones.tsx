@@ -94,10 +94,12 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
 
   // Cargar direcciones al abrir el modal
   useEffect(() => {
-    if (open && direcciones.length === 0) {
+    if (open) {
+      console.log('🔄 [SelectorDirecciones] Modal abierto, cargando direcciones...');
       cargarDirecciones();
     }
-  }, [open, cargarDirecciones, direcciones.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Aplicar filtro de búsqueda
   const aplicarFiltroBusqueda = useCallback((termino: string) => {
@@ -137,6 +139,10 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
 
   // Inicializar direcciones filtradas cuando cambien las direcciones
   useEffect(() => {
+    console.log('🔍 [SelectorDirecciones] Direcciones del hook:', direcciones.length);
+    if (direcciones.length > 0) {
+      console.log('📋 [SelectorDirecciones] Primera dirección:', direcciones[0]);
+    }
     setDireccionesFiltradas(direcciones);
   }, [direcciones]);
 
@@ -194,7 +200,11 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
   const direccionesPaginadas = useMemo(() => {
     const start = page * rowsPerPage;
     const end = start + rowsPerPage;
-    return direccionesFiltradas.slice(start, end);
+    const paginadas = direccionesFiltradas.slice(start, end);
+    console.log('📄 [SelectorDirecciones] Direcciones paginadas:', paginadas.length);
+    console.log('📄 [SelectorDirecciones] Total filtradas:', direccionesFiltradas.length);
+    console.log('📄 [SelectorDirecciones] Página:', page, 'Filas por página:', rowsPerPage);
+    return paginadas;
   }, [direccionesFiltradas, page, rowsPerPage]);
 
   return (
@@ -268,24 +278,19 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
                   <TableCell padding="checkbox" width={50}>
                     Sel.
                   </TableCell>
-                  <TableCell>Sector</TableCell>
-                  <TableCell>Barrio</TableCell>
-                  <TableCell>Vía</TableCell>
-                  <TableCell align="center">Cuadra</TableCell>
-                  <TableCell align="center">Lado</TableCell>
-                  <TableCell align="center">Lotes</TableCell>
+                  <TableCell>Dirección Completa</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
+                    <TableCell colSpan={2} align="center">
                       <CircularProgress size={30} />
                     </TableCell>
                   </TableRow>
                 ) : direccionesPaginadas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
+                    <TableCell colSpan={2} align="center">
                       <Typography variant="body2" color="text.secondary">
                         No se encontraron direcciones
                       </Typography>
@@ -293,7 +298,7 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
                   </TableRow>
                 ) : (
                   direccionesPaginadas.map((direccion, index) => (
-                    <TableRow 
+                    <TableRow
                       key={`direccion-${direccion.id || index}-${index}`}
                       hover
                       onClick={() => setSelectedId(direccion.id)}
@@ -307,40 +312,8 @@ const SelectorDirecciones: React.FC<SelectorDireccionesProps> = ({
                         />
                       </TableCell>
                       <TableCell>
-                        <Chip 
-                          label={direccion.nombreSector || 'Sin sector'} 
-                          size="small"
-                          icon={<ApartmentIcon />}
-                          sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1) }}
-                        />
-                      </TableCell>
-                      <TableCell>{direccion.nombreBarrio || '-'}</TableCell>
-                      <TableCell>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Chip 
-                            label={direccion.nombreTipoVia || 'CALLE'} 
-                            size="small"
-                            variant="outlined"
-                            sx={{ fontSize: '0.7rem' }}
-                          />
-                          <Typography variant="body2">
-                            {direccion.nombreVia || '-'}
-                          </Typography>
-                        </Stack>
-                      </TableCell>
-                      <TableCell align="center">
-                        {direccion.cuadra || '-'}
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip 
-                          label={direccion.lado || 'D'} 
-                          size="small"
-                          color={direccion.lado === 'I' ? 'warning' : 'default'}
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Typography variant="caption">
-                          {direccion.loteInicial || 1} - {direccion.loteFinal || 1}
+                        <Typography variant="body2">
+                          {direccion.descripcion || '-'}
                         </Typography>
                       </TableCell>
                     </TableRow>

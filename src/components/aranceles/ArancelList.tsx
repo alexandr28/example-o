@@ -62,7 +62,7 @@ export const ListaArancelesPorDireccion: React.FC<ListaArancelesPorDireccionProp
   useGeneralApi = false
 }) => {
   // Estados
-  const [anioSeleccionado, setAnioSeleccionado] = useState<number | null>(new Date().getFullYear());
+  const [anioSeleccionado, setAnioSeleccionado] = useState<number | null>(null);
   const [codDireccionBusqueda, setCodDireccionBusqueda] = useState<number | null>(null);
   const [parametroBusqueda, setParametroBusqueda] = useState<string>('');
   const [page, setPage] = useState(0);
@@ -112,11 +112,11 @@ export const ListaArancelesPorDireccion: React.FC<ListaArancelesPorDireccionProp
     try {
       setLoadingBusqueda(true);
       console.log('🔄 [ListaArancelesPorDireccion] Buscando con API general:', { parametroBusqueda, anioSeleccionado });
-      
+
       let resultados: any[] = [];
-      
+
+      // Cargar todos los aranceles primero
       if (parametroBusqueda.trim() === '') {
-        // Si no hay búsqueda, cargar todos los aranceles
         console.log('📋 [ListaArancelesPorDireccion] Cargando todos los aranceles...');
         resultados = await arancelService.obtenerTodosAranceles();
       } else {
@@ -128,16 +128,23 @@ export const ListaArancelesPorDireccion: React.FC<ListaArancelesPorDireccionProp
           codUsuario: 1
         });
       }
-      
-      console.log('✅ [ListaArancelesPorDireccion] Resultados obtenidos de API general:', resultados);
-      console.log('📊 [ListaArancelesPorDireccion] Cantidad de resultados:', resultados.length);
-      
+
+      console.log('✅ [ListaArancelesPorDireccion] Resultados obtenidos de API:', resultados.length);
+
+      // Filtrar por año si está seleccionado Y tiene un valor válido (filtro en el cliente)
+      if (anioSeleccionado !== null && anioSeleccionado > 0 && resultados.length > 0) {
+        const resultadosFiltrados = resultados.filter(arancel => arancel.anio === anioSeleccionado);
+        console.log(`🔍 [ListaArancelesPorDireccion] Filtrado por año ${anioSeleccionado}: ${resultadosFiltrados.length} de ${resultados.length}`);
+        resultados = resultadosFiltrados;
+      } else {
+        console.log('📋 [ListaArancelesPorDireccion] Sin filtro de año - mostrando todos los resultados');
+      }
+
+      console.log('📊 [ListaArancelesPorDireccion] Cantidad final de resultados:', resultados.length);
+
       // Actualizar estado con los resultados
       setArancelesEncontrados(resultados);
-      
-      // Log después de actualizar el estado
-      console.log('🔄 [ListaArancelesPorDireccion] Estado actualizado, resultados guardados');
-      
+
     } catch (error) {
       console.error('❌ [ListaArancelesPorDireccion] Error en búsqueda con API general:', error);
       setArancelesEncontrados([]);
@@ -147,15 +154,70 @@ export const ListaArancelesPorDireccion: React.FC<ListaArancelesPorDireccionProp
     }
   }, [parametroBusqueda, anioSeleccionado]);
 
+  // Efecto para cargar todos los aranceles al montar el componente
+  useEffect(() => {
+    const cargarArancelesIniciales = async () => {
+      try {
+        setLoadingBusqueda(true);
+        console.log('🔄 [ListaArancelesPorDireccion] Cargando aranceles iniciales...');
+
+        if (useGeneralApi) {
+          // Si usa API general, cargar todos y filtrar por año si es necesario
+          let resultados = await arancelService.obtenerTodosAranceles();
+
+          if (anioSeleccionado !== null && anioSeleccionado > 0) {
+            resultados = resultados.filter(arancel => arancel.anio === anioSeleccionado);
+            console.log(`🔍 [ListaArancelesPorDireccion] Filtrado inicial por año ${anioSeleccionado}: ${resultados.length}`);
+          } else {
+            console.log(`📋 [ListaArancelesPorDireccion] Cargando todos los aranceles sin filtro de año: ${resultados.length}`);
+          }
+
+          setArancelesEncontrados(resultados);
+        } else {
+          // API legacy
+          const resultados = await arancelService.listarAranceles({
+            codDireccion: undefined,
+            anio: undefined,
+            parametroBusqueda: '',
+            codUsuario: 1
+          });
+          setArancelesEncontrados(resultados);
+        }
+
+        console.log('✅ [ListaArancelesPorDireccion] Aranceles iniciales cargados');
+      } catch (error) {
+        console.error('❌ [ListaArancelesPorDireccion] Error cargando aranceles iniciales:', error);
+        setArancelesEncontrados([]);
+      } finally {
+        setLoadingBusqueda(false);
+      }
+    };
+
+    // Cargar aranceles iniciales al montar
+    cargarArancelesIniciales();
+  }, [useGeneralApi]); // Se ejecuta al montar y cuando cambia useGeneralApi
+
+  // Efecto para recargar cuando cambia el año o se limpia el campo de búsqueda
+  useEffect(() => {
+    if (useGeneralApi) {
+      // Si estamos usando la API general, recargar con los filtros actuales
+      const timer = setTimeout(() => {
+        buscarConApiGeneral();
+      }, 300); // Debounce de 300ms
+
+      return () => clearTimeout(timer);
+    }
+  }, [parametroBusqueda, anioSeleccionado, useGeneralApi, buscarConApiGeneral]);
+
   // Efecto para manejar parámetros de búsqueda iniciales desde redirección
   useEffect(() => {
     if (initialSearchParams) {
       console.log('🎯 [ListaArancelesPorDireccion] Recibiendo parámetros iniciales:', initialSearchParams);
-      
+
       // Establecer los valores en el estado
       setAnioSeleccionado(initialSearchParams.anio);
       setCodDireccionBusqueda(initialSearchParams.codDireccion);
-      
+
       // Realizar la búsqueda automáticamente
       setTimeout(async () => {
         console.log('🔄 [ListaArancelesPorDireccion] Ejecutando búsqueda automática...');
@@ -164,9 +226,10 @@ export const ListaArancelesPorDireccion: React.FC<ListaArancelesPorDireccionProp
           const resultados = await arancelService.listarAranceles({
             anio: initialSearchParams.anio,
             codDireccion: initialSearchParams.codDireccion,
-            codUsuario: 1
+            codUsuario: 1,
+            parametroBusqueda: ''
           });
-          
+
           console.log('✅ [ListaArancelesPorDireccion] Búsqueda automática completada:', resultados);
           setArancelesEncontrados(resultados);
         } catch (error) {
@@ -454,16 +517,35 @@ export const ListaArancelesPorDireccion: React.FC<ListaArancelesPorDireccionProp
             ))}
           </Box>
         ) : (useGeneralApi ? arancelesEncontrados.length > 0 : anioSeleccionado && codDireccionBusqueda && arancelesEncontrados.length > 0) ? (
-          <TableContainer 
-            component={Paper} 
+          <TableContainer
+            component={Paper}
             variant="outlined"
             sx={{
               borderRadius: 2,
               border: '1px solid',
               borderColor: 'divider',
+              maxHeight: { xs: 300, sm: 350, md: 400 },
+              overflowY: 'auto',
+              overflowX: 'auto',
               '& .MuiTable-root': {
                 borderCollapse: 'separate',
-                borderSpacing: 0
+                borderSpacing: 0,
+                minWidth: { xs: 600, sm: 700, md: 750 }
+              },
+              '&::-webkit-scrollbar': {
+                width: 8,
+                height: 8,
+              },
+              '&::-webkit-scrollbar-track': {
+                bgcolor: alpha(theme.palette.grey[200], 0.5),
+                borderRadius: 2,
+              },
+              '&::-webkit-scrollbar-thumb': {
+                bgcolor: alpha(theme.palette.primary.main, 0.3),
+                borderRadius: 2,
+                '&:hover': {
+                  bgcolor: alpha(theme.palette.primary.main, 0.5),
+                }
               }
             }}
           >

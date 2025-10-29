@@ -58,10 +58,24 @@ interface HeadCell {
 }
 
 const headCells: HeadCell[] = [
-  { id: 'nombreVia', label: 'N°', sortable: true },
+  { id: 'nombreVia', label: 'Vía', sortable: true },
   { id: 'ubicacion', label: 'Ubicación', sortable: true },
   { id: 'acciones', label: 'Acciones', align: 'center' }
 ];
+
+// Función para obtener anchos de columna responsive
+const getColumnWidth = (columnId: string): object => {
+  switch (columnId) {
+    case 'nombreVia':
+      return { width: { xs: '35%', sm: '40%', md: '50%' }, minWidth: 150 };
+    case 'ubicacion':
+      return { width: { xs: '50%', sm: '45%', md: '40%' }, minWidth: 200 };
+    case 'acciones':
+      return { width: { xs: '15%', sm: '15%', md: '10%' }, minWidth: 80 };
+    default:
+      return { width: 'auto' };
+  }
+};
 
 const CalleListMUI: React.FC<CalleListProps> = ({
   calles,
@@ -353,19 +367,25 @@ const CalleListMUI: React.FC<CalleListProps> = ({
         </Box>
 
         {/* Tabla con scroll interno */}
-        <TableContainer 
+        <TableContainer
           component={Paper}
           elevation={2}
-          sx={{ 
+          sx={{
             width: '100%',
-            height: 400,
-            maxHeight: 400,
+            height: { xs: 300, sm: 350, md: 400 },
+            maxHeight: { xs: 300, sm: 350, md: 400 },
             borderRadius: 2,
             border: `1px solid ${theme.palette.divider}`,
-            overflow: 'auto',
+            overflowY: 'auto',
+            overflowX: { xs: 'auto', sm: 'auto', md: 'hidden' },
             position: 'relative',
             '& .MuiTable-root': {
-              minWidth: 750
+              width: '100%',
+              tableLayout: 'fixed',
+              minWidth: { xs: 500, sm: 600, md: '100%' },
+              '& .MuiTableCell-root': {
+                padding: { xs: '8px 4px', sm: '10px 8px', md: '12px 10px' }
+              }
             },
             '&::-webkit-scrollbar': {
               width: 8,
@@ -391,19 +411,19 @@ const CalleListMUI: React.FC<CalleListProps> = ({
                   <TableCell
                     key={headCell.id}
                     align={headCell.align || 'left'}
-                    sx={{ 
+                    sx={{
+                      ...getColumnWidth(headCell.id as string),
                       fontWeight: 700,
                       fontSize: '0.875rem',
-                      bgcolor: theme.palette.background.paper, // Fondo sólido primero
-                      backgroundImage: `linear-gradient(${alpha(theme.palette.primary.main, 0.08)}, ${alpha(theme.palette.primary.main, 0.08)})`, // Luego el color
+                      bgcolor: theme.palette.background.paper,
+                      backgroundImage: `linear-gradient(${alpha(theme.palette.primary.main, 0.08)}, ${alpha(theme.palette.primary.main, 0.08)})`,
                       color: theme.palette.primary.main,
                       borderBottom: `2px solid ${theme.palette.primary.main}`,
                       textTransform: 'uppercase',
                       letterSpacing: 0.5,
-                      py: 2,
                       position: 'sticky',
                       top: 0,
-                      zIndex: 10 // Aumentar z-index para asegurar que esté encima
+                      zIndex: 10
                     }}
                   >
                     {headCell.sortable ? (
@@ -491,10 +511,13 @@ const CalleListMUI: React.FC<CalleListProps> = ({
                         }
                       }}
                     >
-                      <TableCell sx={{ py: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}>
-                        <Box sx={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
+                      <TableCell sx={{
+                        ...getColumnWidth('nombreVia'),
+                        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`
+                      }}>
+                        <Box sx={{
+                          display: 'flex',
+                          alignItems: 'center',
                           gap: 1.5
                         }}>
                           <Box
@@ -534,9 +557,12 @@ const CalleListMUI: React.FC<CalleListProps> = ({
                           </Box>
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ py: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}>
-                        <Box sx={{ 
-                          display: 'flex', 
+                      <TableCell sx={{
+                        ...getColumnWidth('ubicacion'),
+                        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`
+                      }}>
+                        <Box sx={{
+                          display: 'flex',
                           flexDirection: 'row',
                           alignItems: 'center',
                           gap: 1,
@@ -606,9 +632,12 @@ const CalleListMUI: React.FC<CalleListProps> = ({
                           />
                         </Box>
                       </TableCell>
-                      <TableCell 
+                      <TableCell
                         align="center"
-                        sx={{ py: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}
+                        sx={{
+                          ...getColumnWidth('acciones'),
+                          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`
+                        }}
                       >
                         <Tooltip title="Editar calle" arrow>
                           <IconButton

@@ -175,19 +175,20 @@ export interface PredioFormData {
   anio?: number;
   fechaAdquisicion?: Date | string | null;
   condicionPropiedad: string;
-  
+
   // Ubicación
   direccionId?: number;
   direccion?: string;
   numeroFinca?: string;
   otroNumero?: string;
-  
+
   // Características
   tipoPredio?: string;
   conductor: string;
   usoPredio?: string;
   estadoPredio?: string;
-  
+  clasificacionPredio?: string;
+
   // Valores
   areaTerreno: number;
   valorTerreno?: number;
@@ -206,6 +207,8 @@ export interface FiltroPredio {
   contribuyenteId?: number;
   tipoPredio?: TipoPredio | string;
   usoPredio?: UsoPredio | string;
+  estadoPredio?: EstadoPredio | string;
+  condicionPropiedad?: CondicionPropiedad | string;
   direccionId?: number;
   fechaDesde?: Date;
   fechaHasta?: Date;

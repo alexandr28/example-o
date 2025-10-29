@@ -35,27 +35,30 @@ interface CrearPisoFormData {
   // Datos básicos requeridos
   anio: number;
   codPredio: string;
+  codPiso?: number;
   numeroPiso: number;
   areaConstruida: number;
-  
+
   // Datos opcionales
   fechaConstruccion?: string;
-  codLetraMurosColumnas?: string;
   murosColumnas?: string;
-  codLetraTechos?: string;
   techos?: string;
-  codLetraPisos?: string;
   pisos?: string;
-  codLetraPuertasVentanas?: string;
   puertasVentanas?: string;
-  codLetraRevestimiento?: string;
   revestimiento?: string;
-  codLetraBanios?: string;
   banios?: string;
-  codLetraInstalacionesElectricas?: string;
   instalacionesElectricas?: string;
+  codLetraMurosColumnas?: string;
+  codLetraTechos?: string;
+  codLetraPisos?: string;
+  codLetraPuertasVentanas?: string;
+  codLetraRevestimiento?: string;
+  codLetraBanios?: string;
+  codLetraInstalacionesElectricas?: string;
   codEstadoConservacion?: string;
   codMaterialEstructural?: string;
+  valorAreasComunes?: string;
+  codUsuario?: number;
 }
 
 /**
@@ -224,25 +227,28 @@ export const usePisos = () => {
       const datosApi: CreatePisoApiDTO = {
         anio: datos.anio || new Date().getFullYear(),
         codPredio: String(datos.codPredio),
+        codPiso: Number(datos.codPiso || 1),
         numeroPiso: Number(datos.numeroPiso),
         fechaConstruccion: datos.fechaConstruccion || "1990-01-01",
-        codLetraMurosColumnas: String(datos.codLetraMurosColumnas || "1101"),
         murosColumnas: String(datos.murosColumnas || "100101"),
-        codLetraTechos: String(datos.codLetraTechos || "1101"),
         techos: String(datos.techos || "100102"),
-        codLetraPisos: String(datos.codLetraPisos || "1101"),
         pisos: String(datos.pisos || "100201"),
-        codLetraPuertasVentanas: String(datos.codLetraPuertasVentanas || "1101"),
         puertasVentanas: String(datos.puertasVentanas || "100202"),
-        codLetraRevestimiento: String(datos.codLetraRevestimiento || "1101"),
         revestimiento: String(datos.revestimiento || "100203"),
-        codLetraBanios: String(datos.codLetraBanios || "1101"),
         banios: String(datos.banios || "100204"),
-        codLetraInstalacionesElectricas: String(datos.codLetraInstalacionesElectricas || "1101"),
         instalacionesElectricas: String(datos.instalacionesElectricas || "100301"),
+        codLetraMurosColumnas: String(datos.codLetraMurosColumnas || "1101"),
+        codLetraTechos: String(datos.codLetraTechos || "1101"),
+        codLetraPisos: String(datos.codLetraPisos || "1101"),
+        codLetraPuertasVentanas: String(datos.codLetraPuertasVentanas || "1101"),
+        codLetraRevestimiento: String(datos.codLetraRevestimiento || "1101"),
+        codLetraBanios: String(datos.codLetraBanios || "1101"),
+        codLetraInstalacionesElectricas: String(datos.codLetraInstalacionesElectricas || "1101"),
         codEstadoConservacion: String(datos.codEstadoConservacion || "9402"),
         codMaterialEstructural: String(datos.codMaterialEstructural || "0703"),
-        areaConstruida: String(datos.areaConstruida)
+        areaConstruida: String(datos.areaConstruida),
+        valorAreasComunes: String(datos.valorAreasComunes || "0"),
+        codUsuario: Number(datos.codUsuario || 1)
       };
       
       console.log('📤 [usePisos] Datos preparados para API POST:', datosApi);
@@ -299,25 +305,28 @@ export const usePisos = () => {
         const datosApi: CreatePisoApiDTO = {
           anio: datos.anio || new Date().getFullYear(),
           codPredio: String(datos.codPredio),
+          codPiso: Number(datos.codPiso || 1),
           numeroPiso: Number(datos.numeroPiso),
           fechaConstruccion: datos.fechaConstruccion || "1990-01-01",
-          codLetraMurosColumnas: String(datos.codLetraMurosColumnas || "1101"),
           murosColumnas: String(datos.murosColumnas || "100101"),
-          codLetraTechos: String(datos.codLetraTechos || "1101"),
           techos: String(datos.techos || "100102"),
-          codLetraPisos: String(datos.codLetraPisos || "1101"),
           pisos: String(datos.pisos || "100201"),
+          puertasVentanas: String(datos.puertasVentanas || "100202"),
+          revestimiento: String(datos.revestimiento || "100203"),
+          banios: String(datos.banios || "100204"),
+          instalacionesElectricas: String(datos.instalacionesElectricas || "100301"),
+          codLetraMurosColumnas: String(datos.codLetraMurosColumnas || "1101"),
+          codLetraTechos: String(datos.codLetraTechos || "1101"),
+          codLetraPisos: String(datos.codLetraPisos || "1101"),
           codLetraPuertasVentanas: String(datos.codLetraPuertasVentanas || "1101"),
-          puertasVentanas: String(datos.puertasVentanas || "100202").trim(),
           codLetraRevestimiento: String(datos.codLetraRevestimiento || "1101"),
-          revestimiento: String(datos.revestimiento || "100203").trim(),
           codLetraBanios: String(datos.codLetraBanios || "1101"),
-          banios: String(datos.banios || "100204").trim(),
           codLetraInstalacionesElectricas: String(datos.codLetraInstalacionesElectricas || "1101"),
-          instalacionesElectricas: String(datos.instalacionesElectricas || "100301").trim(),
           codEstadoConservacion: String(datos.codEstadoConservacion || "9402"),
           codMaterialEstructural: String(datos.codMaterialEstructural || "0703"),
-          areaConstruida: String(datos.areaConstruida)
+          areaConstruida: String(datos.areaConstruida),
+          valorAreasComunes: String(datos.valorAreasComunes || "0"),
+          codUsuario: Number(datos.codUsuario || 1)
         };
         
         // TODO: Implementar método PUT en el servicio cuando esté disponible

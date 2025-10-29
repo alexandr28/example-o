@@ -19,19 +19,25 @@ type ComplexEndpoint = {
 
 interface EndpointsConfig {
   barrio: SimpleEndpoint;
-  sector: SimpleEndpoint;
+  sector: ComplexEndpoint;
   via: SimpleEndpoint;  // Reemplaza a calle
-  contribuyente: SimpleEndpoint;
+  contribuyente: ComplexEndpoint;
   arancel: SimpleEndpoint;
   valorUnitario: SimpleEndpoint;
   uit: SimpleEndpoint;
   alcabala: SimpleEndpoint;
   depreciacion: SimpleEndpoint;
-  predio: SimpleEndpoint;
+  predio: ComplexEndpoint;
   piso: SimpleEndpoint;
   direccion: ComplexEndpoint;
   persona: ComplexEndpoint;
   constante: ComplexEndpoint;
+  serenazgo: SimpleEndpoint;
+  limpiezaPublica: ComplexEndpoint;
+  parquesJardines: SimpleEndpoint;
+  cuentaCorriente: ComplexEndpoint;
+  resolucionInteres: SimpleEndpoint;
+  vencimiento: SimpleEndpoint;
 }
 
 // ========================================
@@ -54,15 +60,26 @@ export const API_CONFIG = {
   
   endpoints: {
     barrio: '/api/barrio',
-    sector: '/api/sector',
+    sector: {
+      base: '/api/sector',
+      listarCuadrante: '/api/sector/listarCuadrante',
+      listarUnidadUrbana: '/api/sector/listarTipoUnidadUrbana',
+    },
     via: '/api/via/listarVia',  // ← CORREGIDO: era /api/calle
-    contribuyente: '/api/contribuyente',
+    contribuyente: {
+      base: '/api/contribuyente',
+      general: '/api/contribuyente/general',
+    },
     arancel: '/api/arancel',
     valorUnitario: '/api/valoresunitarios',
     uit: '/api/uitEpa',
     alcabala: '/api/alcabala',
     depreciacion: '/api/depreciacion',
-    predio: '/api/predio',
+    predio: {
+      base: '/api/predio',
+      all: '/api/predio/all',
+      usos: '/api/predio/usos',
+    },
     piso: '/api/piso',
     asignacion:'/api/asignacionpredio',
     direccion: {
@@ -80,7 +97,22 @@ export const API_CONFIG = {
       base: '/api/constante',
       listarPadre: '/api/constante/listarConstantePadre',
       listarHijo: '/api/constante/listarConstanteHijo'
-    }
+    },
+    serenazgo: '/api/arbitrioSerenazgo',
+    limpiezaPublica: {
+      base: '/api/arbitrioLimpiezaPublica',
+      listarLimpiezaPublicaOtros: '/api/arbitrioLimpiezaPublica/listarArbitrioLimpiezaPublicaOtros',
+      insertarLimpiezaPublicaOtros: '/api/arbitrioLimpiezaPublica/insertarArbitrioLimpiezaPublicaOtros',
+      actualizarLimpiezaPublicaOtros: '/api/arbitrioLimpiezaPublica/actualizarArbitrioLimpiezaPublicaOtros',
+    },
+    parquesJardines: '/api/arbitrioParquesJardines',
+    cuentaCorriente : {
+      base: '/api/estadoCuenta',
+      listar: '/api/estadoCuenta/listar',
+      listarDetalle: '/api/estadoCuenta/listarDetalle',
+    },
+    resolucionInteres: '/api/resolucionInteres',
+    vencimiento: '/api/vencimiento',
   } as EndpointsConfig,
   
   defaultParams: {

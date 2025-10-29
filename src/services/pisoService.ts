@@ -9,6 +9,7 @@ export interface PisoData {
   id: number;
   codigoPredio: number | string;
   numeroPiso: number;
+  numeroPisoDesc?: string; // Descripción del piso (ej: "1° piso")
   areaConstruida: number;
   clasificacion?: string;
   materialEstructural?: string;
@@ -75,30 +76,33 @@ export interface CreatePisoDTO {
 
 /**
  * DTO para crear pisos según la estructura exacta del API
- * URL: POST http://26.161.18.122:8080/api/piso
+ * URL: POST http://26.161.18.122:8085/api/piso
  */
 export interface CreatePisoApiDTO {
   anio: number;
   codPredio: string;
+  codPiso: number;
   numeroPiso: number;
   fechaConstruccion: string; // Formato "YYYY-MM-DD"
-  codLetraMurosColumnas: string;
   murosColumnas: string;
-  codLetraTechos: string;
   techos: string;
-  codLetraPisos: string;
   pisos: string;
-  codLetraPuertasVentanas: string;
   puertasVentanas: string;
-  codLetraRevestimiento: string;
   revestimiento: string;
-  codLetraBanios: string;
   banios: string;
-  codLetraInstalacionesElectricas: string;
   instalacionesElectricas: string;
+  codLetraMurosColumnas: string;
+  codLetraTechos: string;
+  codLetraPisos: string;
+  codLetraPuertasVentanas: string;
+  codLetraRevestimiento: string;
+  codLetraBanios: string;
+  codLetraInstalacionesElectricas: string;
   codEstadoConservacion: string;
   codMaterialEstructural: string;
   areaConstruida: string;
+  valorAreasComunes: string;
+  codUsuario: number;
 }
 
 export interface UpdatePisoDTO extends Partial<CreatePisoDTO> {
@@ -238,12 +242,12 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
         return String(valor).trim().replace(/\s+/g, '');
       };
       
-      // El API requiere TODOS los parámetros - usar valores por defecto si no se proporcionan
+      // El API requiere TODOS los parámetros - usar valores por defecto o vacíos si no se proporcionan
       const queryParams: Record<string, string> = {
-        codPiso: limpiarParametro(params.codPiso || 1),
-        anio: limpiarParametro(params.anio || new Date().getFullYear()),
-        codPredio: limpiarParametro(params.codPredio || '20231'),
-        numeroPiso: limpiarParametro(params.numeroPiso || 1)
+        anio: limpiarParametro(params.anio !== undefined ? params.anio : new Date().getFullYear()),
+        codPiso: limpiarParametro(params.codPiso !== undefined ? params.codPiso : ''),
+        codPredio: limpiarParametro(params.codPredio !== undefined ? params.codPredio : ''),
+        numeroPiso: limpiarParametro(params.numeroPiso !== undefined ? params.numeroPiso : '')
       };
       
       console.log('📡 [PisoService] Parámetros finales enviados al API:', queryParams);
@@ -289,14 +293,39 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
         throw new Error(errorMessage);
       }
       
-      const data = await response.json();
-      console.log('📡 [PisoService] Respuesta del API:', data);
-      
+      const response_json = await response.json();
+      console.log('📡 [PisoService] Respuesta del API:', response_json);
+      console.log('📡 [PisoService] Tipo de respuesta:', typeof response_json);
+      console.log('📡 [PisoService] Es Array:', Array.isArray(response_json));
+
+      // Extraer los datos del wrapper del API
+      let data;
+      if (response_json.success && response_json.data) {
+        console.log('📡 [PisoService] Respuesta tiene estructura {success, data}');
+        data = response_json.data;
+      } else if (response_json.data) {
+        console.log('📡 [PisoService] Respuesta tiene propiedad data');
+        data = response_json.data;
+      } else {
+        console.log('📡 [PisoService] Respuesta es directa (sin wrapper)');
+        data = response_json;
+      }
+
       // El API puede devolver un objeto directo o un array
       const pisosData = Array.isArray(data) ? data : [data];
-      
+      console.log('📡 [PisoService] pisosData después de conversión:', pisosData);
+      console.log('📡 [PisoService] Cantidad de pisos:', pisosData.length);
+
       const pisosFormateados = pisosData.map((item: any, index: number) => {
         console.log(`🔍 [PisoService] Procesando piso ${index + 1}:`, item);
+        console.log(`🔍 [PisoService] Valores clave del item:`, {
+          valorUnitario: item.valorUnitario,
+          incremento: item.incremento,
+          depreciacion: item.depreciacion,
+          valorUnitarioDepreciado: item.valorUnitarioDepreciado,
+          valorAreaConstruida: item.valorAreaConstruida,
+          valorConstruccion: item.valorConstruccion
+        });
         
         // Formatear fecha de construcción
         let fechaConstruccionStr = item.fechaConstruccionStr;
@@ -305,21 +334,25 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
           fechaConstruccionStr = fecha.toISOString().split('T')[0];
         }
         
+        // Limpiar codPredio de espacios en blanco
+        const codPredioLimpio = item.codPredio ? String(item.codPredio).trim() : null;
+
         const pisoFormateado: PisoData = {
           // IDs
-          id: item.codPiso || index + 1,
+          id: item.codPiso ?? index + 1,
           codPiso: item.codPiso,
-          
-          // Información básica
+
+          // Información básica - limpiar codPredio de espacios
           anio: item.anio,
-          codigoPredio: item.codPredio,
-          codPredio: item.codPredio,
+          codigoPredio: codPredioLimpio ?? '',
+          codPredio: codPredioLimpio ?? '',
           numeroPiso: item.numeroPiso,
-          
+          numeroPisoDesc: item.numeroPisoDesc,
+
           // Fechas
           fechaConstruccion: item.fechaConstruccion,
           fechaConstruccionStr: fechaConstruccionStr,
-          
+
           // Componentes estructurales
           codLetraMurosColumnas: item.codLetraMurosColumnas,
           murosColumnas: item.murosColumnas,
@@ -335,22 +368,22 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
           banios: item.banios,
           codLetraInstalacionesElectricas: item.codLetraInstalacionesElectricas,
           instalacionesElectricas: item.instalacionesElectricas,
-          
+
           // Estados y materiales
           codEstadoConservacion: item.codEstadoConservacion,
           codMaterialEstructural: item.codMaterialEstructural,
-          
-          // Valores
-          valorUnitario: item.valorUnitario || 0,
-          areaConstruida: item.areaConstruida || 0,
-          incremento: item.incremento || 0,
-          depreciacion: item.depreciacion || 0,
-          montoDepreciacion: item.montoDepreciacion,
-          valorUnitarioDepreciado: item.valorUnitarioDepreciado,
-          valorAreaConstruida: item.valorAreaConstruida,
-          valorAreasComunes: item.valorAreasComunes,
-          valorConstruccion: item.valorConstruccion,
-          
+
+          // Valores - usar ?? para mantener 0 y valores decimales como válidos
+          valorUnitario: item.valorUnitario ?? 0,
+          areaConstruida: item.areaConstruida ?? 0,
+          incremento: item.incremento ?? 0,
+          depreciacion: item.depreciacion ?? 0,
+          montoDepreciacion: item.montoDepreciacion ?? null,
+          valorUnitarioDepreciado: item.valorUnitarioDepreciado ?? 0,
+          valorAreaConstruida: item.valorAreaConstruida ?? 0,
+          valorAreasComunes: item.valorAreasComunes ?? null,
+          valorConstruccion: item.valorConstruccion ?? 0,
+
           // Campos adicionales para compatibilidad
           estado: item.estado || 'ACTIVO',
           fechaRegistro: item.fechaRegistro,
@@ -358,10 +391,19 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
         };
         
         console.log(`✅ [PisoService] Piso ${index + 1} formateado:`, pisoFormateado);
+        console.log(`✅ [PisoService] Valores finales del piso formateado:`, {
+          valorUnitario: pisoFormateado.valorUnitario,
+          incremento: pisoFormateado.incremento,
+          depreciacion: pisoFormateado.depreciacion,
+          valorUnitarioDepreciado: pisoFormateado.valorUnitarioDepreciado,
+          valorAreaConstruida: pisoFormateado.valorAreaConstruida,
+          valorConstruccion: pisoFormateado.valorConstruccion
+        });
         return pisoFormateado;
       });
-      
+
       console.log('✅ [PisoService] Total pisos formateados:', pisosFormateados.length);
+      console.log('✅ [PisoService] Array completo de pisos formateados:', pisosFormateados);
       return pisosFormateados;
       
     } catch (error: any) {
@@ -517,53 +559,56 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
   
   /**
    * Crea un nuevo piso usando POST sin autenticación
-   * URL: POST http://26.161.18.122:8080/api/piso
+   * URL: POST http://26.161.18.122:8085/api/piso
    * Estructura JSON exacta según especificación del API
    */
   async crearPisoSinAuth(datos: CreatePisoApiDTO): Promise<PisoData> {
     try {
       console.log('➕ [PisoService] Creando piso sin autenticación:', datos);
-      
+
       // Validaciones de datos requeridos
       if (!datos.codPredio || !datos.codPredio.trim()) {
         throw new Error('codPredio es requerido');
       }
-      
+
       if (!datos.numeroPiso || datos.numeroPiso <= 0) {
         throw new Error('numeroPiso es requerido y debe ser mayor a 0');
       }
-      
+
       if (!datos.areaConstruida || parseFloat(datos.areaConstruida) <= 0) {
         throw new Error('areaConstruida es requerido y debe ser mayor a 0');
       }
-      
+
       // Asegurar que los datos coincidan EXACTAMENTE con el JSON esperado
       const datosParaEnviar: CreatePisoApiDTO = {
         anio: Number(datos.anio),
         codPredio: String(datos.codPredio).trim(),
+        codPiso: Number(datos.codPiso || 1),
         numeroPiso: Number(datos.numeroPiso),
         fechaConstruccion: String(datos.fechaConstruccion || "1990-01-01"),
-        codLetraMurosColumnas: String(datos.codLetraMurosColumnas || "1101").trim(),
         murosColumnas: String(datos.murosColumnas || "100101"),
-        codLetraTechos: String(datos.codLetraTechos || "1101").trim(),
         techos: String(datos.techos || "100102"),
-        codLetraPisos: String(datos.codLetraPisos || "1101").trim(),
         pisos: String(datos.pisos || "100201"),
-        codLetraPuertasVentanas: String(datos.codLetraPuertasVentanas || "1101").trim(),
-        puertasVentanas: String(datos.puertasVentanas || "100202").trim(),
-        codLetraRevestimiento: String(datos.codLetraRevestimiento || "1101").trim(),
-        revestimiento: String(datos.revestimiento || "100203").trim(),
-        codLetraBanios: String(datos.codLetraBanios || "1101").trim(),
-        banios: String(datos.banios || "100204").trim(),
-        codLetraInstalacionesElectricas: String(datos.codLetraInstalacionesElectricas || "1101").trim(),
-        instalacionesElectricas: String(datos.instalacionesElectricas || "100301").trim(),
-        codEstadoConservacion: String(datos.codEstadoConservacion || "9402").trim(),
-        codMaterialEstructural: String(datos.codMaterialEstructural || "0703").trim(),
-        areaConstruida: String(datos.areaConstruida)
+        puertasVentanas: String(datos.puertasVentanas || "100202"),
+        revestimiento: String(datos.revestimiento || "100203"),
+        banios: String(datos.banios || "100204"),
+        instalacionesElectricas: String(datos.instalacionesElectricas || "100301"),
+        codLetraMurosColumnas: String(datos.codLetraMurosColumnas || "1101"),
+        codLetraTechos: String(datos.codLetraTechos || "1101"),
+        codLetraPisos: String(datos.codLetraPisos || "1101"),
+        codLetraPuertasVentanas: String(datos.codLetraPuertasVentanas || "1101"),
+        codLetraRevestimiento: String(datos.codLetraRevestimiento || "1101"),
+        codLetraBanios: String(datos.codLetraBanios || "1101"),
+        codLetraInstalacionesElectricas: String(datos.codLetraInstalacionesElectricas || "1101"),
+        codEstadoConservacion: String(datos.codEstadoConservacion || "9402"),
+        codMaterialEstructural: String(datos.codMaterialEstructural || "0703"),
+        areaConstruida: String(datos.areaConstruida),
+        valorAreasComunes: String(datos.valorAreasComunes || "0"),
+        codUsuario: Number(datos.codUsuario || 1)
       };
-      
+
       // URL específica del API
-      const url = 'http://26.161.18.122:8080/api/piso';
+      const url = buildApiUrl('/api/piso');
       
       console.log('📡 [PisoService] URL para crear:', url);
       console.log('📤 [PisoService] JSON exacto a enviar:', JSON.stringify(datosParaEnviar, null, 2));

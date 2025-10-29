@@ -14,6 +14,7 @@ export { default as NotificationContainer } from './utils/Notification';
 export { default as PersonaForm } from './contribuyentes/PersonaForm';
 export { default as ContribuyenteForm } from './contribuyentes/ContribuyenteForm';
 export { default as ContribuyenteConsulta } from './contribuyentes/ContribuyenteConsulta';
+export { default as DeduccionBeneficio } from './contribuyentes/DeduccionBeneficio';
 export {default as SelectorDirecciones } from './modal/SelectorDirecciones';
 export {default as FormSecction }from './utils/FormSecction';
 
@@ -83,3 +84,8 @@ export { default as PorNumeroRecibo } from './caja/consultas/PorNumeroRecibo';
 
 // También exportar los tipos para uso externo
 export type { AperturaCajaData } from './caja/AperturaCaja';
+
+// Exportación de componentes de Escalas
+export { default as RegistroTIM } from './escalas/RegistroTIM';
+export { default as RegResolucionTIM } from './escalas/RegResolucionTIM';
+export { default as Vencimiento } from './escalas/Vencimiento';

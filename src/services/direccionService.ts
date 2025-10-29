@@ -35,9 +35,9 @@ export interface DireccionData {
 
 export interface CreateDireccionDTO {
   codigoSector: number;
-  codigoBarrio: number;
+  codigoBarrio?: number | null;
   codigoCalle: number;
-  cuadra?: string;
+  cuadra?: string | null;
   lado?: string;
   loteInicial?: number;
   loteFinal?: number;
@@ -45,6 +45,7 @@ export interface CreateDireccionDTO {
   codUsuario?: number;
   ruta?: number;
   zona?: number;
+  ubicacionAreaVerde?: number;
 }
 
 export interface UpdateDireccionDTO extends Partial<CreateDireccionDTO> {
@@ -124,54 +125,67 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
   /**
    * Sobrescribe el método getAll para manejar correctamente las peticiones sin autenticación
    */
+  /**
+   * Lista direcciones usando query params - NO requiere autenticación
+   * URL: GET http://26.161.18.122:8085/api/direccion/listarDireccion?parametrosBusqueda=a&codUsuario=1
+   */
   async getAll(params?: any): Promise<DireccionData[]> {
     try {
-      console.log('🔍 [DireccionService] Obteniendo todas las direcciones');
-      
+      console.log('🔍 [DireccionService] Obteniendo todas las direcciones con params:', params);
+
       // Construir URL con query parameters
       const queryParams = new URLSearchParams();
-      
-      // Agregar parámetros requeridos
+
+      // parametrosBusqueda (por defecto 'a' para traer todas)
       queryParams.append('parametrosBusqueda', params?.parametrosBusqueda || 'a');
+
+      // codUsuario siempre se envía (requerido)
       queryParams.append('codUsuario', '1');
-      
-      // Agregar otros parámetros si existen
-      if (params?.estado) {
-        queryParams.append('estado', params.estado);
-      }
-      
+
+      // Endpoint correcto: /listarDireccion
       const url = `${API_CONFIG.baseURL}${this.endpoint}/listarDireccion?${queryParams.toString()}`;
       console.log('📡 [DireccionService] GET:', url);
-      
-      // Petición directa sin autenticación
+      console.log('📋 [DireccionService] Ejemplo: http://26.161.18.122:8085/api/direccion/listarDireccion?parametrosBusqueda=a&codUsuario=1');
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Accept': 'application/json'
-          // NO incluir Authorization
-          // NO incluir Content-Type en GET
+          // NO requiere autenticación
         }
       });
-      
+
       console.log('📡 [DireccionService] Response Status:', response.status);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ [DireccionService] Error Response:', errorText);
         throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
       }
-      
+
       const responseData = await response.json();
       console.log('✅ [DireccionService] Datos recibidos:', responseData);
-      console.log('✅ [DireccionService] Primer item del array:', responseData[0]);
-      
-      // Si la respuesta es directamente un array (nueva estructura)
-      if (Array.isArray(responseData)) {
-        console.log('📊 [DireccionService] Normalizando', responseData.length, 'direcciones');
-        
-        // Normalizar los datos según la nueva estructura de la API
-        const direccionesNormalizadas = responseData.map((item: any) => ({
-          id: item.codDireccion || Date.now() + Math.random(),
+      console.log('✅ [DireccionService] Tiene success?', responseData.success);
+      console.log('✅ [DireccionService] Tiene data?', responseData.data);
+      console.log('✅ [DireccionService] Tipo de datos:', Array.isArray(responseData) ? 'Array' : typeof responseData);
+
+      // Manejar la estructura de respuesta con wrapper (success/data) - PRIMERO
+      if (responseData && typeof responseData === 'object' && responseData.success && responseData.data) {
+        const data = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+        console.log('📊 [DireccionService] Usando estructura con wrapper, normalizando', data.length, 'direcciones');
+
+        if (data.length > 0) {
+          console.log('✅ [DireccionService] Primer item del wrapper:', data[0]);
+        }
+
+        if (data.length === 0) {
+          console.log('⚠️ [DireccionService] API retornó array vacío - no hay direcciones registradas');
+          return [];
+        }
+
+        // Normalizar según la estructura del API /listarDireccion
+        const direccionesNormalizadas = data.map((item: any) => ({
+          id: item.codDireccion || 0,
           codigo: item.codDireccion || 0,
           codigoSector: item.codSector || 0,
           codigoBarrio: item.codBarrio || 0,
@@ -183,8 +197,8 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
           nombreCalle: item.nombreVia || '',
           nombreVia: item.nombreVia || '',
           nombreTipoVia: item.nombreTipoVia || '',
-          cuadra: item.cuadra?.toString() || '',
-          lado: item.codLado === 8101 ? 'PAR' : item.codLado === 8102 ? 'IMPAR' : 'NINGUNO',
+          cuadra: item.cuadra !== null && item.cuadra !== undefined ? item.cuadra.toString() : '',
+          lado: item.codLado === 8101 ? 'PAR' : item.codLado === 8102 ? 'IMPAR' : item.codLado === 8103 ? 'NINGUNO' : '',
           loteInicial: item.loteInicial || undefined,
           loteFinal: item.loteFinal || undefined,
           descripcion: item.direccionCompleta || '',
@@ -194,19 +208,65 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
           rutaNombre: item.ruta || '',
           zonaNombre: item.zona || ''
         }));
-        
-        console.log('✅ [DireccionService] Primera dirección normalizada:', direccionesNormalizadas[0]);
-        console.log('✅ [DireccionService] Campos de primera dirección:', Object.keys(direccionesNormalizadas[0]));
-        
+
+        console.log('✅ [DireccionService] Direcciones normalizadas:', direccionesNormalizadas.length);
+        if (direccionesNormalizadas.length > 0) {
+          console.log('✅ [DireccionService] Primera dirección normalizada:', direccionesNormalizadas[0]);
+        }
+
         return direccionesNormalizadas;
       }
-      
-      // Manejar la estructura de respuesta antigua (si existe)
-      if (responseData.success && responseData.data) {
-        const data = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
-        return this.normalizeData(data);
+
+      // Si la respuesta es directamente un array (sin wrapper)
+      if (Array.isArray(responseData)) {
+        console.log('✅ [DireccionService] Cantidad de registros (array directo):', responseData.length);
+
+        if (responseData.length > 0) {
+          console.log('✅ [DireccionService] Primer item del array:', responseData[0]);
+        }
+
+        if (responseData.length === 0) {
+          console.log('⚠️ [DireccionService] API retornó array vacío - no hay direcciones registradas');
+          return [];
+        }
+
+        console.log('📊 [DireccionService] Normalizando', responseData.length, 'direcciones (array directo)');
+
+        // Normalizar según la estructura del API /listarDireccion
+        const direccionesNormalizadas = responseData.map((item: any) => ({
+          id: item.codDireccion || 0,
+          codigo: item.codDireccion || 0,
+          codigoSector: item.codSector || 0,
+          codigoBarrio: item.codBarrio || 0,
+          codigoCalle: item.codVia || 0,
+          codigoTipoVia: item.codTipoVia || undefined,
+          codigoBarrioVia: item.codBarrioVia || undefined,
+          nombreSector: item.nombreSector || '',
+          nombreBarrio: item.nombreBarrio || '',
+          nombreCalle: item.nombreVia || '',
+          nombreVia: item.nombreVia || '',
+          nombreTipoVia: item.nombreTipoVia || '',
+          cuadra: item.cuadra !== null && item.cuadra !== undefined ? item.cuadra.toString() : '',
+          lado: item.codLado === 8101 ? 'PAR' : item.codLado === 8102 ? 'IMPAR' : item.codLado === 8103 ? 'NINGUNO' : '',
+          loteInicial: item.loteInicial || undefined,
+          loteFinal: item.loteFinal || undefined,
+          descripcion: item.direccionCompleta || '',
+          estado: 'ACTIVO',
+          ruta: item.codRuta || undefined,
+          zona: item.codZona || undefined,
+          rutaNombre: item.ruta || '',
+          zonaNombre: item.zona || ''
+        }));
+
+        console.log('✅ [DireccionService] Direcciones normalizadas:', direccionesNormalizadas.length);
+        if (direccionesNormalizadas.length > 0) {
+          console.log('✅ [DireccionService] Primera dirección normalizada:', direccionesNormalizadas[0]);
+        }
+
+        return direccionesNormalizadas;
       }
-      
+
+      console.log('⚠️ [DireccionService] Estructura de respuesta no reconocida, retornando array vacío');
       return [];
       
     } catch (error: any) {
@@ -302,50 +362,87 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
   
   /**
    * Crea una nueva dirección
-   * POST http://26.161.18.122:8080/api/direccion sin autenticación
+   * POST http://26.161.18.122:8085/api/direccion sin autenticación
+   * Soporta dos formatos: con barrio y sin barrio
    */
   async crearDireccion(datos: CreateDireccionDTO): Promise<DireccionData> {
     try {
       console.log('🔍 [DireccionService] Creando dirección con datos:', datos);
-      
+      console.log('🔍 [DireccionService] codigoBarrio tipo:', typeof datos.codigoBarrio, 'valor:', datos.codigoBarrio);
+      console.log('🔍 [DireccionService] codigoSector tipo:', typeof datos.codigoSector, 'valor:', datos.codigoSector);
+
       // Validaciones
-      if (!datos.codigoSector || !datos.codigoBarrio || !datos.codigoCalle) {
-        throw new Error('Debe proporcionar sector, barrio y calle');
+      if (!datos.codigoSector && !datos.codigoBarrio) {
+        throw new Error('Debe proporcionar sector o barrio');
       }
-      
+
+      if (!datos.codigoCalle) {
+        throw new Error('Debe proporcionar una calle');
+      }
+
       if (!datos.ruta) {
         throw new Error('Debe seleccionar una ruta');
       }
-      
+
       if (!datos.zona) {
         throw new Error('Debe seleccionar una zona');
       }
-      
+
       if (datos.loteInicial && datos.loteFinal) {
         if (datos.loteInicial > datos.loteFinal) {
           throw new Error('El lote inicial no puede ser mayor al lote final');
         }
       }
-      
-      // Preparar datos en formato JSON según el ejemplo proporcionado
-      const requestData = {
-        codDireccion: null,
-        codBarrioVia: datos.codigoBarrio,
-        cuadra: datos.cuadra ? parseInt(datos.cuadra) : 1,
-        codLado: datos.lado === 'PAR' ? 8101 : datos.lado === 'IMPAR' ? 8102 : 8103, // Mapear lado a código
-        loteInicial: datos.loteInicial || 1,
-        loteFinal: datos.loteFinal || 20,
-        codUsuario: datos.codUsuario || 1,
-        codZona: datos.zona || 1,
-        codRuta: datos.ruta || 1,
-        codVia: datos.codigoCalle,
-        codBarrio: datos.codigoBarrio,
-        parametroBusqueda: null
-      };
-      
+
+      // Convertir lado a código
+      const codLado = datos.lado === 'PAR' ? 8101 : datos.lado === 'IMPAR' ? 8102 : 8103;
+
+      // Determinar si tiene barrio o no
+      const tieneBarrio = datos.codigoBarrio && datos.codigoBarrio > 0;
+
+      console.log('🔍 [DireccionService] tieneBarrio:', tieneBarrio, 'condición:', datos.codigoBarrio, '>', 0);
+
+      let requestData: any;
+
+      if (tieneBarrio) {
+        // Método POST con Barrio
+        requestData = {
+          codDireccion: null,
+          codBarrioVia: datos.codigoBarrio,
+          cuadra: datos.cuadra && datos.cuadra.trim() !== '' ? parseInt(datos.cuadra) : 1,
+          codLado: codLado,
+          loteInicial: datos.loteInicial || 1,
+          loteFinal: datos.loteFinal || 20,
+          codUsuario: datos.codUsuario || 1,
+          codZona: datos.zona,
+          codRuta: datos.ruta,
+          codVia: datos.codigoCalle,
+          codBarrio: datos.codigoBarrio,
+          codUbicacionAreaVerde: datos.ubicacionAreaVerde || 1,
+          parametroBusqueda: null
+        };
+      } else {
+        // Método POST sin Barrio
+        requestData = {
+          codSector: datos.codigoSector,
+          codBarrio: null,
+          codVia: datos.codigoCalle,
+          cuadra: datos.cuadra && datos.cuadra.trim() !== '' ? parseInt(datos.cuadra) : null,
+          codLado: codLado,
+          loteInicial: datos.loteInicial || 1,
+          loteFinal: datos.loteFinal || 20,
+          codZona: datos.zona,
+          codRuta: datos.ruta,
+          codUbicacionAreaVerde: datos.ubicacionAreaVerde || 1,
+          parametroBusqueda: null,
+          codUsuario: datos.codUsuario || 1
+        };
+      }
+
       console.log('📡 [DireccionService] Enviando POST a:', `${API_CONFIG.baseURL}${this.endpoint}`);
+      console.log('📡 [DireccionService] Tipo:', tieneBarrio ? 'CON BARRIO' : 'SIN BARRIO');
       console.log('📡 [DireccionService] Datos a enviar:', requestData);
-      
+
       const response = await fetch(`${API_CONFIG.baseURL}${this.endpoint}`, {
         method: 'POST',
         headers: {
@@ -354,26 +451,33 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
         },
         body: JSON.stringify(requestData)
       });
-      
+
+      console.log('📡 [DireccionService] Response status:', response.status);
+      console.log('📡 [DireccionService] Response ok:', response.ok);
+
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('❌ [DireccionService] Error response:', errorText);
         throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
       }
-      
+
       // Try to parse response
       let responseData;
       const contentType = response.headers.get('content-type');
-      
+      console.log('📡 [DireccionService] Content-Type:', contentType);
+
       if (contentType && contentType.includes('application/json')) {
         responseData = await response.json();
+        console.log('📡 [DireccionService] Respuesta JSON parseada:', responseData);
       } else {
         // If response is not JSON, it might be a simple text or number (ID)
         const responseText = await response.text();
-        console.log('📡 [DireccionService] Respuesta no JSON:', responseText);
-        
+        console.log('📡 [DireccionService] Respuesta no JSON (texto):', responseText);
+
         // If we get a number, it's likely the ID of the created direccion
         const possibleId = parseInt(responseText);
         if (!isNaN(possibleId) && possibleId > 0) {
+          console.log('✅ [DireccionService] ID de dirección creada:', possibleId);
           // Return a basic direccion object with the new ID
           return {
             id: possibleId,
@@ -387,32 +491,77 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
             loteFinal: datos.loteFinal,
             estado: 'ACTIVO'
           } as DireccionData;
+        } else {
+          // If it's just a success message or something else
+          console.log('✅ [DireccionService] Respuesta exitosa (no numérica):', responseText);
+          return {
+            id: Date.now(),
+            codigo: Date.now(),
+            codigoSector: datos.codigoSector,
+            codigoBarrio: datos.codigoBarrio,
+            codigoCalle: datos.codigoCalle,
+            cuadra: datos.cuadra,
+            lado: datos.lado,
+            loteInicial: datos.loteInicial,
+            loteFinal: datos.loteFinal,
+            estado: 'ACTIVO'
+          } as DireccionData;
         }
       }
-      
-      console.log('📡 [DireccionService] Respuesta recibida:', responseData);
-      
+
       // Handle different response structures
       if (responseData) {
         // If response has success and data properties
         if (responseData.success && responseData.data) {
+          console.log('✅ [DireccionService] Estructura con success/data');
           const direcciones = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
-          return this.normalizeData(direcciones)[0];
+          const normalized = this.normalizeData(direcciones);
+          if (normalized && normalized.length > 0) {
+            return normalized[0];
+          }
+          console.warn('⚠️ [DireccionService] normalizeData devolvió array vacío, creando objeto manual');
         }
-        
+
         // If response is directly the data
         if (responseData.codDireccion || responseData.id) {
-          return this.normalizeData([responseData])[0];
+          console.log('✅ [DireccionService] Estructura directa con codDireccion/id');
+          const normalized = this.normalizeData([responseData]);
+          if (normalized && normalized.length > 0) {
+            return normalized[0];
+          }
+          console.warn('⚠️ [DireccionService] normalizeData devolvió array vacío, creando objeto manual');
         }
-        
+
         // If response is an array
         if (Array.isArray(responseData) && responseData.length > 0) {
-          return this.normalizeData(responseData)[0];
+          console.log('✅ [DireccionService] Estructura de array');
+          const normalized = this.normalizeData(responseData);
+          if (normalized && normalized.length > 0) {
+            return normalized[0];
+          }
+          console.warn('⚠️ [DireccionService] normalizeData devolvió array vacío, creando objeto manual');
+        }
+
+        // If response has success: true (even without data)
+        if (responseData.success === true) {
+          console.log('✅ [DireccionService] Respuesta con success: true (sin data explícita)');
+          return {
+            id: Date.now(),
+            codigo: Date.now(),
+            codigoSector: datos.codigoSector,
+            codigoBarrio: datos.codigoBarrio,
+            codigoCalle: datos.codigoCalle,
+            cuadra: datos.cuadra,
+            lado: datos.lado,
+            loteInicial: datos.loteInicial,
+            loteFinal: datos.loteFinal,
+            estado: 'ACTIVO'
+          } as DireccionData;
         }
       }
-      
+
       // If we reach here but the status was OK, assume success
-      console.log('⚠️ [DireccionService] Respuesta exitosa pero estructura no reconocida, asumiendo éxito');
+      console.log('✅ [DireccionService] Respuesta exitosa pero estructura no reconocida, asumiendo éxito');
       return {
         id: Date.now(), // Temporary ID
         codigo: Date.now(),
@@ -426,55 +575,130 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
         estado: 'ACTIVO'
       } as DireccionData;
       
-    } catch (error) {
-      console.error('Error al crear dirección:', error);
-      throw error;
+    } catch (error: any) {
+      console.error('❌ [DireccionService] Error al crear dirección:', error);
+      console.error('❌ [DireccionService] Error message:', error?.message);
+      console.error('❌ [DireccionService] Error stack:', error?.stack);
+      throw new Error(`Error al crear dirección: ${error?.message || 'Error desconocido'}`);
     }
   }
   
   /**
    * Actualiza una dirección existente
+   * PUT http://26.161.18.122:8085/api/direccion sin autenticación
+   * Soporta dos formatos: con barrio y sin barrio
    */
   async actualizarDireccion(id: number, datos: UpdateDireccionDTO): Promise<DireccionData> {
     try {
+      console.log('🔍 [DireccionService] Actualizando dirección:', id, datos);
+
       if (datos.loteInicial && datos.loteFinal) {
         if (datos.loteInicial > datos.loteFinal) {
           throw new Error('El lote inicial no puede ser mayor al lote final');
         }
       }
-      
-      // Usar FormData para PUT
-      const formData = new FormData();
-      if (datos.codigoSector) formData.append('codigoSector', datos.codigoSector.toString());
-      if (datos.codigoBarrio) formData.append('codigoBarrio', datos.codigoBarrio.toString());
-      if (datos.codigoCalle) formData.append('codigoCalle', datos.codigoCalle.toString());
-      if (datos.cuadra) formData.append('cuadra', datos.cuadra);
-      if (datos.lado) formData.append('lado', datos.lado);
-      if (datos.loteInicial) formData.append('loteInicial', datos.loteInicial.toString());
-      if (datos.loteFinal) formData.append('loteFinal', datos.loteFinal.toString());
-      if (datos.descripcion) formData.append('descripcion', datos.descripcion);
-      if (datos.estado) formData.append('estado', datos.estado);
-      formData.append('codUsuario', '1');
-      
-      const response = await fetch(`${API_CONFIG.baseURL}${this.endpoint}/${id}`, {
+
+      // Convertir lado a código
+      const codLado = datos.lado === 'PAR' ? 8101 : datos.lado === 'IMPAR' ? 8102 : 8103;
+
+      // Determinar si tiene barrio o no
+      const tieneBarrio = datos.codigoBarrio && datos.codigoBarrio > 0;
+
+      let requestData: any;
+
+      if (tieneBarrio) {
+        // Método PUT con Barrio
+        requestData = {
+          codDireccion: id,
+          codSector: null,
+          codBarrio: datos.codigoBarrio,
+          codVia: datos.codigoCalle,
+          cuadra: datos.cuadra && datos.cuadra.trim() !== '' ? parseInt(datos.cuadra) : null,
+          codLado: codLado,
+          loteInicial: datos.loteInicial || 1,
+          loteFinal: datos.loteFinal || 30,
+          codZona: datos.zona,
+          codRuta: datos.ruta,
+          codUbicacionAreaVerde: datos.ubicacionAreaVerde || 1,
+          parametroBusqueda: null,
+          codUsuario: datos.codUsuario || 1
+        };
+      } else {
+        // Método PUT sin Barrio
+        requestData = {
+          codDireccion: id,
+          codSector: datos.codigoSector,
+          codBarrio: null,
+          codVia: datos.codigoCalle,
+          cuadra: datos.cuadra && datos.cuadra.trim() !== '' ? parseInt(datos.cuadra) : null,
+          codLado: codLado,
+          loteInicial: datos.loteInicial || 1,
+          loteFinal: datos.loteFinal || 30,
+          codZona: datos.zona,
+          codRuta: datos.ruta,
+          codUbicacionAreaVerde: datos.ubicacionAreaVerde || 1,
+          parametroBusqueda: null,
+          codUsuario: datos.codUsuario || 1
+        };
+      }
+
+      console.log('📡 [DireccionService] Enviando PUT a:', `${API_CONFIG.baseURL}${this.endpoint}`);
+      console.log('📡 [DireccionService] Tipo:', tieneBarrio ? 'CON BARRIO' : 'SIN BARRIO');
+      console.log('📡 [DireccionService] Datos a enviar:', requestData);
+
+      const response = await fetch(`${API_CONFIG.baseURL}${this.endpoint}`, {
         method: 'PUT',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestData)
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
       }
-      
-      const responseData = await response.json();
-      
+
+      // Try to parse response
+      let responseData;
+      const contentType = response.headers.get('content-type');
+
+      if (contentType && contentType.includes('application/json')) {
+        responseData = await response.json();
+      } else {
+        // If response is not JSON, assume success
+        const responseText = await response.text();
+        console.log('📡 [DireccionService] Respuesta no JSON:', responseText);
+
+        return {
+          id: id,
+          codigo: id,
+          codigoSector: datos.codigoSector || 0,
+          codigoBarrio: datos.codigoBarrio || 0,
+          codigoCalle: datos.codigoCalle || 0,
+          cuadra: datos.cuadra,
+          lado: datos.lado,
+          loteInicial: datos.loteInicial,
+          loteFinal: datos.loteFinal,
+          estado: datos.estado || 'ACTIVO'
+        } as DireccionData;
+      }
+
+      console.log('📡 [DireccionService] Respuesta recibida:', responseData);
+
       if (responseData.success && responseData.data) {
         const direcciones = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
         return this.normalizeData(direcciones)[0];
       }
-      
+
+      // If response has the data directly
+      if (responseData.codDireccion || responseData.id) {
+        return this.normalizeData([responseData])[0];
+      }
+
       throw new Error('Error al actualizar la dirección');
-      
+
     } catch (error) {
       console.error('Error al actualizar dirección:', error);
       throw error;

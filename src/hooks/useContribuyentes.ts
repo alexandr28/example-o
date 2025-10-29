@@ -45,30 +45,34 @@ export const useContribuyentes = () => {
    * Convierte datos de la API al formato de lista
    */
   const convertirAListItem = (data: any): ContribuyenteListItem => {
-    // Determinar el nombres completo
-    let nombresCompleto = '';
-    
-    if (data.nombresCompleto) {
-      nombresCompleto = data.nombresCompleto;
+    // Determinar el nombre completo
+    let nombreCompleto = '';
+
+    // Prioridad: nombreCompleto > nombres (si contiene el nombre completo) > construir desde partes
+    if (data.nombreCompleto) {
+      nombreCompleto = data.nombreCompleto;
+    } else if (data.nombres && data.nombres.includes(' ')) {
+      // En API general, 'nombres' contiene el nombre completo: "Mantilla Miñano Jhonatan"
+      nombreCompleto = data.nombres;
     } else if (data.razonSocial) {
-      nombresCompleto = data.razonSocial;
+      nombreCompleto = data.razonSocial;
     } else {
-      // Construir nombres desde apellidos y nombres
+      // Construir nombre desde apellidos y nombres
       const partes = [
-        data.apellidopaterno || data.apellidopaterno,
-        data.apellidomaterno || data.apellidomaterno,
+        data.apellidoPaterno || data.apellidopaterno,
+        data.apellidoMaterno || data.apellidomaterno,
         data.nombres
       ].filter(Boolean);
-      nombresCompleto = partes.join(' ').trim() || 'Sin nombres';
+      nombreCompleto = partes.join(' ').trim() || 'Sin nombre';
     }
-    
+
     return {
       codigo: data.codigo || data.codContribuyente || data.codPersona || 0,
-      contribuyente: nombresCompleto,
-      documento: data.numerodocumento || data.numerodocumento || 'Sin documento',
+      contribuyente: nombreCompleto,
+      documento: data.numeroDocumento || data.numerodocumento || 'Sin documento',
       direccion: data.direccion === 'null' ? 'Sin dirección' : (data.direccion || 'Sin dirección'),
       telefono: data.telefono || '',
-      tipoPersona: (data.tipoPersona === '0301' || data.codTipopersona === '0301') ? 'natural' : 'juridica'
+      tipoPersona: (data.tipoPersona === '0301' || data.codTipopersona === '0301' || data.tipoContribuyente === 'NATURAL') ? 'natural' : 'juridica'
     };
   };
   
@@ -128,17 +132,12 @@ export const useContribuyentes = () => {
       
       // Construir parámetros de búsqueda para la nueva API general
       const params: any = {
-        parametroBusqueda: filtro?.busqueda || '',
+        parametroBusqueda: filtro?.busqueda || 'a',
         codUsuario: 1
       };
-      
-      // Si no hay filtros específicos, obtener todos los contribuyentes
-      if (!filtro || (!filtro.busqueda && !filtro.tipoContribuyente && !filtro.tipoDocumento)) {
-        resultados = await contribuyenteService.obtenerTodosContribuyentes();
-      } else {
-        // Usar la nueva API general con parámetro de búsqueda
-        resultados = await contribuyenteService.buscarContribuyentes(params);
-      }
+
+      // Usar la nueva API general con parámetro de búsqueda
+      resultados = await contribuyenteService.buscarContribuyentes(params);
       
       // Convertir y establecer resultados
       const listaFormateada = resultados.map(convertirAListItem);
@@ -432,7 +431,7 @@ export const useContribuyentes = () => {
       const itemLista: ContribuyenteListItem = {
         codigo: codTipoContribuyenteDetalle || codPersonaDetalle || 0,
         contribuyente: nombresCompleto,
-        documento: detalle.numerodocumento || detalle.numerodocumento || 'Sin documento',
+        documento: detalle.numerodocumento || 'Sin documento',
         direccion: detalle.direccion || 'Sin dirección',
         telefono: detalle.telefono || '',
         tipoPersona: detalle.codTipopersona === '0301' ? 'natural' : 'juridica'

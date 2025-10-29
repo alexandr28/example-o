@@ -32,7 +32,8 @@ import {
   LocationOn as LocationIcon,
   Layers as LayersIcon,
   AttachMoney as MoneyIcon,
-  TrendingUp as TrendingUpIcon
+  TrendingUp as TrendingUpIcon,
+  Clear as ClearIcon
 } from '@mui/icons-material';
 import { usePisos } from '../../../hooks/usePisos';
 import SelectorPredios from './SelectorPredios';
@@ -90,12 +91,12 @@ const ConsultaPisos: React.FC = () => {
         return String(valor).trim().replace(/\s+/g, '');
       };
       
-      // El API requiere TODOS los parámetros - proporcionar valores por defecto
+      // El API requiere TODOS los parámetros - permitir vacíos para búsqueda amplia
       const parametros = {
-        codPiso: filtros.codPiso ? parseInt(limpiarParametro(filtros.codPiso)) : 1,
         anio: filtros.anio || new Date().getFullYear(),
-        codPredio: limpiarParametro(filtros.codPredio || (predio?.codPredio || predio?.codigoPredio) || '20231'),
-        numeroPiso: filtros.numeroPiso ? parseInt(limpiarParametro(filtros.numeroPiso)) : 1
+        codPiso: filtros.codPiso ? parseInt(limpiarParametro(filtros.codPiso)) : undefined,
+        codPredio: filtros.codPredio ? limpiarParametro(filtros.codPredio) : (predio?.codPredio || predio?.codigoPredio || ''),
+        numeroPiso: filtros.numeroPiso ? parseInt(limpiarParametro(filtros.numeroPiso)) : undefined
       };
       
       console.log('📡 [ConsultaPisos] Parámetros enviados al API:', parametros);
@@ -103,19 +104,22 @@ const ConsultaPisos: React.FC = () => {
       const pisosEncontrados = await consultarPisos(parametros);
       
       console.log('✅ [ConsultaPisos] Pisos encontrados:', pisosEncontrados.length);
-      
-      // Convertir a formato de tabla
+      console.log('📋 [ConsultaPisos] Datos recibidos:', pisosEncontrados);
+
+      // Convertir a formato de tabla - usar ?? para manejar null correctamente
       const pisosFormateados: Piso[] = pisosEncontrados.map((piso, index) => ({
-        id: piso.id || piso.codPiso || index + 1,
+        id: piso.id ?? piso.codPiso ?? index + 1,
         item: index + 1,
-        descripcion: `Piso ${piso.numeroPiso || index + 1}`,
-        valorUnitario: piso.valorUnitario || 0,
-        incremento: piso.incremento || 0,
-        porcentajeDepreciacion: piso.depreciacion || 0,
-        valorUnicoDepreciado: piso.valorUnitarioDepreciado || 0,
-        valorAreaConstruida: piso.valorAreaConstruida || 0
+        descripcion: piso.numeroPisoDesc || `Piso ${piso.numeroPiso ?? index + 1}`,
+        valorUnitario: piso.valorUnitario ?? 0,
+        incremento: piso.incremento ?? 0,
+        porcentajeDepreciacion: piso.depreciacion ?? 0,
+        valorUnicoDepreciado: piso.valorUnitarioDepreciado ?? 0,
+        valorAreaConstruida: piso.valorAreaConstruida ?? 0
       }));
-      
+
+      console.log('📊 [ConsultaPisos] Pisos formateados para tabla:', pisosFormateados);
+
       setPisos(pisosFormateados);
       setPisosData(pisosEncontrados);
       
@@ -225,6 +229,19 @@ const ConsultaPisos: React.FC = () => {
     }));
     setPisos([]);
     setPisosData([]);
+  };
+
+  // Limpiar filtros
+  const handleLimpiar = () => {
+    setFiltros({
+      codPiso: '',
+      anio: new Date().getFullYear(),
+      codPredio: '',
+      numeroPiso: ''
+    });
+    setPisos([]);
+    setPisosData([]);
+    setPredio(null);
   };
 
   // Editar piso
@@ -422,10 +439,10 @@ const ConsultaPisos: React.FC = () => {
           </Box>
           
           {/* Formulario de Búsqueda con mejor layout */}
-          <Box sx={{ 
-            display: 'flex', 
+          <Box sx={{
+            display: 'flex',
             flexDirection: { xs: 'column', md: 'row' },
-            gap: 2, 
+            gap: 2,
             alignItems: { xs: 'stretch', md: 'flex-end' },
             mb: 3,
             p: 2,
@@ -433,91 +450,8 @@ const ConsultaPisos: React.FC = () => {
             borderRadius: 2,
             border: `1px solid ${alpha(theme.palette.divider, 0.3)}`
           }}>
-            {/* Botón Seleccionar Predio */}
-            <Box sx={{ 
-              flex: { xs: '1 1 100%', md: '0 0 130px' },
-              minWidth: { xs: '100%', md: '130px' }
-            }}>
-              <Button
-                fullWidth
-                variant="outlined"
-                onClick={() => setShowSelectorPredios(true)}
-                startIcon={<DomainIcon />}
-                sx={{ 
-                  height: 40,
-                  borderRadius: 2,
-                  borderWidth: 2,
-                  '&:hover': {
-                    borderWidth: 2,
-                    bgcolor: alpha(theme.palette.primary.main, 0.04)
-                  }
-                }}
-              >
-                Seleccionar
-              </Button>
-            </Box>
-            
-            {/* Código de Predio */}
-            <Box sx={{ 
-              flex: { xs: '0 0 100%', md: '0 0 110px' },
-              minWidth: { xs: '100%', md: '100px' }
-            }}>
-              <TextField
-                fullWidth
-                label="Código de predio"
-                value={predio?.codPredio || predio?.codigoPredio || ''}
-                placeholder=""
-                size="small"
-                InputProps={{
-                  readOnly: true,
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <HomeIcon color="action" />
-                    </InputAdornment>
-                  )
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    bgcolor: alpha(theme.palette.grey[100], 0.5)
-                  }
-                }}
-              />
-            </Box>
-            
-            {/* Dirección */}
-            <Box sx={{ 
-              flex: { xs: '1 1 100%', md: '1 1 300px' },
-              minWidth: { xs: '100%', md: '300px' }
-            }}>
-              <TextField
-                fullWidth
-                label="Dirección predial"
-                value={predio?.direccion || ''}
-                placeholder="Dirección del predio seleccionado"
-                size="small"
-                InputProps={{
-                  readOnly: true,
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <LocationIcon color="action" />
-                    </InputAdornment>
-                  )
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    bgcolor: alpha(theme.palette.grey[100], 0.5)
-                  }
-                }}
-              />
-            </Box>
-            
-            {/* Selector Año */}
-            <Box sx={{ 
-              flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '0 0 120px' },
-              minWidth: { xs: '100%', md: '120px' }
-            }}>
+            {/* Año */}
+            <Box sx={{ flex: '0 0 100px' }}>
               <TextField
                 fullWidth
                 size="small"
@@ -526,27 +460,67 @@ const ConsultaPisos: React.FC = () => {
                 value={filtros.anio || ''}
                 onChange={(e) => setFiltros(prev => ({ ...prev, anio: parseInt(e.target.value) || new Date().getFullYear() }))}
                 InputProps={{
-                  inputProps: { 
-                    min: 1900, 
-                    max: new Date().getFullYear() 
+                  inputProps: {
+                    min: 1900,
+                    max: new Date().getFullYear()
                   }
                 }}
               />
             </Box>
-            
-            {/* Botón Buscar */}
-            <Box sx={{ 
-              flex: { xs: '0 0 100%', md: '0 0 100px' },
-              minWidth: { xs: '100%', md: '100px' }
-            }}>
-              <Button
+
+            {/* Código Piso */}
+            <Box sx={{ flex: '0 0 100px' }}>
+              <TextField
                 fullWidth
+                size="small"
+                label="Código Piso"
+                value={filtros.codPiso}
+                onChange={(e) => setFiltros(prev => ({ ...prev, codPiso: e.target.value }))}
+                placeholder="Opcional"
+              />
+            </Box>
+
+            {/* Código Predio */}
+            <Box sx={{ flex: '0 0 120px' }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Código Predio"
+                value={filtros.codPredio}
+                onChange={(e) => setFiltros(prev => ({ ...prev, codPredio: e.target.value }))}
+                placeholder="Ej: 20255"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <HomeIcon sx={{ fontSize: 18 }} />
+                    </InputAdornment>
+                  )
+                }}
+              />
+            </Box>
+
+            {/* Número Piso */}
+            <Box sx={{ flex: '0 0 100px' }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Número Piso"
+                value={filtros.numeroPiso}
+                onChange={(e) => setFiltros(prev => ({ ...prev, numeroPiso: e.target.value }))}
+                placeholder="Opcional"
+              />
+            </Box>
+
+            {/* Botón Buscar */}
+            <Box sx={{ flex: '0 0 auto' }}>
+              <Button
                 variant="contained"
                 onClick={handleBuscar}
                 disabled={loading}
                 startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SearchIcon />}
-                sx={{ 
+                sx={{
                   height: 40,
+                  minWidth: 100,
                   borderRadius: 2,
                   fontWeight: 600,
                   boxShadow: theme.shadows[2],
@@ -556,6 +530,21 @@ const ConsultaPisos: React.FC = () => {
                 }}
               >
                 {loading ? 'Buscando...' : 'Buscar'}
+              </Button>
+            </Box>
+
+            {/* Botón Limpiar */}
+            <Box sx={{ flex: '0 0 auto' }}>
+              <Button
+                variant="outlined"
+                onClick={handleLimpiar}
+                startIcon={<ClearIcon />}
+                sx={{
+                  height: 40,
+                  minWidth: 100
+                }}
+              >
+                Limpiar
               </Button>
             </Box>
           </Box>

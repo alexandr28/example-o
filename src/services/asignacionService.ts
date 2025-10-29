@@ -46,7 +46,7 @@ class AsignacionService {
   private baseURL: string;
 
   constructor() {
-    this.baseURL = 'http://26.161.18.122:8080/api/asignacionpredio';
+    this.baseURL = 'http://26.161.18.122:8085/api/asignacionpredio';
   }
 
   /**
@@ -166,7 +166,7 @@ class AsignacionService {
 
   /**
    * Crear una nueva asignación de predio
-   * POST http://26.161.18.122:8080/api/asignacionpredio
+   * POST http://26.161.18.122:8085/api/asignacionpredio (sin autenticación)
    * @param datos - Datos de la asignación a crear
    * @returns Promise con la asignación creada
    */
@@ -204,9 +204,13 @@ class AsignacionService {
         throw new Error(`Error ${response.status}: ${response.statusText} - ${errorText}`);
       }
       
-      const responseData = await response.json();
-      console.log('✅ [AsignacionService] Asignación creada exitosamente:', responseData);
-      
+      const responseJson = await response.json();
+      console.log('✅ [AsignacionService] Respuesta completa del API:', responseJson);
+
+      // Extraer datos del wrapper si existe
+      const responseData = responseJson.data || responseJson;
+      console.log('✅ [AsignacionService] Datos de asignación extraídos:', responseData);
+
       // Normalizar los datos de respuesta
       const asignacionNormalizada: AsignacionPredio = {
         id: responseData.codAsignacion || responseData.id || Math.floor(Math.random() * 10000),

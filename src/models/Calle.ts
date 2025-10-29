@@ -36,7 +36,7 @@ export interface Calle {
 export interface CalleFormData {
   tipoVia: number;
   codSector: number;
-  codBarrio: number;
+  codBarrio?: number | null;
   nombreCalle: string;
 }
 

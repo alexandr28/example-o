@@ -231,19 +231,20 @@ class ConstanteService {
       
       const responseData: ConstanteResponse = await response.json();
       console.log(`📡 [ConstanteService] Respuesta recibida:`, responseData);
-      
+
       // El API devuelve un array directo según el JSON ejemplo
       let data: ConstanteData[] = [];
-      
+
       if (Array.isArray(responseData)) {
         data = responseData;
       } else if (responseData.success && Array.isArray(responseData.data)) {
         data = responseData.data;
       } else if (typeof responseData === 'object' && responseData) {
         // Manejar JSON simple como en el ejemplo
+        const rawData = responseData as any;
         data = [{
-          codConstante: responseData.codConstante || '',
-          nombreCategoria: responseData.nombreCategoria || ''
+          codConstante: rawData.codConstante || '',
+          nombreCategoria: rawData.nombreCategoria || ''
         }];
       }
       
@@ -293,19 +294,20 @@ class ConstanteService {
       
       const responseData: ConstanteResponse = await response.json();
       console.log(`📡 [ConstanteService] Respuesta hijo recibida:`, responseData);
-      
+
       // El API devuelve un array directo según el JSON ejemplo
       let data: ConstanteData[] = [];
-      
+
       if (Array.isArray(responseData)) {
         data = responseData;
       } else if (responseData.success && Array.isArray(responseData.data)) {
         data = responseData.data;
       } else if (typeof responseData === 'object' && responseData) {
         // Manejar JSON simple como en el ejemplo
+        const rawData = responseData as any;
         data = [{
-          codConstante: responseData.codConstante || '',
-          nombreCategoria: responseData.nombreCategoria || ''
+          codConstante: rawData.codConstante || '',
+          nombreCategoria: rawData.nombreCategoria || ''
         }];
       }
       
@@ -1902,7 +1904,7 @@ class ConstanteService {
 
   /**
    * Obtiene lista de ubicaciones de área verde
-   * API GET: http://26.161.18.122:8085/api/constante/listarUbicacionAreaVerd
+   * API GET: http://26.161.18.122:8085/api/constante/listarUbicacionAreaVerde
    */
   async listarUbicacionAreaVerde(): Promise<UbicacionAreaVerdeData[]> {
     try {
@@ -1915,10 +1917,10 @@ class ConstanteService {
           abreviatura: item.codConstante || ''
         }));
       }
-      
+
       console.log('🔍 [ConstanteService] Obteniendo ubicaciones de área verde');
-      
-      const url = `http://26.161.18.122:8085/api/constante/listarUbicacionAreaVerd`;
+
+      const url = `http://26.161.18.122:8085/api/constante/listarUbicacionAreaVerde`;
       
       const response = await fetch(url, {
         method: 'GET',

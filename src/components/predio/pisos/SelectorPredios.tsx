@@ -98,11 +98,11 @@ const SelectorPredios: React.FC<SelectorPrediosProps> = ({
   onSelect
 }) => {
   const theme = useTheme();
-  const { 
-    predios, 
-    loading, 
-    cargarPredios, 
-    buscarPredios
+  const {
+    predios,
+    loading,
+    cargarTodosPredios,
+    buscarPrediosConFiltros
   } = usePredios();
 
   // Estados locales
@@ -113,16 +113,20 @@ const SelectorPredios: React.FC<SelectorPrediosProps> = ({
   const [filtros, setFiltros] = useState({
     codigoPredio: '',
     anio: new Date().getFullYear(),
+    codPredioBase: '',
+    parametroBusqueda: '',
     estadoPredio: '',
     condicionPropiedad: ''
   });
 
-  // Cargar predios cuando se abre el modal
+  // Cargar predios cuando se abre el modal usando la API correcta
   useEffect(() => {
     if (open) {
-      cargarPredios();
+      console.log('🔓 [SelectorPredios] Modal abierto, cargando todos los predios desde /all');
+      cargarTodosPredios();
     }
-  }, [open, cargarPredios]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Filtrar predios localmente
   const filteredPredios = useMemo(() => {
@@ -155,18 +159,25 @@ const SelectorPredios: React.FC<SelectorPrediosProps> = ({
   };
 
   const handleBuscar = () => {
-    buscarPredios(filtros);
+    // Usar la nueva API con query params
+    buscarPrediosConFiltros(
+      filtros.anio || undefined,
+      filtros.codPredioBase || undefined,
+      filtros.parametroBusqueda || undefined
+    );
   };
 
   const handleLimpiarFiltros = () => {
     setFiltros({
       codigoPredio: '',
       anio: new Date().getFullYear(),
+      codPredioBase: '',
+      parametroBusqueda: '',
       estadoPredio: '',
       condicionPropiedad: ''
     });
     setSearchTerm('');
-    cargarPredios();
+    cargarTodosPredios();
   };
 
   const getEstadoChip = (estado?: string) => {
@@ -352,7 +363,7 @@ const SelectorPredios: React.FC<SelectorPrediosProps> = ({
               <Button
                 variant="outlined"
                 startIcon={<RefreshIcon />}
-                onClick={cargarPredios}
+                onClick={() => cargarTodosPredios()}
                 disabled={loading}
                 size="small"
               >

@@ -20,6 +20,7 @@ import {
   Search as SearchIcon,
   Save as SaveIcon
 } from '@mui/icons-material';
+import { useParquesJardines } from '../../hooks/useParquesJardines';
 
 interface UbicacionOption {
   id: number;
@@ -42,21 +43,30 @@ interface TasaMensualData {
 }
 
 const ParquesJardines: React.FC = () => {
+  // Hook de parques y jardines
+  const {
+    parquesJardines,
+    loading: loadingParques,
+    listarParquesJardines,
+    crearParquesJardines,
+    actualizarParquesJardines
+  } = useParquesJardines();
+
   // Estados para Registro de Tasas
   const [anioRegistro, setAnioRegistro] = useState<string>(new Date().getFullYear().toString());
   const [ubicacion, setUbicacion] = useState<UbicacionOption | null>(null);
   const [ruta, setRuta] = useState<RutaOption | null>(null);
   const [tasaNueva, setTasaNueva] = useState<string>('');
-  
+
   // Estado para formData y errors
   const [formData, setFormData] = useState<{ anio: number | '' }>({
     anio: new Date().getFullYear()
   });
   const [errors, setErrors] = useState<{ anio?: string }>({});
-  
+
   // Estados para Consulta de Tasas
   const [anioConsulta, setAnioConsulta] = useState<string>(new Date().getFullYear().toString());
-  
+
   // Estados para loading y datos de tabla
   const [isLoading, setIsLoading] = useState(false);
   const [mostrarTabla, setMostrarTabla] = useState(false);
@@ -78,45 +88,87 @@ const ParquesJardines: React.FC = () => {
     { id: 6, label: 'Ruta 06 ' },
   ];
 
-  // Datos de ejemplo para la tabla de tasas mensuales
-  const datosTasasMensuales: TasaMensualData[] = [
-    {
-      ubicacion: 'Frente a Parque',
-      ruta1: 15.50,
-      ruta2: 18.75,
-      ruta3: 22.30,
-      ruta4: 16.80,
-      ruta5: 19.25,
-      ruta6: 21.40
-    },
-    {
-      ubicacion: 'Frente a área verdes',
-      ruta1: 12.30,
-      ruta2: 14.60,
-      ruta3: 17.85,
-      ruta4: 13.90,
-      ruta5: 15.75,
-      ruta6: 18.20
-    },
-    {
-      ubicacion: 'Cerca de área verde',
-      ruta1: 8.75,
-      ruta2: 10.40,
-      ruta3: 12.60,
-      ruta4: 9.85,
-      ruta5: 11.30,
-      ruta6: 13.15
-    },
-    {
-      ubicacion: 'Lejos de áreas verdes',
-      ruta1: 5.50,
-      ruta2: 6.80,
-      ruta3: 8.20,
-      ruta4: 6.15,
-      ruta5: 7.45,
-      ruta6: 8.95
+  // Transformar datos del hook al formato de la tabla
+  const datosTasasMensuales: TasaMensualData[] = React.useMemo(() => {
+    console.log('[ParquesJardines] Transformando datos, total registros:', parquesJardines.length);
+
+    if (parquesJardines.length > 0) {
+      console.log('[ParquesJardines] Ejemplo de registro:', parquesJardines[0]);
     }
-  ];
+
+    // Obtener todas las ubicaciones únicas del API
+    const ubicacionesUnicas = [...new Set(
+      parquesJardines
+        .map(pj => pj.ubicacionAreaVerde)
+        .filter((ub): ub is string => ub !== null && ub !== undefined && ub.trim() !== '')
+    )];
+
+    console.log('[ParquesJardines] Ubicaciones únicas encontradas:', ubicacionesUnicas);
+
+    // Si no hay datos, usar las ubicaciones hardcodeadas para mostrar la estructura vacía
+    const ubicacionesAMostrar: string[] = ubicacionesUnicas.length > 0
+      ? ubicacionesUnicas
+      : ubicaciones.map(u => u.label);
+
+    return ubicacionesAMostrar.map(ubicacionNombre => {
+      // Para cada ubicación, buscar las tasas de cada ruta
+      const fila: TasaMensualData = {
+        ubicacion: ubicacionNombre,
+        ruta1: '',
+        ruta2: '',
+        ruta3: '',
+        ruta4: '',
+        ruta5: '',
+        ruta6: ''
+      };
+
+      // Buscar todos los registros de esta ubicación - comparar por nombre normalizado
+      const registrosUbicacion = parquesJardines.filter(pj => {
+        const ubicacionAPI = (pj.ubicacionAreaVerde || '').toLowerCase().trim();
+        const ubicacionLocal = ubicacionNombre.toLowerCase().trim();
+        return ubicacionAPI === ubicacionLocal;
+      });
+
+      console.log(`[ParquesJardines] ${ubicacionNombre}: encontrados ${registrosUbicacion.length} registros`);
+      if (registrosUbicacion.length > 0) {
+        console.log(`[ParquesJardines] Registros para ${ubicacionNombre}:`, registrosUbicacion);
+      }
+
+      // Mapear cada registro a la ruta correspondiente - comparar por nombre de ruta
+      registrosUbicacion.forEach(registro => {
+        const tasa = registro.tasaMensual;
+        const nombreRuta = (registro.nombreRuta || '').toUpperCase().trim();
+
+        console.log(`[ParquesJardines] Procesando: ubicacion=${registro.ubicacionAreaVerde}, ruta=${nombreRuta}, tasa=${tasa}`);
+
+        // Extraer el número de la ruta desde el nombre (ej: "RUTA 1" -> 1)
+        const match = nombreRuta.match(/RUTA\s*(\d+)/);
+        if (match) {
+          const numeroRuta = parseInt(match[1]);
+          console.log(`[ParquesJardines] Número de ruta extraído: ${numeroRuta}`);
+
+          if (numeroRuta === 1) {
+            fila.ruta1 = tasa;
+          } else if (numeroRuta === 2) {
+            fila.ruta2 = tasa;
+          } else if (numeroRuta === 3) {
+            fila.ruta3 = tasa;
+          } else if (numeroRuta === 4) {
+            fila.ruta4 = tasa;
+          } else if (numeroRuta === 5) {
+            fila.ruta5 = tasa;
+          } else if (numeroRuta === 6) {
+            fila.ruta6 = tasa;
+          }
+        } else {
+          console.log(`[ParquesJardines] ⚠️ No se pudo extraer número de ruta de: "${nombreRuta}"`);
+        }
+      });
+
+      console.log(`[ParquesJardines] Fila resultante para ${ubicacionNombre}:`, fila);
+      return fila;
+    });
+  }, [parquesJardines]);
 
   // Handler para cambio de año
   const handleAnioChange = (year: number | '') => {
@@ -151,14 +203,47 @@ const ParquesJardines: React.FC = () => {
   };
 
   // Handlers para Registro
-  const handleRegistroTasa = () => {
-    console.log('Registrar Tasa:', {
-      anio: formData.anio,
-      ubicacion,
-      ruta,
-      tasaNueva
-    });
-    // Aquí iría la lógica para registrar la tasa
+  const handleRegistroTasa = async () => {
+    if (!formData.anio || !ubicacion || !ruta || !tasaNueva) {
+      console.warn('[ParquesJardines] Faltan datos requeridos');
+      return;
+    }
+
+    try {
+      const datos = {
+        anio: Number(formData.anio),
+        codRuta: ruta.id,
+        codUbicacion: ubicacion.id,
+        tasaMensual: parseFloat(tasaNueva)
+      };
+
+      console.log('[ParquesJardines] Registrando tasa con datos:', datos);
+
+      // Verificar si ya existe un registro con esa combinación
+      const existente = parquesJardines.find(
+        pj => pj.anio === datos.anio &&
+              pj.codRuta === datos.codRuta &&
+              pj.codUbicacion === datos.codUbicacion
+      );
+
+      if (existente) {
+        console.log('[ParquesJardines] Actualizando registro existente');
+        await actualizarParquesJardines(datos);
+      } else {
+        console.log('[ParquesJardines] Creando nuevo registro');
+        await crearParquesJardines(datos);
+      }
+
+      // Limpiar formulario
+      handleNuevo();
+
+      // Recargar datos
+      await listarParquesJardines({ anio: datos.anio });
+      setMostrarTabla(true);
+
+    } catch (error) {
+      console.error('[ParquesJardines] Error registrando tasa:', error);
+    }
   };
 
   const handleNuevo = () => {
@@ -171,15 +256,17 @@ const ParquesJardines: React.FC = () => {
   };
 
   // Handler para Consulta
-  const handleBuscar = () => {
-    console.log('Buscar tasas del año:', anioConsulta);
-    setIsLoading(true);
-    
-    // Simular carga de datos
-    setTimeout(() => {
+  const handleBuscar = async () => {
+    try {
+      setIsLoading(true);
+      console.log('[ParquesJardines] Buscando tasas del año:', anioConsulta);
+      await listarParquesJardines({ anio: parseInt(anioConsulta) });
       setMostrarTabla(true);
+    } catch (error) {
+      console.error('[ParquesJardines] Error buscando tasas:', error);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -229,34 +316,18 @@ const ParquesJardines: React.FC = () => {
             }}
             error={!!errors.anio}
             helperText={errors.anio}
-            sx={{ 
+            sx={{
               width: '120px' ,
               '& .MuiInputBase-root': {
                 height: '37px'
               }
             }}
             InputProps={{
-              inputProps: { 
-                min: 1900, 
-                max: new Date().getFullYear() 
+              inputProps: {
+                min: 1900,
+                max: new Date().getFullYear()
               }
             }}
-          />
-        {/* seleccionar ubicacion*/}
-          <Autocomplete
-            value={ubicacion}
-            onChange={(_, newValue) => setUbicacion(newValue)}
-            options={ubicaciones}
-            getOptionLabel={(option) => option.label}
-            size="small"
-            sx={{ minWidth: 190, flex: 0 }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Ubicación"
-                placeholder="Seleccione ubicación"
-              />
-            )}
           />
         {/* seleccionar ruta*/}
           <Autocomplete
@@ -271,6 +342,22 @@ const ParquesJardines: React.FC = () => {
                 {...params}
                 label="Ruta"
                 placeholder="Seleccione ruta"
+              />
+            )}
+          />
+        {/* seleccionar ubicacion*/}
+          <Autocomplete
+            value={ubicacion}
+            onChange={(_, newValue) => setUbicacion(newValue)}
+            options={ubicaciones}
+            getOptionLabel={(option) => option.label}
+            size="small"
+            sx={{ minWidth: 190, flex: 0 }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Ubicación"
+                placeholder="Seleccione ubicación"
               />
             )}
           />
@@ -386,18 +473,15 @@ const ParquesJardines: React.FC = () => {
             size="small"
             label="Año"
             type="number"
-            value={formData.anio || ''}
+            value={anioConsulta || ''}
             onChange={(e) => {
-              const newYear = parseInt(e.target.value) || '';
-              handleAnioChange(newYear);
+              setAnioConsulta(e.target.value);
             }}
-            error={!!errors.anio}
-            helperText={errors.anio}
             sx={{ width: '120px' }}
             InputProps={{
-              inputProps: { 
-                min: 1900, 
-                max: new Date().getFullYear() 
+              inputProps: {
+                min: 1900,
+                max: new Date().getFullYear()
               }
             }}
           />
@@ -523,19 +607,12 @@ const ParquesJardines: React.FC = () => {
                 </TableHead>
                 <TableBody>
                   {datosTasasMensuales.map((fila, index) => (
-                    <TableRow 
+                    <TableRow
                       key={index}
-                      sx={{ 
-                        '&:nth-of-type(even)': { 
-                          backgroundColor: 'grey.50' 
-                        },
-                        '&:hover': {
-                          backgroundColor: 'primary.light',
-                          transform: 'scale(1.005)',
-                          transition: 'all 0.2s ease-in-out',
-                          boxShadow: 1
-                        },
-                        transition: 'all 0.2s ease-in-out'
+                      sx={{
+                        '&:nth-of-type(even)': {
+                          backgroundColor: 'grey.50'
+                        }
                       }}
                     >
                       <TableCell 
@@ -553,52 +630,71 @@ const ParquesJardines: React.FC = () => {
                       {[fila.ruta1, fila.ruta2, fila.ruta3, fila.ruta4, fila.ruta5, fila.ruta6].map((tasa, rutaIndex) => (
                         <TableCell 
                           key={rutaIndex}
-                          sx={{ 
+                          sx={{
                             textAlign: 'center',
                             fontSize: '0.9rem',
                             fontWeight: 500,
                             borderRight: rutaIndex < 5 ? '1px solid' : 'none',
                             borderColor: 'divider',
                             py: 2,
-                            color: tasa ? 'success.main' : 'text.secondary',
-                            cursor: tasa ? 'pointer' : 'default'
+                            color: typeof tasa === 'number' ? 'success.main' : 'text.secondary',
+                            cursor: typeof tasa === 'number' ? 'pointer' : 'default'
                           }}
                         >
-                          {tasa ? (
-                            <Tooltip 
+                          {typeof tasa === 'number' ? (
+                            <Tooltip
                               title={`Clic para editar: ${fila.ubicacion} - Ruta ${rutaIndex + 1}`}
                               arrow
                               placement="top"
                             >
-                              <Box 
+                              <Box
                                 onClick={() => handleTasaClick(fila.ubicacion, rutaIndex, tasa)}
                                 sx={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: 0.5,
                                   backgroundColor: 'success.light',
                                   color: 'success.contrastText',
-                                  px: 1.5,
-                                  py: 0.5,
+                                  px: 2,
+                                  py: 1,
                                   borderRadius: 1,
                                   fontWeight: 600,
                                   fontSize: '0.875rem',
                                   cursor: 'pointer',
                                   transition: 'all 0.2s ease-in-out',
+                                  width: '100%',
+                                  minHeight: '60px',
                                   '&:hover': {
                                     backgroundColor: 'success.main',
-                                    transform: 'scale(1.05)',
+                                    transform: 'scale(1.02)',
                                     boxShadow: 2
                                   },
                                   '&:active': {
-                                    transform: 'scale(0.95)'
+                                    transform: 'scale(0.98)'
                                   }
                                 }}
                               >
-                                S/ {tasa.toFixed(2)}
+                                <Box>Mensual: S/ {tasa.toFixed(2)}</Box>
+                                <Box sx={{
+                                  fontSize: '0.75rem',
+                                  fontWeight: 500,
+                                  opacity: 0.9,
+                                  borderTop: '1px solid rgba(255,255,255,0.3)',
+                                  pt: 0.3,
+                                  width: '100%',
+                                  textAlign: 'center'
+                                }}>
+                                  Anual: S/ {(tasa * 12).toFixed(2)}
+                                </Box>
                               </Box>
                             </Tooltip>
                           ) : (
                             <Box sx={{
                               color: 'text.secondary',
-                              fontStyle: 'italic'
+                              fontStyle: 'italic',
+                              py: 2
                             }}>
                               No aplica
                             </Box>

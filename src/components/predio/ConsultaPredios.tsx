@@ -90,12 +90,13 @@ const formatDireccion = (direccion: string | Direccion | null | undefined): stri
 const ConsultaPredios: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const { 
-    predios, 
-    loading, 
-    cargarPredios, 
+  const {
+    predios,
+    loading,
+    cargarPredios,
     cargarTodosPredios,
     buscarPredios,
+    buscarPrediosConFiltros,
     cargarEstadisticas
   } = usePredios();
 
@@ -106,6 +107,8 @@ const ConsultaPredios: React.FC = () => {
   const [filtros, setFiltros] = useState({
     codigoPredio: '',
     anio: new Date().getFullYear(),
+    codPredioBase: '',
+    parametroBusqueda: '',
     estadoPredio: '',
     condicionPropiedad: ''
   });
@@ -155,13 +158,30 @@ const ConsultaPredios: React.FC = () => {
   };
 
   const handleBuscar = () => {
-    buscarPredios(filtros);
+    // Si hay filtros nuevos (codPredioBase o parametroBusqueda), usar la nueva API
+    if (filtros.codPredioBase || filtros.parametroBusqueda !== undefined) {
+      buscarPrediosConFiltros(
+        filtros.anio || undefined,
+        filtros.codPredioBase || undefined,
+        filtros.parametroBusqueda
+      );
+    } else {
+      // Usar método legacy si solo hay filtros antiguos
+      buscarPredios({
+        codigoPredio: filtros.codigoPredio,
+        anio: filtros.anio,
+        estadoPredio: filtros.estadoPredio,
+        condicionPropiedad: filtros.condicionPropiedad
+      });
+    }
   };
 
   const handleLimpiarFiltros = () => {
     setFiltros({
       codigoPredio: '',
       anio: new Date().getFullYear(),
+      codPredioBase: '',
+      parametroBusqueda: '',
       estadoPredio: '',
       condicionPropiedad: ''
     });
@@ -193,58 +213,15 @@ const ConsultaPredios: React.FC = () => {
 
       {/* Barra de búsqueda y filtros */}
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Box sx={{ 
-          display: 'flex', 
+        <Box sx={{
+          display: 'flex',
           flexDirection: { xs: 'column', md: 'row' },
-          gap: 2, 
+          gap: 2,
           alignItems: { xs: 'stretch', md: 'center' },
           flexWrap: 'wrap'
         }}>
-          {/* Campo de búsqueda principal */}
-          <Box sx={{ 
-            flex: { xs: '1 1 100%', md: '1 1 300px' },
-            minWidth: { xs: '100%', md: '300px' },
-            maxWidth: { xs: '100%', md: '400px' }
-          }}>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="Buscar por código, dirección, conductor..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-                endAdornment: searchTerm && (
-                  <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setSearchTerm('')}>
-                      <ClearIcon />
-                    </IconButton>
-                  </InputAdornment>
-                )
-              }}
-            />
-          </Box>
-          
-          {/* Código Predio */}
-          <Box sx={{ 
-            flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '0 0 150px' },
-            minWidth: { xs: '100%', md: '150px' }
-          }}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Código Predio"
-              value={filtros.codigoPredio}
-              onChange={(e) => setFiltros({ ...filtros, codigoPredio: e.target.value })}
-            />
-          </Box>
-          
           {/* Año */}
-          <Box sx={{ 
+          <Box sx={{
             flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '0 0 120px' },
             minWidth: { xs: '100%', md: '120px' }
           }}>
@@ -256,11 +233,39 @@ const ConsultaPredios: React.FC = () => {
               value={filtros.anio}
               onChange={(e) => setFiltros({ ...filtros, anio: parseInt(e.target.value) })}
               InputProps={{
-                inputProps: { 
-                  min: 1900, 
-                  max: new Date().getFullYear() 
+                inputProps: {
+                  min: 1900,
+                  max: new Date().getFullYear()
                 }
               }}
+            />
+          </Box>
+
+          {/* Código Predio Base */}
+          <Box sx={{
+            flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '0 0 150px' },
+            minWidth: { xs: '100%', md: '150px' }
+          }}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Código Predio Base"
+              value={filtros.codPredioBase}
+              onChange={(e) => setFiltros({ ...filtros, codPredioBase: e.target.value })}
+            />
+          </Box>
+
+          {/* Parámetro de Búsqueda */}
+          <Box sx={{
+            flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '0 0 200px' },
+            minWidth: { xs: '100%', md: '200px' }
+          }}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Parámetro Búsqueda"
+              value={filtros.parametroBusqueda}
+              onChange={(e) => setFiltros({ ...filtros, parametroBusqueda: e.target.value })}
             />
           </Box>
           

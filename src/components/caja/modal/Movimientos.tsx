@@ -25,11 +25,16 @@ import {
   CalendarToday as CalendarIcon,
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
-  SwapHoriz as SwapHorizIcon
+  SwapHoriz as SwapHorizIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import type { TableContainerProps } from '@mui/material/TableContainer';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+
+// Importar hooks de atajos de teclado
+import { useModuleHotkeys } from '../../../hooks/useModuleHotkeys';
+import { Tooltip } from '@mui/material';
 
 // Styled Components
 const StyledDialog = styled(Dialog)(({ theme }) => ({
@@ -250,6 +255,48 @@ const Movimientos: React.FC<MovimientosProps> = ({ open, onClose }) => {
     // Aquí iría la lógica de impresión
   };
 
+  // Manejar impresión de reporte completo
+  const handleImprimirReporte = () => {
+    console.log('Imprimir reporte de movimientos');
+    // Aquí iría la lógica de impresión del reporte
+  };
+
+  // Actualizar fecha a hoy
+  const handleActualizarFecha = () => {
+    setFechaFiltro(new Date());
+  };
+
+  // Configurar atajos de teclado cuando el modal está abierto
+  useModuleHotkeys('Movimientos de Caja', [
+    {
+      id: 'imprimir-reporte',
+      name: 'Imprimir Reporte',
+      description: 'Imprimir reporte completo de movimientos',
+      hotkey: { key: 'F6', preventDefault: true, enabled: open },
+      action: handleImprimirReporte,
+      enabled: open,
+      icon: 'print'
+    },
+    {
+      id: 'actualizar-fecha',
+      name: 'Actualizar',
+      description: 'Actualizar fecha a hoy',
+      hotkey: { key: 'F5', preventDefault: true, enabled: open },
+      action: handleActualizarFecha,
+      enabled: open,
+      icon: 'refresh'
+    },
+    {
+      id: 'cerrar-modal',
+      name: 'Cerrar',
+      description: 'Cerrar el modal de movimientos',
+      hotkey: { key: 'Escape', preventDefault: true, enabled: open },
+      action: onClose,
+      enabled: open,
+      icon: 'close'
+    }
+  ]);
+
   return (
     <StyledDialog
       open={open}
@@ -425,21 +472,77 @@ const Movimientos: React.FC<MovimientosProps> = ({ open, onClose }) => {
 
       {/* Actions */}
       <Divider />
-      <DialogActions sx={{ p: 2 }}>
-        <Button
-          onClick={onClose}
-          variant="outlined"
-          startIcon={<CloseIcon />}
+      <DialogActions sx={{ p: 2, flexDirection: 'column', alignItems: 'stretch', gap: 1 }}>
+        {/* Leyenda de Atajos de Teclado */}
+        <Box
+          sx={{
+            px: 2,
+            py: 1,
+            backgroundColor: '#f5f5f5',
+            borderRadius: 1,
+            border: '1px solid #e0e0e0'
+          }}
         >
-          Cerrar
-        </Button>
-        <Button
-          variant="contained"
-          startIcon={<PrintIcon />}
-          onClick={() => console.log('Imprimir reporte de movimientos')}
-        >
-          Imprimir Reporte
-        </Button>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', alignItems: 'center' }}>
+            <Typography variant="caption" fontWeight="bold" color="text.secondary" sx={{ mr: 1 }}>
+              Atajos:
+            </Typography>
+
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Paper elevation={1} sx={{ px: 1, py: 0.5, fontSize: '0.75rem', fontFamily: 'monospace', fontWeight: 'bold', bgcolor: 'white' }}>F5</Paper>
+              <Typography variant="caption" color="text.secondary">Actualizar</Typography>
+            </Box>
+
+            <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Paper elevation={1} sx={{ px: 1, py: 0.5, fontSize: '0.75rem', fontFamily: 'monospace', fontWeight: 'bold', bgcolor: 'white' }}>F6</Paper>
+              <Typography variant="caption" color="text.secondary">Imprimir Reporte</Typography>
+            </Box>
+
+            <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Paper elevation={1} sx={{ px: 1, py: 0.5, fontSize: '0.75rem', fontFamily: 'monospace', fontWeight: 'bold', bgcolor: 'white' }}>Esc</Paper>
+              <Typography variant="caption" color="text.secondary">Cerrar</Typography>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Botones de acción */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+          <Tooltip title="Cerrar (Esc)" arrow>
+            <Button
+              onClick={onClose}
+              variant="outlined"
+              startIcon={<CloseIcon />}
+            >
+              Cerrar
+            </Button>
+          </Tooltip>
+
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="Actualizar a Hoy (F5)" arrow>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={handleActualizarFecha}
+              >
+                Actualizar
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="Imprimir Reporte (F6)" arrow>
+              <Button
+                variant="contained"
+                startIcon={<PrintIcon />}
+                onClick={handleImprimirReporte}
+              >
+                Imprimir Reporte
+              </Button>
+            </Tooltip>
+          </Box>
+        </Box>
       </DialogActions>
     </StyledDialog>
   );

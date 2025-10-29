@@ -32,7 +32,7 @@ const schema = yup.object().shape({
     .string()
     .trim()
     .required('El nombre del barrio es requerido')
-    .min(3, 'El nombre debe tener al menos 3 caracteres')
+    .min(1, 'El nombre debe tener al menos 1 caracter')
     .max(100, 'El nombre no puede exceder 100 caracteres')
     .default(''),
   codSector: yup
@@ -213,6 +213,8 @@ const BarrioForm: React.FC<BarrioFormProps> = ({
                 <Autocomplete
                   options={sectores || []}
                   getOptionLabel={(option) => option.nombre || 'Sin nombre'}
+                  getOptionKey={(option) => option.id}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
                   value={sectores?.find(s => s.id === field.value) || null}
                   onChange={(_, newValue) => {
                     field.onChange(newValue?.id || 0);

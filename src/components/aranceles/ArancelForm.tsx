@@ -124,7 +124,9 @@ export const AsignacionArancelForm: React.FC<AsignacionArancelFormProps> = ({
   };
 
   const handleCostoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value) || 0;
+    const inputValue = e.target.value;
+    // Si el campo está vacío, permitir vacío (no forzar a 0)
+    const value = inputValue === '' ? 0 : parseFloat(inputValue);
     setFormData(prev => ({ ...prev, costoArancel: value }));
     setErrors(prev => ({ ...prev, costoArancel: '' }));
   };
@@ -228,7 +230,13 @@ export const AsignacionArancelForm: React.FC<AsignacionArancelFormProps> = ({
   // Función para formatear la dirección mostrada
   const formatearDireccion = (direccion: any) => {
     if (!direccion) return 'Seleccione una dirección';
-    
+
+    // Mostrar la descripción completa que viene del API
+    if (direccion.descripcion) {
+      return direccion.descripcion;
+    }
+
+    // Fallback: construir la dirección si no hay descripción
     const partes = [];
     if (direccion.sector) partes.push(direccion.sector);
     if (direccion.barrio) partes.push(direccion.barrio);
@@ -240,7 +248,7 @@ export const AsignacionArancelForm: React.FC<AsignacionArancelFormProps> = ({
     if (direccion.loteInicial && direccion.loteFinal) {
       partes.push(`LT ${direccion.loteInicial} - ${direccion.loteFinal}`);
     }
-    
+
     return partes.join(' + ');
   };
 
@@ -307,8 +315,14 @@ export const AsignacionArancelForm: React.FC<AsignacionArancelFormProps> = ({
             label="Costo Arancel *"
             type="number"
             size="small"
-            value={formData.costoArancel}
+            value={formData.costoArancel || ''}
             onChange={handleCostoChange}
+            onFocus={(e) => {
+              // Al hacer clic, si el valor es 0, limpiar el campo
+              if (formData.costoArancel === 0) {
+                e.target.select();
+              }
+            }}
             error={!!errors.costoArancel}
             helperText={errors.costoArancel}
             disabled={loading}
@@ -318,7 +332,7 @@ export const AsignacionArancelForm: React.FC<AsignacionArancelFormProps> = ({
                  S./
                 </InputAdornment>
               ),
-             
+
               sx: { height: 40 },
               inputProps: { min: 0, step: 0.01 }
             }}

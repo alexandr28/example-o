@@ -145,61 +145,43 @@ export const useDirecciones = () => {
     try {
       setLoading(true);
       setError(null);
-      
-      console.log('🔍 Cargando direcciones con parámetros:', parametros);
-      
-      // Intentar cargar desde el servicio real con query params
-      try {
-        // Importar el servicio si no está importado
-        const direccionService = (await import('../services/direccionService')).default;
-        
-        // Llamar con query params específicos
-        const queryParams = {
-          parametrosBusqueda: parametros?.parametrosBusqueda || parametros?.nombreVia || 'a',
-          codUsuario: 1,
-          ...(parametros?.codigoSector && { codigoSector: parametros.codigoSector }),
-          ...(parametros?.codigoBarrio && { codigoBarrio: parametros.codigoBarrio })
-        };
-        
-        const direccionesApi = await direccionService.getAll(queryParams);
-        
-        if (direccionesApi && direccionesApi.length > 0) {
-          console.log('✅ Direcciones cargadas desde API:', direccionesApi.length);
-          setDirecciones(direccionesApi);
-          return;
-        }
-      } catch (apiError) {
-        console.error('❌ Error cargando desde API:', apiError);
+
+      console.log('🔍 [useDirecciones] Cargando direcciones con parámetros:', parametros);
+
+      // Importar el servicio
+      const direccionService = (await import('../services/direccionService')).default;
+
+      // Preparar query params - si no hay parámetros, enviar vacío para obtener todas
+      const queryParams: any = {
+        codUsuario: 1
+      };
+
+      // Agregar parámetros opcionales si existen
+      if (parametros?.codigoSector) {
+        queryParams.codigoSector = parametros.codigoSector;
       }
-      
-      // Si falla o no hay datos, usar direcciones de ejemplo
-      console.log('⚠️ Usando direcciones de ejemplo');
-      const direccionesEjemplo: DireccionData[] = [
-        {
-          id: 1,
-          codigo: 1,
-          codigoSector: 1,
-          codigoBarrio: 1,
-          codigoCalle: 1,
-          nombreSector: 'Centro',
-          nombreBarrio: 'Los Jardines',
-          nombreCalle: 'Av. Principal',
-          nombreVia: 'Principal',
-          nombreTipoVia: 'AVENIDA',
-          codigoTipoVia: 3801,
-          cuadra: '12',
-          lado: 'Derecho',
-          loteInicial: 1,
-          loteFinal: 50,
-          descripcion: 'AVENIDA Principal CUADRA 12',
-          estado: 'ACTIVO'
-        }
-      ];
-      
-      setDirecciones(direccionesEjemplo);
+
+      if (parametros?.codigoBarrio) {
+        queryParams.codigoBarrio = parametros.codigoBarrio;
+      }
+
+      if (parametros?.parametrosBusqueda) {
+        queryParams.parametrosBusqueda = parametros.parametrosBusqueda;
+      }
+
+      console.log('📡 [useDirecciones] Query params a enviar:', queryParams);
+
+      const direccionesApi = await direccionService.getAll(queryParams);
+
+      console.log('✅ [useDirecciones] Direcciones cargadas desde API:', direccionesApi.length);
+      console.log('📊 [useDirecciones] Primera dirección:', direccionesApi[0]);
+
+      setDirecciones(direccionesApi);
+
     } catch (error: any) {
-      console.error('❌ Error al cargar direcciones:', error);
+      console.error('❌ [useDirecciones] Error al cargar direcciones:', error);
       setError(error.message);
+      setDirecciones([]); // Establecer array vacío en caso de error
     } finally {
       setLoading(false);
     }
@@ -217,36 +199,44 @@ export const useDirecciones = () => {
       
       // Llamar al servicio para crear la dirección
       const nuevaDireccionCreada = await direccionService.crearDireccion(datos);
-      
+
       console.log('✅ [useDirecciones] Dirección creada:', nuevaDireccionCreada);
-      
+
+      // Validar que el servicio devolvió un resultado
+      if (!nuevaDireccionCreada) {
+        console.error('❌ [useDirecciones] El servicio no devolvió una dirección válida');
+        throw new Error('El servicio no devolvió una dirección válida');
+      }
+
       // Obtener nombres de las entidades relacionadas para actualizar la lista local
-      const sector = sectores.find(s => s.codigo === datos.codigoSector);
-      const barrio = barrios.find(b => b.codigo === datos.codigoBarrio);
-      const calle = calles.find(c => c.codigo === datos.codigoCalle);
-      
+      const sector = sectores.find(s => s.codigo === datos.codigoSector || s.codSector === datos.codigoSector);
+      const barrio = barrios.find(b => b.codigo === datos.codigoBarrio || (b as any).codBarrio === datos.codigoBarrio);
+      const calle = calles.find(c => c.codigo === datos.codigoCalle || (c as any).codCalle === datos.codigoCalle);
+
+      console.log('📊 [useDirecciones] Datos relacionados:', { sector: sector?.nombre, barrio: barrio?.nombre, calle: calle?.nombre });
+
       // Agregar la nueva dirección con datos completos
       const nuevaDireccion: DireccionData = {
-        id: nuevaDireccionCreada.id || Date.now(),
-        codigo: Date.now(),
+        id: nuevaDireccionCreada?.id || Date.now(),
+        codigo: nuevaDireccionCreada?.codigo || Date.now(),
         ...datos,
-        nombreSector: sector?.nombre || '',
-        nombreBarrio: barrio?.nombre || '',
-        nombreCalle: calle?.nombre || '',
+        nombreSector: sector?.nombre || sector?.nombreSector || '',
+        nombreBarrio: barrio?.nombre || barrio?.nombreBarrio || '',
+        nombreCalle: calle?.nombre || calle?.nombreCalle || '',
         nombreVia: calle?.nombreVia || calle?.nombre || '',
-        nombreTipoVia: calle?.tipo || 'CALLE',
-        descripcion: `${calle?.tipo || 'CALLE'} ${calle?.nombre || ''} ${datos.cuadra ? `CUADRA ${datos.cuadra}` : ''}`.trim(),
+        nombreTipoVia: calle?.tipo || calle?.nombreTipoVia || 'CALLE',
+        descripcion: `${calle?.tipo || calle?.nombreTipoVia || 'CALLE'} ${calle?.nombre || ''} ${datos.cuadra ? `CUADRA ${datos.cuadra}` : ''}`.trim(),
         estado: 'ACTIVO'
       };
       
       setDirecciones(prev => [...prev, nuevaDireccion]);
-      
-      NotificationService.success('Dirección creada correctamente');
+
+      // NotificationService.success('Dirección creada correctamente'); // Comentado: la notificación se maneja en la página
       return true;
-      
+
     } catch (error: any) {
-      NotificationService.error(error.message || 'Error al crear dirección');
-      return false;
+      // NotificationService.error(error.message || 'Error al crear dirección'); // Comentado: el error se maneja en la página
+      throw error; // Re-lanzar el error para que lo maneje la página
     } finally {
       setLoading(false);
     }
@@ -260,16 +250,16 @@ export const useDirecciones = () => {
       // TODO: Implementar cuando el servicio esté disponible
       console.log('📝 Actualizando dirección:', id, datos);
       
-      setDirecciones(prev => prev.map(dir => 
+      setDirecciones(prev => prev.map(dir =>
         dir.id === id ? { ...dir, ...datos } : dir)
       );
-      
-      NotificationService.success('Dirección actualizada correctamente');
+
+      // NotificationService.success('Dirección actualizada correctamente'); // Comentado: la notificación se maneja en la página
       return true;
-      
+
     } catch (error: any) {
-      NotificationService.error(error.message || 'Error al actualizar dirección');
-      return false;
+      // NotificationService.error(error.message || 'Error al actualizar dirección'); // Comentado: el error se maneja en la página
+      throw error; // Re-lanzar el error para que lo maneje la página
     } finally {
       setLoading(false);
     }
@@ -284,13 +274,13 @@ export const useDirecciones = () => {
       console.log('🗑️ Eliminando dirección:', id);
       
       setDirecciones(prev => prev.filter(dir => dir.id !== id));
-      
-      NotificationService.success('Dirección eliminada correctamente');
+
+      // NotificationService.success('Dirección eliminada correctamente'); // Comentado: la notificación se maneja en la página
       return true;
-      
+
     } catch (error: any) {
-      NotificationService.error(error.message || 'Error al eliminar dirección');
-      return false;
+      // NotificationService.error(error.message || 'Error al eliminar dirección'); // Comentado: el error se maneja en la página
+      throw error; // Re-lanzar el error para que lo maneje la página
     } finally {
       setLoading(false);
     }

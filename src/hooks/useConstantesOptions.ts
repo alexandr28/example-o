@@ -551,6 +551,7 @@ export const useClasificacionOptions = () => {
   );
 };
 
+{/* clasificacion predio */}
 export const useClasificacionPredio =()=> {
   const defaultOptions : OptionFormat[] = [
     {value: '0501', label:'CASAS HABITACION Y DEPARTAMENTO PARA CASAS' , id:'0501'},
@@ -567,19 +568,21 @@ export const useClasificacionPredio =()=> {
   );
 }
 
+{/* nivel antiguedad */}
 export const useTipoNivelAntiguedad = () =>{
   return useConstantesOptions(
     () => constanteService.obtenerTiposNivelAntiguedad(),
     undefined,
   );
 }
-
+{/* material predominante */}
 export const useMaterialPredominante = () => {
   return useConstantesOptions(
     () => constanteService.obtenerTiposMaterialEstructuralPredominante(),
     undefined,
   );
 }
+{/* tipos lados direccion */}
 export const useTiposLadosDireccion = () => {
   const defaultOptions: OptionFormat[] = [
     { value: 'NINGUNO', label: 'NINGUNO', id: '8103' },
@@ -631,6 +634,7 @@ export const useEstadoOptions = () => {
   );
 };
 
+{/* letras valores unitarios */}
 export const useLetraValoresUnitariosOptions = () => {
   return useConstantesOptions(
     () => constanteService.obtenerTiposLetrasValoresUnitarios(),
@@ -767,7 +771,7 @@ export const useGrupoUsoOptions = () => {
 
 /**
  * Hook específico para ubicaciones de área verde
- * API GET: http://26.161.18.122:8085/api/constante/listarUbicacionAreaVerd
+ * API GET: http://26.161.18.122:8085/api/constante/listarUbicacionAreaVerde
  */
 export const useUbicacionAreaVerdeOptions = () => {
   const [options, setOptions] = useState<OptionFormat[]>([]);

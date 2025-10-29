@@ -153,13 +153,15 @@ const menuItems: MenuItem[] = [
     icon: <DashboardIcon />,
     path: '/dashboard',
   },
+  
   {
     id: 'contribuyentes',
     label: 'Contribuyentes',
     icon: <PeopleIcon />,
     subMenuItems: [
-      { id: 'nuevo-contribuyente', label: 'Nuevo', path: '/contribuyente/nuevo' },
-      { id: 'consulta-contribuyente', label: 'Consulta', path: '/contribuyente/consulta' },
+      { id: 'nuevo-contribuyente', label: 'Registro Contribuyente', path: '/contribuyente/nuevo' },
+      { id: 'consulta-contribuyente', label: 'Consulta Contribuyente', path: '/contribuyente/consulta' },
+      { id: 'deduccion-beneficio', label: 'Deduccion Beneficio', path: '/contribuyente/deduccion-beneficio' },
      
     ],
   },
@@ -192,8 +194,8 @@ const menuItems: MenuItem[] = [
     subMenuItems: [
       { id: 'nuevo-fraccionamiento', label: 'Nuevo', path: '/fraccionamiento/nuevo' },
       { id: 'consulta-fraccionamiento', label: 'Consulta', path: '/fraccionamiento/consulta' },
-      { id: 'gestion-lotes', label: 'Gestión de Lotes', path: '/fraccionamiento/lotes' },
-      { id: 'aprobaciones', label: 'Aprobaciones', path: '/fraccionamiento/aprobaciones' },
+      { id: 'aprobacion-fraccionamiento', label: 'Aprobacion', path: '/fraccionamiento/aprobacion' },
+      { id: 'reporte-fraccionamiento', label: 'Reporte Fraccionamiento', path: '/fraccionamiento/reportes' },
     ],
   },
   {
@@ -236,20 +238,48 @@ const sistemaMenuItems: MenuItem[] = [
     label: 'Mantenedores',
     icon: <SettingsIcon />,
     subMenuItems: [
-      // Ubicación
-      { id: 'sectores-ubicacion', label: 'Sectores', path: '/mantenedores/sectores' },
-      { id: 'barrios-ubicacion', label: 'Barrios', path: '/mantenedores/barrios' },
-      { id: 'calles-ubicacion', label: 'Calles', path: '/mantenedores/calles' },
-      { id: 'direcciones-ubicacion', label: 'Direcciones', path: '/mantenedores/direcciones' },
-      // Arancel
-      { id: 'asignacion-arancel', label: 'Valores Arancelarios', path: '/mantenedores/aranceles' },
-      { id: 'valoresUnitarios-arancel', label: 'Valores Unitarios', path: '/mantenedores/valores-unitarios' },
+      // Ubicación - Agrupado en un sub-menú
+      {
+        id: 'ubicacion',
+        label: 'Ubicación',
+        subMenuItems: [
+          { id: 'sectores-ubicacion', label: 'Sectores', path: '/mantenedores/sectores' },
+          { id: 'barrios-ubicacion', label: 'Barrios', path: '/mantenedores/barrios' },
+          { id: 'calles-ubicacion', label: 'Calles', path: '/mantenedores/calles' },
+          { id: 'direcciones-ubicacion', label: 'Direcciones', path: '/mantenedores/direcciones' },
+        ]
+      },
+      // Valores
+      {
+        id: 'valores',
+        label: 'Valores',
+        subMenuItems: [
+          { id: 'asignacion-arancel', label: 'Valores Arancelarios', path: '/mantenedores/aranceles' },
+          { id: 'valoresUnitarios-arancel', label: 'Valores Unitarios', path: '/mantenedores/valores-unitarios' },
+        ]
+      },
       // Tarifas
-      { id: 'uit-epa', label: 'UIT - EPA', path: '/mantenedores/uit' },
-      { id: 'depreciacion', label: 'Depreciación', path: '/mantenedores/depreciacion' },
-      { id: 'arbitrios', label: 'Arbitrios', path: '/mantenedores/arbitrios' },
-      { id: 'alcabala', label: 'Alcabala', path: '/mantenedores/alcabala' },
-      { id: 'escala', label: 'Escala', path: '/mantenedores/escala' },
+      {
+        id: 'tarifas',
+        label: 'Tarifas',
+        subMenuItems: [
+          { id: 'uit-epa', label: 'UIT - EPA', path: '/mantenedores/uit' },
+          { id: 'arbitrios', label: 'Arbitrios', path: '/mantenedores/arbitrios' },
+        ]
+      },
+      // Escalas
+      {
+        id: 'escala',
+        label: 'Escala',
+        subMenuItems: [
+          { id: 'alcabala', label: 'Alcabala', path: '/mantenedores/alcabala' },
+          { id: 'depreciacion', label: 'Depreciación', path: '/mantenedores/depreciacion' },
+          { id: 'registro-tim', label: 'Registro TIM', path: '/mantenedores/escalas/registro-tim' },
+          { id: 'reg-resol-tim', label: 'Reg. Resol. TIM', path: '/mantenedores/escalas/reg-resolucion-tim' },
+          { id: 'vencimiento', label: 'Vencimiento', path: '/mantenedores/escalas/vencimiento' },
+          
+        ]
+      },
     ],
   },
   {
@@ -354,8 +384,8 @@ const AppSidebar: FC<AppSidebarProps> = memo(() => {
     if (openSubmenus.includes(menuId)) {
       setOpenSubmenus(prev => prev.filter(id => id !== menuId));
     } else {
-      // Si está cerrado, cerrar todos los demás y abrir este
-      setOpenSubmenus([menuId]);
+      // Si está cerrado, agregarlo al array (mantener los padres abiertos)
+      setOpenSubmenus(prev => [...prev, menuId]);
     }
   }, [openSubmenus, setOpenSubmenus]);
 

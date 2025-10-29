@@ -204,11 +204,12 @@ const SelectorContribuyente: React.FC<SelectorContribuyenteProps> = ({
 
 
   return (
-    <Dialog 
-      open={isOpen} 
+    <Dialog
+      open={isOpen}
       onClose={onClose}
       maxWidth="lg"
       fullWidth
+      disableRestoreFocus
       PaperProps={{
         sx: {
           height: '80vh',

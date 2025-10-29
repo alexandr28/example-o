@@ -1,5 +1,5 @@
 // src/components/caja/modal/DeudaContribuyente.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -37,13 +37,23 @@ import {
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 
+// Importar hooks de atajos de teclado
+import { useModuleHotkeys } from '../../../hooks/useModuleHotkeys';
+import { Tooltip } from '@mui/material';
+
+// Importar componentes de deuda separados
+import DeudaGlobal from './deuda/DeudaGlobal';
+import DeudaOrdinariaComponent from './deuda/DeudaOrdinaria';
+import DeudaFraccionada from './deuda/DeudaFraccionada';
+import DeudaCoactiva from './deuda/DeudaCoactiva';
+
 // Styled Components
 const StyledDialog = styled(Dialog)(({ theme }) => ({
   '& .MuiDialog-paper': {
     borderRadius: theme.spacing(2),
-    minWidth: '800px',
-    maxWidth: '1000px',
-    height: '600px',
+    minWidth: '1200px',
+    maxWidth: '1400px',
+    height: '750px',
     overflowX: 'hidden',
   },
 }));
@@ -1020,6 +1030,83 @@ const DeudaContribuyente: React.FC<DeudaContribuyenteProps> = ({
     onClose();
   };
 
+  // Manejar acción de Nuevo (limpiar campos pero mantener modal abierto)
+  const handleNuevo = () => {
+    setMontoAPagar('');
+    setTipoMonto('repartir');
+    setSelectedRows([]);
+    setSelectedAño(null);
+    setCuotasFraccionamiento([]);
+    setTributosFraccionados([]);
+    setMontoFraccionado('');
+    setSelectedExpediente(null);
+    setSelectedAñoCoactivo(null);
+    setAñosCoactivos([]);
+    setTributosCoactivos([]);
+    setMontoCoactivo('');
+  };
+
+  // Función para procesar el pago según el tab activo
+  const handlePagar = () => {
+    if (deudaTabValue === 1) {
+      procesarPagoDeudaOrdinaria();
+    } else if (deudaTabValue === 2) {
+      procesarPagoDeudaFraccionamiento();
+    } else if (deudaTabValue === 3) {
+      procesarPagoDeudaCoactiva();
+    }
+  };
+
+  // Configurar atajos de teclado cuando el modal está abierto
+  useModuleHotkeys('Deuda Contribuyente', [
+    {
+      id: 'pagar-deuda',
+      name: 'Pagar',
+      description: 'Procesar el pago de la deuda seleccionada',
+      hotkey: { key: 'F4', preventDefault: true, enabled: open },
+      action: handlePagar,
+      enabled: open && deudaTabValue !== 0 && !!montoAPagar && parseFloat(montoAPagar) > 0,
+      icon: 'payment'
+    },
+    {
+      id: 'nuevo-pago',
+      name: 'Nuevo',
+      description: 'Limpiar campos para nuevo pago',
+      hotkey: { key: 'F2', preventDefault: true, enabled: open },
+      action: handleNuevo,
+      enabled: open && deudaTabValue !== 0 && (!!montoAPagar || selectedRows.length > 0),
+      icon: 'refresh'
+    },
+    {
+      id: 'cerrar-modal',
+      name: 'Cerrar',
+      description: 'Cerrar el modal de deuda',
+      hotkey: { key: 'Escape', preventDefault: true, enabled: open },
+      action: handleClose,
+      enabled: open,
+      icon: 'close'
+    }
+  ]);
+
+  // Auto-cargar datos iniciales cuando se cambia a las pestañas de Fraccionamiento o Coactiva
+  useEffect(() => {
+    if (deudaTabValue === 2 && resolucionesFraccionamiento.length > 0) {
+      // Auto-seleccionar el primer año para Deuda Fraccionamiento
+      handleAñoClick(resolucionesFraccionamiento[0].año);
+    } else if (deudaTabValue === 3 && expedientesCoactivos.length > 0) {
+      // Auto-seleccionar el primer expediente para Deuda Coactiva
+      const primerExpediente = expedientesCoactivos[0];
+      handleExpedienteClick(primerExpediente.añoExpediente);
+      // También auto-seleccionar el primer año dentro de ese expediente
+      if (primerExpediente.años.length > 0) {
+        setTimeout(() => {
+          handleAñoCoactivoClick(primerExpediente.años[0].año);
+        }, 0);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deudaTabValue]);
+
   return (
     <StyledDialog
       open={open}
@@ -1047,7 +1134,7 @@ const DeudaContribuyente: React.FC<DeudaContribuyenteProps> = ({
       <DialogContent sx={{ padding: 3, height: '100%', overflow: 'hidden' }}>
         <ContentBox>
           {contribuyenteData ? (
-            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, height: '100%', overflow: 'hidden' }}>
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, height: '100%', overflow: 'hidden' }}>
               {/* Tabla de datos del contribuyente */}
               <Paper elevation={1} sx={{ border: '1px solid #e0e0e0' }}>
                 <TableContainer>
@@ -1077,7 +1164,7 @@ const DeudaContribuyente: React.FC<DeudaContribuyenteProps> = ({
               </Paper>
 
               {/* Seccion Monto a Pagar */}
-              <Paper elevation={1} sx={{ p: 2, border: '1px solid #e0e0e0', opacity: deudaTabValue === 0 ? 0.5 : 1 }}>
+              <Paper elevation={1} sx={{ p: 1, border: '1px solid #e0e0e0', opacity: deudaTabValue === 0 ? 0.5 : 1 }}>
                
                 {/** TextField Monto */}
                 <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1117,51 +1204,54 @@ const DeudaContribuyente: React.FC<DeudaContribuyenteProps> = ({
                   </Box>
                   {/** Button Pagar */}
                   <Box sx={{ flex: '0 1 auto' }}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={
-                        deudaTabValue === 1 ? procesarPagoDeudaOrdinaria :
-                        deudaTabValue === 2 ? procesarPagoDeudaFraccionamiento :
-                        deudaTabValue === 3 ? procesarPagoDeudaCoactiva :
-                        () => console.log('Pagar clicked')
-                      }
-                      disabled={
-                        deudaTabValue === 0 ||
-                        !montoAPagar ||
-                        parseFloat(montoAPagar) <= 0 ||
-                        (deudaTabValue === 1 && montoExcedeDeuda()) ||
-                        (deudaTabValue === 2 && (!selectedAño || cuotasFraccionamiento.filter(c => c.checked).length === 0)) ||
-                        (deudaTabValue === 3 && (!selectedExpediente || !selectedAñoCoactivo || tributosCoactivos.filter(t => t.checked).length === 0))
-                      }
-                      sx={{
-                        px: 3,
-                        height: '40px'
-                      }}
-                    >
-                      Pagar
-                    </Button>
+                    <Tooltip title="Pagar Deuda (F4)" arrow>
+                      <span>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          onClick={handlePagar}
+                          disabled={
+                            deudaTabValue === 0 ||
+                            !montoAPagar ||
+                            parseFloat(montoAPagar) <= 0 ||
+                            (deudaTabValue === 1 && montoExcedeDeuda()) ||
+                            (deudaTabValue === 2 && (!selectedAño || cuotasFraccionamiento.filter(c => c.checked).length === 0)) ||
+                            (deudaTabValue === 3 && (!selectedExpediente || !selectedAñoCoactivo || tributosCoactivos.filter(t => t.checked).length === 0))
+                          }
+                          sx={{
+                            px: 3,
+                            height: '40px'
+                          }}
+                        >
+                          Pagar
+                        </Button>
+                      </span>
+                    </Tooltip>
                   </Box>
                   {/** Button Nuevo */}
                   <Box sx={{ flex: '0 1 auto' }}>
-                    <Button
-                      variant="outlined"
-                      onClick={() => console.log('Nuevo clicked')}
-                      disabled={deudaTabValue === 0 || !montoAPagar || parseFloat(montoAPagar) <= 0}
-                      sx={{
-                        px: 3,
-                        height: '40px',
-                        backgroundColor: 'white',
-                        borderColor: 'primary.main',
-                        color: 'primary.main',
-                        '&:hover': {
-                          backgroundColor: 'primary.light',
-                          borderColor: 'primary.main',
-                        }
-                      }}
-                    >
-                      Nuevo
-                    </Button>
+                    <Tooltip title="Limpiar Campos (F2)" arrow>
+                      <span>
+                        <Button
+                          variant="outlined"
+                          onClick={handleNuevo}
+                          disabled={deudaTabValue === 0 || (!montoAPagar && selectedRows.length === 0)}
+                          sx={{
+                            px: 3,
+                            height: '40px',
+                            backgroundColor: 'white',
+                            borderColor: 'primary.main',
+                            color: 'primary.main',
+                            '&:hover': {
+                              backgroundColor: 'primary.light',
+                              borderColor: 'primary.main',
+                            }
+                          }}
+                        >
+                          Nuevo
+                        </Button>
+                      </span>
+                    </Tooltip>
                   </Box>
                 </Box>
                 
@@ -1199,949 +1289,51 @@ const DeudaContribuyente: React.FC<DeudaContribuyenteProps> = ({
                 </Box>
                 
                 {/* Contenido de tabs de deuda */}
-                <Box sx={{ flex: 1, p: 2, display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
+                <Box sx={{ flex: 1, p: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                   {/* Tab Deuda Global */}
                   {deudaTabValue === 0 && (
-                    <Box sx={{ display: 'flex', gap: 2, height: '100%', overflow: 'hidden' }}>
-                      {/* Tabla de Deuda Global */}
-                      <Box sx={{ flex: 1, minHeight: 0 }}>
-                        <TableContainer 
-                          component={Paper} 
-                          variant="outlined"
-                          sx={{
-                            height: '100%',
-                            overflowY: 'auto',
-                            overflowX: 'hidden',
-                            '&::-webkit-scrollbar': {
-                              width: '8px',
-                            },
-                            '&::-webkit-scrollbar-track': {
-                              backgroundColor: '#f1f1f1',
-                            },
-                            '&::-webkit-scrollbar-thumb': {
-                              backgroundColor: '#888',
-                              borderRadius: '4px',
-                              '&:hover': {
-                                backgroundColor: '#555',
-                              },
-                            },
-                          }}
-                        >
-                          <Table size="small" stickyHeader sx={{ minWidth: 750, tableLayout: 'fixed' }}>
-                            <TableHead>
-                              <TableRow>
-                                <TableCell sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 35, maxWidth: 35, p: 0.25, fontSize: '0.75rem' }}>
-                                  Año
-                                </TableCell>
-                                <TableCell sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 80, maxWidth: 80, p: 0, pl: 0.25, fontSize: '0.75rem' }}>
-                                  Titulo
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  1
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  2
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  3
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  4
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  5
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  6
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  7
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  8
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  9
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  10
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  11
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  12
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 50, maxWidth: 50, p: 0.25, fontSize: '0.75rem' }}>
-                                  Deuda
-                                </TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {deudaGlobalData.map((item) => (
-                                <TableRow key={item.id} hover>
-                                  <TableCell sx={{ p: 0.25, fontSize: '0.7rem' }}>{item.año}</TableCell>
-                                  <TableCell sx={{ p: 0, pl: 0.25, fontSize: '0.7rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.titulo}</TableCell>
-                                  <TableCell align="right" sx={{ p: 0, fontSize: '0.65rem' }}>{item.mes1 > 0 ? item.mes1.toFixed(2) : '-'}</TableCell>
-                                  <TableCell align="right" sx={{ p: 0, fontSize: '0.65rem' }}>{item.mes2 > 0 ? item.mes2.toFixed(2) : '-'}</TableCell>
-                                  <TableCell align="right" sx={{ p: 0, fontSize: '0.65rem' }}>{item.mes3 > 0 ? item.mes3.toFixed(2) : '-'}</TableCell>
-                                  <TableCell align="right" sx={{ p: 0, fontSize: '0.65rem' }}>{item.mes4 > 0 ? item.mes4.toFixed(2) : '-'}</TableCell>
-                                  <TableCell align="right" sx={{ p: 0, fontSize: '0.65rem' }}>{item.mes5 > 0 ? item.mes5.toFixed(2) : '-'}</TableCell>
-                                  <TableCell align="right" sx={{ p: 0, fontSize: '0.65rem' }}>{item.mes6 > 0 ? item.mes6.toFixed(2) : '-'}</TableCell>
-                                  <TableCell align="right" sx={{ p: 0, fontSize: '0.65rem' }}>{item.mes7 > 0 ? item.mes7.toFixed(2) : '-'}</TableCell>
-                                  <TableCell align="right" sx={{ p: 0, fontSize: '0.65rem' }}>{item.mes8 > 0 ? item.mes8.toFixed(2) : '-'}</TableCell>
-                                  <TableCell align="right" sx={{ p: 0, fontSize: '0.65rem' }}>{item.mes9 > 0 ? item.mes9.toFixed(2) : '-'}</TableCell>
-                                  <TableCell align="right" sx={{ p: 0, fontSize: '0.65rem' }}>{item.mes10 > 0 ? item.mes10.toFixed(2) : '-'}</TableCell>
-                                  <TableCell align="right" sx={{ p: 0, fontSize: '0.65rem' }}>{item.mes11 > 0 ? item.mes11.toFixed(2) : '-'}</TableCell>
-                                  <TableCell align="right" sx={{ p: 0, fontSize: '0.65rem' }}>{item.mes12 > 0 ? item.mes12.toFixed(2) : '-'}</TableCell>
-                                  <TableCell align="right" sx={{ p: 0.25, fontSize: '0.7rem', fontWeight: 'bold' }}>
-                                    S/. {item.deuda.toFixed(2)}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      </Box>
-
-                      {/* TextField Deuda Global Total */}
-                      <Box sx={{ flex: '0 1 200px', minWidth: '200px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                        <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                          Deuda Global
-                        </Typography>
-                        <TextField
-                          value={`S/. ${calcularDeudaGlobalTotal().toFixed(2)}`}
-                          size="small"
-                          fullWidth
-                          disabled
-                          sx={{ 
-                            '& .MuiInputBase-root': {
-                              backgroundColor: 'primary.main',
-                              color: 'white',
-                            },
-                            '& .MuiInputBase-input.Mui-disabled': {
-                              WebkitTextFillColor: 'white',
-                              color: 'white',
-                              fontWeight: 'bold'
-                            },
-                            '& .MuiOutlinedInput-notchedOutline': {
-                              borderColor: 'primary.dark',
-                            }
-                          }}
-                        />
-                      </Box>
-                    </Box>
+                    <DeudaGlobal data={deudaGlobalData} />
                   )}
 
                   {/* Tab Deuda Ordinaria */}
                   {deudaTabValue === 1 && (
-                    <Box sx={{ display: 'flex', gap: 2, height: '100%', overflow: 'hidden' }}>
-                      {/* Tabla de Deuda Ordinaria */}
-                      <Box sx={{ flex: 1, minHeight: 0 }}>
-                        <TableContainer 
-                          component={Paper} 
-                          variant="outlined"
-                          sx={{
-                            height: '100%',
-                            overflowY: 'auto',
-                            overflowX: 'hidden',
-                            '&::-webkit-scrollbar': {
-                              width: '8px',
-                            },
-                            '&::-webkit-scrollbar-track': {
-                              backgroundColor: '#f1f1f1',
-                            },
-                            '&::-webkit-scrollbar-thumb': {
-                              backgroundColor: '#888',
-                              borderRadius: '4px',
-                              '&:hover': {
-                                backgroundColor: '#555',
-                              },
-                            },
-                          }}
-                        >
-                          <Table size="small" stickyHeader sx={{ minWidth: tipoMonto === 'seleccionar' ? 800 : 750, tableLayout: 'fixed' }}>
-                            <TableHead>
-                              <TableRow>
-                                {tipoMonto === 'seleccionar' && (
-                                  <TableCell sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 40, maxWidth: 40, p: 0.25 }}>
-                                    {/* Empty header for checkbox column */}
-                                  </TableCell>
-                                )}
-                                <TableCell sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 35, maxWidth: 35, p: 0.25, fontSize: '0.75rem' }}>
-                                  Año
-                                </TableCell>
-                                <TableCell sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 80, maxWidth: 80, p: 0, pl: 0.25, fontSize: '0.75rem' }}>
-                                  Tributo
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  1
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  2
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  3
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  4
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  5
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  6
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  7
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  8
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  9
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  10
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  11
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 30, maxWidth: 30, p: 0, fontSize: '0.7rem' }}>
-                                  12
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: 50, maxWidth: 50, p: 0.25, fontSize: '0.75rem' }}>
-                                  Deuda
-                                </TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {deudaGlobalData.map((item) => (
-                                <TableRow key={item.id} hover>
-                                  {tipoMonto === 'seleccionar' && (
-                                    <TableCell sx={{ p: 0.25 }}>
-                                      <Checkbox
-                                        size="small"
-                                        checked={selectedRows.includes(item.id)}
-                                        onChange={() => handleRowSelection(item.id)}
-                                        sx={{ p: 0 }}
-                                      />
-                                    </TableCell>
-                                  )}
-                                  <TableCell sx={{ p: 0.25, fontSize: '0.7rem' }}>{item.año}</TableCell>
-                                  <TableCell sx={{ p: 0, pl: 0.25, fontSize: '0.7rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.titulo}</TableCell>
-                                  <TableCell align="right" sx={{ 
-                                    p: 0, 
-                                    fontSize: '0.65rem',
-                                    background: getCellColor(item.id, 'mes1', item.mes1),
-                                    color: getCellColor(item.id, 'mes1', item.mes1) !== 'transparent' ? 'white' : 'inherit'
-                                  }}>
-                                    {item.mes1 > 0 ? item.mes1.toFixed(2) : '-'}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ 
-                                    p: 0, 
-                                    fontSize: '0.65rem',
-                                    background: getCellColor(item.id, 'mes2', item.mes2),
-                                    color: getCellColor(item.id, 'mes2', item.mes2) !== 'transparent' ? 'white' : 'inherit'
-                                  }}>
-                                    {item.mes2 > 0 ? item.mes2.toFixed(2) : '-'}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ 
-                                    p: 0, 
-                                    fontSize: '0.65rem',
-                                    background: getCellColor(item.id, 'mes3', item.mes3),
-                                    color: getCellColor(item.id, 'mes3', item.mes3) !== 'transparent' ? 'white' : 'inherit'
-                                  }}>
-                                    {item.mes3 > 0 ? item.mes3.toFixed(2) : '-'}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ 
-                                    p: 0, 
-                                    fontSize: '0.65rem',
-                                    background: getCellColor(item.id, 'mes4', item.mes4),
-                                    color: getCellColor(item.id, 'mes4', item.mes4) !== 'transparent' ? 'white' : 'inherit'
-                                  }}>
-                                    {item.mes4 > 0 ? item.mes4.toFixed(2) : '-'}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ 
-                                    p: 0, 
-                                    fontSize: '0.65rem',
-                                    background: getCellColor(item.id, 'mes5', item.mes5),
-                                    color: getCellColor(item.id, 'mes5', item.mes5) !== 'transparent' ? 'white' : 'inherit'
-                                  }}>
-                                    {item.mes5 > 0 ? item.mes5.toFixed(2) : '-'}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ 
-                                    p: 0, 
-                                    fontSize: '0.65rem',
-                                    background: getCellColor(item.id, 'mes6', item.mes6),
-                                    color: getCellColor(item.id, 'mes6', item.mes6) !== 'transparent' ? 'white' : 'inherit'
-                                  }}>
-                                    {item.mes6 > 0 ? item.mes6.toFixed(2) : '-'}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ 
-                                    p: 0, 
-                                    fontSize: '0.65rem',
-                                    background: getCellColor(item.id, 'mes7', item.mes7),
-                                    color: getCellColor(item.id, 'mes7', item.mes7) !== 'transparent' ? 'white' : 'inherit'
-                                  }}>
-                                    {item.mes7 > 0 ? item.mes7.toFixed(2) : '-'}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ 
-                                    p: 0, 
-                                    fontSize: '0.65rem',
-                                    background: getCellColor(item.id, 'mes8', item.mes8),
-                                    color: getCellColor(item.id, 'mes8', item.mes8) !== 'transparent' ? 'white' : 'inherit'
-                                  }}>
-                                    {item.mes8 > 0 ? item.mes8.toFixed(2) : '-'}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ 
-                                    p: 0, 
-                                    fontSize: '0.65rem',
-                                    background: getCellColor(item.id, 'mes9', item.mes9),
-                                    color: getCellColor(item.id, 'mes9', item.mes9) !== 'transparent' ? 'white' : 'inherit'
-                                  }}>
-                                    {item.mes9 > 0 ? item.mes9.toFixed(2) : '-'}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ 
-                                    p: 0, 
-                                    fontSize: '0.65rem',
-                                    background: getCellColor(item.id, 'mes10', item.mes10),
-                                    color: getCellColor(item.id, 'mes10', item.mes10) !== 'transparent' ? 'white' : 'inherit'
-                                  }}>
-                                    {item.mes10 > 0 ? item.mes10.toFixed(2) : '-'}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ 
-                                    p: 0, 
-                                    fontSize: '0.65rem',
-                                    background: getCellColor(item.id, 'mes11', item.mes11),
-                                    color: getCellColor(item.id, 'mes11', item.mes11) !== 'transparent' ? 'white' : 'inherit'
-                                  }}>
-                                    {item.mes11 > 0 ? item.mes11.toFixed(2) : '-'}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ 
-                                    p: 0, 
-                                    fontSize: '0.65rem',
-                                    background: getCellColor(item.id, 'mes12', item.mes12),
-                                    color: getCellColor(item.id, 'mes12', item.mes12) !== 'transparent' ? 'white' : 'inherit'
-                                  }}>
-                                    {item.mes12 > 0 ? item.mes12.toFixed(2) : '-'}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ p: 0.25, fontSize: '0.7rem', fontWeight: 'bold' }}>
-                                    S/. {item.deuda.toFixed(2)}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      </Box>
-
-                      {/* TextField Deuda Ordinaria Total */}
-                      <Box sx={{ flex: '0 1 200px', minWidth: '200px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                        <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                          Deuda Ordinaria
-                        </Typography>
-                        <TextField
-                          value={`S/. ${calcularDeudaGlobalTotal().toFixed(2)}`}
-                          size="small"
-                          fullWidth
-                          disabled
-                          sx={{ 
-                            '& .MuiInputBase-root': {
-                              backgroundColor: 'primary.main',
-                              color: 'white',
-                            },
-                            '& .MuiInputBase-input.Mui-disabled': {
-                              WebkitTextFillColor: 'white',
-                              color: 'white',
-                              fontWeight: 'bold'
-                            },
-                            '& .MuiOutlinedInput-notchedOutline': {
-                              borderColor: 'primary.dark',
-                            }
-                          }}
-                        />
-                      </Box>
-                    </Box>
+                    <DeudaOrdinariaComponent
+                      data={deudaGlobalData}
+                      tipoMonto={tipoMonto}
+                      selectedRows={selectedRows}
+                      onRowSelection={handleRowSelection}
+                      getCellColor={getCellColor}
+                      calcularDeudaTotal={calcularDeudaGlobalTotal}
+                    />
                   )}
                   {/* tabs Deuda Fraccionamiento */}
                   {deudaTabValue === 2 && (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%', overflow: 'hidden' }}>
-                      {/* Contenedor de las tres tablas */}
-                      <Box sx={{ display: 'flex', gap: 0, height: '160px', overflow: 'hidden' }}>
-                        {/* Primera tabla: Año y Res */}
-                        <TableContainer 
-                          component={Paper} 
-                          variant="outlined"
-                          sx={{
-                            width: '120px',
-                            minWidth: '120px',
-                            maxHeight: '160px',
-                            borderRadius: 0,
-                            borderRight: 0,
-                            overflowY: 'auto',
-                            overflowX: 'hidden',
-                            '&::-webkit-scrollbar': {
-                              width: '8px',
-                            },
-                            '&::-webkit-scrollbar-track': {
-                              backgroundColor: '#f1f1f1',
-                            },
-                            '&::-webkit-scrollbar-thumb': {
-                              backgroundColor: '#888',
-                              borderRadius: '4px',
-                              '&:hover': {
-                                backgroundColor: '#555',
-                              },
-                            },
-                          }}
-                        >
-                          <Table size="small" stickyHeader>
-                            <TableHead>
-                              <TableRow>
-                                <TableCell sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: '60px', fontSize: '0.75rem' }}>
-                                  Año
-                                </TableCell>
-                                <TableCell sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: '60px', fontSize: '0.75rem' }}>
-                                  Res
-                                </TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {resolucionesFraccionamiento.map((item, index) => (
-                                <TableRow key={index}>
-                                  <TableCell 
-                                    sx={{ 
-                                      fontSize: '0.7rem', 
-                                      cursor: 'pointer',
-                                      backgroundColor: selectedAño === item.año ? 'primary.main' : 'transparent',
-                                      color: selectedAño === item.año ? 'white' : 'inherit',
-                                      '&:hover': {
-                                        backgroundColor: selectedAño === item.año ? 'primary.dark' : 'primary.light',
-                                        color: 'white'
-                                      }
-                                    }}
-                                    onClick={() => handleAñoClick(item.año)}
-                                  >
-                                    {item.año}
-                                  </TableCell>
-                                  <TableCell sx={{ fontSize: '0.7rem' }}>
-                                    {item.resolucion}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-
-                        {/* Segunda tabla: Check, N°Cuota, Deuda, IM, Cuota, F.Venc */}
-                        <TableContainer 
-                          component={Paper} 
-                          variant="outlined"
-                          sx={{
-                            width: '350px',
-                            minWidth: '350px',
-                            maxHeight: '160px',
-                            borderRadius: 0,
-                            borderRight: 0,
-                            overflowY: 'auto',
-                            overflowX: 'hidden',
-                            '&::-webkit-scrollbar': {
-                              width: '8px',
-                            },
-                            '&::-webkit-scrollbar-track': {
-                              backgroundColor: '#f1f1f1',
-                            },
-                            '&::-webkit-scrollbar-thumb': {
-                              backgroundColor: '#888',
-                              borderRadius: '4px',
-                              '&:hover': {
-                                backgroundColor: '#555',
-                              },
-                            },
-                          }}
-                        >
-                          <Table size="small" stickyHeader>
-                            <TableHead>
-                              <TableRow>
-                                <TableCell sx={{ backgroundColor: '#f5f5f5', width: '30px', p: 0.5 }}>
-                                  {/* Check header */}
-                                </TableCell>
-                                <TableCell sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', fontSize: '0.75rem' }}>
-                                  N°Cuota
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', fontSize: '0.75rem' }}>
-                                  Deuda
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', fontSize: '0.75rem' }}>
-                                  IM
-                                </TableCell>
-                                <TableCell align="right" sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', fontSize: '0.75rem' }}>
-                                  Cuota
-                                </TableCell>
-                                <TableCell sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', fontSize: '0.75rem' }}>
-                                  F.Venc.
-                                </TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {cuotasFraccionamiento.length > 0 ? cuotasFraccionamiento.map((cuota) => (
-                                <TableRow key={cuota.nCuota}>
-                                  <TableCell sx={{ p: 0.5 }}>
-                                    <Checkbox
-                                      size="small"
-                                      checked={cuota.checked}
-                                      onChange={() => handleCuotaCheck(cuota.nCuota)}
-                                      sx={{ p: 0 }}
-                                    />
-                                  </TableCell>
-                                  <TableCell sx={{ fontSize: '0.7rem' }}>
-                                    {cuota.nCuota}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ fontSize: '0.7rem' }}>
-                                    {cuota.deuda.toFixed(2)}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ fontSize: '0.7rem' }}>
-                                    {cuota.im.toFixed(2)}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ fontSize: '0.7rem' }}>
-                                    {cuota.cuota.toFixed(2)}
-                                  </TableCell>
-                                  <TableCell sx={{ fontSize: '0.7rem' }}>
-                                    {cuota.fVenc}
-                                  </TableCell>
-                                </TableRow>
-                              )) : (
-                                <TableRow>
-                                  <TableCell colSpan={6} align="center" sx={{ fontSize: '0.7rem', color: 'text.secondary', py: 2 }}>
-                                    Seleccione un año para ver las cuotas
-                                  </TableCell>
-                                </TableRow>
-                              )}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-
-                        {/* Tercera tabla: Tributo y columnas 1-12 con scroll horizontal */}
-                        <Box sx={{ flex: 1, display: 'flex', maxHeight: '160px', overflow: 'hidden', border: '1px solid #e0e0e0', borderRadius: 0 }}>
-                          <TableContainer 
-                            component={Paper} 
-                            elevation={0}
-                            sx={{
-                              flex: 1,
-                              maxHeight: '160px',
-                              overflowX: 'auto',
-                              overflowY: 'auto',
-                              '&::-webkit-scrollbar': {
-                                height: '8px',
-                                width: '8px',
-                              },
-                              '&::-webkit-scrollbar-track': {
-                                backgroundColor: '#f1f1f1',
-                              },
-                              '&::-webkit-scrollbar-thumb': {
-                                backgroundColor: '#888',
-                                borderRadius: '4px',
-                                '&:hover': {
-                                  backgroundColor: '#555',
-                                },
-                              },
-                            }}
-                          >
-                            <Table size="small" stickyHeader>
-                              <TableHead>
-                                <TableRow>
-                                  <TableCell 
-                                    sx={{ 
-                                      backgroundColor: '#f5f5f5', 
-                                      fontWeight: 'bold', 
-                                      fontSize: '0.75rem',
-                                      position: 'sticky',
-                                      left: 0,
-                                      zIndex: 3,
-                                      borderRight: '1px solid #e0e0e0'
-                                    }}
-                                  >
-                                    Tributo
-                                  </TableCell>
-                                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((mes) => (
-                                    <TableCell 
-                                      key={mes}
-                                      align="right" 
-                                      sx={{ 
-                                        backgroundColor: '#f5f5f5', 
-                                        fontWeight: 'bold', 
-                                        fontSize: '0.7rem',
-                                        minWidth: '45px'
-                                      }}
-                                    >
-                                      {mes}
-                                    </TableCell>
-                                  ))}
-                                </TableRow>
-                              </TableHead>
-                              <TableBody>
-                                {(tributosFraccionados.length > 0 ? tributosFraccionados : tributosFraccionadosBase).map((row, index) => (
-                                  <TableRow key={index}>
-                                    <TableCell 
-                                      sx={{ 
-                                        fontSize: '0.7rem',
-                                        position: 'sticky',
-                                        left: 0,
-                                        backgroundColor: 'white',
-                                        zIndex: 2,
-                                        borderRight: '1px solid #e0e0e0'
-                                      }}
-                                    >
-                                      {row.tributo}
-                                    </TableCell>
-                                    {row.valores.map((valor, mesIndex) => (
-                                      <TableCell 
-                                        key={mesIndex}
-                                        align="right" 
-                                        sx={{ 
-                                          fontSize: '0.65rem',
-                                          minWidth: '45px',
-                                          background: getCellColorFraccionamiento(index, mesIndex),
-                                          color: getCellColorFraccionamiento(index, mesIndex) !== 'transparent' ? 'white' : 'inherit'
-                                        }}
-                                      >
-                                        {valor > 0 ? valor.toFixed(2) : '-'}
-                                      </TableCell>
-                                    ))}
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </TableContainer>
-                        </Box>
-                      </Box>
-
-                      {/* TextField Deuda Fraccionada */}
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2, mt: 1 }}>
-                        <Typography variant="subtitle2" fontWeight="bold">
-                          Deuda Fraccionada:
-                        </Typography>
-                        <TextField
-                          value={montoFraccionado || 'S/. 0.00'}
-                          size="small"
-                          disabled
-                          sx={{ 
-                            width: '150px',
-                            '& .MuiInputBase-root': {
-                              backgroundColor: 'primary.main',
-                              color: 'white',
-                            },
-                            '& .MuiInputBase-input.Mui-disabled': {
-                              WebkitTextFillColor: 'white',
-                              color: 'white',
-                              fontWeight: 'bold'
-                            },
-                            '& .MuiOutlinedInput-notchedOutline': {
-                              borderColor: 'primary.dark',
-                            }
-                          }}
-                        />
-                      </Box>
-                    </Box>
+                    <DeudaFraccionada
+                      resolucionesFraccionamiento={resolucionesFraccionamiento}
+                      cuotasFraccionamiento={cuotasFraccionamiento}
+                      tributosFraccionados={tributosFraccionados}
+                      tributosFraccionadosBase={tributosFraccionadosBase}
+                      selectedAño={selectedAño}
+                      montoFraccionado={montoFraccionado}
+                      onAñoClick={handleAñoClick}
+                      onCuotaCheck={handleCuotaCheck}
+                      getCellColorFraccionamiento={getCellColorFraccionamiento}
+                    />
                   )}
                   {/* tabs Deuda Coactiva */}
                   {deudaTabValue === 3 && (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%', overflow: 'hidden' }}>
-                      {/* Contenedor de las tres tablas */}
-                      <Box sx={{ display: 'flex', gap: 0, maxHeight: '160px', overflow: 'hidden' }}>
-                        {/* Primera tabla: Año Expediente y N° Expediente */}
-                        <TableContainer 
-                          component={Paper} 
-                          variant="outlined"
-                          sx={{
-                            width: '180px',
-                            minWidth: '180px',
-                            maxHeight: '160px',
-                            borderRadius: 0,
-                            borderRight: 0,
-                            overflowY: 'auto',
-                            overflowX: 'hidden',
-                            '&::-webkit-scrollbar': {
-                              width: '8px',
-                            },
-                            '&::-webkit-scrollbar-track': {
-                              backgroundColor: '#f1f1f1',
-                            },
-                            '&::-webkit-scrollbar-thumb': {
-                              backgroundColor: '#888',
-                              borderRadius: '4px',
-                              '&:hover': {
-                                backgroundColor: '#555',
-                              },
-                            },
-                          }}
-                        >
-                          <Table size="small" stickyHeader>
-                            <TableHead>
-                              <TableRow>
-                                <TableCell sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: '90px', fontSize: '0.75rem' }}>
-                                  Año Expediente
-                                </TableCell>
-                                <TableCell sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', width: '90px', fontSize: '0.75rem' }}>
-                                  N° Expediente
-                                </TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {expedientesCoactivos.map((expediente, index) => (
-                                <TableRow key={index}>
-                                  <TableCell 
-                                    sx={{ 
-                                      fontSize: '0.7rem', 
-                                      cursor: 'pointer',
-                                      backgroundColor: selectedExpediente === expediente.añoExpediente ? 'primary.main' : 'transparent',
-                                      color: selectedExpediente === expediente.añoExpediente ? 'white' : 'inherit',
-                                      '&:hover': {
-                                        backgroundColor: selectedExpediente === expediente.añoExpediente ? 'primary.dark' : 'primary.light',
-                                        color: 'white'
-                                      }
-                                    }}
-                                    onClick={() => handleExpedienteClick(expediente.añoExpediente)}
-                                  >
-                                    {expediente.añoExpediente}
-                                  </TableCell>
-                                  <TableCell sx={{ fontSize: '0.7rem' }}>
-                                    {expediente.nroExpediente}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-
-                        {/* Segunda tabla: Años */}
-                        <TableContainer 
-                          component={Paper} 
-                          variant="outlined"
-                          sx={{
-                            width: '100px',
-                            minWidth: '100px',
-                            maxHeight: '160px',
-                            borderRadius: 0,
-                            borderRight: 0,
-                            overflowY: 'auto',
-                            overflowX: 'hidden',
-                            '&::-webkit-scrollbar': {
-                              width: '8px',
-                            },
-                            '&::-webkit-scrollbar-track': {
-                              backgroundColor: '#f1f1f1',
-                            },
-                            '&::-webkit-scrollbar-thumb': {
-                              backgroundColor: '#888',
-                              borderRadius: '4px',
-                              '&:hover': {
-                                backgroundColor: '#555',
-                              },
-                            },
-                          }}
-                        >
-                          <Table size="small" stickyHeader>
-                            <TableHead>
-                              <TableRow>
-                                <TableCell sx={{ backgroundColor: '#f5f5f5', fontWeight: 'bold', fontSize: '0.75rem' }}>
-                                  Año
-                                </TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {añosCoactivos.length > 0 ? añosCoactivos.map((añoData) => (
-                                <TableRow key={añoData.año}>
-                                  <TableCell 
-                                    sx={{ 
-                                      fontSize: '0.7rem', 
-                                      cursor: 'pointer',
-                                      backgroundColor: selectedAñoCoactivo === añoData.año ? 'primary.main' : 'transparent',
-                                      color: selectedAñoCoactivo === añoData.año ? 'white' : 'inherit',
-                                      '&:hover': {
-                                        backgroundColor: selectedAñoCoactivo === añoData.año ? 'primary.dark' : 'primary.light',
-                                        color: 'white'
-                                      }
-                                    }}
-                                    onClick={() => handleAñoCoactivoClick(añoData.año)}
-                                  >
-                                    {añoData.año}
-                                  </TableCell>
-                                </TableRow>
-                              )) : (
-                                <TableRow>
-                                  <TableCell align="center" sx={{ fontSize: '0.7rem', color: 'text.secondary', py: 2 }}>
-                                    Seleccione expediente
-                                  </TableCell>
-                                </TableRow>
-                              )}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-
-                        {/* Tercera tabla: Tributos con check y columnas 1-12 con scroll horizontal */}
-                        <Box sx={{ flex: 1, display: 'flex', maxHeight: '160px', overflow: 'hidden', border: '1px solid #e0e0e0', borderRadius: 0 }}>
-                          <TableContainer 
-                            component={Paper} 
-                            elevation={0}
-                            sx={{
-                              flex: 1,
-                              maxHeight: '160px',
-                              overflowX: 'auto',
-                              overflowY: 'auto',
-                              '&::-webkit-scrollbar': {
-                                height: '8px',
-                                width: '8px',
-                              },
-                              '&::-webkit-scrollbar-track': {
-                                backgroundColor: '#f1f1f1',
-                              },
-                              '&::-webkit-scrollbar-thumb': {
-                                backgroundColor: '#888',
-                                borderRadius: '4px',
-                                '&:hover': {
-                                  backgroundColor: '#555',
-                                },
-                              },
-                            }}
-                          >
-                            <Table size="small" stickyHeader>
-                              <TableHead>
-                                <TableRow>
-                                  {tributosCoactivos.length > 0 && (
-                                    <TableCell 
-                                      sx={{ 
-                                        backgroundColor: '#f5f5f5', 
-                                        fontWeight: 'bold', 
-                                        fontSize: '0.75rem',
-                                        position: 'sticky',
-                                        left: 0,
-                                        zIndex: 3,
-                                        borderRight: '1px solid #e0e0e0',
-                                        width: '30px'
-                                      }}
-                                    >
-                                      {/* Check header */}
-                                    </TableCell>
-                                  )}
-                                  <TableCell 
-                                    sx={{ 
-                                      backgroundColor: '#f5f5f5', 
-                                      fontWeight: 'bold', 
-                                      fontSize: '0.75rem',
-                                      position: 'sticky',
-                                      left: tributosCoactivos.length > 0 ? '30px' : 0,
-                                      zIndex: 3,
-                                      borderRight: '1px solid #e0e0e0'
-                                    }}
-                                  >
-                                    Tributo
-                                  </TableCell>
-                                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((mes) => (
-                                    <TableCell 
-                                      key={mes}
-                                      align="right" 
-                                      sx={{ 
-                                        backgroundColor: '#f5f5f5', 
-                                        fontWeight: 'bold', 
-                                        fontSize: '0.7rem',
-                                        minWidth: '45px'
-                                      }}
-                                    >
-                                      {mes}
-                                    </TableCell>
-                                  ))}
-                                </TableRow>
-                              </TableHead>
-                              <TableBody>
-                                {tributosCoactivos.length > 0 ? tributosCoactivos.map((tributo, index) => (
-                                  <TableRow key={index}>
-                                    <TableCell 
-                                      sx={{ 
-                                        position: 'sticky',
-                                        left: 0,
-                                        backgroundColor: 'white',
-                                        zIndex: 2,
-                                        borderRight: '1px solid #e0e0e0',
-                                        p: 0.5,
-                                        width: '30px'
-                                      }}
-                                    >
-                                      <Checkbox
-                                        size="small"
-                                        checked={tributo.checked}
-                                        onChange={() => handleTributoCoactivoCheck(index)}
-                                        sx={{ p: 0 }}
-                                      />
-                                    </TableCell>
-                                    <TableCell 
-                                      sx={{ 
-                                        fontSize: '0.7rem',
-                                        position: 'sticky',
-                                        left: '30px',
-                                        backgroundColor: 'white',
-                                        zIndex: 2,
-                                        borderRight: '1px solid #e0e0e0'
-                                      }}
-                                    >
-                                      {tributo.tributo}
-                                    </TableCell>
-                                    {tributo.valores.map((valor, mesIndex) => (
-                                      <TableCell 
-                                        key={mesIndex}
-                                        align="right" 
-                                        sx={{ 
-                                          fontSize: '0.65rem',
-                                          minWidth: '45px',
-                                          background: getCellColorCoactivo(index, mesIndex),
-                                          color: getCellColorCoactivo(index, mesIndex) !== 'transparent' ? 'white' : 'inherit'
-                                        }}
-                                      >
-                                        {valor > 0 ? valor.toFixed(2) : '-'}
-                                      </TableCell>
-                                    ))}
-                                  </TableRow>
-                                )) : (
-                                  <TableRow>
-                                    <TableCell colSpan={14} align="center" sx={{ fontSize: '0.7rem', color: 'text.secondary', py: 2 }}>
-                                      Seleccione un año para ver los tributos
-                                    </TableCell>
-                                  </TableRow>
-                                )}
-                              </TableBody>
-                            </Table>
-                          </TableContainer>
-                        </Box>
-                      </Box>
-
-                      {/* TextField Deuda Coactiva */}
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2, mt: 1 }}>
-                        <Typography variant="subtitle2" fontWeight="bold">
-                          Deuda Coactiva:
-                        </Typography>
-                        <TextField
-                          value={montoCoactivo || 'S/. 0.00'}
-                          size="small"
-                          disabled
-                          sx={{ 
-                            width: '150px',
-                            '& .MuiInputBase-root': {
-                              backgroundColor: 'primary.main',
-                              color: 'white',
-                            },
-                            '& .MuiInputBase-input.Mui-disabled': {
-                              WebkitTextFillColor: 'white',
-                              color: 'white',
-                              fontWeight: 'bold'
-                            },
-                            '& .MuiOutlinedInput-notchedOutline': {
-                              borderColor: 'primary.dark',
-                            }
-                          }}
-                        />
-                      </Box>
-                    </Box>
+                    <DeudaCoactiva
+                      expedientesCoactivos={expedientesCoactivos}
+                      añosCoactivos={añosCoactivos}
+                      tributosCoactivos={tributosCoactivos}
+                      selectedExpediente={selectedExpediente}
+                      selectedAñoCoactivo={selectedAñoCoactivo}
+                      montoCoactivo={montoCoactivo}
+                      onExpedienteClick={handleExpedienteClick}
+                      onAñoCoactivoClick={handleAñoCoactivoClick}
+                      onTributoCoactivoCheck={handleTributoCoactivoCheck}
+                      getCellColorCoactivo={getCellColorCoactivo}
+                    />
                   )}
                 </Box>
               </Paper>
@@ -2157,6 +1349,58 @@ const DeudaContribuyente: React.FC<DeudaContribuyenteProps> = ({
       </DialogContent>
 
       {/* Actions */}
+      <Divider />
+      <DialogActions sx={{ p: 2, flexDirection: 'column', alignItems: 'stretch', gap: 1 }}>
+        {/* Leyenda de Atajos de Teclado */}
+        <Box
+          sx={{
+            px: 2,
+            py: 1,
+            backgroundColor: '#f5f5f5',
+            borderRadius: 1,
+            border: '1px solid #e0e0e0'
+          }}
+        >
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', alignItems: 'center' }}>
+            <Typography variant="caption" fontWeight="bold" color="text.secondary" sx={{ mr: 1 }}>
+              Atajos:
+            </Typography>
+
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Paper elevation={1} sx={{ px: 1, py: 0.5, fontSize: '0.75rem', fontFamily: 'monospace', fontWeight: 'bold', bgcolor: 'white' }}>F2</Paper>
+              <Typography variant="caption" color="text.secondary">Nuevo</Typography>
+            </Box>
+
+            <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Paper elevation={1} sx={{ px: 1, py: 0.5, fontSize: '0.75rem', fontFamily: 'monospace', fontWeight: 'bold', bgcolor: 'white' }}>F4</Paper>
+              <Typography variant="caption" color="text.secondary">Pagar</Typography>
+            </Box>
+
+            <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Paper elevation={1} sx={{ px: 1, py: 0.5, fontSize: '0.75rem', fontFamily: 'monospace', fontWeight: 'bold', bgcolor: 'white' }}>Esc</Paper>
+              <Typography variant="caption" color="text.secondary">Cerrar</Typography>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Botón Cerrar */}
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Tooltip title="Cerrar (Esc)" arrow>
+            <Button
+              onClick={handleClose}
+              variant="outlined"
+              color="error"
+              startIcon={<CloseIcon />}
+            >
+              Cerrar
+            </Button>
+          </Tooltip>
+        </Box>
+      </DialogActions>
 
     </StyledDialog>
   );

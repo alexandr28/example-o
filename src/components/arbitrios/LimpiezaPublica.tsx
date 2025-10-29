@@ -24,6 +24,8 @@ import {
   Home as HomeIcon,
   Business as BusinessIcon
 } from '@mui/icons-material';
+import { useListaUsosOptions } from '../../hooks/useConstantesOptions';
+import { useLimpiezaPublica } from '../../hooks/useLimpiezaPublica';
 
 // Interfaces
 interface ZonaOption {
@@ -80,21 +82,40 @@ const a11yProps = (index: number) => {
 
 const LimpiezaPublica: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
-  
+
+  // Hook para opciones de uso
+  const { options: usosOptions } = useListaUsosOptions();
+
+  // Hook para limpieza publica
+  const {
+    limpiezaPublica,
+    limpiezaPublicaOtros,
+    loading: loadingLimpieza,
+    listarLimpiezaPublica,
+    crearLimpiezaPublica,
+    actualizarLimpiezaPublica,
+    listarLimpiezaPublicaOtros,
+    crearLimpiezaPublicaOtros,
+    actualizarLimpiezaPublicaOtros
+  } = useLimpiezaPublica();
+
   // Estados para Casa Habitación
   const [anioCasa, setAnioCasa] = useState<number>(new Date().getFullYear());
   const [zonaCasa, setZonaCasa] = useState<ZonaOption | null>(null);
+  const [criterioUsoCasa, setCriterioUsoCasa] = useState<any>(null);
   const [tasaCasa, setTasaCasa] = useState<string>('');
   const [anioConsultaCasa, setAnioConsultaCasa] = useState<string>(new Date().getFullYear().toString());
   const [mostrarTablaCasa, setMostrarTablaCasa] = useState(false);
-  
+
   // Estados para Otros Usos
   const [anioOtros, setAnioOtros] = useState<number>(new Date().getFullYear());
+  const [zonaOtros, setZonaOtros] = useState<ZonaOption | null>(null);
+  const [criterioUsoOtros, setCriterioUsoOtros] = useState<any>(null);
   const [criterioOtros, setCriterioOtros] = useState<CriterioOption | null>(null);
   const [tasaOtros, setTasaOtros] = useState<string>('');
   const [anioConsultaOtros, setAnioConsultaOtros] = useState<string>(new Date().getFullYear().toString());
   const [mostrarTablaOtros, setMostrarTablaOtros] = useState(false);
-  
+
   const [isLoading, setIsLoading] = useState(false);
   
   // Opciones para Zonas (16 zonas)
@@ -109,115 +130,192 @@ const LimpiezaPublica: React.FC = () => {
     label: `CT${i + 1}`
   }));
   
-  // Datos de ejemplo para Casa Habitación
-  const datosCasaHabitacion: TasaCasaHabitacion[] = [
-    { zona: 'Zona 1', tasaMensual: 0.50 },
-    { zona: 'Zona 2', tasaMensual: 0.48 },
-    { zona: 'Zona 3', tasaMensual: 0.46 },
-    { zona: 'Zona 4', tasaMensual: 0.44 },
-    { zona: 'Zona 5', tasaMensual: 0.42 },
-    { zona: 'Zona 6', tasaMensual: 0.40 },
-    { zona: 'Zona 7', tasaMensual: 0.38 },
-    { zona: 'Zona 8', tasaMensual: 0.36 },
-    { zona: 'Zona 9', tasaMensual: 0.35 },
-    { zona: 'Zona 10', tasaMensual: 0.34 },
-    { zona: 'Zona 11', tasaMensual: 0.33 },
-    { zona: 'Zona 12', tasaMensual: 0.32 },
-    { zona: 'Zona 13', tasaMensual: 0.31 },
-    { zona: 'Zona 14', tasaMensual: 0.30 },
-    { zona: 'Zona 15', tasaMensual: 0.29 },
-    { zona: 'Zona 16', tasaMensual: 0.28 },
-  ];
-  
-  // Datos de ejemplo para Otros Usos
-  const datosOtrosUsos: TasaOtrosUsos[] = [
-    { usoPredio: 'CT1 - Comercio Menor', tasaMensual: 0.85 },
-    { usoPredio: 'CT2 - Comercio Mayor', tasaMensual: 1.20 },
-    { usoPredio: 'CT3 - Servicios Profesionales', tasaMensual: 0.95 },
-    { usoPredio: 'CT4 - Industria Ligera', tasaMensual: 1.50 },
-    { usoPredio: 'CT5 - Industria Pesada', tasaMensual: 2.00 },
-    { usoPredio: 'CT6 - Educación', tasaMensual: 0.60 },
-    { usoPredio: 'CT7 - Salud', tasaMensual: 0.75 },
-    { usoPredio: 'CT8 - Recreación', tasaMensual: 0.70 },
-  ];
+  // Mapear datos de Casa Habitación desde el hook
+  const datosCasaHabitacion: TasaCasaHabitacion[] = limpiezaPublica.map(lp => ({
+    zona: lp.nombreZona || `Zona ${lp.codZona}`,
+    tasaMensual: lp.tasaMensual
+  }));
+
+  // Mapear datos de Otros Usos desde el hook
+  const datosOtrosUsos: TasaOtrosUsos[] = limpiezaPublicaOtros.map(lp => ({
+    usoPredio: lp.criterioUso || `CT${lp.codCriterio}`,
+    tasaMensual: lp.tasaMensual
+  }));
   
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
   
   // Handlers para Casa Habitación
-  const handleRegistroCasa = () => {
-    console.log('Registrar Tasa Casa Habitación:', {
-      año: anioCasa,
-      zona: zonaCasa,
-      tasa: tasaCasa
-    });
+  const handleRegistroCasa = async () => {
+    if (!zonaCasa || !tasaCasa || !criterioUsoCasa) {
+      console.warn('Faltan datos requeridos');
+      return;
+    }
+
+    try {
+      const datos = {
+        anio: anioCasa,
+        tasaMensual: parseFloat(tasaCasa),
+        codZona: zonaCasa.id,
+        codCriterio: parseInt(criterioUsoCasa.value)
+      };
+
+      console.log('Registrar/Actualizar Tasa Casa Habitación:', datos);
+
+      // Verificar si ya existe para decidir si crear o actualizar
+      const existente = limpiezaPublica.find(
+        lp => lp.anio === datos.anio && lp.codZona === datos.codZona && lp.codCriterio === datos.codCriterio
+      );
+
+      if (existente) {
+        await actualizarLimpiezaPublica(datos);
+      } else {
+        await crearLimpiezaPublica(datos);
+      }
+
+      // Limpiar formulario
+      setZonaCasa(null);
+      setCriterioUsoCasa(null);
+      setTasaCasa('');
+
+      // Recargar datos
+      await listarLimpiezaPublica({ anio: anioCasa });
+    } catch (error) {
+      console.error('Error en handleRegistroCasa:', error);
+    }
   };
-  
+
   const handleNuevoCasa = () => {
     setAnioCasa(new Date().getFullYear());
     setZonaCasa(null);
+    setCriterioUsoCasa(null);
     setTasaCasa('');
   };
-  
-  const handleBuscarCasa = () => {
+
+  const handleBuscarCasa = async () => {
+    if (!anioConsultaCasa) return;
+
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      await listarLimpiezaPublica({ anio: parseInt(anioConsultaCasa) });
       setMostrarTablaCasa(true);
+    } catch (error) {
+      console.error('Error buscando Casa Habitación:', error);
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
   };
   
   // Handlers para Otros Usos
-  const handleRegistroOtros = () => {
-    console.log('Registrar Tasa Otros Usos:', {
-      año: anioOtros,
-      criterio: criterioOtros,
-      tasa: tasaOtros
-    });
+  const handleRegistroOtros = async () => {
+    if (!zonaOtros || !tasaOtros || !criterioUsoOtros) {
+      console.warn('[LimpiezaPublica] Faltan datos requeridos para Otros Usos');
+      return;
+    }
+
+    try {
+      const datos = {
+        anio: anioOtros,
+        tasaMensual: parseFloat(tasaOtros),
+        codZona: zonaOtros.id,
+        codCriterio: parseInt(criterioUsoOtros.value)
+      };
+
+      console.log('[LimpiezaPublica] Registrando Otros Usos con datos:', datos);
+
+      // Verificar si ya existe un registro con esa combinación
+      const existente = limpiezaPublicaOtros.find(
+        lp => lp.anio === datos.anio &&
+              lp.codZona === datos.codZona &&
+              lp.codCriterio === datos.codCriterio
+      );
+
+      if (existente) {
+        console.log('[LimpiezaPublica] Actualizando registro existente de Otros Usos');
+        await actualizarLimpiezaPublicaOtros(datos);
+      } else {
+        console.log('[LimpiezaPublica] Creando nuevo registro de Otros Usos');
+        await crearLimpiezaPublicaOtros(datos);
+      }
+
+      // Limpiar formulario
+      handleNuevoOtros();
+
+      // Recargar tabla
+      await listarLimpiezaPublicaOtros({ anio: datos.anio });
+      setMostrarTablaOtros(true);
+
+    } catch (error) {
+      console.error('[LimpiezaPublica] Error registrando Otros Usos:', error);
+    }
   };
-  
+
   const handleNuevoOtros = () => {
     setAnioOtros(new Date().getFullYear());
-    setCriterioOtros(null);
+    setZonaOtros(null);
+    setCriterioUsoOtros(null);
     setTasaOtros('');
   };
-  
-  const handleBuscarOtros = () => {
-    setIsLoading(true);
-    setTimeout(() => {
+
+  const handleBuscarOtros = async () => {
+    try {
+      setIsLoading(true);
+      await listarLimpiezaPublicaOtros({ anio: parseInt(anioConsultaOtros) });
       setMostrarTablaOtros(true);
+    } catch (error) {
+      console.error('[LimpiezaPublica] Error buscando Otros Usos:', error);
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
   };
   
   // Handler para click en celda de Casa Habitación
   const handleCasaClick = (zona: string, tasaValue: number) => {
-    // Encontrar la zona correspondiente
-    const zonaSeleccionada = zonas.find(z => z.label === zona);
-    
-    // Actualizar los campos del formulario
-    setAnioCasa(parseInt(anioConsultaCasa));
-    setZonaCasa(zonaSeleccionada || null);
-    setTasaCasa(tasaValue.toString());
-    
-    // Scroll hacia arriba para mostrar el formulario
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Buscar el registro completo en los datos
+    const registro = limpiezaPublica.find(lp =>
+      (lp.nombreZona === zona || `Zona ${lp.codZona}` === zona) &&
+      lp.tasaMensual === tasaValue
+    );
+
+    if (registro) {
+      // Encontrar la zona y criterio correspondientes
+      const zonaSeleccionada = zonas.find(z => z.id === registro.codZona);
+      const criterioSeleccionado = usosOptions.find(u => Number(u.value) === registro.codCriterio);
+
+      // Actualizar los campos del formulario
+      setAnioCasa(registro.anio || parseInt(anioConsultaCasa));
+      setZonaCasa(zonaSeleccionada || null);
+      setCriterioUsoCasa(criterioSeleccionado || null);
+      setTasaCasa(registro.tasaMensual.toString());
+
+      // Scroll hacia arriba para mostrar el formulario
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
-  
+
   // Handler para click en celda de Otros Usos
   const handleOtrosClick = (usoPredio: string, tasaValue: number) => {
-    // Extraer el criterio del usoPredio (ej: "CT1 - Comercio Menor" -> "CT1")
-    const criterioCode = usoPredio.split(' - ')[0];
-    const criterioSeleccionado = criterios.find(c => c.label === criterioCode);
-    
-    // Actualizar los campos del formulario
-    setAnioOtros(parseInt(anioConsultaOtros));
-    setCriterioOtros(criterioSeleccionado || null);
-    setTasaOtros(tasaValue.toString());
-    
-    // Scroll hacia arriba para mostrar el formulario
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Buscar el registro completo en los datos
+    const registro = limpiezaPublicaOtros.find(lp =>
+      (lp.criterioUso === usoPredio || `CT${lp.codCriterio}` === usoPredio) &&
+      lp.tasaMensual === tasaValue
+    );
+
+    if (registro) {
+      // Encontrar la zona y criterio correspondientes
+      const zonaSeleccionada = zonas.find(z => z.id === registro.codZona);
+      const criterioSeleccionado = usosOptions.find(u => Number(u.value) === registro.codCriterio);
+
+      // Actualizar los campos del formulario
+      setAnioOtros(registro.anio || parseInt(anioConsultaOtros));
+      setZonaOtros(zonaSeleccionada || null);
+      setCriterioUsoOtros(criterioSeleccionado || null);
+      setTasaOtros(registro.tasaMensual.toString());
+
+      // Scroll hacia arriba para mostrar el formulario
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
   
   return (
@@ -274,7 +372,7 @@ const LimpiezaPublica: React.FC = () => {
               p: 3,
               mb: 3,
               backgroundColor: 'background.paper',
-              width: '55%'
+              width: '70%'
             }}
           >
             <Typography 
@@ -293,7 +391,7 @@ const LimpiezaPublica: React.FC = () => {
             </Typography>
 
             {/* Primera fila */}
-            <Box sx={{ 
+            <Box sx={{
               display: 'flex',
               gap: 2,
               mb: 2
@@ -305,19 +403,39 @@ const LimpiezaPublica: React.FC = () => {
                 type="number"
                 value={anioCasa}
                 onChange={(e) => setAnioCasa(parseInt(e.target.value))}
-                sx={{ 
+                sx={{
                   width: '120px',
                   '& .MuiInputBase-root': {
                     height: '35px'
                   }
                 }}
                 InputProps={{
-                  inputProps: { 
-                    min: 1900, 
-                    max: new Date().getFullYear() 
+                  inputProps: {
+                    min: 1900,
+                    max: new Date().getFullYear()
                   }
                 }}
               />
+
+              {/* Tasa Mensual */}
+              <TextField
+                label="Tasa Mensual"
+                value={tasaCasa}
+                onChange={(e) => setTasaCasa(e.target.value)}
+                size="small"
+                type="number"
+                sx={{
+                  width: '120px',
+                  '& .MuiInputBase-root': {
+                    height: '35px'
+                  }
+                }}
+                InputProps={{
+                  startAdornment: <Box sx={{ mr: 0.5, color: 'text.secondary' }}>S/ x m²</Box>
+                }}
+                placeholder="0.00"
+              />
+
               {/* Zona */}
               <Autocomplete
                 value={zonaCasa}
@@ -334,23 +452,24 @@ const LimpiezaPublica: React.FC = () => {
                   />
                 )}
               />
-              {/* Tasa Mensual */}
-              <TextField
-                label="Tasa Mensual"
-                value={tasaCasa}
-                onChange={(e) => setTasaCasa(e.target.value)}
+
+              {/* Criterio Uso */}
+              <Autocomplete
+                value={criterioUsoCasa}
+                onChange={(_, newValue) => setCriterioUsoCasa(newValue)}
+                options={usosOptions.filter(option =>
+                  option.label?.toUpperCase().includes('CASA')
+                )}
+                getOptionLabel={(option) => option.label || ''}
                 size="small"
-                type="number"
-                sx={{ 
-                  width: '120px' ,
-                  '& .MuiInputBase-root': {
-                    height: '35px'
-                  }
-                }}
-                InputProps={{
-                  startAdornment: <Box sx={{ mr: 0.5, color: 'text.secondary' }}>S/ x m²</Box>
-                }}
-                placeholder="0.00"
+                sx={{ minWidth: 180, flex: 0 }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Criterio Uso"
+                    placeholder="Seleccione criterio"
+                  />
+                )}
               />
             </Box>
 
@@ -456,8 +575,8 @@ const LimpiezaPublica: React.FC = () => {
                 <Table stickyHeader>
                   <TableHead>
                     <TableRow>
-                      <TableCell 
-                        sx={{ 
+                      <TableCell
+                        sx={{
                           fontWeight: 700,
                           backgroundColor: 'primary.main',
                           color: 'primary.contrastText'
@@ -465,15 +584,25 @@ const LimpiezaPublica: React.FC = () => {
                       >
                         Zona de Servicio
                       </TableCell>
-                      <TableCell 
+                      <TableCell
                         align="center"
-                        sx={{ 
+                        sx={{
                           fontWeight: 700,
                           backgroundColor: 'primary.main',
                           color: 'primary.contrastText'
                         }}
                       >
                         Tasa Mensual (S/ x m²)
+                      </TableCell>
+                      <TableCell
+                        align="center"
+                        sx={{
+                          fontWeight: 700,
+                          backgroundColor: 'primary.main',
+                          color: 'primary.contrastText'
+                        }}
+                      >
+                        Tasa Anual
                       </TableCell>
                     </TableRow>
                   </TableHead>
@@ -485,7 +614,7 @@ const LimpiezaPublica: React.FC = () => {
                       >
                         <TableCell sx={{ cursor: 'default' }}>{row.zona}</TableCell>
                         <TableCell align="center" sx={{ cursor: 'pointer' }}>
-                          <Tooltip 
+                          <Tooltip
                             title={`Clic para editar: ${row.zona} - S/ ${row.tasaMensual.toFixed(2)}`}
                             arrow
                             placement="top"
@@ -516,6 +645,21 @@ const LimpiezaPublica: React.FC = () => {
                             </Box>
                           </Tooltip>
                         </TableCell>
+                        <TableCell align="center">
+                          <Box
+                            sx={{
+                              display: 'inline-block',
+                              backgroundColor: 'info.light',
+                              color: 'info.contrastText',
+                              px: 2,
+                              py: 0.5,
+                              borderRadius: 1,
+                              fontWeight: 600
+                            }}
+                          >
+                            S/ {(row.tasaMensual * 12).toFixed(2)}
+                          </Box>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -534,7 +678,7 @@ const LimpiezaPublica: React.FC = () => {
               p: 3,
               mb: 3,
               backgroundColor: 'background.paper',
-              width:'60%'
+              width:'70%'
             }}
           >
             <Typography 
@@ -553,64 +697,85 @@ const LimpiezaPublica: React.FC = () => {
             </Typography>
 
             {/* Primera fila */}
-            <Box sx={{ 
+            <Box sx={{
               display: 'flex',
               gap: 2,
               mb: 2
             }}>
-
+              {/* Año */}
               <TextField
                 size="small"
                 label="Año"
                 type="number"
                 value={anioOtros}
                 onChange={(e) => setAnioOtros(parseInt(e.target.value))}
-                sx={{ 
-                  width: '120px' ,
+                sx={{
+                  width: '120px',
                   '& .MuiInputBase-root': {
-                    height: '37px'
+                    height: '35px'
                   }
                 }}
                 InputProps={{
-                  inputProps: { 
-                    min: 1900, 
-                    max: new Date().getFullYear() 
+                  inputProps: {
+                    min: 1900,
+                    max: new Date().getFullYear()
                   }
                 }}
               />
-              
-              <Autocomplete
-                value={criterioOtros}
-                onChange={(_, newValue) => setCriterioOtros(newValue)}
-                options={criterios}
-                getOptionLabel={(option) => option.label}
-                size="small"
-                sx={{ minWidth: 180, flex: 0 }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Criterio"
-                    placeholder="Seleccione criterio"
-                  />
-                )}
-              />
-              
+
+              {/* Tasa Mensual */}
               <TextField
                 label="Tasa Mensual"
                 value={tasaOtros}
                 onChange={(e) => setTasaOtros(e.target.value)}
                 size="small"
                 type="number"
-                sx={{ 
-                  width: '120px' ,
+                sx={{
+                  width: '120px',
                   '& .MuiInputBase-root': {
-                    height: '37px'
+                    height: '35px'
                   }
                 }}
                 InputProps={{
                   startAdornment: <Box sx={{ mr: 0.5, color: 'text.secondary' }}>S/ x m²</Box>
                 }}
                 placeholder="0.00"
+              />
+
+              {/* Zona */}
+              <Autocomplete
+                value={zonaOtros}
+                onChange={(_, newValue) => setZonaOtros(newValue)}
+                options={zonas}
+                getOptionLabel={(option) => option.label}
+                size="small"
+                sx={{ minWidth: 150, flex: 0 }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Zona"
+                    placeholder="Seleccione zona"
+                  />
+                )}
+              />
+
+              {/* Criterio Uso */}
+              <Autocomplete
+                value={criterioUsoOtros}
+                onChange={(_, newValue) => setCriterioUsoOtros(newValue)}
+                options={usosOptions.filter(option =>
+                  !option.label?.toUpperCase().includes('CASA')
+                )}
+                getOptionLabel={(option) => option.label || ''}
+                size="small"
+                sx={{ minWidth: 180, flex: 0 }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Criterio Uso"
+                    placeholder="Seleccione criterio"
+                  />
+                )}
               />
             </Box>
 
@@ -625,7 +790,7 @@ const LimpiezaPublica: React.FC = () => {
                 color="primary"
                 startIcon={<SaveIcon />}
                 onClick={handleRegistroOtros}
-                disabled={!criterioOtros || !tasaOtros}
+                disabled={!zonaOtros || !tasaOtros || !criterioUsoOtros}
               >
                 Registrar
               </Button>
@@ -716,8 +881,8 @@ const LimpiezaPublica: React.FC = () => {
                 <Table stickyHeader>
                   <TableHead>
                     <TableRow>
-                      <TableCell 
-                        sx={{ 
+                      <TableCell
+                        sx={{
                           fontWeight: 700,
                           backgroundColor: 'primary.main',
                           color: 'primary.contrastText'
@@ -725,15 +890,25 @@ const LimpiezaPublica: React.FC = () => {
                       >
                         Uso del Predio
                       </TableCell>
-                      <TableCell 
+                      <TableCell
                         align="center"
-                        sx={{ 
+                        sx={{
                           fontWeight: 700,
                           backgroundColor: 'primary.main',
                           color: 'primary.contrastText'
                         }}
                       >
                         Tasa Mensual (S/ x m²)
+                      </TableCell>
+                      <TableCell
+                        align="center"
+                        sx={{
+                          fontWeight: 700,
+                          backgroundColor: 'primary.main',
+                          color: 'primary.contrastText'
+                        }}
+                      >
+                        Tasa Anual
                       </TableCell>
                     </TableRow>
                   </TableHead>
@@ -745,7 +920,7 @@ const LimpiezaPublica: React.FC = () => {
                       >
                         <TableCell sx={{ cursor: 'default' }}>{row.usoPredio}</TableCell>
                         <TableCell align="center" sx={{ cursor: 'pointer' }}>
-                          <Tooltip 
+                          <Tooltip
                             title={`Clic para editar: ${row.usoPredio} - S/ ${row.tasaMensual.toFixed(2)}`}
                             arrow
                             placement="top"
@@ -775,6 +950,21 @@ const LimpiezaPublica: React.FC = () => {
                               S/ {row.tasaMensual.toFixed(2)}
                             </Box>
                           </Tooltip>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Box
+                            sx={{
+                              display: 'inline-block',
+                              backgroundColor: 'success.light',
+                              color: 'success.contrastText',
+                              px: 2,
+                              py: 0.5,
+                              borderRadius: 1,
+                              fontWeight: 600
+                            }}
+                          >
+                            S/ {(row.tasaMensual * 12).toFixed(2)}
+                          </Box>
                         </TableCell>
                       </TableRow>
                     ))}

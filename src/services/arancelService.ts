@@ -67,16 +67,16 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
       '/api/arancel',
       {
         normalizeItem: (item: any) => ({
-          codArancel: item.codArancel || null,
+          codArancel: item.codArancel !== undefined ? item.codArancel : null,
           anio: item.anio || new Date().getFullYear(),
           codDireccion: item.codDireccion || 0,
-          costo: item.costo || null,
-          codUsuario: item.codUsuario || null,
-          costoArancel: parseFloat(item.costoArancel || '0'),
+          costo: item.costo !== undefined ? item.costo : null,
+          codUsuario: item.codUsuario !== undefined ? item.codUsuario : null,
+          costoArancel: parseFloat(item.costoArancel || item.costo || '0'),
           direccionCompleta: item.direccionCompleta || '',
-          sector: item.sector || '',
-          barrio: item.barrio || '',
-          calle: item.calle || ''
+          sector: item.sector !== undefined && item.sector !== null ? item.sector : '',
+          barrio: item.barrio !== undefined && item.barrio !== null ? item.barrio : '',
+          calle: item.calle !== undefined && item.calle !== null ? item.calle : ''
         }),
         
         validateItem: (item: ArancelData) => {
@@ -99,60 +99,70 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
   }
 
   /**
-   * Lista aranceles usando la nueva API general con query params - NO requiere autenticación
-   * URL: GET http://26.161.18.122:8080/api/arancel/listaGeneral?parametroBusqueda=a&anio=2025&codUsuario=1
+   * Lista aranceles usando query params - NO requiere autenticación
+   * URL: GET http://26.161.18.122:8085/api/arancel?codDireccion=&anio=&parametroBusqueda=a&codUsuario=1
    * Ejemplo de respuesta JSON:
    * {
    *   "codArancel": null,
-   *   "anio": 2025,
-   *   "codDireccion": 4,
+   *   "anio": 2024,
+   *   "codDireccion": 1,
    *   "costo": null,
    *   "codUsuario": null,
-   *   "costoArancel": 280.0,
-   *   "direccionCompleta": "AA.HH. Virgen de la puerta BARRIO barrio 178, CALLE proceres caidos, Cuadra 1, Lotes: 100 - 120",
-   *   "sector": "AA.HH. Virgen de la puerta",
-   *   "barrio": "barrio 178",
-   *   "calle": "proceres caidos"
+   *   "costoArancel": 200.0,
+   *   "direccionCompleta": "SECT. Central Barrio 1, Pje. Carlos Alvear, Cuadra 2, Lado P, Lotes: 1 - 20",
+   *   "sector": null,
+   *   "barrio": null,
+   *   "calle": null
    * }
    */
-  async listarArancelesGeneral(params?: { 
-    parametroBusqueda?: string; 
-    anio?: number; 
-    codUsuario?: number 
+  async listarArancelesGeneral(params?: {
+    codDireccion?: number;
+    anio?: number;
+    parametroBusqueda?: string;
+    codUsuario?: number;
   }): Promise<ArancelData[]> {
     try {
-      console.log('🔍 [ArancelService] Listando aranceles con API general:', params);
-      
-      // Construir URL base para la nueva API general
-      const baseUrl = `${API_CONFIG.baseURL}/api/arancel/listaGeneral`;
-      
+      console.log('🔍 [ArancelService] Listando aranceles con params:', params);
+
+      // Construir URL base
+      const baseUrl = `${API_CONFIG.baseURL}/api/arancel`;
+
       // Construir parámetros de consulta
       const queryParams = new URLSearchParams();
-      
-      // Agregar parámetros según la nueva API
+
+      // codDireccion (opcional, vacío si no se proporciona)
+      if (params?.codDireccion !== undefined && params?.codDireccion > 0) {
+        queryParams.set('codDireccion', params.codDireccion.toString());
+      } else {
+        queryParams.set('codDireccion', '');
+      }
+
+      // anio (opcional, vacío si no se proporciona)
+      if (params?.anio !== undefined && params?.anio > 0) {
+        queryParams.set('anio', params.anio.toString());
+      } else {
+        queryParams.set('anio', '');
+      }
+
+      // parametroBusqueda (opcional)
       if (params?.parametroBusqueda !== undefined) {
         queryParams.set('parametroBusqueda', params.parametroBusqueda);
       } else {
-        queryParams.set('parametroBusqueda', ''); // Por defecto vacío para obtener todos
+        queryParams.set('parametroBusqueda', '');
       }
-      
-      if (params?.anio !== undefined) {
-        queryParams.set('anio', params.anio.toString());
-      } else {
-        queryParams.set('anio', new Date().getFullYear().toString()); // Año actual por defecto
-      }
-      
+
+      // codUsuario (requerido, por defecto 1)
       if (params?.codUsuario !== undefined) {
         queryParams.set('codUsuario', params.codUsuario.toString());
       } else {
-        queryParams.set('codUsuario', '1'); // Valor por defecto
+        queryParams.set('codUsuario', '1');
       }
       
       const url = `${baseUrl}?${queryParams.toString()}`;
       
-      console.log('📡 [ArancelService] GET URL construida para API general:', url);
+      console.log('📡 [ArancelService] GET URL construida:', url);
       console.log('📋 [ArancelService] Query params:', queryParams.toString());
-      console.log('📋 [ArancelService] Ejemplo esperado: http://26.161.18.122:8080/api/arancel/listaGeneral?parametroBusqueda=a&anio=2025&codUsuario=1');
+      console.log('📋 [ArancelService] Ejemplo esperado: http://26.161.18.122:8085/api/arancel?codDireccion=&anio=&parametroBusqueda=a&codUsuario=1');
       
       // Realizar petición GET sin autenticación
       const response = await fetch(url, {
@@ -210,18 +220,18 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
       
       console.log('✅ [ArancelService] Items para normalizar:', items);
       
-      // Normalizar datos según estructura esperada de la nueva API
+      // Normalizar datos según estructura esperada de la API
       const normalized = items.map(item => ({
-        codArancel: item.codArancel || null,
+        codArancel: item.codArancel !== undefined ? item.codArancel : null,
         anio: item.anio || 0,
         codDireccion: item.codDireccion || 0,
-        costo: item.costo || null,
-        codUsuario: item.codUsuario || null,
+        costo: item.costo !== undefined ? item.costo : null,
+        codUsuario: item.codUsuario !== undefined ? item.codUsuario : null,
         costoArancel: parseFloat(item.costoArancel || item.costo || '0'),
         direccionCompleta: item.direccionCompleta || '',
-        sector: item.sector || '',
-        barrio: item.barrio || '',
-        calle: item.calle || ''
+        sector: item.sector !== undefined && item.sector !== null ? item.sector : '',
+        barrio: item.barrio !== undefined && item.barrio !== null ? item.barrio : '',
+        calle: item.calle !== undefined && item.calle !== null ? item.calle : ''
       }));
       
       console.log('✅ [ArancelService] Datos normalizados de API general:', normalized);
@@ -239,11 +249,16 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
 
   /**
    * Obtiene todos los aranceles usando la nueva API
-   * Para obtener todos, usa parametroBusqueda vacío
+   * Para obtener todos, usa parametroBusqueda vacío y sin filtro de año
    */
   async obtenerTodosAranceles(): Promise<ArancelData[]> {
-    console.log('📋 [ArancelService] Obteniendo todos los aranceles');
-    return this.listarAranceles({ parametroBusqueda: 'a', anio: new Date().getFullYear(), codUsuario: 1 });
+    console.log('📋 [ArancelService] Obteniendo todos los aranceles (sin filtro de año)');
+    return this.listarArancelesGeneral({
+      parametroBusqueda: 'a',
+      codDireccion: undefined,
+      anio: undefined, // NO pasar año para obtener de todos los años
+      codUsuario: 1
+    });
   }
 
   /**
@@ -399,16 +414,16 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
       
       // Normalizar datos según estructura esperada
       const normalized = items.map(item => ({
-        codArancel: item.codArancel || null,
+        codArancel: item.codArancel !== undefined ? item.codArancel : null,
         anio: item.anio || 0,
         codDireccion: item.codDireccion || 0,
-        costo: item.costo || null,
-        codUsuario: item.codUsuario || null,
+        costo: item.costo !== undefined ? item.costo : null,
+        codUsuario: item.codUsuario !== undefined ? item.codUsuario : null,
         costoArancel: parseFloat(item.costoArancel || item.costo || '0'),
         direccionCompleta: item.direccionCompleta || '',
-        sector: item.sector || '',
-        barrio: item.barrio || '',
-        calle: item.calle || ''
+        sector: item.sector !== undefined && item.sector !== null ? item.sector : '',
+        barrio: item.barrio !== undefined && item.barrio !== null ? item.barrio : '',
+        calle: item.calle !== undefined && item.calle !== null ? item.calle : ''
       }));
       
       console.log('✅ [ArancelService] Datos normalizados:', normalized);

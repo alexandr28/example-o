@@ -31,13 +31,17 @@ export interface CalleData {
 }
 
 export interface CreateCalleDTO {
-  codTipoVia: number;
   nombreVia: string;
-  codSector: number;
+  codTipoVia: string;
   codBarrio: number;
+  codSector: number;
 }
 
-export interface UpdateCalleDTO extends Partial<CreateCalleDTO> {
+export interface UpdateCalleDTO {
+  nombreVia?: string;
+  codTipoVia?: string;
+  codBarrio?: number;
+  codSector?: number;
   estado?: string;
   fechaModificacion?: string;
 }
@@ -152,44 +156,62 @@ class CalleApiService extends BaseApiService<CalleData, CreateCalleDTO, UpdateCa
   async create(data: CreateCalleDTO): Promise<CalleData> {
     try {
       console.log('📝 [CalleApiService] Creando vía con datos:', data);
-      
-      // Usar fetch directamente para POST
-      const url = buildApiUrl(this.endpoint);
-      
+
+      // Preparar payload en el orden correcto
+      // Si codBarrio es 0 o undefined, enviar string vacío como en Postman
+      const payload = {
+        nombreVia: data.nombreVia,
+        codTipoVia: data.codTipoVia,
+        codBarrio: data.codBarrio && data.codBarrio > 0 ? data.codBarrio : "",
+        codSector: data.codSector
+      };
+
+      console.log('📤 [CalleApiService] Payload a enviar:', payload);
+
+      // Usar endpoint insertarVias
+      const url = buildApiUrl('/api/via/insertarVias');
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(payload)
       });
-      
+
       console.log('📡 Status:', response.status);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ Error response:', errorText);
         throw new Error(`Error al crear vía: ${response.status}`);
       }
-      
+
       const responseData = await response.json();
       console.log('✅ Respuesta del servidor:', responseData);
-      
+
       // Crear objeto de respuesta
       const created: CalleData = {
+        codVia: responseData.codVia || responseData.id || 0,
+        codTipoVia: data.codTipoVia,
+        codBarrio: data.codBarrio,
+        codSector: data.codSector,
+        nombreVia: data.nombreVia,
+        descTipoVia: '',
+        nombreBarrio: '',
+        nombreSector: '',
         codigo: responseData.codVia || responseData.id || 0,
         nombre: data.nombreVia,
         codigoVia: data.codTipoVia,
-        nombreVia: data.nombreVia,
         codigoBarrio: data.codBarrio,
         estado: 'ACTIVO',
         fechaRegistro: new Date().toISOString()
       };
-      
+
       this.clearCache();
       return created;
-      
+
     } catch (error: any) {
       console.error('❌ [CalleApiService] Error creando vía:', error);
       throw error;
@@ -197,29 +219,68 @@ class CalleApiService extends BaseApiService<CalleData, CreateCalleDTO, UpdateCa
   }
   
   /**
-   * Actualizar vía (si el endpoint lo soporta)
+   * Actualizar vía usando el endpoint /api/via/actualizarVias
    */
   async update(id: number, data: UpdateCalleDTO): Promise<CalleData> {
     try {
-      const url = buildApiUrl(`${this.endpoint}/${id}`);
-      
+      console.log('📝 [CalleApiService] Actualizando vía con ID:', id);
+      console.log('📝 [CalleApiService] Datos a actualizar:', data);
+
+      // Preparar payload según la estructura del API
+      const payload = {
+        codVia: id,
+        nombreVia: data.nombreVia || '',
+        codTipoVia: data.codTipoVia ? String(data.codTipoVia) : '',
+        codBarrio: data.codBarrio || 0,
+        codSector: data.codSector || 0
+      };
+
+      console.log('📤 [CalleApiService] Payload a enviar:', payload);
+
+      // Usar endpoint actualizarVias
+      const url = buildApiUrl('/api/via/actualizarVias');
+
       const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(payload)
       });
-      
+
+      console.log('📡 Status:', response.status);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Error response:', errorText);
         throw new Error(`Error al actualizar vía: ${response.status}`);
       }
-      
+
       const responseData = await response.json();
+      console.log('✅ Respuesta del servidor:', responseData);
+
+      // Crear objeto de respuesta normalizado
+      const updated: CalleData = {
+        codVia: id,
+        codTipoVia: payload.codTipoVia,
+        codBarrio: payload.codBarrio,
+        codSector: payload.codSector,
+        nombreVia: payload.nombreVia,
+        descTipoVia: '',
+        nombreBarrio: '',
+        nombreSector: '',
+        codigo: id,
+        nombre: payload.nombreVia,
+        codigoVia: payload.codTipoVia,
+        codigoBarrio: payload.codBarrio,
+        estado: 'ACTIVO',
+        fechaModificacion: new Date().toISOString()
+      };
+
       this.clearCache();
-      
-      return this.normalizeData([responseData])[0];
+      return updated;
+
     } catch (error) {
       console.error('❌ [CalleApiService] Error actualizando vía:', error);
       throw error;

@@ -173,25 +173,60 @@ export const useCalles = () => {
 
   // Crear calle con validación
   const crearCalle = useCallback(async (data: CreateCalleDTO) => {
-    // Validar que el barrio existe
-    const barrioExiste = barrios.some(b => b.codigo === data.codBarrio);
-    if (!barrioExiste && data.codBarrio > 0) {
-      throw new Error('El barrio seleccionado no existe');
+    // Validar que el barrio existe (solo si se proporciona)
+    if (data.codBarrio > 0) {
+      const barrioExiste = barrios.some(b => b.codigo === data.codBarrio);
+      if (!barrioExiste) {
+        throw new Error('El barrio seleccionado no existe');
+      }
     }
-    
-    return actions.createItem(data);
+
+    // Preparar datos con codTipoVia como string
+    const payload: CreateCalleDTO = {
+      nombreVia: data.nombreVia,
+      codTipoVia: String(data.codTipoVia),
+      codBarrio: data.codBarrio || 0,
+      codSector: data.codSector
+    };
+
+    console.log('📤 [useCalles] Enviando payload:', payload);
+
+    return actions.createItem(payload);
+  }, [actions, barrios]);
+
+  // Actualizar calle con validación
+  const actualizarCalle = useCallback(async (id: number, data: UpdateCalleDTO) => {
+    // Validar que el barrio existe (solo si se proporciona)
+    if (data.codBarrio && data.codBarrio > 0) {
+      const barrioExiste = barrios.some(b => b.codigo === data.codBarrio);
+      if (!barrioExiste) {
+        throw new Error('El barrio seleccionado no existe');
+      }
+    }
+
+    // Preparar datos con codTipoVia como string
+    const payload: UpdateCalleDTO = {
+      nombreVia: data.nombreVia,
+      codTipoVia: data.codTipoVia ? String(data.codTipoVia) : undefined,
+      codBarrio: data.codBarrio || 0,
+      codSector: data.codSector
+    };
+
+    console.log('📤 [useCalles] Actualizando con payload:', payload);
+
+    return actions.updateItem(id, payload);
   }, [actions, barrios]);
 
   // Función para guardar (crear o actualizar)
   const guardarCalle = useCallback(async (data: CreateCalleDTO | UpdateCalleDTO) => {
     if (state.selectedItem && modoEdicion) {
       // Actualizar
-      return actions.updateItem(state.selectedItem.codigo!, data as UpdateCalleDTO);
+      return actualizarCalle(state.selectedItem.codigo!, data as UpdateCalleDTO);
     } else {
       // Crear
       return crearCalle(data as CreateCalleDTO);
     }
-  }, [state.selectedItem, modoEdicion, actions, crearCalle]);
+  }, [state.selectedItem, modoEdicion, actualizarCalle, crearCalle]);
 
   // Actualizar sector
   const actualizarSector = useCallback(async (sectorId: number, nombre: string) => {
@@ -241,7 +276,7 @@ export const useCalles = () => {
     // Acciones CRUD
     cargarCalles: actions.loadItems,
     crearCalle,
-    actualizarCalle: actions.updateItem,
+    actualizarCalle,
     eliminarCalle: actions.deleteItem,
     seleccionarCalle: actions.selectItem,
     buscarCalles: actions.search,
