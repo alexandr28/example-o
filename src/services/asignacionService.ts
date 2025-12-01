@@ -180,11 +180,20 @@ class AsignacionService {
       }
       
       // Asegurar que codAsignacion no se envía en el request (debe ser null)
+      // Limpiar espacios en blanco de los campos string
       const datosParaEnviar = {
-        ...datos,
-        codAsignacion: null // Forzar a null para que SQL genere el ID
+        anio: datos.anio,
+        codPredio: String(datos.codPredio).trim(),
+        codContribuyente: datos.codContribuyente,
+        codAsignacion: null, // Forzar a null para que SQL genere el ID
+        porcentajeCondomino: datos.porcentajeCondomino,
+        fechaDeclaracion: datos.fechaDeclaracion,
+        fechaVenta: datos.fechaVenta,
+        codModoDeclaracion: String(datos.codModoDeclaracion).trim(),
+        pensionista: datos.pensionista,
+        codEstado: String(datos.codEstado).trim()
       };
-      
+
       console.log('📤 [AsignacionService] Enviando datos (codAsignacion=null):', JSON.stringify(datosParaEnviar, null, 2));
       
       const response = await fetch(this.baseURL, {
@@ -203,9 +212,18 @@ class AsignacionService {
         console.error('❌ [AsignacionService] Error del servidor:', errorText);
         throw new Error(`Error ${response.status}: ${response.statusText} - ${errorText}`);
       }
-      
+
       const responseJson = await response.json();
-      console.log('✅ [AsignacionService] Respuesta completa del API:', responseJson);
+      console.log('📥 [AsignacionService] Respuesta completa del API:', responseJson);
+
+      // Validar si el servidor devuelve success: false
+      if (responseJson.success === false) {
+        const errorMessage = responseJson.data || responseJson.message || 'Error al crear la asignación';
+        console.error('❌ [AsignacionService] El servidor rechazó la operación:', errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      console.log('✅ [AsignacionService] Asignación creada exitosamente');
 
       // Extraer datos del wrapper si existe
       const responseData = responseJson.data || responseJson;
@@ -216,17 +234,20 @@ class AsignacionService {
         id: responseData.codAsignacion || responseData.id || Math.floor(Math.random() * 10000),
         codPredio: responseData.codPredio || datos.codPredio,
         codContribuyente: responseData.codContribuyente?.toString() || datos.codContribuyente.toString(),
+        codAsignacion: responseData.codAsignacion || null,
         anio: responseData.anio || datos.anio,
-        fechaAsignacion: responseData.fechaDeclaracion || datos.fechaDeclaracion,
-        estado: responseData.codEstado === "0201" ? "Activo" : "Inactivo",
-        contribuyente: responseData.contribuyente || '',
-        direccionPredio: responseData.direccionPredio || '',
-        tipoPredio: responseData.tipoPredio || '',
-        modoDeclaracion: responseData.codModoDeclaracion || datos.codModoDeclaracion,
-        fechaVenta: responseData.fechaVenta || datos.fechaVenta,
-        fechaDeclaracion: responseData.fechaDeclaracion || datos.fechaDeclaracion,
-        esPensionista: (responseData.pensionista || datos.pensionista) === 1,
         porcentajeCondominio: responseData.porcentajeCondomino || datos.porcentajeCondomino || 100,
+        fechaDeclaracion: responseData.fechaDeclaracion || datos.fechaDeclaracion,
+        fechaVenta: responseData.fechaVenta || datos.fechaVenta,
+        fechaDeclaracionStr: responseData.fechaDeclaracionStr || '',
+        fechaVentaStr: responseData.fechaVentaStr || '',
+        codModoDeclaracion: responseData.codModoDeclaracion || datos.codModoDeclaracion,
+        pensionista: responseData.pensionista || datos.pensionista || 0,
+        codEstado: responseData.codEstado || "0201",
+        codUsuario: responseData.codUsuario || null,
+        nombreContribuyente: responseData.contribuyente || '',
+        estado: responseData.codEstado === "0201" ? "Activo" : "Inactivo",
+        esPensionista: (responseData.pensionista || datos.pensionista) === 1,
         porcentajeLibre: 100 - (responseData.porcentajeCondomino || datos.porcentajeCondomino || 0)
       };
       
@@ -268,17 +289,20 @@ class AsignacionService {
         id: data.id || id,
         codPredio: data.codPredio || '',
         codContribuyente: data.codContribuyente || '',
+        codAsignacion: data.codAsignacion || null,
         anio: data.anio || new Date().getFullYear(),
-        fechaAsignacion: data.fechaAsignacion || '',
-        estado: data.estado || 'Activo',
-        contribuyente: data.contribuyente || data.nombreContribuyente || '',
-        direccionPredio: data.direccionPredio || data.direccion || '',
-        tipoPredio: data.tipoPredio || '',
-        modoDeclaracion: data.modoDeclaracion || '',
-        fechaVenta: data.fechaVenta || '',
-        fechaDeclaracion: data.fechaDeclaracion || '',
-        esPensionista: data.esPensionista || false,
         porcentajeCondominio: data.porcentajeCondominio || 100,
+        fechaDeclaracion: data.fechaDeclaracion || 0,
+        fechaVenta: data.fechaVenta || 0,
+        fechaDeclaracionStr: data.fechaDeclaracionStr || '',
+        fechaVentaStr: data.fechaVentaStr || '',
+        codModoDeclaracion: data.codModoDeclaracion || data.modoDeclaracion || '',
+        pensionista: data.pensionista || 0,
+        codEstado: data.codEstado || '0201',
+        codUsuario: data.codUsuario || null,
+        nombreContribuyente: data.contribuyente || data.nombreContribuyente || '',
+        estado: data.estado || 'Activo',
+        esPensionista: data.esPensionista || false,
         porcentajeLibre: data.porcentajeLibre || 100
       };
 

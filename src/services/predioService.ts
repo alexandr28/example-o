@@ -57,7 +57,7 @@ export interface CreatePredioDTO {
   codTipoPredio: string;
   codCondicionPropiedad: string;
   codDireccion: number;
-  codUsoPredio: number;
+  codUsoPredio: number | null; // null para clasificación "Casa habitación" (0501)
   fechaAdquisicion: string; // Formato "YYYY-MM-DD"
   numeroCondominos: number;
   codListaConductor: string;
@@ -104,10 +104,19 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
     super(
       '/api/predio',
       {
-        normalizeItem: (item: any) => ({
+        normalizeItem: (item: any) => {
+          // Debug: Ver valores crudos del API
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[PredioService] Normalizando item:', {
+              codPredio: item.codPredio,
+              codPredioBase: item.codPredioBase,
+              raw: item
+            });
+          }
+          return {
             anio: item.anio,
             codPredio: item.codPredio || null,
-            codPredioBase: item.codPredioBase,
+            codPredioBase: item.codPredioBase?.toString() || null,
             numeroFinca: item.numeroFinca,
             otroNumero: item.otroNumero,
             codClasificacion: item.codClasificacion,
@@ -138,12 +147,13 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
             descripcionUso: item.descripcionUso,
             parametroBusqueda: item.parametroBusqueda,
             nombreSectorCompleto: item.nombreSectorCompleto,
-          }),
+          };
+        },
 
           validateItem: (item: PredioData) => {
           return !!(
-            item.codPredio && 
-            item.areaTerreno >= 0
+            item.codPredio &&
+            item.areaTerreno !== undefined && item.areaTerreno >= 0
           );
         }
       },
@@ -478,20 +488,21 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
       }
       
       // Asegurar que los datos coincidan EXACTAMENTE con el JSON esperado
+      // NOTA: codUsoPredio puede ser null para clasificación "Casa habitación" (0501)
       const datosParaEnviar: CreatePredioDTO = {
         anio: datos.anio,
         codPredio: null, // SIEMPRE null - SQL lo asigna automáticamente
         numeroFinca: Number(datos.numeroFinca),
         otroNumero: String(datos.otroNumero || ""),
-        codClasificacion: String(datos.codClasificacion || "0502"),
-        estPredio: String(datos.estPredio || "2503"),
-        codTipoPredio: String(datos.codTipoPredio || "2601"),
-        codCondicionPropiedad: String(datos.codCondicionPropiedad || "2701"),
+        codClasificacion: String(datos.codClasificacion || "0502").trim(),
+        estPredio: String(datos.estPredio || "2503").trim(),
+        codTipoPredio: String(datos.codTipoPredio || "2601").trim(),
+        codCondicionPropiedad: String(datos.codCondicionPropiedad || "2701").trim(),
         codDireccion: Number(datos.codDireccion),
-        codUsoPredio: Number(datos.codUsoPredio || 1),
+        codUsoPredio: datos.codUsoPredio === null ? null : Number(datos.codUsoPredio || 1),
         fechaAdquisicion: String(datos.fechaAdquisicion || new Date().toISOString().split('T')[0]),
         numeroCondominos: Number(datos.numeroCondominos || 2),
-        codListaConductor: String(datos.codListaConductor || "1401"),
+        codListaConductor: String(datos.codListaConductor || "1401").trim(),
         codUbicacionAreaVerde: Number(datos.codUbicacionAreaVerde || 1),
         areaTerreno: Number(datos.areaTerreno),
         totalAreaConstruccion: datos.totalAreaConstruccion ? Number(datos.totalAreaConstruccion) : null,
@@ -562,8 +573,17 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
       }
       
       const responseData = await response.json();
-      console.log('✅ [PredioService] Predio creado exitosamente:', responseData);
-      
+      console.log('📡 [PredioService] Respuesta del servidor:', responseData);
+
+      // Validar si el servidor devuelve success: false
+      if (responseData.success === false) {
+        const errorMessage = responseData.data || responseData.message || 'Error al crear el predio';
+        console.error('❌ [PredioService] El servidor rechazó la operación:', errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      console.log('✅ [PredioService] Predio creado exitosamente');
+
       // Normalizar la respuesta
       const predioCreado: PredioData = {
         anio: responseData.anio || datosParaEnviar.anio,
@@ -575,7 +595,7 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
         codTipoPredio: responseData.codTipoPredio || datosParaEnviar.codTipoPredio,
         codCondicionPropiedad: responseData.codCondicionPropiedad || datosParaEnviar.codCondicionPropiedad,
         codDireccion: responseData.codDireccion?.toString() || datosParaEnviar.codDireccion.toString(),
-        codUsoPredio: responseData.codUsoPredio?.toString() || datosParaEnviar.codUsoPredio.toString(),
+        codUsoPredio: responseData.codUsoPredio?.toString() || (datosParaEnviar.codUsoPredio ? datosParaEnviar.codUsoPredio.toString() : null),
         fechaAdquisicion: responseData.fechaAdquisicion || datosParaEnviar.fechaAdquisicion,
         numeroCondominos: responseData.numeroCondominos?.toString() || datosParaEnviar.numeroCondominos.toString(),
         codListaConductor: responseData.codListaConductor || datosParaEnviar.codListaConductor,
@@ -715,7 +735,7 @@ class PredioService extends BaseApiService<PredioData, CreatePredioDTO, UpdatePr
     areaConstruidaTotal: number;
   }> {
     try {
-      const predios = await this.obtenerPredios();
+      const predios = await this.obtenerTodosPredios();
       
       const estadisticas = {
         total: predios.length,

@@ -819,7 +819,11 @@ const ContribuyenteConsulta: React.FC<ContribuyenteConsultaProps> = ({
               getDireccionTextoCompleto={(direccion: any) => {
                 // Función para obtener el texto completo de la dirección
                 if (!direccion) return 'Sin dirección';
-                return direccion.direccionCompleta || 'Sin dirección';
+                let texto = direccion.direccionCompleta || '';
+                // Eliminar la parte de "Lotes: X - Y" o "Lote: X"
+                texto = texto.replace(/,?\s*Lotes?:\s*\d+\s*-?\s*\d*/gi, '').trim();
+                texto = texto.replace(/,\s*$/, '').trim();
+                return texto || 'Sin dirección';
               }}
               disablePersonaFields={false}
               onGuardar={async (data) => {

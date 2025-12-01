@@ -111,11 +111,12 @@ export interface PredioApiResponse {
 export interface Predio {
   id?: number;
   codigoPredio: string;
-  
+  codPredioBase?: string;
+
   // Relación con contribuyente
   contribuyenteId?: number;
   contribuyente?: Contribuyente;
-  
+
   // Datos de adquisición
   anio?: number | null;
   fechaAdquisicion?: Date | string | null;

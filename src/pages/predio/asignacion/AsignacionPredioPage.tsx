@@ -10,7 +10,8 @@ import {
   Stack,
   Chip,
   useTheme,
-  alpha
+  alpha,
+  GlobalStyles
 } from '@mui/material';
 import {
   NavigateNext as NavigateNextIcon,
@@ -21,9 +22,9 @@ import {
   Dashboard as DashboardIcon
 } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
-import MainLayout from '../../layout/MainLayout';
-import AsignacionPredio from '../../components/predio/AsignacionPredio';
-import { useAsignacion } from '../../hooks/useAsignacion';
+import MainLayout from '../../../layout/MainLayout';
+import {AsignacionPredio} from '../../../components';
+import { useAsignacion } from '../../../hooks';
 
 const AsignacionPredioPage: React.FC = () => {
   const theme = useTheme();
@@ -213,20 +214,23 @@ const AsignacionPredioPage: React.FC = () => {
         </Box>
       </Container>
       
+      
       {/* Estilos globales para animación */}
-      <style jsx global>{`
-        @keyframes pulse {
-          0% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
-          100% {
-            opacity: 1;
-          }
-        }
-      `}</style>
+      <GlobalStyles
+        styles={{
+          '@keyframes pulse': {
+            '0%': {
+              opacity: 1,
+            },
+            '50%': {
+              opacity: 0.5,
+            },
+            '100%': {
+              opacity: 1,
+            },
+          },
+        }}
+      />
     </MainLayout>
   );
 };

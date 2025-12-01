@@ -37,7 +37,7 @@ const CuentaConsultaPage: React.FC = () => {
 
   return (
     <MainLayout>
-      <Container maxWidth="xl" sx={{ py: 3 }}>0
+      <Container maxWidth="xl" sx={{ py: 3 }}>
         {/* Breadcrumbs */}
         <Paper
           elevation={0}

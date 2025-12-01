@@ -6,11 +6,11 @@ import {
   CreateCalleDTO, 
   UpdateCalleDTO,
 } from '../services/calleApiService';
-import { SectorData } from '../services/sectorService';
+import { SectorData } from '../services/SectorService';
 import { BarrioData } from '../services/barrioService';
 import { TipoViaData } from '../services/viaService';
 import calleService from '../services/calleApiService';
-import sectorService from '../services/sectorService';
+import sectorService from '../services/SectorService';
 import barrioService from '../services/barrioService';
 import tipoViaService from '../services/viaService';
 
@@ -135,8 +135,8 @@ export const useCalles = () => {
 
   // Helpers para obtener nombres
   const obtenerNombreSector = useCallback((codSector: number): string => {
-    const sector = sectores.find(s => s.codigo === codSector);
-    return sector?.nombre || 'Sin sector';
+    const sector = sectores.find(s => s.codSector === codSector);
+    return sector?.nombreSector || 'Sin sector';
   }, [sectores]);
 
   const obtenerNombreBarrio = useCallback((codBarrio: number): string => {

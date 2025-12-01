@@ -32,6 +32,8 @@ import {
   FilterList as FilterIcon,
   Home as HomeIcon,
   Terrain as TerrainIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { usePredios } from '../../hooks/usePredioAPI';
@@ -104,6 +106,8 @@ const ConsultaPredios: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
+  const [orderBy, setOrderBy] = useState<'anio' | 'codigo'>('codigo');
+  const [order, setOrder] = useState<'asc' | 'desc'>('desc');
   const [filtros, setFiltros] = useState({
     codigoPredio: '',
     anio: new Date().getFullYear(),
@@ -119,18 +123,44 @@ const ConsultaPredios: React.FC = () => {
     cargarTodosPredios(); // Cargar todos los predios usando API /all
   }, [cargarEstadisticas, cargarTodosPredios]);
 
-  // Filtrar predios localmente
+  // Filtrar y ordenar predios localmente
   const filteredPredios = useMemo(() => {
-    if (!searchTerm) return predios;
-    
-    const term = searchTerm.toLowerCase();
-    return predios.filter(predio => 
-      predio.codigoPredio?.toLowerCase().includes(term) ||
-      predio.direccion?.toString().toLowerCase().includes(term) ||
-      predio.conductor?.toLowerCase().includes(term) ||
-      predio.numeroFinca?.toLowerCase().includes(term)
-    );
-  }, [predios, searchTerm]);
+    let filtered = predios;
+
+    // Aplicar filtro de búsqueda
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(predio =>
+        predio.codigoPredio?.toLowerCase().includes(term) ||
+        predio.direccion?.toString().toLowerCase().includes(term) ||
+        predio.conductor?.toLowerCase().includes(term) ||
+        predio.numeroFinca?.toLowerCase().includes(term)
+      );
+    }
+
+    // Aplicar ordenamiento
+    const sorted = [...filtered].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      if (orderBy === 'anio') {
+        aValue = a.anio || 0;
+        bValue = b.anio || 0;
+      } else {
+        // orderBy === 'codigo'
+        aValue = a.codPredioBase || a.codPredio || a.codigoPredio || '';
+        bValue = b.codPredioBase || b.codPredio || b.codigoPredio || '';
+      }
+
+      if (order === 'asc') {
+        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+      } else {
+        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+      }
+    });
+
+    return sorted;
+  }, [predios, searchTerm, orderBy, order]);
 
   // Paginar predios
   const paginatedPredios = useMemo(() => {
@@ -140,6 +170,18 @@ const ConsultaPredios: React.FC = () => {
   }, [filteredPredios, page, rowsPerPage]);
 
   // Handlers
+  const handleSort = (column: 'anio' | 'codigo') => {
+    if (orderBy === column) {
+      // Toggle order
+      setOrder(order === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Change column, set to desc by default
+      setOrderBy(column);
+      setOrder('desc');
+    }
+    setPage(0); // Reset to first page
+  };
+
   const handleChangePage = (_: unknown, newPage: number) => {
     setPage(newPage);
   };
@@ -154,7 +196,14 @@ const ConsultaPredios: React.FC = () => {
   };
 
   const handleView = (predio: Predio) => {
-    navigate(`/predio/detalle/${predio.codigoPredio}`);
+    // Navegar a Consulta Pisos con el código base del predio
+    navigate('/predio/pisos/consulta', {
+      state: {
+        codigoPredio: predio.codPredioBase || predio.codigoPredio || predio.codPredio,
+        codPredioBase: predio.codPredioBase,
+        predio: predio
+      }
+    });
   };
 
   const handleBuscar = () => {
@@ -249,7 +298,7 @@ const ConsultaPredios: React.FC = () => {
             <TextField
               fullWidth
               size="small"
-              label="Código Predio Base"
+              label="Código Predio"
               value={filtros.codPredioBase}
               onChange={(e) => setFiltros({ ...filtros, codPredioBase: e.target.value })}
             />
@@ -388,19 +437,55 @@ const ConsultaPredios: React.FC = () => {
           <Table stickyHeader size="medium">
             <TableHead>
               <TableRow key="header-row">
-                <TableCell sx={{
-                  bgcolor: alpha(theme.palette.primary.main, 0.08),
-                  color: theme.palette.primary.main,
-                  fontWeight: 700,
-                  fontSize: '0.875rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                  borderBottom: `2px solid ${theme.palette.primary.main}`,
-                  py: 2
-                }}>
+                <TableCell
+                  onClick={() => handleSort('anio')}
+                  sx={{
+                    bgcolor: alpha(theme.palette.primary.main, 0.08),
+                    color: theme.palette.primary.main,
+                    fontWeight: 700,
+                    fontSize: '0.875rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                    borderBottom: `2px solid ${theme.palette.primary.main}`,
+                    py: 2,
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    '&:hover': {
+                      bgcolor: alpha(theme.palette.primary.main, 0.12),
+                    }
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    AÑO
+                    {orderBy === 'anio' && (
+                      order === 'asc' ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />
+                    )}
+                  </Box>
+                </TableCell>
+                <TableCell
+                  onClick={() => handleSort('codigo')}
+                  sx={{
+                    bgcolor: alpha(theme.palette.primary.main, 0.08),
+                    color: theme.palette.primary.main,
+                    fontWeight: 700,
+                    fontSize: '0.875rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                    borderBottom: `2px solid ${theme.palette.primary.main}`,
+                    py: 2,
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    '&:hover': {
+                      bgcolor: alpha(theme.palette.primary.main, 0.12),
+                    }
+                  }}
+                >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <TerrainIcon fontSize="small" />
                     CÓDIGO
+                    {orderBy === 'codigo' && (
+                      order === 'asc' ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />
+                    )}
                   </Box>
                 </TableCell>
                 <TableCell sx={{
@@ -480,7 +565,7 @@ const ConsultaPredios: React.FC = () => {
             <TableBody>
               {loading ? (
                 <TableRow key="loading-row">
-                  <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
                     <Stack alignItems="center" spacing={2}>
                       <CircularProgress 
                         size={48} 
@@ -512,14 +597,32 @@ const ConsultaPredios: React.FC = () => {
                       '&:last-child td, &:last-child th': { border: 0 }
                     }}
                   >
-                    <TableCell sx={{ 
+                    <TableCell sx={{
+                      borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+                      py: 2
+                    }}>
+                      <Typography variant="body2" fontWeight={600}>
+                        {predio.anio || '-'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{
                       borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
                       py: 2
                     }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Chip
                           icon={<TerrainIcon fontSize="small" />}
-                          label={predio.codPredio || predio.codigoPredio || 'Sin código'}
+                          label={(() => {
+                            // Debug: Verificar valores
+                            if (process.env.NODE_ENV === 'development') {
+                              console.log('[ConsultaPredios] Predio:', {
+                                codPredioBase: predio.codPredioBase,
+                                codPredio: predio.codPredio,
+                                codigoPredio: predio.codigoPredio
+                              });
+                            }
+                            return predio.codPredioBase || predio.codPredio || predio.codigoPredio || 'Sin código';
+                          })()}
                           size="small"
                           variant="outlined"
                           color="primary"
@@ -607,9 +710,9 @@ const ConsultaPredios: React.FC = () => {
                       py: 2
                     }}>
                       <Stack direction="row" spacing={0.5} justifyContent="center">
-                        <Tooltip title="Ver detalles" arrow>
-                          <IconButton 
-                            size="small" 
+                        <Tooltip title="Ver Pisos del Predio" arrow>
+                          <IconButton
+                            size="small"
                             onClick={() => handleView(predio)}
                             sx={{
                               bgcolor: alpha(theme.palette.info.main, 0.08),
@@ -645,7 +748,7 @@ const ConsultaPredios: React.FC = () => {
                 ))
               ) : (
                 <TableRow key="no-data-row">
-                  <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
                     <Stack alignItems="center" spacing={3}>
                       <Box sx={{
                         p: 3,

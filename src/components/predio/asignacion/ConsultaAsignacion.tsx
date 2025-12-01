@@ -33,10 +33,10 @@ import {
   Home as HomeIcon,
   Error as ErrorIcon
 } from '@mui/icons-material';
-import SelectorContribuyente from '../modal/SelectorContribuyente';
-import { NotificationService } from '../utils/Notification';
-import { useAsignacion } from '../../hooks/useAsignacion';
-import { AsignacionPredio } from '../../services/asignacionService';
+import {SelectorContribuyente} from '../../';
+import { NotificationService } from '../../utils/Notification';
+import { useAsignacion } from '../../../hooks/useAsignacion';
+import { AsignacionPredio } from '../../../services/asignacionService';
 
 interface ConsultaAsignacionData {
   anio: string;

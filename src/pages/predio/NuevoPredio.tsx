@@ -40,19 +40,20 @@ const NuevoPredio: FC = memo(() => {
   // Handler para cuando se envía el formulario
   const handleSubmitPredio = async (data: any) => {
     console.log('🏠 [NuevoPredio] Datos del formulario recibidos:', data);
-    
+    console.log('🎯 [NuevoPredio] clasificacionPredio del form:', data.clasificacionPredio);
+
     // Preparar datos según estructura exacta del JSON del API
     const datosFormulario = {
       // Datos requeridos
       numeroFinca: data.numeroFinca || '',
       areaTerreno: Number(data.areaTerreno) || 0,
       direccionId: data.direccion?.id || data.direccionId,
-      
+
       // Datos del formulario mapeados correctamente
       anio: data.anio || new Date().getFullYear(),
       otroNumero: data.otroNumero || '',
       fechaAdquisicion: data.fechaAdquisicion,
-      
+
       // Mapeo correcto de códigos del formulario
       codClasificacion: data.clasificacionPredio, // Campo del form → campo del API
       estadoPredio: data.estadoPredio, // Para usarlo como estPredio en el DTO
@@ -60,24 +61,25 @@ const NuevoPredio: FC = memo(() => {
       codCondicionPropiedad: data.condicionPropiedad, // Campo del form → campo del API
       codUsoPredio: data.usoPredio, // Campo del form → campo del API
       codListaConductor: data.conductor, // Campo del form → campo del API
-      
+
       // Datos numéricos
       numeroPisos: Number(data.numeroPisos) || 1,
       numeroCondominos: Number(data.numeroCondominos) || 2, // Por defecto 2 según JSON ejemplo
-      
+
       // Datos opcionales (pueden ser null)
       totalAreaConstruccion: data.totalAreaConstruccion ? Number(data.totalAreaConstruccion) : null,
       valorTerreno: data.valorTerreno ? Number(data.valorTerreno) : null,
       valorTotalConstruccion: data.valorTotalConstruccion ? Number(data.valorTotalConstruccion) : null,
       autoavaluo: data.autoavaluo ? Number(data.autoavaluo) : null,
-      
+
       // Valores por defecto según el JSON ejemplo
       codUbicacionAreaVerde: 1,
       codEstado: "0201",
       codUsuario: 1
     };
-    
+
     console.log('📤 [NuevoPredio] Enviando datos al hook:', datosFormulario);
+    console.log('🎯 [NuevoPredio] codClasificacion mapeado:', datosFormulario.codClasificacion);
     
     // Llamar al hook que maneja la creación con la API
     const predioCreado = await crearPredio(datosFormulario);

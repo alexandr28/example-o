@@ -24,7 +24,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { DireccionData, CreateDireccionDTO } from '../../services/direccionService';
-import { SectorData } from '../../services/sectorService';
+import { SectorData } from '../../services/SectorService';
 import { BarrioData } from '../../services/barrioService';
 import { CalleData } from '../../services/calleApiService';
 import { useTiposLadosDireccion, useRutasOptions, useZonasOptions, useUbicacionAreaVerdeOptions } from '../../hooks/useConstantesOptions';
@@ -65,7 +65,9 @@ const direccionSchema = z.object({
   }),
   
   cuadra: z.string().optional(),
-  
+
+  manzana: z.string().optional(),
+
   lado: z.string(),
   
   loteInicial: z.coerce.number()
@@ -190,6 +192,7 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
       codigoBarrio: null,
       codigoCalle: null,
       cuadra: '',
+      manzana: '',
       lado: '',
       loteInicial: 0,
       loteFinal: 0,
@@ -256,6 +259,7 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
           codigoBarrio: direccionSeleccionada.codigoBarrio || 0,
           codigoCalle: direccionSeleccionada.codigoCalle || 0,
           cuadra: direccionSeleccionada.cuadra || '',
+          manzana: (direccionSeleccionada as any).manzana || '',
           lado: direccionSeleccionada.lado || defaultLado,
           loteInicial: direccionSeleccionada.loteInicial || 0,
           loteFinal: direccionSeleccionada.loteFinal || 0,
@@ -275,6 +279,7 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
         codigoBarrio: null,
         codigoCalle: null,
         cuadra: '',
+        manzana: '',
         lado: defaultLado,
         loteInicial: 0,
         loteFinal: 0,
@@ -304,6 +309,7 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
         codigoBarrio: (data.codigoBarrio && data.codigoBarrio > 0) ? data.codigoBarrio : null,
         codigoCalle: data.codigoCalle || 0,
         cuadra: data.cuadra || null,
+        manzana: data.manzana || null,
         lado: data.lado || (effectiveLadoOptions?.find(opt => opt.value === 'NINGUNO')?.value || effectiveLadoOptions?.[0]?.value || 'NINGUNO'),
         loteInicial: data.loteInicial || 0,
         loteFinal: data.loteFinal || 0,
@@ -610,8 +616,8 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
           </Box>
 
           {/* Cuadra */}
-          <Box sx={{ 
-            flex: { xs: '1 1 48%', sm: '0 0 150px', md: '0 0 150px' }, 
+          <Box sx={{
+            flex: { xs: '1 1 48%', sm: '0 0 150px', md: '0 0 150px' },
             minWidth: { xs: '48%', sm: '150px', md: '150px' }
           }}>
             <Controller
@@ -625,6 +631,36 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                   placeholder="Ej: 10"
                   error={!!errors.cuadra}
                   helperText={errors.cuadra?.message}
+                  sx={{
+                    '& .MuiInputBase-root': {
+                      height: '40px',
+                      fontSize: '0.875rem'
+                    },
+                    '& .MuiInputLabel-root': {
+                      fontSize: '0.875rem'
+                    },
+                  }}
+                />
+              )}
+            />
+          </Box>
+
+          {/* Manzana */}
+          <Box sx={{
+            flex: { xs: '1 1 48%', sm: '0 0 150px', md: '0 0 150px' },
+            minWidth: { xs: '48%', sm: '150px', md: '150px' }
+          }}>
+            <Controller
+              name="manzana"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  fullWidth
+                  label="Manzana"
+                  placeholder="Ej: A"
+                  error={!!errors.manzana}
+                  helperText={errors.manzana?.message}
                   sx={{
                     '& .MuiInputBase-root': {
                       height: '40px',
@@ -757,7 +793,6 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                         error={!!errors.ruta}
                         helperText={errors.ruta?.message}
                         placeholder="Seleccione una ruta"
-                        required
                         sx={{
                           '& .MuiInputBase-root': {
                             height: '40px'
@@ -796,8 +831,8 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
           </Box>
 
           {/* Zona */}
-          <Box sx={{ 
-            flex: { xs: '1 1 48%', sm: '0 0 200px', md: '0 0 200px' }, 
+          <Box sx={{
+            flex: { xs: '1 1 48%', sm: '0 0 200px', md: '0 0 200px' },
             minWidth: { xs: '48%', sm: '200px', md: '200px' }
           }}>
             <Controller
@@ -809,8 +844,8 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                     {...field}
                     options={zonaOptions || []}
                     getOptionKey={(option) => `zona-${typeof option === 'number' ? option : option.value}`}
-                    getOptionLabel={(option) => 
-                      typeof option === 'number' 
+                    getOptionLabel={(option) =>
+                      typeof option === 'number'
                         ? zonaOptions?.find(z => z.value === option)?.label || `Zona ${option}`
                         : option.label || ''
                     }
@@ -827,7 +862,6 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                         error={!!errors.zona}
                         helperText={errors.zona?.message}
                         placeholder="Seleccione una zona"
-                        required
                         sx={{
                           '& .MuiInputBase-root': {
                             height: '40px'

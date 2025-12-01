@@ -153,7 +153,11 @@ const ContribuyenteFormMUI: React.FC<ContribuyenteFormMUIProps> = ({
   const getDireccionTextoCompleto = useCallback((direccion: any, nFinca?: string, otroNumero?: string) => {
     if (!direccion) return '';
 
-    let texto = `${direccion.descripcion}`;
+    // Obtener la descripción y eliminar la parte de "Lotes: X - Y" o "Lote: X"
+    let texto = direccion.descripcion || '';
+    texto = texto.replace(/,?\s*Lotes?:\s*\d+\s*-?\s*\d*/gi, '').trim();
+    // Eliminar coma al final si quedó
+    texto = texto.replace(/,\s*$/, '').trim();
 
     if (nFinca) {
       texto += ` - N° Finca: ${nFinca}`;

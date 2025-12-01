@@ -387,11 +387,11 @@ class ResolucionInteresService {
 
       const url = `${API_CONFIG.baseURL}${this.endpoint}`;
 
-      console.log('[ResolucionInteresService] DELETE URL:', url);
+      console.log('[ResolucionInteresService] PUT URL:', url);
 
-      // Petición DELETE sin autenticación usando JSON
+      // Petición PUT sin autenticación usando JSON
       const response = await fetch(url, {
-        method: 'DELETE',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'

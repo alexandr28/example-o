@@ -33,3 +33,8 @@ export {
   useDeleteResolucionInteres,
   useResolucionInteresOptions
 } from './useResolucionInteres';
+export { useMantenedorCaja } from './useMantenedorCaja';
+export { useTurnos } from './useTurnos';
+export { useAperturaCajas } from './useAperturaCajas';
+export { useUsuarios } from './useUsuarios';
+export { useCuentaCorriente } from './useCuentaCorriente';

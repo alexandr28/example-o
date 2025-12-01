@@ -1,11 +1,11 @@
 // src/hooks/useSectores.ts
 import { useState, useCallback, useEffect } from 'react';
 import { Sector, SectorFormData } from '../models/Sector';
-import sectorService from '../services/sectorService';
+import sectorService from '../services/SectorService';
 import { NotificationService } from '../components/utils/Notification';
 
 // Tipos del servicio
-import type { SectorData, CuadranteData, UnidadUrbanaData } from '../services/sectorService';
+import type { SectorData, CuadranteData, UnidadUrbanaData } from '../services/SectorService';
 
 /**
  * Adaptador para convertir SectorData (servicio) a Sector (modelo)

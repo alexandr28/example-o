@@ -13,26 +13,31 @@ export {default as UitPage} from './mantenedores/UitPage'
 export {default as AlcabalaPage} from './mantenedores/AlcabalaPage'
 export {default as DepreciacionPage} from './mantenedores/DepreciacionPage'
 export {default as ArbitriosPage} from './mantenedores/ArbitriosPage'
+export { default as CajaMantPage } from './mantenedores/CajasPage';
 export { default as LoginPage } from './Login/LoginPage';
 
 // Páginas de Predio
 export { default as NuevoPredio } from './predio/NuevoPredio';
 export { default as ConsultaPredioPage } from './predio/ConsultaPredioPage';
 export { default as RegistroPisoPage } from './predio/pisos/RegistroPisoPage';
-export { default as ConsultaPisosPage } from './predio/pisos/ConsultaPisoPage'; 
-export { default as AsignacionPredioPage } from './predio/AsignacionPredioPage';
-export { default as ConsultaAsignacionPage } from './predio/ConsultaAsignacionPage';
+export { default as ConsultaPisosPage } from './predio/pisos/ConsultaPisoPage';
+export { default as AsignacionPredioPage } from './predio/asignacion/AsignacionPredioPage';
+export { default as ConsultaAsignacionPage } from './predio/asignacion/ConsultaAsignacionPage';
+export { default as ConsultaPUHRPage } from './predio/puhr/ConsultaPUHRPage';
 
 
 // 🎯 NUEVAS PÁGINAS DE CAJA
 export { default as CajaPage } from './caja/CajaPage';
 export { default as ConsultasCaja } from './caja/ConsultasCaja';
 export { default as ReportesCajaPage } from './caja/ReportesCajaPage';
+export { default as AsignacionCajaPage } from './caja/AsignacionCajaPage';
+export { default as CajasPage } from './mantenedores/CajasPage';
 
 // Páginas de Escalas
 export { default as RegistroTIMPage } from './mantenedores/escalas/RegistroTIMPage';
 export { default as RegResolucionTIMPage } from './mantenedores/escalas/RegResolucionTIMPage';
 export { default as VencimientoPage } from './mantenedores/VencimientoPage';
+
 
 // Páginas de Reportes
 export { default as ReportesPage } from './reportes/ReportesPage';
@@ -43,3 +48,20 @@ export { default as ConsultaFraccionamientoPage } from './fraccionamiento/Consul
 export { default as AprobacionFraccionamientoPage } from './fraccionamiento/AprobacionFraccionamientoPage';
 export { default as CronogramaPage } from './fraccionamiento/CronogramaPage';
 export { default as ReportesFraccionamientoPage } from './fraccionamiento/ReportesFraccionamientoPage';
+
+// Páginas de Sistema
+export { default as UsuariosPage } from './sistema/UsuariosPage';
+export { default as RolesPage } from './sistema/RolesPage';
+export { default as PermisosPage } from './sistema/PermisosPage';
+export { default as ConfiguracionPage } from './sistema/ConfiguracionPage';
+export { default as AuditoriaPage } from './sistema/AuditoriaPage';
+export { default as RespaldoPage } from './sistema/RespaldoPage';
+
+// Paginas de Usuarios
+export { default as UsersPage } from './usuarios/UsersPage';
+
+// Páginas de Coactiva
+export { default as CoactivaPage } from './coactiva/CoactivaPage';
+export { default as ExpedientePage } from './coactiva/ExpedientePage';
+export { default as ResolucionesPage } from './coactiva/ResolucionesPage';
+export { default as NotificacionesPage } from './coactiva/NotificacionesPage';

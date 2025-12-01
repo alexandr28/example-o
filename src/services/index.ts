@@ -27,3 +27,39 @@ export type {
 } from './resolucionInteresService';
 
 export { default as fraccionamientoService } from './fraccionamientoService';
+
+export { mantenedorCajaService } from './mantenedorCajaService';
+export type {
+  MantenedorCajaData,
+  CreateMantenedorCajaDTO,
+  UpdateMantenedorCajaDTO,
+  DeleteMantenedorCajaDTO,
+  ListarMantenedorCajaParams
+} from './mantenedorCajaService';
+
+export { turnoService } from './turnoService';
+export type {
+  TurnoData,
+  CreateTurnoDTO,
+  UpdateTurnoDTO,
+  DeleteTurnoDTO,
+  ListarTurnoParams
+} from './turnoService';
+
+export { aperturaCajaService } from './aperturaCajaService';
+export type {
+  AperturaCajaData,
+  AperturaCajaDTO,
+  CierreCajaDTO
+} from './aperturaCajaService';
+
+export { usuarioService } from './usuarioService';
+export type {
+  UsuarioData,
+  CreateUsuarioDTO,
+  UpdateUsuarioDTO,
+  CambiarClaveDTO,
+  DarBajaDTO,
+  ActivarDTO,
+  ListarUsuariosParams
+} from './usuarioService';

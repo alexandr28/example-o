@@ -1,6 +1,6 @@
-// src/hooks/useAuth.ts - Con expiración de 6 horas
+// src/hooks/useAuth.ts - Con expiracion de 6 horas
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { authService } from '../services/authService';
+import { authService, RegisterData, RegisterResponse } from '../services/authService';
 import { AuthCredentials, AuthUser, AuthResult } from '../models/Auth';
 
 export const useAuth = () => {
@@ -147,26 +147,60 @@ export const useAuth = () => {
     }
   }, []);
 
-  // Función para cerrar sesión
+  // Funcion para registrar un nuevo usuario
+  const register = useCallback(async (data: RegisterData): Promise<RegisterResponse> => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log('[useAuth] Iniciando proceso de registro...');
+
+      // Validar datos
+      if (!data.username || !data.nombrePersona || !data.documento || !data.codEstado || !data.password || !data.role) {
+        throw new Error('Todos los campos son requeridos');
+      }
+
+      const result = await authService.register(data);
+
+      if (result.success) {
+        console.log('[useAuth] Registro exitoso');
+        setError(null);
+        return result;
+      } else {
+        setError(result.message || 'Error al registrar usuario');
+        return result;
+      }
+
+    } catch (error: any) {
+      console.error('[useAuth] Error en registro:', error);
+      const errorMessage = error.message || 'Error desconocido al registrar usuario';
+      setError(errorMessage);
+      return { success: false, message: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Funcion para cerrar sesion
   const logout = useCallback(() => {
-    console.log('🔒 [useAuth] Cerrando sesión...');
-    
-    // Detener monitor de expiración
+    console.log('[useAuth] Cerrando sesion...');
+
+    // Detener monitor de expiracion
     if (expiryMonitorRef.current) {
       expiryMonitorRef.current();
       expiryMonitorRef.current = null;
     }
-    
+
     // Usar el servicio para logout
     authService.logout();
-    
+
     // Limpiar estados
     setUser(null);
     setAuthToken(null);
     setIsAuthenticated(false);
     setError(null);
-    
-    console.log('✅ [useAuth] Sesión cerrada');
+
+    console.log('[useAuth] Sesion cerrada');
   }, []);
 
   // Función para renovar el token
@@ -226,12 +260,13 @@ export const useAuth = () => {
     loading,
     error,
     isAuthenticated,
-    
+
     // Acciones
     login,
+    register,
     logout,
     renewToken,
-    
+
     // Utilidades
     getTokenRemainingTime,
     isTokenExpired: authService.isTokenExpired.bind(authService),

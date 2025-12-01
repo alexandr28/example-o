@@ -725,10 +725,10 @@ const SelectorPredios: React.FC<SelectorPrediosProps> = ({
           mx: 2,
           mt: 1
         }}>
-          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500, fontSize: '0.75rem' }}>
+          <Typography component="span" variant="body2" color="text.secondary" sx={{ fontWeight: 500, fontSize: '0.75rem' }}>
             Mostrando {paginatedPredios.length} de {filteredPredios.length} predios
             {filteredPredios.length !== predios.length && (
-              <Chip 
+              <Chip
                 label={`${predios.length - filteredPredios.length} filtrados`}
                 size="small"
                 variant="outlined"

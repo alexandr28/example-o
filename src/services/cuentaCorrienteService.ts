@@ -8,6 +8,7 @@ import { buildApiUrl } from '../config/api.unified.config';
 export interface EstadoCuentaAnual {
   codContribuyente: number | null;
   anio: number;
+  tributo: string | null;
   grupoTributo: string;
   totalCargos: number;
   totalPagado: number;
@@ -36,11 +37,24 @@ export interface EstadoCuentaAnual {
   abono11: number | null;
   cargo12: number | null;
   abono12: number | null;
+  venc_ene: string | null;
+  venc_feb: string | null;
+  venc_mar: string | null;
+  venc_abr: string | null;
+  venc_may: string | null;
+  venc_jun: string | null;
+  venc_jul: string | null;
+  venc_ago: string | null;
+  venc_sep: string | null;
+  venc_oct: string | null;
+  venc_nov: string | null;
+  venc_dic: string | null;
 }
 
 export interface EstadoCuentaDetalle {
   codContribuyente: number | null;
   anio: number;
+  tributo: string;
   grupoTributo: string;
   totalCargos: number;
   totalPagado: number;
@@ -69,6 +83,18 @@ export interface EstadoCuentaDetalle {
   abono11: number;
   cargo12: number;
   abono12: number;
+  venc_ene: string | null;
+  venc_feb: string | null;
+  venc_mar: string | null;
+  venc_abr: string | null;
+  venc_may: string | null;
+  venc_jun: string | null;
+  venc_jul: string | null;
+  venc_ago: string | null;
+  venc_sep: string | null;
+  venc_oct: string | null;
+  venc_nov: string | null;
+  venc_dic: string | null;
 }
 
 /**
@@ -94,6 +120,7 @@ class CuentaCorrienteService extends BaseApiService<EstadoCuentaAnual, any, any>
         normalizeItem: (item: any) => ({
           codContribuyente: item.codContribuyente,
           anio: item.anio || 0,
+          tributo: item.tributo || null,
           grupoTributo: item.grupoTributo || '',
           totalCargos: item.totalCargos || 0,
           totalPagado: item.totalPagado || 0,
@@ -122,6 +149,18 @@ class CuentaCorrienteService extends BaseApiService<EstadoCuentaAnual, any, any>
           abono11: item.abono11,
           cargo12: item.cargo12,
           abono12: item.abono12,
+          venc_ene: item.venc_ene || null,
+          venc_feb: item.venc_feb || null,
+          venc_mar: item.venc_mar || null,
+          venc_abr: item.venc_abr || null,
+          venc_may: item.venc_may || null,
+          venc_jun: item.venc_jun || null,
+          venc_jul: item.venc_jul || null,
+          venc_ago: item.venc_ago || null,
+          venc_sep: item.venc_sep || null,
+          venc_oct: item.venc_oct || null,
+          venc_nov: item.venc_nov || null,
+          venc_dic: item.venc_dic || null,
         }),
 
         validateItem: (item: EstadoCuentaAnual) => {
@@ -256,6 +295,7 @@ class CuentaCorrienteService extends BaseApiService<EstadoCuentaAnual, any, any>
       const detallesNormalizados = items.map((item: any) => ({
         codContribuyente: item.codContribuyente,
         anio: item.anio || 0,
+        tributo: item.tributo || '',
         grupoTributo: item.grupoTributo || '',
         totalCargos: item.totalCargos || 0,
         totalPagado: item.totalPagado || 0,
@@ -284,6 +324,18 @@ class CuentaCorrienteService extends BaseApiService<EstadoCuentaAnual, any, any>
         abono11: item.abono11 || 0,
         cargo12: item.cargo12 || 0,
         abono12: item.abono12 || 0,
+        venc_ene: item.venc_ene || null,
+        venc_feb: item.venc_feb || null,
+        venc_mar: item.venc_mar || null,
+        venc_abr: item.venc_abr || null,
+        venc_may: item.venc_may || null,
+        venc_jun: item.venc_jun || null,
+        venc_jul: item.venc_jul || null,
+        venc_ago: item.venc_ago || null,
+        venc_sep: item.venc_sep || null,
+        venc_oct: item.venc_oct || null,
+        venc_nov: item.venc_nov || null,
+        venc_dic: item.venc_dic || null,
       }));
 
       console.log(` [CuentaCorrienteService] ${detallesNormalizados.length} detalles procesados`);

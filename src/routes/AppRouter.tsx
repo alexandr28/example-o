@@ -29,6 +29,7 @@ import {
   ConsultaPisosPage,
   AsignacionPredioPage,
   ConsultaAsignacionPage,
+  ConsultaPUHRPage,
   CajaPage,
   ConsultasCaja,
   ReportesCajaPage,
@@ -41,6 +42,18 @@ import {
   AprobacionFraccionamientoPage,
   CronogramaPage,
   ReportesFraccionamientoPage,
+  UsuariosPage,
+  RolesPage,
+  PermisosPage,
+  ConfiguracionPage,
+  AuditoriaPage,
+  RespaldoPage,
+  CoactivaPage,
+  ExpedientePage,
+  ResolucionesPage,
+  NotificacionesPage,
+  UsersPage,
+  CajasPage,
 } from '../pages';
 
 // Importar página de cuenta corriente
@@ -142,6 +155,25 @@ const AppRouter: React.FC = () => {
                   <Route path="/predio/pisos/consulta" element={
                     <ProtectedRoute>
                       <ConsultaPisosPage />
+                    </ProtectedRoute>
+                  } />
+
+                  {/* Ruta PU-HR */}
+                  <Route path="/predio/puhr/consulta-pu-hr" element={
+                    <ProtectedRoute>
+                      <ConsultaPUHRPage />
+                    </ProtectedRoute>
+                  } />
+
+                  {/* Rutas de Transferencia */}
+                  <Route path="/predio/transferencia/alcabala" element={
+                    <ProtectedRoute>
+                      <DemoPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/predio/transferencia/reporte-alcabala" element={
+                    <ProtectedRoute>
+                      <DemoPage />
                     </ProtectedRoute>
                   } />
 
@@ -256,22 +288,22 @@ const AppRouter: React.FC = () => {
                   {/* Rutas coactiva */}
                   <Route path="/coactiva" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <CoactivaPage />
                     </ProtectedRoute>
                   } />
-                  <Route path="/coactiva/expediente" element={
+                  <Route path="/coactiva/expedientes" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <ExpedientePage />
                     </ProtectedRoute>
                   } />
                   <Route path="/coactiva/resoluciones" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <ResolucionesPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/coactiva/notificaciones" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <NotificacionesPage />
                     </ProtectedRoute>
                   } />
                   
@@ -331,6 +363,11 @@ const AppRouter: React.FC = () => {
                       <ArbitriosPage />
                     </ProtectedRoute>
                   } />
+                  <Route path="/mantenedores/caja/cajas" element={
+                    <ProtectedRoute>
+                      <CajasPage />
+                    </ProtectedRoute>
+                  } />
 
                   {/* Rutas de Escalas */}
                   <Route path="/mantenedores/escalas/registro-tim" element={
@@ -352,36 +389,58 @@ const AppRouter: React.FC = () => {
                   {/* Rutas de sistema */}
                   <Route path="/sistema/usuarios" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <UsuariosPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/sistema/roles" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <RolesPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/sistema/permisos" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <PermisosPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/sistema/configuracion" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <ConfiguracionPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/sistema/auditoria" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <AuditoriaPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/sistema/respaldo" element={
                     <ProtectedRoute>
-                      <DemoPage />
+                      <RespaldoPage />
                     </ProtectedRoute>
                   } />
-                  
-                  {/* Rutas de migración */}
+
+                  {/* Rutas de usuarios */}
+                  <Route path="/usuarios/crear-cuenta" element={
+                    <ProtectedRoute>
+                      <UsersPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/usuarios/consulta" element={
+                    <ProtectedRoute>
+                      <UsersPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/usuarios/recuperar-password" element={
+                    <ProtectedRoute>
+                      <UsersPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/usuarios/otras-opciones" element={
+                    <ProtectedRoute>
+                      <UsersPage />
+                    </ProtectedRoute>
+                  } />
+
+                  {/* Rutas de migracion */}
                   <Route path="/migracion" element={
                     <ProtectedRoute>
                       <DemoPage />

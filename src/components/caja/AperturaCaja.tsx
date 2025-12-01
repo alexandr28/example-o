@@ -125,9 +125,9 @@ const AperturaCaja: React.FC<AperturaCajaProps> = ({
   // Limpiar formulario al cerrar
   const handleClose = () => {
     setFormData({
-      numeroCaja: '00013',
+      numeroCaja: '',
       fechaApertura: new Date().toLocaleDateString('es-PE'),
-      montoInicial: 1000.0000,
+      montoInicial: 0,
       descripcion: '',
       codUsuario: 1
     });
@@ -195,12 +195,19 @@ const AperturaCaja: React.FC<AperturaCajaProps> = ({
               <TextField
                 label="Número de Caja"
                 value={formData.numeroCaja}
-                onChange={(e) => handleInputChange('numeroCaja', e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '');
+                  handleInputChange('numeroCaja', value);
+                }}
                 error={!!errors.numeroCaja}
                 helperText={errors.numeroCaja}
                 disabled={loading}
                 size="small"
                 sx={{ flex: 1 }}
+                inputProps={{
+                  pattern: '[0-9]*',
+                  inputMode: 'numeric'
+                }}
               />
 
               {/* Fecha de Apertura */}
@@ -219,6 +226,7 @@ const AperturaCaja: React.FC<AperturaCajaProps> = ({
                 type="number"
                 value={formData.montoInicial}
                 onChange={(e) => handleInputChange('montoInicial', parseFloat(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
                 error={!!errors.montoInicial}
                 helperText={errors.montoInicial}
                 disabled={loading}
@@ -233,19 +241,6 @@ const AperturaCaja: React.FC<AperturaCajaProps> = ({
                 }}
               />
             </Box>
-
-            {/* Descripción */}
-            <TextField
-              label="Descripción (Opcional)"
-              value={formData.descripcion}
-              onChange={(e) => handleInputChange('descripcion', e.target.value)}
-              disabled={loading}
-              size="small"
-              fullWidth
-              multiline
-              rows={2}
-              placeholder="Ingrese una descripción para la apertura de caja (opcional)..."
-            />
           </Box>
 
           {/* Alert informativo */}

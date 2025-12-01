@@ -295,29 +295,32 @@ class ValorUnitarioService extends BaseApiService<ValorUnitarioData, CreateValor
       }
       
       console.log('📊 [ValorUnitarioService] Items a normalizar:', items.length, 'elementos');
-      
+      console.log('📋 [ValorUnitarioService] Año a asignar a los valores:', anioFinal);
+
       // Normalizar según la estructura real del API
       const valoresFormateados = items.map((item: any, index: number) => {
         console.log(`🔍 [ValorUnitarioService] Procesando item ${index + 1}:`, item);
-        
+
+        // IMPORTANTE: Usar anioFinal (el año del query param) si el item no tiene año
+        // porque el API filtra por año pero puede no devolver el campo anio en cada registro
         const valorFormateado = {
           id: item.codigoValorUnitario || item.codValorUnitario || item.id || `temp_${index + 1}`,
-          año: item.anio || item.año || new Date().getFullYear(),
+          año: item.anio || item.año || anioFinal, // Usar anioFinal en lugar de new Date().getFullYear()
           categoria: item.codCategoria || item.categoria || '',
           subcategoria: item.codSubcategoria || item.subcategoria || '',
           letra: item.codLetra || item.letra || 'A',
           costo: parseFloat(item.costo?.toString() || '0'),
-          descripcionCategoria: item.descripcionCategoria || 
+          descripcionCategoria: item.descripcionCategoria ||
             ValorUnitarioService.obtenerDescripcionCategoria(item.codCategoria || item.categoria),
-          descripcionSubcategoria: item.descripcionSubcategoria || 
+          descripcionSubcategoria: item.descripcionSubcategoria ||
             ValorUnitarioService.obtenerDescripcionSubcategoria(item.codSubcategoria || item.subcategoria),
           estado: item.estado || 'ACTIVO',
           fechaRegistro: item.fechaRegistro,
           fechaModificacion: item.fechaModificacion,
           codUsuario: item.codUsuario || API_CONFIG.defaultParams.codUsuario
         };
-        
-        console.log(`✅ [ValorUnitarioService] Item ${index + 1} formateado:`, valorFormateado);
+
+        console.log(`✅ [ValorUnitarioService] Item ${index + 1} formateado (año: ${valorFormateado.año}):`, valorFormateado);
         return valorFormateado;
       });
       

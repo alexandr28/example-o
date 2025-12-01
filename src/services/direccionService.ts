@@ -19,6 +19,7 @@ export interface DireccionData {
   nombreVia?: string;
   nombreTipoVia?: string;
   cuadra?: string;
+  manzana?: string;
   lado?: string;
   loteInicial?: number;
   loteFinal?: number;
@@ -38,6 +39,7 @@ export interface CreateDireccionDTO {
   codigoBarrio?: number | null;
   codigoCalle: number;
   cuadra?: string | null;
+  manzana?: string | null;
   lado?: string;
   loteInicial?: number;
   loteFinal?: number;
@@ -88,6 +90,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
           nombreVia: item.nombreVia || '',
           nombreTipoVia: item.nombreTipoVia || '',
           cuadra: item.cuadra?.toString() || '',
+          manzana: item.manzana?.toString() || '',
           lado: item.codLado === 8101 ? 'PAR' : item.codLado === 8102 ? 'IMPAR' : 'NINGUNO',
           loteInicial: item.loteInicial ? parseInt(item.loteInicial) : undefined,
           loteFinal: item.loteFinal ? parseInt(item.loteFinal) : undefined,
@@ -127,7 +130,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
    */
   /**
    * Lista direcciones usando query params - NO requiere autenticación
-   * URL: GET http://26.161.18.122:8085/api/direccion/listarDireccion?parametrosBusqueda=a&codUsuario=1
+   * URL: GET http://26.161.18.122:8085/api/direccion?parametrosBusqueda=b&codUsuario=3
    */
   async getAll(params?: any): Promise<DireccionData[]> {
     try {
@@ -140,12 +143,12 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
       queryParams.append('parametrosBusqueda', params?.parametrosBusqueda || 'a');
 
       // codUsuario siempre se envía (requerido)
-      queryParams.append('codUsuario', '1');
+      queryParams.append('codUsuario', String(params?.codUsuario || 3));
 
-      // Endpoint correcto: /listarDireccion
-      const url = `${API_CONFIG.baseURL}${this.endpoint}/listarDireccion?${queryParams.toString()}`;
+      // Endpoint: /api/direccion con query params
+      const url = `${API_CONFIG.baseURL}${this.endpoint}?${queryParams.toString()}`;
       console.log('📡 [DireccionService] GET:', url);
-      console.log('📋 [DireccionService] Ejemplo: http://26.161.18.122:8085/api/direccion/listarDireccion?parametrosBusqueda=a&codUsuario=1');
+      console.log('📋 [DireccionService] Ejemplo: http://26.161.18.122:8085/api/direccion?parametrosBusqueda=b&codUsuario=3');
 
       const response = await fetch(url, {
         method: 'GET',
@@ -198,6 +201,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
           nombreVia: item.nombreVia || '',
           nombreTipoVia: item.nombreTipoVia || '',
           cuadra: item.cuadra !== null && item.cuadra !== undefined ? item.cuadra.toString() : '',
+          manzana: item.manzana !== null && item.manzana !== undefined ? item.manzana.toString() : '',
           lado: item.codLado === 8101 ? 'PAR' : item.codLado === 8102 ? 'IMPAR' : item.codLado === 8103 ? 'NINGUNO' : '',
           loteInicial: item.loteInicial || undefined,
           loteFinal: item.loteFinal || undefined,
@@ -247,6 +251,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
           nombreVia: item.nombreVia || '',
           nombreTipoVia: item.nombreTipoVia || '',
           cuadra: item.cuadra !== null && item.cuadra !== undefined ? item.cuadra.toString() : '',
+          manzana: item.manzana !== null && item.manzana !== undefined ? item.manzana.toString() : '',
           lado: item.codLado === 8101 ? 'PAR' : item.codLado === 8102 ? 'IMPAR' : item.codLado === 8103 ? 'NINGUNO' : '',
           loteInicial: item.loteInicial || undefined,
           loteFinal: item.loteFinal || undefined,
@@ -278,40 +283,43 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
   
   /**
    * Obtiene todas las direcciones activas
+   * URL: GET http://26.161.18.122:8085/api/direccion?parametrosBusqueda=a&codUsuario=3
    */
   async obtenerTodos(): Promise<DireccionData[]> {
     try {
-      const params = { 
+      const params = {
         estado: 'ACTIVO',
-        parametrosBusqueda: 'a' // Para obtener todas
+        parametrosBusqueda: 'a',
+        codUsuario: 3
       };
       const direcciones = await this.getAll(params);
       console.log(`✅ [DireccionService] obtenerTodos: ${direcciones.length} direcciones`);
       return direcciones;
     } catch (error) {
       console.error('Error al obtener direcciones:', error);
-      // Devolver array vacío en caso de error
       return [];
     }
   }
   
   /**
    * Busca direcciones con parámetros específicos
+   * URL: GET http://26.161.18.122:8085/api/direccion?parametrosBusqueda=b&codUsuario=3
    */
   async buscar(params: BusquedaDireccionParams): Promise<DireccionData[]> {
     try {
       console.log('🔍 [DireccionService] Buscando direcciones:', params);
-      
+
       const queryParams = new URLSearchParams();
       queryParams.append('parametrosBusqueda', params.parametrosBusqueda || params.nombreVia || 'a');
-      queryParams.append('codUsuario', '1');
-      
+      queryParams.append('codUsuario', String(params.codUsuario || 3));
+
       if (params.estado) {
         queryParams.append('estado', params.estado);
       }
-      
-      const url = `${API_CONFIG.baseURL}${this.endpoint}/listarDireccion?${queryParams.toString()}`;
-      
+
+      const url = `${API_CONFIG.baseURL}${this.endpoint}?${queryParams.toString()}`;
+      console.log('📡 [DireccionService] GET buscar:', url);
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -410,6 +418,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
           codDireccion: null,
           codBarrioVia: datos.codigoBarrio,
           cuadra: datos.cuadra && datos.cuadra.trim() !== '' ? parseInt(datos.cuadra) : 1,
+          manzana: datos.manzana && datos.manzana.trim() !== '' ? datos.manzana.trim() : null,
           codLado: codLado,
           loteInicial: datos.loteInicial || 1,
           loteFinal: datos.loteFinal || 20,
@@ -428,6 +437,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
           codBarrio: null,
           codVia: datos.codigoCalle,
           cuadra: datos.cuadra && datos.cuadra.trim() !== '' ? parseInt(datos.cuadra) : null,
+          manzana: datos.manzana && datos.manzana.trim() !== '' ? datos.manzana.trim() : null,
           codLado: codLado,
           loteInicial: datos.loteInicial || 1,
           loteFinal: datos.loteFinal || 20,
@@ -486,6 +496,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
             codigoBarrio: datos.codigoBarrio,
             codigoCalle: datos.codigoCalle,
             cuadra: datos.cuadra,
+            manzana: datos.manzana,
             lado: datos.lado,
             loteInicial: datos.loteInicial,
             loteFinal: datos.loteFinal,
@@ -501,6 +512,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
             codigoBarrio: datos.codigoBarrio,
             codigoCalle: datos.codigoCalle,
             cuadra: datos.cuadra,
+            manzana: datos.manzana,
             lado: datos.lado,
             loteInicial: datos.loteInicial,
             loteFinal: datos.loteFinal,
@@ -552,6 +564,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
             codigoBarrio: datos.codigoBarrio,
             codigoCalle: datos.codigoCalle,
             cuadra: datos.cuadra,
+            manzana: datos.manzana,
             lado: datos.lado,
             loteInicial: datos.loteInicial,
             loteFinal: datos.loteFinal,
@@ -569,6 +582,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
         codigoBarrio: datos.codigoBarrio,
         codigoCalle: datos.codigoCalle,
         cuadra: datos.cuadra,
+        manzana: datos.manzana,
         lado: datos.lado,
         loteInicial: datos.loteInicial,
         loteFinal: datos.loteFinal,
@@ -614,6 +628,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
           codBarrio: datos.codigoBarrio,
           codVia: datos.codigoCalle,
           cuadra: datos.cuadra && datos.cuadra.trim() !== '' ? parseInt(datos.cuadra) : null,
+          manzana: datos.manzana && datos.manzana.trim() !== '' ? datos.manzana.trim() : null,
           codLado: codLado,
           loteInicial: datos.loteInicial || 1,
           loteFinal: datos.loteFinal || 30,
@@ -631,6 +646,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
           codBarrio: null,
           codVia: datos.codigoCalle,
           cuadra: datos.cuadra && datos.cuadra.trim() !== '' ? parseInt(datos.cuadra) : null,
+          manzana: datos.manzana && datos.manzana.trim() !== '' ? datos.manzana.trim() : null,
           codLado: codLado,
           loteInicial: datos.loteInicial || 1,
           loteFinal: datos.loteFinal || 30,
@@ -678,6 +694,7 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
           codigoBarrio: datos.codigoBarrio || 0,
           codigoCalle: datos.codigoCalle || 0,
           cuadra: datos.cuadra,
+          manzana: datos.manzana,
           lado: datos.lado,
           loteInicial: datos.loteInicial,
           loteFinal: datos.loteFinal,

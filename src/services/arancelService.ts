@@ -221,7 +221,7 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
       console.log('✅ [ArancelService] Items para normalizar:', items);
       
       // Normalizar datos según estructura esperada de la API
-      const normalized = items.map(item => ({
+      const normalized = items.map((item: any) => ({
         codArancel: item.codArancel !== undefined ? item.codArancel : null,
         anio: item.anio || 0,
         codDireccion: item.codDireccion || 0,
@@ -411,9 +411,9 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
       }
       
       console.log('✅ [ArancelService] Items para normalizar:', items);
-      
+
       // Normalizar datos según estructura esperada
-      const normalized = items.map(item => ({
+      const normalized = items.map((item: any) => ({
         codArancel: item.codArancel !== undefined ? item.codArancel : null,
         anio: item.anio || 0,
         codDireccion: item.codDireccion || 0,
@@ -425,7 +425,7 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
         barrio: item.barrio !== undefined && item.barrio !== null ? item.barrio : '',
         calle: item.calle !== undefined && item.calle !== null ? item.calle : ''
       }));
-      
+
       console.log('✅ [ArancelService] Datos normalizados:', normalized);
       return normalized;
       
@@ -600,9 +600,13 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
         codDireccion: responseData.codDireccion || datos.codDireccion,
         costo: responseData.costo || datos.costo,
         codUsuario: responseData.codUsuario || datos.codUsuario,
-        costoArancel: responseData.costo || datos.costo // Mapear costo a costoArancel
+        costoArancel: responseData.costo || datos.costo, // Mapear costo a costoArancel
+        direccionCompleta: responseData.direccionCompleta || '',
+        sector: responseData.sector || '',
+        barrio: responseData.barrio || '',
+        calle: responseData.calle || ''
       };
-      
+
       console.log('✅ [ArancelService] Arancel normalizado:', arancelCreado);
       return arancelCreado;
       
@@ -774,7 +778,7 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
       
       const responseData = await response.json();
       console.log('✅ [ArancelService] Arancel actualizado exitosamente:', responseData);
-      
+
       // Normalizar la respuesta según la estructura esperada
       const arancelActualizado: ArancelData = {
         codArancel: responseData.codArancel || datos.codArancel,
@@ -782,9 +786,13 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
         codDireccion: responseData.codDireccion || datos.codDireccion,
         costo: responseData.costo || datos.costo,
         codUsuario: responseData.codUsuario || datos.codUsuario,
-        costoArancel: responseData.costo || datos.costo // Mapear costo a costoArancel
+        costoArancel: responseData.costo || datos.costo, // Mapear costo a costoArancel
+        direccionCompleta: responseData.direccionCompleta || '',
+        sector: responseData.sector || '',
+        barrio: responseData.barrio || '',
+        calle: responseData.calle || ''
       };
-      
+
       console.log('✅ [ArancelService] Arancel actualizado normalizado:', arancelActualizado);
       return arancelActualizado;
       
@@ -803,7 +811,7 @@ class ArancelService extends BaseApiService<ArancelData, CreateArancelDTO, Updat
       console.log('🗑️ [ArancelService] Eliminando arancel:', codArancel);
       
       const response = await fetch(`${API_CONFIG.baseURL}${this.endpoint}/${codArancel}`, {
-        method: 'DELETE',
+        method: 'PUT',
         headers: {
           'Accept': 'application/json'
         }

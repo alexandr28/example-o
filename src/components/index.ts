@@ -15,7 +15,7 @@ export { default as PersonaForm } from './contribuyentes/PersonaForm';
 export { default as ContribuyenteForm } from './contribuyentes/ContribuyenteForm';
 export { default as ContribuyenteConsulta } from './contribuyentes/ContribuyenteConsulta';
 export { default as DeduccionBeneficio } from './contribuyentes/DeduccionBeneficio';
-export {default as SelectorDirecciones } from './modal/SelectorDirecciones';
+
 export {default as FormSecction }from './utils/FormSecction';
 
 
@@ -56,22 +56,30 @@ export { default as DepreciacionUnificado } from './depreciacion/DepreciacionUni
 export {default as LoginForm } from './auth/LoginForm'
 export {default as ProtectedRoute} from './auth/ProtectedRoute'
 
-
+// Utils
 export { default as FormErrorBoundary } from './utils/FormErrorBoundary';
-
-
-
 export { default as FormSection } from './utils/FormSecction';
+// Exportación de componentes de navegación
 
+export {default as navigationGuard } from './utils/navigationGuard'
+
+// Components de Predio
 export { default as PredioForm } from './predio/PredioForm'
 export {default as ConsultaPredios} from  './predio/ConsultaPredios'
 export {default as ConsultaPisos } from './predio/pisos/ConsultaPisos'
 export {default as RegistrosPisos} from './predio/pisos/RegistrosPisos'
 export {default as  SelectorPredios} from './predio/pisos/SelectorPredios'
+export { default as AsignacionPredio } from './predio/asignacion/AsignacionPredio'
+export { default as ConsultaAsignacion } from './predio/asignacion/ConsultaAsignacion'
+export { default as PU } from './predio/pu/PU';
+export { default as HR } from './predio/hr/HR';
 
-// Exportación de componentes de navegación
+// Modal
+export { default as SelectorContribuyente } from './modal/SelectorContribuyente';
+export { default as SelectorDireccionArancel } from './modal/SelectorDireccionArancel';
+export { default as SelectorPredio } from './modal/SelectorPredio';
+export {default as SelectorDirecciones } from './modal/SelectorDirecciones';
 
-export {default as navigationGuard } from './utils/navigationGuard'
 
 // 🎯 NUEVOS COMPONENTES DE CAJA
 export { default as AperturaCaja } from './caja/AperturaCaja';
@@ -82,6 +90,12 @@ export { default as PorFecha } from './caja/consultas/PorFecha';
 export { default as PorContribuyente } from './caja/consultas/PorContribuyente';
 export { default as PorNumeroRecibo } from './caja/consultas/PorNumeroRecibo';
 
+// Componentes de Mantenedores de Caja
+export { default as Cajas } from './caja/mantenedores/Cajas';
+export { default as AsignacionCaja } from './caja/AsignacionCaja';
+
+
+
 // También exportar los tipos para uso externo
 export type { AperturaCajaData } from './caja/AperturaCaja';
 
@@ -89,3 +103,9 @@ export type { AperturaCajaData } from './caja/AperturaCaja';
 export { default as RegistroTIM } from './escalas/RegistroTIM';
 export { default as RegResolucionTIM } from './escalas/RegResolucionTIM';
 export { default as Vencimiento } from './escalas/Vencimiento';
+
+// Exportación de componentes de Usuarios
+export { default as Options } from './usuarios/Options';
+
+// Exportación de componentes de Cuenta Corriente
+export { default as CuentaList } from './cuenta/CuentaList';

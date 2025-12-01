@@ -12,23 +12,12 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
   useTheme,
   alpha,
   Autocomplete,
-  CircularProgress,
-  Tabs,
-  Tab
+  CircularProgress
 } from '@mui/material';
 import {
-  CalendarToday as CalendarIcon,
-  Print as PrintIcon,
   Search as SearchIcon,
   Home as HomeIcon,
   Assignment as AssignmentIcon,
@@ -38,15 +27,14 @@ import {
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { es } from 'date-fns/locale';
-import SelectorContribuyente from '../modal/SelectorContribuyente';
-import SelectorPredio from '../modal/SelectorPredio';
-import { NotificationService } from '../utils/Notification';
+import {SelectorContribuyente} from '../../';
+import SelectorPredios from '../pisos/SelectorPredios';
+import { NotificationService } from '../../utils/Notification';
 import {
   useEstadoOptions,
-  useAnioOptions,
   useModoDeclaracionOptions
-} from '../../hooks/useConstantesOptions';
-import { CreateAsignacionAPIDTO } from '../../services/asignacionService';
+} from '../../../hooks/useConstantesOptions';
+import { CreateAsignacionAPIDTO } from '../../../services/asignacionService';
 
 interface AsignacionData {
   año: number;
@@ -55,6 +43,7 @@ interface AsignacionData {
   modoDeclaracion: string;
   fechaVenta: Date | null;
   fechaDeclaracion: Date | null;
+  porcentajeCondomino: number;
   esPensionista: boolean;
   estado: string;
 }
@@ -73,12 +62,9 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
   const currentYear = new Date().getFullYear();
   
   // Hooks para opciones
-  const { options: aniosOptions } = useAnioOptions(2020);
   const { options: estadosOptions } = useEstadoOptions();
   const { options: modoDeclaracionOptions, loading: loadingModoDeclaracion } = useModoDeclaracionOptions();
   
-  // Estado para controlar el tab activo
-  const [activeTab, setActiveTab] = useState(0);
   const [internalLoading, setInternalLoading] = useState(false);
   
   const loading = externalLoading || internalLoading;
@@ -91,6 +77,7 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
     modoDeclaracion: '',
     fechaVenta: null,
     fechaDeclaracion: null,
+    porcentajeCondomino: 0,
     esPensionista: false,
     estado: 'Activo'
   });
@@ -100,10 +87,9 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
 
   // Debug para verificar las opciones (después de que el estado esté inicializado)
   useEffect(() => {
-    console.log('🔍 aniosOptions:', aniosOptions);
     console.log('🔍 modoDeclaracionOptions:', modoDeclaracionOptions);
     console.log('🔍 asignacionData.modoDeclaracion:', asignacionData.modoDeclaracion);
-  }, [aniosOptions, modoDeclaracionOptions, asignacionData.modoDeclaracion]);
+  }, [modoDeclaracionOptions, asignacionData.modoDeclaracion]);
 
   // Handlers
   const handleSelectContribuyente = (contribuyente: any) => {
@@ -114,12 +100,16 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
   const handleSelectPredio = (predio: any) => {
     console.log('🏠 [AsignacionPredio] Predio seleccionado:', predio);
     console.log('🏠 [AsignacionPredio] Propiedades del predio:', Object.keys(predio));
-    console.log('🏠 [AsignacionPredio] Códigos disponibles:', {
+    console.log('🏠 [AsignacionPredio] TODOS los códigos disponibles:', {
       codigoPredio: predio.codigoPredio,
       codPredio: predio.codPredio,
+      codPredioBase: predio.codPredioBase,
       codigo: predio.codigo,
-      id: predio.id
+      id: predio.id,
+      anio: predio.anio
     });
+    console.log('🏠 [AsignacionPredio] Código que se usará:',
+      predio.codPredio || predio.codigoPredio || predio.codPredioBase || predio.codigo || predio.id);
     setAsignacionData({ ...asignacionData, predio });
     setShowPredioModal(false);
   };
@@ -142,26 +132,45 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
 
     try {
       setInternalLoading(true);
-      
+
       // Convertir datos del formulario al formato API
-      const codigoPredio = asignacionData.predio.codigoPredio || 
-                          asignacionData.predio.codPredio || 
-                          asignacionData.predio.codigo || 
-                          asignacionData.predio.id || '';
-                          
-      const codigoContribuyente = parseInt(asignacionData.contribuyente.codigo || 
-                                         asignacionData.contribuyente.codContribuyente || 
+      // Limpiar espacios en blanco del código de predio
+      // NOTA: Usar codPredio primero (es el código real en la BD), luego codigoPredio
+      const codigoPredio = String(
+        asignacionData.predio.codPredio ||
+        asignacionData.predio.codigoPredio ||
+        asignacionData.predio.codPredioBase ||
+        asignacionData.predio.codigo ||
+        asignacionData.predio.id || ''
+      ).trim();
+
+      // Extraer el año del código del predio (primeros 4 dígitos)
+      // Ejemplo: "20243" -> año 2024
+      const anioPredio = codigoPredio.length >= 4
+        ? parseInt(codigoPredio.substring(0, 4))
+        : asignacionData.año;
+
+      console.log('🔑 [AsignacionPredio] Código de predio a enviar:', codigoPredio);
+      console.log('🔑 [AsignacionPredio] Año extraído del código:', anioPredio);
+      console.log('🔑 [AsignacionPredio] Campos del predio:', {
+        codPredio: asignacionData.predio.codPredio,
+        codigoPredio: asignacionData.predio.codigoPredio,
+        codPredioBase: asignacionData.predio.codPredioBase
+      });
+
+      const codigoContribuyente = parseInt(asignacionData.contribuyente.codigo ||
+                                         asignacionData.contribuyente.codContribuyente ||
                                          asignacionData.contribuyente.codigoPersona || '0');
 
       const datosAPI: CreateAsignacionAPIDTO = {
-        anio: asignacionData.año,
+        anio: anioPredio,
         codPredio: codigoPredio,
         codContribuyente: codigoContribuyente,
         codAsignacion: null,
-        porcentajeCondomino: 100,
+        porcentajeCondomino: asignacionData.porcentajeCondomino,
         fechaDeclaracion: asignacionData.fechaDeclaracion.toISOString().split('T')[0],
         fechaVenta: asignacionData.fechaVenta.toISOString().split('T')[0],
-        codModoDeclaracion: asignacionData.modoDeclaracion,
+        codModoDeclaracion: String(asignacionData.modoDeclaracion).trim(),
         pensionista: asignacionData.esPensionista ? 1 : 0,
         codEstado: "0201" // Estado activo por defecto
       };
@@ -194,42 +203,16 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
       modoDeclaracion: '',
       fechaVenta: null,
       fechaDeclaracion: null,
+      porcentajeCondomino: 0,
       esPensionista: false,
       estado: 'Activo'
     });
     NotificationService.info('Formulario limpiado');
   };
 
-  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
-    setActiveTab(newValue);
-  };
-
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
       <Box sx={{ p: 3 }}>
-        {/* Tabs de navegación */}
-        <Paper sx={{ mb: 3 }}>
-          <Tabs 
-            value={activeTab} 
-            onChange={handleTabChange}
-            variant="fullWidth"
-            sx={{
-              borderBottom: 1,
-              borderColor: 'divider',
-              '& .MuiTab-root': {
-                fontWeight: 600
-              }
-            }}
-          >
-            <Tab label="Asignación" icon={<AssignmentIcon />} iconPosition="start" />
-            <Tab label="PU" icon={<PersonIcon />} iconPosition="start" />
-            <Tab label="PU-Masivo" icon={<HomeIcon />} iconPosition="start" />
-          </Tabs>
-        </Paper>
-
-        {/* Panel de Asignación */}
-        {activeTab === 0 && (
-          <Box>
         {/* Sección: Seleccionar contribuyente y predio */}
         <Card sx={{ mb: 3 }}>
           <CardContent>
@@ -299,7 +282,7 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
                     fullWidth
                     label="Código de predio"
                     value={asignacionData.predio?.codigoPredio || asignacionData.predio?.codPredio || asignacionData.predio?.codigo || asignacionData.predio?.id || ''}
-                    InputProps={{ 
+                    InputProps={{
                       readOnly: true,
                       startAdornment: <HomeIcon sx={{ mr: 1, color: 'action.active' }} />
                     }}
@@ -377,6 +360,28 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
                     )}
                   />
                 </Box>
+                {/* Fecha Declaracion */}
+                <Box sx={{ flex: '0 0 100px', maxWidth:'200px' }}>
+                  <DatePicker
+                    label="Fecha declaración"
+                    value={asignacionData.fechaDeclaracion}
+                    onChange={(newValue) => setAsignacionData({
+                      ...asignacionData,
+                      fechaDeclaracion: newValue
+                    })}
+                    slotProps={{
+                      textField: {
+                        fullWidth: true,
+                        size:'small',
+                        sx:{
+                          '& .MuiInputBase-root':{
+                            height:'33px'
+                          }
+                        }
+                      }
+                    }}
+                  />
+                </Box>
                 {/* Fecha de Venta */}
                 <Box sx={{ flex: '0 0 100px', maxWidth:'150px' }}>
                   <DatePicker
@@ -397,40 +402,42 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
                         },
                       }
                     }}
-                    
                   />
                 </Box>
-
-                <Box sx={{ flex: '0 0 100px', maxWidth:'200px' }}>
-                  <DatePicker
-                    label="Fecha declaración"
-                    value={asignacionData.fechaDeclaracion}
-                    onChange={(newValue) => setAsignacionData({
-                      ...asignacionData,
-                      fechaDeclaracion: newValue
-                    })}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        size:'small',
-                        sx:{
-                          '& .MuiInputBase-root':{
-                            height:'33'
-                          }
-                        },
-                        InputProps: {
-                          endAdornment: <CalendarIcon />
-                        }
+                {/* % Condomino */}
+                <Box sx={{ flex: '0 0 100px', maxWidth:'120px' }}>
+                  <TextField
+                    label="% Condomino"
+                    type="number"
+                    value={asignacionData.porcentajeCondomino}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setAsignacionData({
+                        ...asignacionData,
+                        porcentajeCondomino: value === '' ? 0 : Number(value)
+                      });
+                    }}
+                    onFocus={(e) => e.target.select()}
+                    size="small"
+                    fullWidth
+                    inputProps={{
+                      min: 0,
+                      max: 100,
+                      step: 1
+                    }}
+                    sx={{
+                      '& .MuiInputBase-root': {
+                        height: '33px'
                       }
                     }}
                   />
                 </Box>
-
+                {/* Estado - Solo primera opción */}
                 <Box sx={{ flex: '0 0 180px' }}>
                   <Autocomplete
-                    options={estadosOptions}
+                    options={estadosOptions.length > 0 ? [estadosOptions[0]] : []}
                     getOptionLabel={(option) => option?.label || ''}
-                    value={estadosOptions.find(opt => opt.value === asignacionData.estado) || null}
+                    value={estadosOptions.length > 0 ? estadosOptions[0] : null}
                     onChange={(_, newValue) => setAsignacionData({
                       ...asignacionData,
                       estado: String(newValue?.value || 'Activo')
@@ -442,9 +449,9 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
                         label="Estado"
                         placeholder="Seleccione"
                         required
-                        sx={{ 
-                          '& .MuiInputBase-root': { 
-                            height: '33px' 
+                        sx={{
+                          '& .MuiInputBase-root': {
+                            height: '33px'
                           }
                         }}
                       />
@@ -452,7 +459,7 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
                   />
                 </Box>
 
-
+                {/* Es Pensionista */}
                 <Box sx={{ flex: '0 0 140px' }}>
                   <Paper sx={{ p: 2, bgcolor: alpha(theme.palette.grey[100], 0.5) }}>
                     <Typography variant="subtitle2" gutterBottom>
@@ -503,214 +510,6 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
             </Box>
           </CardContent>
         </Card>
-
-          </Box>
-        )}
-
-        {/* Panel de PU */}
-        {activeTab === 1 && (
-          <Box>
-            {/* Sección: PU-Contribuyente */}
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              PU- Contribuyente
-            </Typography>
-            
-            <Paper sx={{ p: 2, bgcolor: alpha(theme.palette.grey[100], 0.3) }}>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
-                <Box sx={{ flex: '0 0 120px' }}>
-                  <Autocomplete
-                    options={aniosOptions}
-                    getOptionLabel={(option) => option?.label || ''}
-                    value={aniosOptions.find(opt => opt.value === asignacionData.año.toString()) || null}
-                    onChange={(_, newValue) => {
-                      console.log('🎯 PU-Contribuyente Año seleccionado:', newValue);
-                      console.log('🎯 Tipo de valor:', typeof newValue?.value);
-                      setAsignacionData({
-                        ...asignacionData,
-                        año: parseInt(newValue?.value?.toString() || new Date().getFullYear().toString())
-                      });
-                    }}
-                    size="small"
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Año"
-                        placeholder="Seleccione año..."
-                      />
-                    )}
-                    sx={{ 
-                      '& .MuiInputBase-root': { 
-                        height: '33px' 
-                      }
-                    }}
-                  />
-                </Box>
-                <Box sx={{ flex: '0 0 120px' }}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    startIcon={<PersonIcon />}
-                    sx={{ height: 33
-                     }}
-                  >
-                    Seleccionar contribuyente
-                  </Button>
-                </Box>
-                <Box sx={{ flex: '0 0 100px' }}>
-                  <TextField
-                    fullWidth
-                    label="Código"
-                    InputProps={{ readOnly: true }}
-                  />
-                </Box>
-                <Box sx={{ flex: '1 1 250px' }}>
-                  <TextField
-                    fullWidth
-                    label="Nombre del contribuyente"
-                    InputProps={{ readOnly: true }}
-                  />
-                </Box>
-                <Box sx={{ flex: '0 0 100px' }}>
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    startIcon={<PrintIcon />}
-                    sx={{ height: 33 }}
-                  >
-                    Imprimir PU
-                  </Button>
-                </Box>
-              </Box>
-
-              <TableContainer component={Paper}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Código Predio</TableCell>
-                      <TableCell>Dirección</TableCell>
-                      <TableCell>Estado</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell>130077</TableCell>
-                      <TableCell>Sector Central Barrio B1 Mz-21 - Av Gran Chimu N°650 - Unidad 2</TableCell>
-                      <TableCell>
-                        <Chip label="ACTIVO" color="success" size="small" />
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Paper>
-          </CardContent>
-        </Card>
-
-          </Box>
-        )}
-
-        {/* Panel de PU-Masivo */}
-        {activeTab === 2 && (
-          <Box>
-            {/* Sección: PU-Masivo */}
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              PU- Masivo
-            </Typography>
-            
-            <Paper sx={{ p: 2, bgcolor: alpha(theme.palette.grey[100], 0.3) }}>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
-                <Box sx={{ flex: '0 0 100px' }}>
-                  <Autocomplete
-                    options={aniosOptions}
-                    getOptionLabel={(option) => option?.label || ''}
-                    value={aniosOptions.find(opt => opt.value === asignacionData.año.toString()) || null}
-                    onChange={(_, newValue) => setAsignacionData({
-                      ...asignacionData,
-                      año: parseInt(newValue?.value?.toString() || new Date().getFullYear().toString())
-                    })}
-                    size="small"
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Año"
-                        placeholder="Seleccione año..."
-                      />
-                    )}
-                    sx={{ 
-                      '& .MuiInputBase-root': { 
-                        height: '33px' 
-                      }
-                    }}
-                  />
-                </Box>
-                <Box sx={{ flex: '0 0 120px' }}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    startIcon={<HomeIcon />}
-                    sx={{ height: 33 }}
-                  >
-                    Seleccionar predio
-                  </Button>
-                </Box>
-                <Box sx={{ flex: '1 1 300px' }}>
-                  <TextField
-                    fullWidth
-                    label="Dirección predial"
-                    InputProps={{ readOnly: true }}
-                  />
-                </Box>
-                <Box sx={{ flex: '0 0 120px' }}>
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    startIcon={<PrintIcon />}
-                    sx={{ height: 33 }}
-                  >
-                    Imprimir PU Masivo
-                  </Button>
-                </Box>
-              </Box>
-
-              <TableContainer component={Paper}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Código Predio</TableCell>
-                      <TableCell>Item</TableCell>
-                      <TableCell>Contribuyente</TableCell>
-                      <TableCell>Estado</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell>130077</TableCell>
-                      <TableCell>1</TableCell>
-                      <TableCell>Cuzco Rodriguez Celinda Elena</TableCell>
-                      <TableCell>
-                        <Chip label="ACTIVO" color="success" size="small" />
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>145620</TableCell>
-                      <TableCell>1</TableCell>
-                      <TableCell>Maldona Maldonado Carlos</TableCell>
-                      <TableCell>
-                        <Chip label="ACTIVO" color="success" size="small" />
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Paper>
-          </CardContent>
-        </Card>
-          </Box>
-        )}
       </Box>
 
       {/* Modales */}
@@ -721,12 +520,10 @@ const AsignacionPredio: React.FC<AsignacionPredioProps> = ({
         title="Seleccionar contribuyente"
       />
 
-      <SelectorPredio
-        isOpen={showPredioModal}
+      <SelectorPredios
+        open={showPredioModal}
         onClose={() => setShowPredioModal(false)}
-        onSelectPredio={handleSelectPredio}
-        title="Selector de predios"
-        contribuyenteId={asignacionData.contribuyente?.codigo}
+        onSelect={handleSelectPredio}
       />
     </LocalizationProvider>
   );

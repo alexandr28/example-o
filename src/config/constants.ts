@@ -8,7 +8,27 @@ export const AUTH_ENDPOINTS = {
   LOGIN: `/auth/login`,
   LOGOUT: `/auth/logout`,
   REFRESH: `/auth/refresh`,
+  REGISTER: `/auth/register`,
 };
+
+// Roles de usuario disponibles
+export const USER_ROLES = {
+  ADMIN: 'ADMIN',
+  CAJERO: 'CAJERO',
+  GERENTE: 'GERENTE',
+  SUPERVISOR: 'SUPERVISOR',
+  USER: 'USER'
+} as const;
+
+// Tipo para roles
+export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES];
+
+// Estados de usuario
+export const USER_ESTADOS = {
+  ACTIVO: '4567',
+  INACTIVO: '4568',
+  SUSPENDIDO: '4569'
+} as const;
 
 // Actualizar endpoints para no requerir autenticación
 export const API_ENDPOINTS = {
@@ -32,11 +52,7 @@ export const API_ENDPOINTS = {
   },
   PARQUES_JARDINES:'/api/arbitrioParquesjardines',
 
-  direccion: {
-      base: '/api/direccion',
-      listarPorNombreVia: `api/direccion/listarDireccionPorNombreVia`,
-      listarPorTipoVia: `api/direccion/listarDireccionPorTipoVia?parametrosBusqueda=a&codUsuario=1`,
-    },
+  
   CONTRIBUYENTE: {
     base: '/api/contribuyente',
     general: '/api/contribuyente/general',
@@ -71,6 +87,35 @@ export const API_ENDPOINTS = {
   },
   RESOLUCION_INTERES: '/api/resolucionInteres',
   Vencimiento: '/api/vencimiento',
+  ASIGNACION_CAJA:{
+    base: '/api/asignacionCaja',
+    listar: '/api/asignacionCaja/listar',
+    insertar: '/api/asignacionCaja/insertar',
+    actualizar: '/api/asignacionCaja/actualizar',
+    eliminar: '/api/asignacionCaja/eliminar', 
+  },
+  CAJA:{
+    base: '/api/caja',
+    listar: '/api/caja/listar',
+    insertar: '/api/caja/insertar',
+    actualizar: '/api/caja/actualizar',
+    eliminar: '/api/caja/eliminar',
+  },
+  TURNO:'/api/turno',
+  APERTURA_CAJA:{
+    base: '/api/aperturaCaja',
+    aperturar: '/api/aperturaCaja/aperturar',
+    cierre: '/api/aperturaCaja/cierre',
+  },
+  USUARIO:{
+    base: '/api/usuario',
+    listar: '/api/usuario/listar',
+    insertar: '/api/usuario/insertar',
+    actualizar: '/api/usuario/actualizar',
+    cambiarClave: '/api/usuario/cambiarClave',
+    darBaja: '/api/usuario/darBaja',
+    activar: '/api/usuario/activar',
+  },
 
   // Autenticación (referencia a AUTH_ENDPOINTS)
   AUTH: `/auth`,

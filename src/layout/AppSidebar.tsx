@@ -24,7 +24,8 @@ import {
   Computer as ComputerIcon,
   SwapVert as SwapVertIcon,
   ChevronLeft as ChevronLeftIcon,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon,
+  ManageAccounts as ManageAccountsIcon
 } from '@mui/icons-material';
 import SidebarWidget from './SidebarWidget';
 import { useSidebar } from '../context/SidebarContext';
@@ -147,14 +148,14 @@ const ToggleButton = styled(IconButton)(({ theme }) => ({
 
 // Elementos del menú principal
 const menuItems: MenuItem[] = [
-  {
+  { /* Dashboard */
     id: 'dashboard',
     label: 'Dashboard',
     icon: <DashboardIcon />,
     path: '/dashboard',
   },
   
-  {
+  { /* Contribuyentes */
     id: 'contribuyentes',
     label: 'Contribuyentes',
     icon: <PeopleIcon />,
@@ -165,7 +166,7 @@ const menuItems: MenuItem[] = [
      
     ],
   },
-  {
+  { /* Predio */
     id: 'predio',
     label: 'Predio',
     icon: <HomeIcon />,
@@ -176,10 +177,19 @@ const menuItems: MenuItem[] = [
       { id: 'consulta-pisos', label: 'Consulta Pisos', path: '/predio/pisos/consulta' },
       { id: 'asignacion-predios', label: 'Asignación', path: '/predio/asignacion/nuevo' },
       { id: 'consulta-asignacion', label: 'Consulta Asignación', path: '/predio/asignacion/consulta' },
-      { id: 'transferencia-predios', label: 'Transferencia', path: '/predio/transferencia' },
+      {id: 'pu-hr', label: 'Consulta PU-HR', path:'/predio/puhr/consulta-pu-hr'},
+      {
+        id: 'transferencia-predios',
+        label: 'Transferencia',
+        subMenuItems: [
+          { id: 'transferencias-alcabala', label: 'Transferencias Alcabala', path: '/predio/transferencia/alcabala' },
+          { id: 'reporte-alcabala', label: 'Reporte Alcabala', path: '/predio/transferencia/reporte-alcabala' },
+        ]
+      },
+      
     ],
   },
-  {
+  { /* Cuenta Corriente */
     id: 'cuenta-corriente',
     label: 'Cuenta Corriente',
     icon: <AccountBalanceIcon />,
@@ -187,7 +197,7 @@ const menuItems: MenuItem[] = [
       { id: 'consulta-cuenta', label: 'Consulta Cuenta', path: '/cuenta-corriente/consulta' },
     ],
   },
-  {
+  { /* Fraccionamiento */
     id: 'fraccionamiento',
     label: 'Fraccionamiento',
     icon: <FraccionamientoIcon />,
@@ -198,7 +208,7 @@ const menuItems: MenuItem[] = [
       { id: 'reporte-fraccionamiento', label: 'Reporte Fraccionamiento', path: '/fraccionamiento/reportes' },
     ],
   },
-  {
+  { /* Caja */
     id: 'caja',
     label: 'Caja',
     icon: <ReceiptIcon />,
@@ -209,7 +219,7 @@ const menuItems: MenuItem[] = [
       { id: 'Reportes', label: 'Reportes', path: '/caja/reportes' },
     ],
   },
-  {
+  { /* Reportes */
     id: 'reportes',
     label: 'Reportes',
     icon: <ReportsIcon />,
@@ -219,7 +229,7 @@ const menuItems: MenuItem[] = [
       { id: 'reporte-recaudacion', label: 'Recaudación', path: '/reportes/recaudacion' },
     ],
   },
-  {
+  { /* Coactiva */
     id: 'coactiva',
     label: 'Coactiva',
     icon: <GavelIcon />,
@@ -233,7 +243,7 @@ const menuItems: MenuItem[] = [
 
 // Elementos del menú SISTEMA
 const sistemaMenuItems: MenuItem[] = [
-  {
+  { /* Mantenedores */
     id: 'mantenedores',
     label: 'Mantenedores',
     icon: <SettingsIcon />,
@@ -280,9 +290,18 @@ const sistemaMenuItems: MenuItem[] = [
           
         ]
       },
+      /** Mantenedores - Caja */
+      {
+        id: 'caja',
+        label: 'Caja',
+        subMenuItems: [
+          { id: 'cajas', label: ' Cajas', path: '/mantenedores/caja/cajas' },
+        ]
+      },
     ],
   },
-  {
+  
+  { /* Sistema */
     id: 'sistema',
     label: 'Sistema',
     icon: <ComputerIcon />,
@@ -292,6 +311,19 @@ const sistemaMenuItems: MenuItem[] = [
       { id: 'respaldo', label: 'Respaldo', path: '/sistema/respaldo' },
     ],
   },
+  /** Usuarios */
+  {
+    id: 'usuarios',
+    label: 'Usuarios',
+    icon: <ManageAccountsIcon />,
+    subMenuItems: [
+      { id: 'crear-cuenta', label: 'Crear Cuenta', path: '/usuarios/crear-cuenta' },
+      { id: 'consulta-usuarios', label: 'Consulta Usuarios', path: '/usuarios/consulta' },
+      { id: 'recuperar-password', label: 'Recuperar Password', path: '/usuarios/recuperar-password' },
+      { id: 'otras-opciones', label: 'Otras Opciones', path: '/usuarios/otras-opciones' },
+    ],
+  },
+  /** Migración */
   {
     id: 'migracion',
     label: 'Migración',

@@ -11,6 +11,7 @@ export interface PisoData {
   numeroPiso: number;
   numeroPisoDesc?: string; // Descripción del piso (ej: "1° piso")
   areaConstruida: number;
+  areaTotalConstruccion?: number; // Área total de construcción
   clasificacion?: string;
   materialEstructural?: string;
   estadoConservacion?: string;
@@ -26,8 +27,9 @@ export interface PisoData {
   fechaModificacion?: string;
   codUsuario?: number;
   // Campos adicionales del API
-  anio?: number;
+  anio?: number | null;
   codPredio?: string;
+  codPredioBase?: string | null;
   codPiso?: number;
   fechaConstruccion?: number | string;
   fechaConstruccionStr?: string;
@@ -376,6 +378,7 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
           // Valores - usar ?? para mantener 0 y valores decimales como válidos
           valorUnitario: item.valorUnitario ?? 0,
           areaConstruida: item.areaConstruida ?? 0,
+          areaTotalConstruccion: item.areaTotalConstruccion ?? 0,
           incremento: item.incremento ?? 0,
           depreciacion: item.depreciacion ?? 0,
           montoDepreciacion: item.montoDepreciacion ?? null,
@@ -393,6 +396,8 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
         console.log(`✅ [PisoService] Piso ${index + 1} formateado:`, pisoFormateado);
         console.log(`✅ [PisoService] Valores finales del piso formateado:`, {
           valorUnitario: pisoFormateado.valorUnitario,
+          areaConstruida: pisoFormateado.areaConstruida,
+          areaTotalConstruccion: pisoFormateado.areaTotalConstruccion,
           incremento: pisoFormateado.incremento,
           depreciacion: pisoFormateado.depreciacion,
           valorUnitarioDepreciado: pisoFormateado.valorUnitarioDepreciado,
@@ -580,10 +585,10 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
       }
 
       // Asegurar que los datos coincidan EXACTAMENTE con el JSON esperado
-      const datosParaEnviar: CreatePisoApiDTO = {
+      // Para creación, codPiso puede ser null (el backend lo genera)
+      const datosParaEnviar: any = {
         anio: Number(datos.anio),
         codPredio: String(datos.codPredio).trim(),
-        codPiso: Number(datos.codPiso || 1),
         numeroPiso: Number(datos.numeroPiso),
         fechaConstruccion: String(datos.fechaConstruccion || "1990-01-01"),
         murosColumnas: String(datos.murosColumnas || "100101"),
@@ -607,11 +612,27 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
         codUsuario: Number(datos.codUsuario || 1)
       };
 
+      // Solo agregar codPiso si tiene un valor válido (para actualización)
+      // Para creación, el backend genera el codPiso automáticamente
+      if (datos.codPiso && Number(datos.codPiso) > 0) {
+        datosParaEnviar.codPiso = Number(datos.codPiso);
+      } else {
+        datosParaEnviar.codPiso = null; // Enviar null para que el backend lo genere
+      }
+
       // URL específica del API
       const url = buildApiUrl('/api/piso');
-      
+
       console.log('📡 [PisoService] URL para crear:', url);
       console.log('📤 [PisoService] JSON exacto a enviar:', JSON.stringify(datosParaEnviar, null, 2));
+      console.log('📤 [PisoService] Verificación de campos críticos:', {
+        anio: datosParaEnviar.anio,
+        codPredio: datosParaEnviar.codPredio,
+        codPiso: datosParaEnviar.codPiso,
+        numeroPiso: datosParaEnviar.numeroPiso,
+        areaConstruida: datosParaEnviar.areaConstruida,
+        fechaConstruccion: datosParaEnviar.fechaConstruccion
+      });
       
       // Petición POST sin autenticación usando JSON
       const response = await fetch(url, {
@@ -641,8 +662,35 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
       }
       
       const responseData = await response.json();
+      console.log('📥 [PisoService] Respuesta raw del API:', responseData);
+      console.log('📥 [PisoService] Tipo de respuesta:', typeof responseData);
+      console.log('📥 [PisoService] Propiedades de respuesta:', Object.keys(responseData || {}));
+      console.log('📥 [PisoService] Respuesta completa JSON:', JSON.stringify(responseData, null, 2));
+
+      // Verificar si la respuesta indica un error del backend
+      // Algunas APIs devuelven {success: false} o {error: true} con HTTP 200
+      if (responseData && responseData.success === false) {
+        const errorMsg = responseData.message || responseData.error || 'Error al crear piso en el servidor';
+        console.error('❌ [PisoService] El API retornó success: false:', errorMsg);
+        console.error('❌ [PisoService] Respuesta completa del error:', responseData);
+        console.error('❌ [PisoService] Datos enviados que causaron el error:', datosParaEnviar);
+        throw new Error(errorMsg);
+      }
+
+      if (responseData && responseData.error) {
+        const errorMsg = responseData.message || responseData.error || 'Error al crear piso en el servidor';
+        console.error('❌ [PisoService] El API retornó error:', errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      // Verificar si la respuesta está vacía o es inválida
+      if (!responseData || (typeof responseData === 'object' && Object.keys(responseData).length === 0)) {
+        console.error('❌ [PisoService] El API retornó una respuesta vacía');
+        throw new Error('El servidor no devolvió datos del piso creado');
+      }
+
       console.log('✅ [PisoService] Piso creado exitosamente:', responseData);
-      
+
       // Normalizar la respuesta usando los datos del responseData
       const pisoCreado: PisoData = {
         id: responseData.codPiso || responseData.id || 0,
@@ -652,7 +700,7 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
         anio: datosParaEnviar.anio,
         numeroPiso: datosParaEnviar.numeroPiso,
         fechaConstruccion: datosParaEnviar.fechaConstruccion,
-        areaConstruida: datosParaEnviar.areaConstruida,
+        areaConstruida: parseFloat(datosParaEnviar.areaConstruida),
         codLetraMurosColumnas: datosParaEnviar.codLetraMurosColumnas,
         murosColumnas: datosParaEnviar.murosColumnas,
         codLetraTechos: datosParaEnviar.codLetraTechos,
@@ -790,8 +838,11 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
         }
         
         // Verificar si el nuevo número ya existe
+        const codigoPredioParaVerificar = typeof (datos.codigoPredio || pisoActual.codigoPredio) === 'number'
+          ? (datos.codigoPredio || pisoActual.codigoPredio) as number
+          : parseInt(String(datos.codigoPredio || pisoActual.codigoPredio));
         const existe = await this.verificarNumeroPisoExiste(
-          datos.codigoPredio || pisoActual.codigoPredio,
+          codigoPredioParaVerificar,
           datos.numeroPiso,
           id
         );
@@ -810,17 +861,12 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
         throw new Error('El año de construcción no puede ser futuro');
       }
       
-      if (datos.porcentajeAreaComun !== undefined && 
+      if (datos.porcentajeAreaComun !== undefined &&
           (datos.porcentajeAreaComun < 0 || datos.porcentajeAreaComun > 100)) {
         throw new Error('El porcentaje de área común debe estar entre 0 y 100');
       }
-      
-      const datosCompletos = {
-        ...datos,
-        fechaModificacion: new Date().toISOString()
-      };
-      
-      return await this.update(id, datosCompletos);
+
+      return await this.update(id, datos);
       
     } catch (error: any) {
       console.error('❌ [PisoService] Error actualizando piso:', error);
@@ -844,8 +890,7 @@ class PisoService extends BaseApiService<PisoData, CreatePisoDTO, UpdatePisoDTO>
       
       // En lugar de eliminar físicamente, cambiar estado a INACTIVO
       await this.update(id, {
-        estado: 'INACTIVO',
-        fechaModificacion: new Date().toISOString()
+        estado: 'INACTIVO'
       });
       
       console.log('✅ [PisoService] Piso marcado como inactivo');

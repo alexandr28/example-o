@@ -11,8 +11,8 @@ import {
   NavigateNext as NavigateNextIcon
 } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
-import MainLayout from '../../layout/MainLayout';
-import ConsultaAsignacion from '../../components/predio/ConsultaAsignacion';
+import MainLayout from '../../../layout/MainLayout';
+import {ConsultaAsignacion} from '../../../components';
 
 const ConsultaAsignacionPage: React.FC = () => {
   // Breadcrumbs

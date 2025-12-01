@@ -121,15 +121,15 @@ const CuentaList: React.FC<CuentaListProps> = ({
   const detalleConceptos = useMemo(() => {
     if (!estadoCuentaDetalle || estadoCuentaDetalle.length === 0) return [];
 
-    // Agrupar por tributo y crear filas de Cargo y Pagado
+    // Agrupar por tributo y crear filas de Cargo, Pagado y F. Venc
     return estadoCuentaDetalle.flatMap((item) => {
       // Aquí mapeamos los datos de la API a la estructura de la tabla
-      // Nota: La API devuelve cargo1-12 y abono1-12, que los mapeamos a col1-col12
+      // Nota: La API devuelve cargo1-12, abono1-12 y venc_ene-dic, que los mapeamos a col1-col12
       return [
         {
           anio: item.anio,
           grupoTributo: item.grupoTributo,
-          tributo: item.grupoTributo,  // Temporal: usando grupoTributo como nombre del tributo
+          tributo: item.tributo,
           concepto: 'Cargo',
           col1: item.cargo1 || 0,
           col2: item.cargo2 || 0,
@@ -150,7 +150,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
         {
           anio: item.anio,
           grupoTributo: item.grupoTributo,
-          tributo: item.grupoTributo,
+          tributo: item.tributo,
           concepto: 'Pagado',
           col1: item.abono1 || 0,
           col2: item.abono2 || 0,
@@ -164,6 +164,27 @@ const CuentaList: React.FC<CuentaListProps> = ({
           col10: item.abono10 || 0,
           col11: item.abono11 || 0,
           col12: item.abono12 || 0,
+          totalCargos: item.totalCargos,
+          totalPagado: item.totalPagado,
+          saldoNeto: item.saldoNeto
+        },
+        {
+          anio: item.anio,
+          grupoTributo: item.grupoTributo,
+          tributo: item.tributo,
+          concepto: 'F. Venc',
+          col1: item.venc_ene || '-',
+          col2: item.venc_feb || '-',
+          col3: item.venc_mar || '-',
+          col4: item.venc_abr || '-',
+          col5: item.venc_may || '-',
+          col6: item.venc_jun || '-',
+          col7: item.venc_jul || '-',
+          col8: item.venc_ago || '-',
+          col9: item.venc_sep || '-',
+          col10: item.venc_oct || '-',
+          col11: item.venc_nov || '-',
+          col12: item.venc_dic || '-',
           totalCargos: item.totalCargos,
           totalPagado: item.totalPagado,
           saldoNeto: item.saldoNeto
@@ -232,7 +253,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
               mb: 2,
               pb: 1,
               borderBottom: '2px solid',
-              borderImage: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%) 1'
+              borderImage: 'linear-gradient(90deg, #4caf50 0%, #2e7d32 100%) 1'
             }}
           >
             <Typography
@@ -240,7 +261,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
               component="h2"
               sx={{
                 fontWeight: 700,
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 letterSpacing: '0.5px'
@@ -257,10 +278,10 @@ const CuentaList: React.FC<CuentaListProps> = ({
               gap: 2.5,
               alignItems: 'stretch',
               p: 2.5,
-              background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.03) 0%, rgba(118, 75, 162, 0.03) 100%)',
+              background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.03) 0%, rgba(46, 125, 50, 0.03) 100%)',
               borderRadius: 2,
               border: '1px solid',
-              borderColor: 'rgba(102, 126, 234, 0.15)'
+              borderColor: 'rgba(76, 175, 80, 0.15)'
             }}
           >
             {/* Seleccionar Contribuyente*/}
@@ -273,20 +294,20 @@ const CuentaList: React.FC<CuentaListProps> = ({
                 sx={{
                   height: 56,
                   borderWidth: 2,
-                  borderColor: '#667eea',
-                  color: '#667eea',
+                  borderColor: '#4caf50',
+                  color: '#4caf50',
                   fontWeight: 600,
                   fontSize: '0.95rem',
                   textTransform: 'none',
-                  background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
+                  background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.05) 0%, rgba(46, 125, 50, 0.05) 100%)',
                   transition: 'all 0.3s ease',
-                  boxShadow: '0 2px 6px rgba(102, 126, 234, 0.15)',
+                  boxShadow: '0 2px 6px rgba(76, 175, 80, 0.15)',
                   '&:hover': {
                     borderWidth: 2,
-                    borderColor: '#764ba2',
-                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                    borderColor: '#2e7d32',
+                    background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.1) 0%, rgba(46, 125, 50, 0.1) 100%)',
                     transform: 'translateY(-2px)',
-                    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.25)'
+                    boxShadow: '0 4px 12px rgba(76, 175, 80, 0.25)'
                   }
                 }}
               >
@@ -400,23 +421,23 @@ const CuentaList: React.FC<CuentaListProps> = ({
                   height: 56,
                   background: !codigoContribuyente || loadingEstadoCuenta
                     ? 'rgba(0,0,0,0.12)'
-                    : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    : 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
                   color: 'white',
                   fontWeight: 700,
                   fontSize: '1rem',
                   textTransform: 'none',
                   boxShadow: !codigoContribuyente || loadingEstadoCuenta
                     ? 'none'
-                    : '0 4px 12px rgba(102, 126, 234, 0.35)',
+                    : '0 4px 12px rgba(76, 175, 80, 0.35)',
                   transition: 'all 0.3s ease',
                   '&:hover': {
                     background: !codigoContribuyente || loadingEstadoCuenta
                       ? 'rgba(0,0,0,0.12)'
-                      : 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
+                      : 'linear-gradient(135deg, #2e7d32 0%, #4caf50 100%)',
                     transform: !codigoContribuyente || loadingEstadoCuenta ? 'none' : 'translateY(-2px)',
                     boxShadow: !codigoContribuyente || loadingEstadoCuenta
                       ? 'none'
-                      : '0 6px 16px rgba(102, 126, 234, 0.45)'
+                      : '0 6px 16px rgba(76, 175, 80, 0.45)'
                   },
                   '&:disabled': {
                     color: 'rgba(0,0,0,0.26)'
@@ -440,7 +461,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
               mb: 2,
               pb: 1,
               borderBottom: '2px solid',
-              borderImage: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%) 1'
+              borderImage: 'linear-gradient(90deg, #4caf50 0%, #2e7d32 100%) 1'
             }}
           >
             <Typography
@@ -448,7 +469,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
               component="h2"
               sx={{
                 fontWeight: 700,
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 letterSpacing: '0.5px'
@@ -479,7 +500,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
                     <TableRow>
                       <TableCell
                         sx={{
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          background: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
                           color: 'white',
                           fontWeight: 700,
                           fontSize: '0.875rem',
@@ -491,7 +512,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
                       <TableCell
                         align="center"
                         sx={{
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          background: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
                           color: 'white',
                           fontWeight: 700,
                           fontSize: '0.875rem',
@@ -540,21 +561,21 @@ const CuentaList: React.FC<CuentaListProps> = ({
                   <TableBody>
                     {estadoCuentaAnual.map((fila, index) => (
                       <TableRow
-                        key={fila.anio}
+                        key={`${fila.anio}-${index}`}
                         onClick={() => handleFilaClick(fila.anio)}
                         sx={{
                           cursor: 'pointer',
                           backgroundColor: anioSeleccionado === fila.anio
-                            ? 'rgba(102, 126, 234, 0.08)'
+                            ? 'rgba(76, 175, 80, 0.08)'
                             : index % 2 === 0 ? 'white' : 'rgba(0,0,0,0.02)',
                           transition: 'all 0.2s ease-in-out',
-                          borderLeft: anioSeleccionado === fila.anio ? '4px solid #667eea' : '4px solid transparent',
+                          borderLeft: anioSeleccionado === fila.anio ? '4px solid #4caf50' : '4px solid transparent',
                           '&:hover': {
                             backgroundColor: anioSeleccionado === fila.anio
-                              ? 'rgba(102, 126, 234, 0.12)'
-                              : 'rgba(102, 126, 234, 0.05)',
+                              ? 'rgba(76, 175, 80, 0.12)'
+                              : 'rgba(76, 175, 80, 0.05)',
                             transform: 'translateX(2px)',
-                            boxShadow: '0 2px 8px rgba(102, 126, 234, 0.15)'
+                            boxShadow: '0 2px 8px rgba(76, 175, 80, 0.15)'
                           }
                         }}
                       >
@@ -562,7 +583,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
                           sx={{
                             fontWeight: 700,
                             fontSize: '0.95rem',
-                            color: anioSeleccionado === fila.anio ? '#667eea' : '#1a237e',
+                            color: anioSeleccionado === fila.anio ? '#4caf50' : '#1b5e20',
                             borderRight: '1px solid rgba(0,0,0,0.06)'
                           }}
                         >
@@ -578,8 +599,8 @@ const CuentaList: React.FC<CuentaListProps> = ({
                             label={fila.grupoTributo}
                             sx={{
                               background: fila.grupoTributo === 'Arbitrial'
-                                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                                : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                                ? 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)'
+                                : 'linear-gradient(135deg, #66bb6a 0%, #43a047 100%)',
                               color: 'white',
                               fontWeight: 600,
                               fontSize: '0.75rem',
@@ -661,10 +682,10 @@ const CuentaList: React.FC<CuentaListProps> = ({
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
+                  background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.05) 0%, rgba(46, 125, 50, 0.05) 100%)',
                   borderRadius: 2,
                   border: '1px solid',
-                  borderColor: 'rgba(102, 126, 234, 0.2)'
+                  borderColor: 'rgba(76, 175, 80, 0.2)'
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -673,7 +694,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
                       width: 8,
                       height: 8,
                       borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      background: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
                       animation: 'pulse 2s ease-in-out infinite',
                       '@keyframes pulse': {
                         '0%, 100%': { opacity: 1, transform: 'scale(1)' },
@@ -684,7 +705,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
                   <Typography
                     variant="body2"
                     sx={{
-                      color: '#667eea',
+                      color: '#4caf50',
                       fontWeight: 500,
                       fontSize: '0.875rem'
                     }}
@@ -745,7 +766,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
               mb: 2,
               pb: 1.5,
               borderBottom: '2px solid',
-              borderImage: 'linear-gradient(90deg, #4facfe 0%, #00f2fe 100%) 1'
+              borderImage: 'linear-gradient(90deg, #66bb6a 0%, #43a047 100%) 1'
             }}
           >
             <Typography
@@ -753,7 +774,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
               component="h2"
               sx={{
                 fontWeight: 700,
-                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                background: 'linear-gradient(135deg, #66bb6a 0%, #43a047 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 letterSpacing: '0.5px',
@@ -766,13 +787,13 @@ const CuentaList: React.FC<CuentaListProps> = ({
               <Chip
                 label={`Año ${anioSeleccionado}`}
                 sx={{
-                  background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                  background: 'linear-gradient(135deg, #66bb6a 0%, #43a047 100%)',
                   color: 'white',
                   fontWeight: 700,
                   fontSize: '0.875rem',
                   height: 32,
                   borderRadius: '16px',
-                  boxShadow: '0 2px 8px rgba(79, 172, 254, 0.3)',
+                  boxShadow: '0 2px 8px rgba(102, 187, 106, 0.3)',
                   px: 2
                 }}
               />
@@ -816,7 +837,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
                       rowSpan={2}
                       align="center"
                       sx={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        background: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
                         color: 'white',
                         fontWeight: 700,
                         fontSize: '0.875rem',
@@ -833,7 +854,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
                       rowSpan={2}
                       align="center"
                       sx={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        background: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
                         color: 'white',
                         fontWeight: 700,
                         fontSize: '0.875rem',
@@ -850,10 +871,13 @@ const CuentaList: React.FC<CuentaListProps> = ({
                       rowSpan={2}
                       align="center"
                       sx={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        background: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
                         color: 'white',
                         fontWeight: 700,
                         fontSize: '0.875rem',
+                        position: 'sticky',
+                        left: 220,
+                        zIndex: 3,
                         minWidth: 250,
                         borderRight: '2px solid rgba(255,255,255,0.3)'
                       }}
@@ -864,11 +888,15 @@ const CuentaList: React.FC<CuentaListProps> = ({
                       rowSpan={2}
                       align="center"
                       sx={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        background: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
                         color: 'white',
                         fontWeight: 700,
                         fontSize: '0.875rem',
-                        minWidth: 100
+                        position: 'sticky',
+                        left: 470,
+                        zIndex: 3,
+                        minWidth: 100,
+                        borderRight: '2px solid rgba(255,255,255,0.3)'
                       }}
                     >
                       Concepto
@@ -877,7 +905,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
                       align="center"
                       colSpan={12}
                       sx={{
-                        background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                        background: 'linear-gradient(135deg, #66bb6a 0%, #43a047 100%)',
                         color: 'white',
                         fontWeight: 700,
                         fontSize: '0.875rem',
@@ -933,7 +961,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
                         key={periodo}
                         align="center"
                         sx={{
-                          background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                          background: 'linear-gradient(135deg, #66bb6a 0%, #43a047 100%)',
                           color: 'white',
                           fontWeight: 600,
                           fontSize: '0.813rem',
@@ -1012,11 +1040,16 @@ const CuentaList: React.FC<CuentaListProps> = ({
                             <TableCell
                               align="left"
                               sx={{
+                                position: 'sticky',
+                                left: 220,
+                                backgroundColor: '#fafafa',
+                                zIndex: 2,
                                 fontWeight: 'bold',
                                 minWidth: 250,
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: 1
+                                gap: 1,
+                                borderRight: '1px solid #e0e0e0'
                               }}
                             >
                               <IconButton
@@ -1036,7 +1069,16 @@ const CuentaList: React.FC<CuentaListProps> = ({
                             </TableCell>
 
                             {/* Concepto - vacío en la fila principal */}
-                            <TableCell>
+                            <TableCell
+                              sx={{
+                                position: 'sticky',
+                                left: 470,
+                                backgroundColor: '#fafafa',
+                                zIndex: 2,
+                                minWidth: 100,
+                                borderRight: '1px solid #e0e0e0'
+                              }}
+                            >
                               <Typography variant="caption" color="text.secondary">
                                 {conceptos.length} concepto(s)
                               </Typography>
@@ -1044,7 +1086,7 @@ const CuentaList: React.FC<CuentaListProps> = ({
 
                             {/* Períodos - sumas totales */}
                             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((col, idx) => (
-                              <TableCell key={col} align="center" sx={{ borderLeft: idx === 0 ? '3px solid #4facfe' : 'none' }}>
+                              <TableCell key={col} align="center" sx={{ borderLeft: idx === 0 ? '3px solid #66bb6a' : 'none' }}>
                                 <Typography variant="caption" fontWeight={600}>
                                   {formatearNumero(conceptos.reduce((sum, c) => {
                                     const value = c[`col${col}` as keyof typeof c];
@@ -1082,8 +1124,14 @@ const CuentaList: React.FC<CuentaListProps> = ({
                             <TableRow
                               key={`${tributo}-${idx}`}
                               sx={{
-                                backgroundColor: detalle.concepto === 'Cargo' ? '#fff8e1' : '#f1f8e9',
-                                '&:hover': { backgroundColor: detalle.concepto === 'Cargo' ? '#fff3e0' : '#e8f5e9' }
+                                backgroundColor:
+                                  detalle.concepto === 'Cargo' ? '#fff8e1' :
+                                  detalle.concepto === 'Pagado' ? '#f1f8e9' : '#e3f2fd',
+                                '&:hover': {
+                                  backgroundColor:
+                                    detalle.concepto === 'Cargo' ? '#fff3e0' :
+                                    detalle.concepto === 'Pagado' ? '#e8f5e9' : '#bbdefb'
+                                }
                               }}
                             >
                               {/* Año - vacío */}
@@ -1093,14 +1141,17 @@ const CuentaList: React.FC<CuentaListProps> = ({
                               <TableCell sx={{ position: 'sticky', left: 80, backgroundColor: 'inherit', zIndex: 2, borderRight: '1px solid #e0e0e0' }} />
 
                               {/* Tributo - vacío */}
-                              <TableCell />
+                              <TableCell sx={{ position: 'sticky', left: 220, backgroundColor: 'inherit', zIndex: 2, borderRight: '1px solid #e0e0e0' }} />
 
                               {/* Concepto */}
-                              <TableCell>
+                              <TableCell sx={{ position: 'sticky', left: 470, backgroundColor: 'inherit', zIndex: 2, borderRight: '1px solid #e0e0e0' }}>
                                 <Chip
                                   label={detalle.concepto}
                                   size="small"
-                                  color={detalle.concepto === 'Cargo' ? 'warning' : 'success'}
+                                  color={
+                                    detalle.concepto === 'Cargo' ? 'warning' :
+                                    detalle.concepto === 'Pagado' ? 'success' : 'info'
+                                  }
                                   variant="outlined"
                                 />
                               </TableCell>
@@ -1109,8 +1160,11 @@ const CuentaList: React.FC<CuentaListProps> = ({
                               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((col, colIdx) => {
                                 const value = detalle[`col${col}` as keyof typeof detalle];
                                 return (
-                                  <TableCell key={col} align="center" sx={{ borderLeft: colIdx === 0 ? '3px solid #4facfe' : 'none' }}>
-                                    {formatearNumero(typeof value === 'number' ? value : 0)}
+                                  <TableCell key={col} align="center" sx={{ borderLeft: colIdx === 0 ? '3px solid #66bb6a' : 'none' }}>
+                                    {detalle.concepto === 'F. Venc'
+                                      ? (typeof value === 'string' ? value : '-')
+                                      : formatearNumero(typeof value === 'number' ? value : 0)
+                                    }
                                   </TableCell>
                                 );
                               })}

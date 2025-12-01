@@ -560,11 +560,23 @@ export const useClasificacionPredio =()=> {
     {value: '0504', label:'CLINICAS,HOSPITALES,CINES,INDUSTRIAS,COLEGIOS,TALLERES' , id:'0504'},
     {value: '0505', label:'COMERCIO' , id:'0505'},
   ]
+
+  // Formatter personalizado para loggear y mapear correctamente los datos
+  const customFormatter = (data: ConstanteData): OptionFormat => {
+    console.log('🔍 [useClasificacionPredio] Raw API item:', data);
+    const option = {
+      value: data.codConstante,
+      label: data.nombreCategoria,
+      id: data.codConstante
+    };
+    console.log('🔍 [useClasificacionPredio] Formatted option:', option);
+    return option;
+  };
+
   return useConstantesOptions(
     () => constanteService.obtenerTiposCasa(),
-    undefined,
+    customFormatter,
     defaultOptions
-
   );
 }
 

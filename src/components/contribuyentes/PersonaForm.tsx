@@ -13,7 +13,12 @@ import {
   Stack,
   Skeleton,
   CircularProgress,
-  Autocomplete
+  Autocomplete,
+  FormControl,
+  FormLabel,
+  RadioGroup,
+  FormControlLabel,
+  Radio
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import {
@@ -592,7 +597,7 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
             </Box>
           )}
 
-          {/* Segunda fila - Solo para personas naturales: Fecha Nacimiento y Sexo */}
+          {/* Segunda fila - Solo para personas naturales: Fecha Nacimiento , Sexo , Estado Civil y Teléfono */}
           {!isJuridica && (
             <Box sx={{ 
               display: 'flex', 
@@ -748,7 +753,7 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
               </Box>
 
               {/* Teléfono */}
-              <Box sx={{ 
+              <Box sx={{
                 flex: { xs: '1 1 100%', sm: '0 0 150px' },
                 width: { xs: '100%', sm: 'auto' }
               }}>
@@ -792,6 +797,69 @@ const PersonaFormMUI: React.FC<PersonaFormProps> = ({
                         )
                       }}
                     />
+                  )}
+                />
+              </Box>
+
+              {/* Exonerado */}
+              <Box sx={{
+                flex: { xs: '1 1 100%', sm: '0 0 200px' },
+                width: { xs: '100%', sm: 'auto' },
+                display: 'flex',
+                alignItems: 'center',
+                minHeight: '40px'
+              }}>
+                <Controller
+                  name="exonerado"
+                  control={control}
+                  defaultValue="No"
+                  render={({ field }) => (
+                    <Box sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      width: '100%'
+                    }}>
+                      <Typography
+                        sx={{
+                          fontSize: '0.875rem',
+                          color: disablePersonaFields ? 'text.disabled' : 'text.primary',
+                          fontWeight: 500,
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Exonerado:
+                      </Typography>
+                      <RadioGroup
+                        {...field}
+                        row
+                        sx={{
+                          '& .MuiFormControlLabel-root': {
+                            marginRight: 1,
+                            marginLeft: 0
+                          },
+                          '& .MuiFormControlLabel-label': {
+                            fontSize: '0.875rem'
+                          },
+                          '& .MuiRadio-root': {
+                            padding: '4px'
+                          }
+                        }}
+                      >
+                        <FormControlLabel
+                          value="Si"
+                          control={<Radio size="small" disabled={disablePersonaFields} />}
+                          label="Si"
+                          disabled={disablePersonaFields}
+                        />
+                        <FormControlLabel
+                          value="No"
+                          control={<Radio size="small" disabled={disablePersonaFields} />}
+                          label="No"
+                          disabled={disablePersonaFields}
+                        />
+                      </RadioGroup>
+                    </Box>
                   )}
                 />
               </Box>

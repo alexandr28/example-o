@@ -404,7 +404,7 @@ export default abstract class BaseApiService<T, CreateDTO = any, UpdateDTO = any
       console.log('🗑️ [BaseApiService] Eliminando:', id);
       
       await this.makeRequest(`/${id}`, {
-        method: 'DELETE'
+        method: 'PUT'
       });
       
       // Limpiar cache después de eliminar

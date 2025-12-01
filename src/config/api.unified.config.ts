@@ -29,7 +29,7 @@ interface EndpointsConfig {
   depreciacion: SimpleEndpoint;
   predio: ComplexEndpoint;
   piso: SimpleEndpoint;
-  direccion: ComplexEndpoint;
+  direccion: SimpleEndpoint;
   persona: ComplexEndpoint;
   constante: ComplexEndpoint;
   serenazgo: SimpleEndpoint;
@@ -38,6 +38,11 @@ interface EndpointsConfig {
   cuentaCorriente: ComplexEndpoint;
   resolucionInteres: SimpleEndpoint;
   vencimiento: SimpleEndpoint;
+  asignacionCaja: ComplexEndpoint;
+  caja: ComplexEndpoint;
+  turno: SimpleEndpoint;
+  aperturaCaja: ComplexEndpoint;
+  usuario: ComplexEndpoint;
 }
 
 // ========================================
@@ -82,11 +87,7 @@ export const API_CONFIG = {
     },
     piso: '/api/piso',
     asignacion:'/api/asignacionpredio',
-    direccion: {
-      base: '/api/direccion',
-      listarPorNombreVia: '/api/direccion/listarDireccionPorNombreVia',
-      listarPorTipoVia: '/api/direccion/listarDireccionPorTipoVia'
-    },
+    direccion:'/api/direccion',
     persona: {
       base: '/api/persona',
       listarPorTipoYNombre: '/api/persona/listarPersonaPorTipoPersonaNombreRazon',
@@ -113,6 +114,35 @@ export const API_CONFIG = {
     },
     resolucionInteres: '/api/resolucionInteres',
     vencimiento: '/api/vencimiento',
+    asignacionCaja: {
+      base: '/api/asignacionCaja',
+      listar: '/api/asignacionCaja/listar',
+      insertar: '/api/asignacionCaja/insertar',
+      actualizar: '/api/asignacionCaja/actualizar',
+      eliminar: '/api/asignacionCaja/eliminar',
+    },
+    caja: {
+      base: '/api/caja',
+      listar: '/api/caja/listar',
+      insertar: '/api/caja/insertar',
+      actualizar: '/api/caja/actualizar',
+      eliminar: '/api/caja/eliminar',
+    },
+    aperturaCaja: {
+      base: '/api/aperturaCaja',
+      aperturar: '/api/aperturaCaja/aperturar',
+      cierre: '/api/aperturaCaja/cierre',
+    },
+    turno: '/api/turno',
+    usuario: {
+      base: '/api/usuario',
+      listar: '/api/usuario/listar',
+      insertar: '/api/usuario/insertar',
+      actualizar: '/api/usuario/actualizar',
+      cambiarClave: '/api/usuario/cambiarClave',
+      darBaja: '/api/usuario/darBaja',
+      activar: '/api/usuario/activar',
+    },
   } as EndpointsConfig,
   
   defaultParams: {

@@ -21,6 +21,7 @@ import {
   InputAdornment,
   Radio,
   TablePagination,
+  TableSortLabel,
   CircularProgress,
   Alert,
   Chip,
@@ -41,7 +42,6 @@ import { usePredios } from '../../hooks/usePredioAPI';
 import { Predio } from '../../models/Predio';
 import { Direccion } from '../../models/Direcciones';
 import { formatCurrency } from '../../utils/formatters';
-import { NotificationService } from '../utils/Notification';
 
 /**
  * Función helper para formatear la dirección
@@ -117,6 +117,7 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [hasSearched, setHasSearched] = useState(false);
+  const [order, setOrder] = useState<'asc' | 'desc'>('desc');
 
   // Hook de predios - DEBE estar después de todos los estados
   const {
@@ -151,12 +152,44 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
     }
   }, [isOpen]);
 
-  // Mostrar predios según si se ha buscado o no
+  // Mostrar predios según si se ha buscado o no con ordenamiento
   const filteredPredios = useMemo(() => {
     // Los resultados ya vienen filtrados de la API o son todos los predios
-    console.log('📊 [SelectorPredio] Predios actuales:', predios.length);
-    return predios;
-  }, [predios]);
+    console.log('📊 [SelectorPredio] Predios actuales:', predios.length, 'Orden:', order);
+
+    // Ordenar predios por código
+    const sorted = [...predios].sort((a, b) => {
+      const aCode = a.codPredioBase || a.codigoPredio || a.codPredio || '';
+      const bCode = b.codPredioBase || b.codigoPredio || b.codPredio || '';
+
+      // Manejar valores vacíos (ponerlos al final)
+      if (!aCode && !bCode) return 0;
+      if (!aCode) return 1;
+      if (!bCode) return -1;
+
+      // Limpiar y convertir a número
+      const aStr = String(aCode).trim();
+      const bStr = String(bCode).trim();
+      const aNum = parseFloat(aStr);
+      const bNum = parseFloat(bStr);
+
+      // Si ambos son números válidos, ordenar numéricamente
+      if (!isNaN(aNum) && !isNaN(bNum) && aStr !== '' && bStr !== '') {
+        return order === 'asc' ? aNum - bNum : bNum - aNum;
+      }
+
+      // Si solo uno es número, priorizar números
+      if (!isNaN(aNum) && aStr !== '') return order === 'asc' ? -1 : 1;
+      if (!isNaN(bNum) && bStr !== '') return order === 'asc' ? 1 : -1;
+
+      // Si no son números, ordenar como strings
+      return order === 'asc'
+        ? aStr.localeCompare(bStr, undefined, { numeric: true, sensitivity: 'base' })
+        : bStr.localeCompare(aStr, undefined, { numeric: true, sensitivity: 'base' });
+    });
+
+    return sorted;
+  }, [predios, order]);
 
   // Paginar resultados
   const paginatedPredios = useMemo(() => {
@@ -166,6 +199,12 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
   }, [filteredPredios, page, rowsPerPage]);
 
   // Handlers
+  const handleRequestSort = () => {
+    const newOrder = order === 'asc' ? 'desc' : 'asc';
+    console.log('🔄 [SelectorPredio] Cambiando orden:', { actual: order, nuevo: newOrder });
+    setOrder(newOrder);
+  };
+
   const handleBuscar = async () => {
     setHasSearched(true);
     setPage(0);
@@ -202,12 +241,42 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
   };
 
   const handleSelectPredio = (predio: Predio) => {
+    const predioId = predio.codPredioBase || predio.codigoPredio || predio.codPredio || predio.id;
+    console.log('✓ [SelectorPredio] Predio seleccionado:', predioId);
     setSelectedPredio(predio);
   };
 
   const handleConfirm = () => {
     if (selectedPredio) {
-      onSelectPredio(selectedPredio);
+      // Asegurar que el código enviado sea el mismo que se muestra en la tabla (codPredioBase)
+      const codigoMostradoEnTabla = selectedPredio.codPredioBase || selectedPredio.codigoPredio || selectedPredio.codPredio;
+
+      console.log('🔍 [SelectorPredio] Valores ANTES de enviar:', {
+        'codPredioBase (DEBE SER ESTE)': selectedPredio.codPredioBase,
+        'codigoPredio (ORIGINAL)': selectedPredio.codigoPredio,
+        'codPredio (ORIGINAL)': selectedPredio.codPredio,
+        'Código mostrado en tabla': codigoMostradoEnTabla
+      });
+
+      // Crear un nuevo objeto donde TODOS los campos de código sean el codPredioBase
+      const predioParaEnviar: Predio = {
+        ...selectedPredio,
+        // Sobrescribir TODOS los campos de código con el código correcto (codPredioBase)
+        codigoPredio: codigoMostradoEnTabla || '',
+        codPredio: codigoMostradoEnTabla,
+        codPredioBase: selectedPredio.codPredioBase
+      };
+
+      console.log('📤 [SelectorPredio] Valores DESPUÉS de modificar:', {
+        'codigoPredio (ENVIADO)': predioParaEnviar.codigoPredio,
+        'codPredio (ENVIADO)': predioParaEnviar.codPredio,
+        'codPredioBase (ENVIADO)': predioParaEnviar.codPredioBase,
+        'OBJETO COMPLETO': predioParaEnviar
+      });
+
+      console.warn('⚠️ SI RECIBES 20258 EN EL FORMULARIO, EL PROBLEMA ESTÁ EN EL FORMULARIO RECEPTOR, NO AQUÍ');
+
+      onSelectPredio(predioParaEnviar);
       onClose();
     }
   };
@@ -344,7 +413,7 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
               </Box>
 
               {/* Parámetro Búsqueda */}
-              <Box sx={{ flex: '0 0 80px' }}>
+              <Box sx={{ flex: '0 0 300px' }}>
                 <TextField
                   fullWidth
                   variant="outlined"
@@ -381,26 +450,32 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
               </Box>
 
               {/* Botones de acción compactos */}
-              <Box sx={{ display: 'flex', gap: 0.5 }}>
+              <Box sx={{ display: 'flex', gap: 1 }}>
                 <Button
                   variant="contained"
                   onClick={handleBuscar}
                   disabled={loading}
                   startIcon={loading ? <CircularProgress size={16} /> : <SearchIcon />}
                   size="small"
-                  sx={{ minWidth: 80 }}
+                  sx={{
+                    minWidth: 90,
+                    height: 40
+                  }}
                 >
                   Buscar
                 </Button>
-                
+
                 <Button
                   variant="outlined"
                   onClick={handleLimpiar}
                   disabled={loading}
                   size="small"
-                  sx={{ minWidth: 40, px: 1 }}
+                  sx={{
+                    minWidth: 90,
+                    height: 40
+                  }}
                 >
-                  <CloseIcon sx={{ fontSize: 16 }} />
+                  Limpiar
                 </Button>
               </Box>
             </Stack>
@@ -423,11 +498,13 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
           <Box sx={{ display: { xs: 'none', md: 'block' } }}>
             <TableContainer sx={{
               maxHeight: 450,
+              overflowX: 'hidden',
+              overflowY: 'auto',
               borderRadius: 1,
               border: `1px solid ${alpha(theme.palette.grey[300], 0.5)}`,
               '&::-webkit-scrollbar': {
                 width: 8,
-                height: 8
+                height: 0
               },
               '&::-webkit-scrollbar-track': {
                 backgroundColor: alpha(theme.palette.grey[200], 0.3),
@@ -441,7 +518,7 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
                 }
               }
             }}>
-              <Table stickyHeader size="small">
+              <Table stickyHeader size="small" sx={{ tableLayout: 'fixed', width: '100%' }}>
                 <TableHead>
                   <TableRow sx={{ 
                     '& .MuiTableCell-head': { 
@@ -456,35 +533,50 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
                       zIndex: 10
                     }
                   }}>
-                    <TableCell padding="checkbox" sx={{ width: 50, textAlign: 'center' }}>
+                    <TableCell padding="checkbox" sx={{ width: '5%', textAlign: 'center' }}>
                       <Typography variant="caption" fontWeight={700}>Sel.</Typography>
                     </TableCell>
-                    <TableCell sx={{ minWidth: 120 }}>
-                      <Stack direction="row" alignItems="center" spacing={0.5}>
-                        <HomeIcon sx={{ fontSize: 14, color: 'primary.main' }} />
-                        <Typography variant="caption" fontWeight={700}>Código</Typography>
-                      </Stack>
+                    <TableCell align="center" sx={{ width: '10%' }}>
+                      <TableSortLabel
+                        active={true}
+                        direction={order}
+                        onClick={handleRequestSort}
+                        sx={{
+                          '& .MuiTableSortLabel-icon': {
+                            fontSize: 16,
+                            opacity: 0.7
+                          },
+                          '&:hover': {
+                            color: 'primary.main'
+                          }
+                        }}
+                      >
+                        <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.5}>
+                          <HomeIcon sx={{ fontSize: 14, color: 'primary.main' }} />
+                          <Typography variant="caption" fontWeight={700}>Código</Typography>
+                        </Stack>
+                      </TableSortLabel>
                     </TableCell>
-                    <TableCell sx={{ minWidth: 250 }}>
+                    <TableCell sx={{ width: '35%' }}>
                       <Stack direction="row" alignItems="center" spacing={0.5}>
                         <LocationIcon sx={{ fontSize: 14, color: 'primary.main' }} />
                         <Typography variant="caption" fontWeight={700}>Dirección</Typography>
                       </Stack>
                     </TableCell>
-                    <TableCell align="right" sx={{ minWidth: 100 }}>
+                    <TableCell align="right" sx={{ width: '12%' }}>
                       <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={0.5}>
                         <TerrainIcon sx={{ fontSize: 14, color: 'primary.main' }} />
                         <Typography variant="caption" fontWeight={700}>Área m²</Typography>
                       </Stack>
                     </TableCell>
-                    <TableCell align="right" sx={{ minWidth: 130 }}>
-                      <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={0.5}>
+                    <TableCell align="center" sx={{ width: '20%' }}>
+                      <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.5}>
                         <PersonIcon sx={{ fontSize: 14, color: 'primary.main' }} />
                         <Typography variant="caption" fontWeight={700}>Conductor</Typography>
                       </Stack>
                     </TableCell>
-                    <TableCell align="right" sx={{ minWidth: 120 }}>
-                      <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={0.5}>
+                    <TableCell align="center" sx={{ width: '18%' }}>
+                      <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.5}>
                         <MoneyIcon sx={{ fontSize: 14, color: 'success.main' }} />
                         <Typography variant="caption" fontWeight={700}>ValorTerreno</Typography>
                       </Stack>
@@ -522,20 +614,32 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
                 </TableRow>
               ) : (
                 paginatedPredios.map((predio, index) => {
-                  const predioId = predio.codigoPredio || predio.codPredio || predio.id;
+                  const predioId = predio.codPredioBase || predio.codigoPredio || predio.codPredio || predio.id;
 
-                  // Normalizar los valores para comparación (limpiar espacios y convertir a string)
-                  const selectedId = selectedPredio
-                    ? String(selectedPredio.codigoPredio || selectedPredio.codPredio || selectedPredio.id || '').trim()
-                    : null;
-                  const currentId = String(predioId || '').trim();
+                  // Crear una clave única para cada predio combinando código y dirección
+                  // Esto asegura que solo se seleccione UNA fila específica, incluso si hay códigos duplicados
+                  const createUniqueKey = (p: Predio | null) => {
+                    if (!p) return null;
+                    const codigo = p.codPredioBase || p.codigoPredio || p.codPredio || p.id || '';
+                    const direccionStr = typeof p.direccion === 'string'
+                      ? p.direccion
+                      : p.direccion?.nombreVia || p.direccion?.descripcion || '';
+                    const direccionId = typeof p.direccion === 'object' && p.direccion !== null
+                      ? (p.direccion as any).id || p.direccionId
+                      : p.direccionId;
+                    // Combinar código + dirección + año para hacer única cada fila
+                    return `${codigo}-${direccionStr}-${direccionId || ''}-${p.anio || ''}`.trim();
+                  };
 
-                  // Comparar solo si ambos IDs existen y coinciden exactamente
-                  const isSelected = selectedId !== null && selectedId !== '' && currentId !== '' && selectedId === currentId;
+                  const selectedKey = createUniqueKey(selectedPredio);
+                  const currentKey = createUniqueKey(predio);
+
+                  // Comparar usando la clave única - solo una fila se seleccionará
+                  const isSelected = selectedKey !== null && currentKey !== null && selectedKey === currentKey;
 
                   return (
                     <TableRow
-                      key={predioId || index}
+                      key={currentKey || index}
                       hover
                       onClick={() => handleSelectPredio(predio)}
                       selected={!!isSelected}
@@ -543,7 +647,7 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
                         cursor: 'pointer',
                         height: 60,
                         bgcolor: isSelected
-                          ? alpha(theme.palette.primary.main, 0.12)
+                          ? alpha(theme.palette.primary.main, 0.25)
                           : index % 2 === 0
                             ? 'transparent'
                             : alpha(theme.palette.grey[50], 0.4),
@@ -551,19 +655,19 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
                         borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
                         '&:hover': {
                           bgcolor: isSelected
-                            ? alpha(theme.palette.primary.main, 0.18)
+                            ? alpha(theme.palette.primary.main, 0.35)
                             : alpha(theme.palette.primary.main, 0.06),
                           borderLeft: `4px solid ${alpha(theme.palette.primary.main, isSelected ? 1 : 0.4)}`,
                           boxShadow: isSelected
-                            ? `0 4px 12px ${alpha(theme.palette.primary.main, 0.25)}`
+                            ? `0 4px 12px ${alpha(theme.palette.primary.main, 0.4)}`
                             : `0 2px 8px ${alpha(theme.palette.grey[400], 0.2)}`,
                           transform: 'translateX(2px)',
                           zIndex: 1
                         },
                         '&.Mui-selected': {
-                          bgcolor: alpha(theme.palette.primary.main, 0.12),
+                          bgcolor: alpha(theme.palette.primary.main, 0.25),
                           '&:hover': {
-                            bgcolor: alpha(theme.palette.primary.main, 0.18)
+                            bgcolor: alpha(theme.palette.primary.main, 0.35)
                           }
                         },
                         '&:last-child td': {
@@ -587,20 +691,17 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
                           }}
                         />
                       </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Chip
-                            label={predioId || 'Sin código'}
-                            size="small"
-                            variant={isSelected ? "filled" : "outlined"}
-                            color={isSelected ? "primary" : "default"}
-                            sx={{ 
-                              fontWeight: 600,
-                              fontSize: '0.7rem',
-                              minWidth: 80
-                            }}
-                          />
-                        </Box>
+                      <TableCell align="center">
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontSize: '0.875rem',
+                            fontWeight: isSelected ? 600 : 500,
+                            color: isSelected ? 'primary.main' : 'text.primary'
+                          }}
+                        >
+                          {predioId || 'Sin código'}
+                        </Typography>
                       </TableCell>
                       <TableCell>
                         <Box>
@@ -635,35 +736,34 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
                           </Typography>
                         </Box>
                       </TableCell>
-                      <TableCell align="right">
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
+                      <TableCell align="center">
+                        <Typography
+                          variant="body2"
+                          sx={{
                             fontSize: '0.8rem',
                             fontWeight: 500,
                             maxWidth: 120,
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
-                            color: predio.conductor ? 'text.primary' : 'text.secondary'
+                            color: predio.conductor ? 'text.primary' : 'text.secondary',
+                            mx: 'auto'
                           }}
                         >
                           {predio.conductor || 'Sin conductor'}
                         </Typography>
                       </TableCell>
-                      <TableCell align="right">
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              fontSize: '0.8rem',
-                              fontWeight: 600,
-                              color: 'success.main'
-                            }}
-                          >
-                            {formatCurrency(predio.valorTerreno || 0)}
-                          </Typography>
-                        </Box>
+                      <TableCell align="center">
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            color: 'success.main'
+                          }}
+                        >
+                          {formatCurrency(predio.valorTerreno || 0)}
+                        </Typography>
                       </TableCell>
                     </TableRow>
                   );
@@ -673,36 +773,23 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
           </Table>
         </TableContainer>
 
-        {/* Paginación mejorada */}
+        {/* Paginación minimalista */}
         <Box sx={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          px: 3,
-          py: 1.5,
-          borderTop: `2px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-          background: `linear-gradient(to right, ${alpha(theme.palette.grey[50], 0.8)}, ${alpha(theme.palette.grey[100], 0.5)})`,
-          boxShadow: `inset 0 1px 3px ${alpha(theme.palette.grey[300], 0.2)}`
+          px: 2,
+          py: 1,
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper'
         }}>
-          <Stack direction="row" alignItems="center" spacing={2}>
-            <Chip
-              label={`Total: ${filteredPredios.length}`}
-              size="small"
-              color="primary"
-              variant="outlined"
-              sx={{
-                fontWeight: 600,
-                fontSize: '0.75rem',
-                borderWidth: 1.5
-              }}
-            />
-            <Typography variant="body2" color="text.secondary" fontWeight={500}>
-              {filteredPredios.length > 0
-                ? `Mostrando ${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, filteredPredios.length)}`
-                : 'Sin resultados'
-              }
-            </Typography>
-          </Stack>
+          <Typography variant="caption" color="text.secondary">
+            {filteredPredios.length > 0
+              ? `${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, filteredPredios.length)} de ${filteredPredios.length}`
+              : 'Sin resultados'
+            }
+          </Typography>
 
           <TablePagination
             component="div"
@@ -718,41 +805,34 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
               '.MuiTablePagination-toolbar': {
                 minHeight: 40,
                 pl: 2,
-                gap: 2
+                display: 'flex',
+                alignItems: 'center'
               },
               '.MuiTablePagination-selectLabel': {
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: 'text.primary'
+                fontSize: '0.75rem',
+                m: 0,
+                mb: 0,
+                lineHeight: '1.5',
+                display: 'inline-flex',
+                alignItems: 'center'
               },
               '.MuiTablePagination-select': {
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                color: 'primary.main',
-                borderRadius: 1,
-                px: 1,
-                py: 0.5,
-                border: `1.5px solid ${alpha(theme.palette.primary.main, 0.3)}`,
-                '&:hover': {
-                  bgcolor: alpha(theme.palette.primary.main, 0.05),
-                  borderColor: theme.palette.primary.main
-                }
+                fontSize: '0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                mr: 1,
+                mt: 0,
+                mb: 0
               },
               '.MuiTablePagination-actions': {
+                ml: 2,
+                display: 'flex',
+                alignItems: 'center',
                 gap: 0.5,
+                mt: 0,
+                mb: 0,
                 '& .MuiIconButton-root': {
-                  border: `1.5px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                  borderRadius: 1,
-                  width: 36,
-                  height: 36,
-                  '&:hover': {
-                    bgcolor: alpha(theme.palette.primary.main, 0.08),
-                    borderColor: theme.palette.primary.main
-                  },
-                  '&.Mui-disabled': {
-                    borderColor: alpha(theme.palette.grey[300], 0.5),
-                    opacity: 0.4
-                  }
+                  padding: 0.75
                 }
               }
             }}
@@ -800,7 +880,7 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
               ) : (
                 <Stack spacing={1} sx={{ py: 1 }}>
                   {paginatedPredios.map((predio, index) => {
-                    const predioId = predio.codigoPredio || predio.codPredio || predio.id;
+                    const predioId = predio.codPredioBase || predio.codigoPredio || predio.codPredio || predio.id;
 
                     // Normalizar los valores para comparación (limpiar espacios y convertir a string)
                     const selectedId = selectedPredio
@@ -984,25 +1064,24 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
               )}
             </Box>
 
-            {/* Paginación móvil */}
-            <Box sx={{ 
-              display: 'flex', 
-              flexDirection: 'column',
+            {/* Paginación móvil minimalista */}
+            <Box sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
               alignItems: 'center',
-              gap: 1,
-              px: 2, 
-              py: 1.5,
-              borderTop: 1,
+              px: 2,
+              py: 1,
+              borderTop: '1px solid',
               borderColor: 'divider',
-              bgcolor: 'grey.50'
+              bgcolor: 'background.paper'
             }}>
               <Typography variant="caption" color="text.secondary">
-                {filteredPredios.length > 0 
-                  ? `${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, filteredPredios.length)} de ${filteredPredios.length}` 
-                  : 'No hay resultados'
+                {filteredPredios.length > 0
+                  ? `${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, filteredPredios.length)} de ${filteredPredios.length}`
+                  : 'Sin resultados'
                 }
               </Typography>
-              
+
               <TablePagination
                 component="div"
                 count={filteredPredios.length}
@@ -1015,15 +1094,32 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
                 rowsPerPageOptions={[5, 8, 10]}
                 sx={{
                   '.MuiTablePagination-toolbar': {
-                    minHeight: 32,
-                    justifyContent: 'center',
-                    px: 0
+                    minHeight: 36,
+                    px: 0,
+                    display: 'flex',
+                    alignItems: 'center'
                   },
                   '.MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows': {
                     display: 'none'
                   },
                   '.MuiTablePagination-select': {
-                    fontSize: '0.75rem'
+                    fontSize: '0.7rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    mr: 0.5,
+                    mt: 0,
+                    mb: 0
+                  },
+                  '.MuiTablePagination-actions': {
+                    ml: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    mt: 0,
+                    mb: 0,
+                    '& .MuiIconButton-root': {
+                      padding: 0.75
+                    }
                   }
                 }}
               />
@@ -1033,19 +1129,34 @@ const SelectorPredio: React.FC<SelectorPredioProps> = ({
       </DialogContent>
 
       <DialogActions sx={{ p: 2, justifyContent: 'center' }}>
-        <Button 
-          onClick={handleConfirm} 
+        <Button
+          onClick={handleConfirm}
           variant="contained"
           disabled={!selectedPredio}
-          sx={{ 
+          sx={{
             px: 4,
-            bgcolor: '#4ECDC4',
+            bgcolor: selectedPredio ? 'primary.main' : 'grey.400',
+            color: selectedPredio ? 'white' : 'grey.600',
+            fontWeight: selectedPredio ? 700 : 500,
+            boxShadow: selectedPredio
+              ? `0 4px 12px ${alpha(theme.palette.primary.main, 0.4)}`
+              : 'none',
+            transform: selectedPredio ? 'scale(1.02)' : 'scale(1)',
+            transition: 'all 0.3s ease-in-out',
             '&:hover': {
-              bgcolor: '#45B8B0'
+              bgcolor: selectedPredio ? 'primary.dark' : 'grey.400',
+              boxShadow: selectedPredio
+                ? `0 6px 16px ${alpha(theme.palette.primary.main, 0.5)}`
+                : 'none',
+              transform: selectedPredio ? 'scale(1.05)' : 'scale(1)'
+            },
+            '&.Mui-disabled': {
+              bgcolor: 'grey.300',
+              color: 'grey.500'
             }
           }}
         >
-          Seleccionar
+          {selectedPredio ? '✓ Seleccionar' : 'Seleccionar'}
         </Button>
       </DialogActions>
     </Dialog>

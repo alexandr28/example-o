@@ -136,7 +136,7 @@ class FraccionamientoService {
 
   async eliminarDeuda(idFraccionamiento: number, idDeuda: number): Promise<void> {
     const url = `${API_CONFIG.baseURL}${this.endpoint}/${idFraccionamiento}/deudas/${idDeuda}`;
-    const response = await fetch(url, { method: 'DELETE' });
+    const response = await fetch(url, { method: 'PUT' });
     if (!response.ok) throw new Error(`Error ${response.status}`);
   }
 

@@ -13,6 +13,7 @@ import { NotificationService } from '../components/utils/Notification';
 const mapPredioDataToModel = (data: PredioData): Predio => {
   return {
     codigoPredio: data.codPredio?.trim() || '',
+    codPredioBase: data.codPredioBase,
     anio: data.anio,
     fechaAdquisicion: data.fechaAdquisicion,
     condicionPropiedad: data.condicionPropiedad || 'PROPIETARIO_UNICO',
@@ -28,7 +29,7 @@ const mapPredioDataToModel = (data: PredioData): Predio => {
     valorTotalConstruccion: data.valorTotalConstruccion,
     valorTerreno: data.valorTerreno,
     autoavaluo: data.autoavaluo,
-    
+
     // Códigos originales de la API
     codPredio: data.codPredio,
     codClasificacion: data.codClasificacion ? Number(data.codClasificacion) : undefined,
@@ -371,24 +372,33 @@ export const usePredios = (): UsePrediosReturn => {
       }
       
       // Preparar datos según la estructura JSON exacta del API
+      // Obtener codClasificacion: puede venir como codClasificacion (de NuevoPredio) o clasificacionPredio (del form)
+      const codClasificacionValue = String((datos as any).codClasificacion || datos.clasificacionPredio || "0502").trim();
+      console.log('🔍 [usePredios] codClasificacion obtenido:', codClasificacionValue, 'de datos:', { codClasificacion: (datos as any).codClasificacion, clasificacionPredio: datos.clasificacionPredio });
+
+      // REGLA: Los predios de clasificación "Casa habitación" (0501) NO deben tener uso
+      const esCasaHabitacion = codClasificacionValue === "0501";
+      const codUsoPredioValue = esCasaHabitacion ? null : Number((datos as any).codUsoPredio || datos.usoPredio || 1);
+      console.log('🔍 [usePredios] esCasaHabitacion:', esCasaHabitacion, 'codUsoPredio:', codUsoPredioValue);
+
       const datosApi = {
         anio: datos.anio || new Date().getFullYear(),
         codPredio: null, // SIEMPRE null - SQL lo asigna automáticamente
         numeroFinca: Number(datos.numeroFinca),
         otroNumero: String(datos.otroNumero || ""),
-        codClasificacion: String(datos.clasificacionPredio || "0502"),
-        estPredio: String(datos.estadoPredio || "2503"),
-        codTipoPredio: String(datos.tipoPredio || "2601"),
-        codCondicionPropiedad: String(datos.condicionPropiedad || "2701"),
+        codClasificacion: codClasificacionValue,
+        estPredio: String((datos as any).estPredio || datos.estadoPredio || "2503").trim(),
+        codTipoPredio: String((datos as any).codTipoPredio || datos.tipoPredio || "2601").trim(),
+        codCondicionPropiedad: String((datos as any).codCondicionPropiedad || datos.condicionPropiedad || "2701").trim(),
         codDireccion: Number(datos.direccionId),
-        codUsoPredio: Number(datos.usoPredio || 1),
+        codUsoPredio: codUsoPredioValue,
         fechaAdquisicion: datos.fechaAdquisicion
           ? (datos.fechaAdquisicion instanceof Date
               ? datos.fechaAdquisicion.toISOString().split('T')[0]
               : String(datos.fechaAdquisicion).split('T')[0])
           : new Date().toISOString().split('T')[0],
         numeroCondominos: Number(datos.numeroCondominos || 2),
-        codListaConductor: String(datos.conductor || "1401"),
+        codListaConductor: String((datos as any).codListaConductor || datos.conductor || "1401").trim(),
         codUbicacionAreaVerde: Number(1),
         areaTerreno: Number(datos.areaTerreno),
         totalAreaConstruccion: datos.totalAreaConstruccion ? Number(datos.totalAreaConstruccion) : null,

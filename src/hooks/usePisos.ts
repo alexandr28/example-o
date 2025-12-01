@@ -13,6 +13,8 @@ interface Piso {
   porcentajeDepreciacion: number;
   valorUnicoDepreciado: number;
   valorAreaConstruida: number;
+  areaConstruida: number;
+  areaTotalConstruccion: number;
 }
 
 interface PisoFormData {
@@ -103,7 +105,9 @@ export const usePisos = () => {
         incremento: piso.incremento || 0,
         porcentajeDepreciacion: piso.depreciacion || 0,
         valorUnicoDepreciado: piso.valorUnitarioDepreciado || 0,
-        valorAreaConstruida: piso.valorAreaConstruida || 0
+        valorAreaConstruida: piso.valorAreaConstruida || 0,
+        areaConstruida: piso.areaConstruida || 0,
+        areaTotalConstruccion: piso.areaTotalConstruccion || 0
       }));
       
       setPisos(pisosFormateados);
@@ -146,7 +150,9 @@ export const usePisos = () => {
         incremento: piso.incremento || 0,
         porcentajeDepreciacion: piso.depreciacion || 0,
         valorUnicoDepreciado: piso.valorUnitarioDepreciado || 0,
-        valorAreaConstruida: piso.valorAreaConstruida || 0
+        valorAreaConstruida: piso.valorAreaConstruida || 0,
+        areaConstruida: piso.areaConstruida || 0,
+        areaTotalConstruccion: piso.areaTotalConstruccion || 0
       }));
       
       console.log('✅ [usePisos] Pisos formateados:', pisosFormateados);
@@ -156,44 +162,8 @@ export const usePisos = () => {
     } catch (error: any) {
       console.error('❌ [usePisos] Error al buscar pisos:', error);
       setError(error.message || 'Error al buscar pisos');
-      
-      // En caso de error, devolver datos de ejemplo para desarrollo
-      console.log('🔄 [usePisos] Usando datos de ejemplo debido al error');
-      const pisosEjemplo: Piso[] = [
-        {
-          id: 1,
-          item: 1,
-          descripcion: 'Primer piso',
-          valorUnitario: 731.52,
-          incremento: 0.00,
-          porcentajeDepreciacion: 0.32,
-          valorUnicoDepreciado: 497.53,
-          valorAreaConstruida: 40500.75
-        },
-        {
-          id: 2,
-          item: 2,
-          descripcion: 'Segundo piso',
-          valorUnitario: 731.52,
-          incremento: 0.00,
-          porcentajeDepreciacion: 0.32,
-          valorUnicoDepreciado: 497.53,
-          valorAreaConstruida: 40500.75
-        },
-        {
-          id: 3,
-          item: 3,
-          descripcion: 'Tercer piso',
-          valorUnitario: 850.00,
-          incremento: 0.05,
-          porcentajeDepreciacion: 0.28,
-          valorUnicoDepreciado: 612.00,
-          valorAreaConstruida: 52000.00
-        }
-      ];
-      
-      setPisos(pisosEjemplo);
-      return pisosEjemplo;
+      setPisos([]);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -218,8 +188,8 @@ export const usePisos = () => {
       if (!datos.numeroPiso || datos.numeroPiso <= 0) {
         throw new Error('El número de piso debe ser mayor a 0');
       }
-      
-      if (!datos.areaConstruida || parseFloat(datos.areaConstruida) <= 0) {
+
+      if (!datos.areaConstruida || datos.areaConstruida <= 0) {
         throw new Error('El área construida debe ser mayor a 0');
       }
       
@@ -252,28 +222,42 @@ export const usePisos = () => {
       };
       
       console.log('📤 [usePisos] Datos preparados para API POST:', datosApi);
-      
+
       const nuevoPiso = await pisoService.crearPisoSinAuth(datosApi);
-      
-      console.log('✅ [usePisos] Piso creado exitosamente:', nuevoPiso);
-      
-      // Actualizar lista local de pisos
-      if (nuevoPiso) {
-        const pisoFormateado: Piso = {
-          id: nuevoPiso.id || 0,
-          item: pisos.length + 1,
-          descripcion: `Piso ${nuevoPiso.numeroPiso}`,
-          valorUnitario: 0,
-          incremento: 0,
-          porcentajeDepreciacion: 0,
-          valorUnicoDepreciado: 0,
-          valorAreaConstruida: 0
-        };
-        
-        setPisos(prev => [...prev, pisoFormateado]);
+
+      console.log('📥 [usePisos] Respuesta del servicio:', nuevoPiso);
+
+      // Verificar que el piso se haya creado correctamente
+      if (!nuevoPiso) {
+        console.error('❌ [usePisos] El servicio no retornó un piso válido');
+        throw new Error('El servidor no confirmó la creación del piso');
       }
-      
-      NotificationService.success(`Piso ${nuevoPiso?.numeroPiso || 'nuevo'} creado exitosamente`);
+
+      // Verificar que tenga un ID o codPiso válido
+      if (!nuevoPiso.codPiso && !nuevoPiso.id) {
+        console.warn('⚠️ [usePisos] El piso no tiene codPiso ni id, puede que no se haya guardado');
+      }
+
+      console.log('✅ [usePisos] Piso creado exitosamente:', nuevoPiso);
+
+      // Actualizar lista local de pisos
+      const pisoFormateado: Piso = {
+        id: nuevoPiso.id || nuevoPiso.codPiso || 0,
+        item: pisos.length + 1,
+        descripcion: `Piso ${nuevoPiso.numeroPiso}`,
+        valorUnitario: 0,
+        incremento: 0,
+        porcentajeDepreciacion: 0,
+        valorUnicoDepreciado: 0,
+        valorAreaConstruida: 0,
+        areaConstruida: nuevoPiso.areaConstruida || 0,
+        areaTotalConstruccion: nuevoPiso.areaTotalConstruccion || 0
+      };
+
+      setPisos(prev => [...prev, pisoFormateado]);
+
+      // NO mostrar notificación aquí - se mostrará en el componente que llama
+      // para evitar doble notificación
       return nuevoPiso;
     } catch (err: any) {
       const mensaje = err.message || 'Error al crear piso';
@@ -332,7 +316,13 @@ export const usePisos = () => {
         // TODO: Implementar método PUT en el servicio cuando esté disponible
         // Por ahora, usar POST para actualizar
         const pisoActualizado = await pisoService.crearPisoSinAuth(datosApi);
-        NotificationService.success(`Piso ${pisoActualizado?.numeroPiso || 'existente'} actualizado exitosamente`);
+
+        // Verificar que el piso se haya actualizado correctamente
+        if (!pisoActualizado) {
+          throw new Error('El servidor no confirmó la actualización del piso');
+        }
+
+        // NO mostrar notificación aquí - se mostrará en el componente
         return pisoActualizado;
         
       } else {

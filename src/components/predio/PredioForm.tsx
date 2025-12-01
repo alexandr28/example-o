@@ -190,7 +190,7 @@ const PredioForm: React.FC<PredioFormProps> = ({
 
   const loadingUsoPredio = false;
   const errorUsoPredio = null;
-  
+
   const { options: estadoPredioData, loading: loadingEstadoPredio, error: errorEstadoPredio } = 
     useConstantesOptions(
       () => constanteService.obtenerTiposEstadoPredio()
@@ -200,24 +200,39 @@ const PredioForm: React.FC<PredioFormProps> = ({
     useConstantesOptions(
       () => constanteService.obtenerTiposModoDeclaracion()
     );
-  
+  // ClasificacionPRedioData
   const { options: clasificacionPredioData, loading: loadingClasificacionPredio, error: errorClasificacionPredio } =
     useClasificacionPredio();
+
+  // Log clasificacionPredioData cuando cambie para debug
+  React.useEffect(() => {
+    console.log('📊 [PredioForm] clasificacionPredioData cargados:', clasificacionPredioData);
+    if (clasificacionPredioData && clasificacionPredioData.length > 0) {
+      clasificacionPredioData.forEach((opt, idx) => {
+        console.log(`  ${idx}: value="${opt.value}", label="${opt.label}"`);
+      });
+    }
+  }, [clasificacionPredioData]);
 
   // Hook para criterio uso (grupo uso)
   const { options: criterioUsoData, loading: loadingCriterioUso, error: errorCriterioUso } =
     useGrupoUsoOptions();
 
+  // Extraer valores de watch para usar en dependencias de useMemo
+  const usoPredioValue = watch('usoPredio');
+  // 
+  const clasificacionPredioValue = watch('clasificacionPredio');
+
   // Filtrar clasificacionPredioData según el usoPredio seleccionado
   const clasificacionPredioFiltrada = React.useMemo(() => {
-    const usoPredioValue = watch('usoPredio');
-
     if (!clasificacionPredioData || clasificacionPredioData.length === 0) {
+      console.log('⚠️ [PredioForm] clasificacionPredioData vacío o no disponible');
       return [];
     }
 
     // Si no hay uso predio seleccionado, devolver todas las opciones
     if (!usoPredioValue) {
+      console.log('📝 [PredioForm] Sin uso predio, mostrando todas las clasificaciones');
       return clasificacionPredioData;
     }
 
@@ -232,6 +247,7 @@ const PredioForm: React.FC<PredioFormProps> = ({
         cp.label?.toUpperCase().includes('CASA')
       );
       console.log('[PredioForm] Mostrando solo clasificaciones CASA:', filtradas.length);
+      console.log('[PredioForm] Opciones CASA filtradas:', filtradas.map(f => ({ value: f.value, label: f.label })));
       return filtradas;
     }
 
@@ -240,20 +256,19 @@ const PredioForm: React.FC<PredioFormProps> = ({
       !cp.label?.toUpperCase().includes('CASA')
     );
     console.log('[PredioForm] Mostrando clasificaciones sin CASA:', filtradas.length);
+    console.log('[PredioForm] Opciones sin CASA filtradas:', filtradas.map(f => ({ value: f.value, label: f.label })));
     return filtradas;
-  }, [clasificacionPredioData, watch('usoPredio'), usoPredioData]);
+  }, [clasificacionPredioData, usoPredioValue, usoPredioData]);
 
   // Determinar si "Uso Predio" debe estar deshabilitado
   const isUsoPredioDisabled = React.useMemo(() => {
-    const clasificacionValue = watch('clasificacionPredio');
-
-    if (!clasificacionValue) {
+    if (!clasificacionPredioValue) {
       return false;
     }
 
     // Obtener el label de la clasificación predio
     const clasificacionLabel = clasificacionPredioData?.find(
-      cp => cp.value === clasificacionValue
+      cp => cp.value === clasificacionPredioValue
     )?.label?.toUpperCase() || '';
 
     console.log('[PredioForm] Verificando si deshabilitar Uso Predio. Clasificación:', clasificacionLabel);
@@ -265,7 +280,7 @@ const PredioForm: React.FC<PredioFormProps> = ({
     }
 
     return false;
-  }, [watch('clasificacionPredio'), clasificacionPredioData]);
+  }, [clasificacionPredioValue, clasificacionPredioData]);
   
    
  
@@ -364,6 +379,8 @@ const PredioForm: React.FC<PredioFormProps> = ({
 
   const onFormSubmit = async (data: PredioFormData) => {
     console.log('📋 [PredioForm] Datos del formulario:', data);
+    console.log('🎯 [PredioForm] clasificacionPredio enviado:', data.clasificacionPredio);
+    console.log('🎯 [PredioForm] clasificacionPredioFiltrada disponibles:', clasificacionPredioFiltrada.map(f => ({ value: f.value, label: f.label })));
 
     try {
       // Si hay un callback onSubmit, usarlo (delegar la creación al padre)
@@ -382,53 +399,6 @@ const PredioForm: React.FC<PredioFormProps> = ({
         setTimeout(() => {
           navigate('/predio/consulta');
         }, 1500);
-      } else {
-        // Si no hay callback, manejar la creación aquí (fallback)
-        console.log('⚠️ [PredioForm] No hay callback onSubmit, manejando creación localmente');
-
-        const createPredioDTO: CreatePredioDTO = {
-          anio: data.anio || new Date().getFullYear(),
-          codPredio: null,
-          numeroFinca: parseInt(data.numeroFinca || '0'),
-          otroNumero: data.otroNumero || '',
-          codClasificacion: data.clasificacionPredio || '0502',
-          estPredio: data.estadoPredio || '2503',
-          codTipoPredio: data.tipoPredio || '2601',
-          codCondicionPropiedad: data.condicionPropiedad || '2701',
-          codDireccion: data.direccion?.codigo || data.direccion?.id || 2,
-          codUsoPredio: parseInt(data.usoPredio || '1'),
-          fechaAdquisicion: data.fechaAdquisicion ?
-            new Date(data.fechaAdquisicion).toISOString().split('T')[0] :
-            new Date().toISOString().split('T')[0],
-          numeroCondominos: data.numeroCondominos ? parseInt(data.numeroCondominos.toString()) : 2,
-          codListaConductor: data.conductor || '1401',
-          codUbicacionAreaVerde: 1,
-          areaTerreno: parseFloat(data.areaTerreno?.toString() || '0'),
-          totalAreaConstruccion: null,
-          valorTotalConstruccion: null,
-          valorTerreno: null,
-          autoavaluo: null,
-          codEstado: '0201',
-          codUsuario: 1
-        };
-
-        const promises: Promise<any>[] = [predioService.crearPredio(createPredioDTO)];
-
-        if (selectedImages.length > 0) {
-          promises.push(uploadService.uploadMultipleFiles(selectedImages));
-        }
-
-        const [predioResult] = await Promise.all(promises);
-
-        NotificationService.success('Predio registrado exitosamente');
-        reset();
-        setSelectedImages([]);
-
-        setTimeout(() => {
-          navigate('/predio/consulta', {
-            state: { predioRecienCreado: predioResult }
-          });
-        }, 1500);
       }
     } catch (error: any) {
       console.error('❌ Error al crear predio o subir imágenes:', error);
@@ -439,17 +409,21 @@ const PredioForm: React.FC<PredioFormProps> = ({
   // Función para construir la descripción completa de la dirección
   const buildDireccionCompleta = (direccion: any, numeroFinca?: string, otroNumero?: string) => {
     if (!direccion) return '';
-    
+
     // Si tiene direccionCompleta, usar esa en lugar del formato anterior
-    let descripcion = direccion.direccionCompleta 
-      ? `${direccion.direccionCompleta}` 
+    let descripcion = direccion.direccionCompleta
+      ? `${direccion.direccionCompleta}`
       : `Año: ${direccion.anio} - Código Dirección: ${direccion.codigo}`;
-    
+
+    // Eliminar la parte de "Lotes: X - Y" o "Lote: X"
+    descripcion = descripcion.replace(/,?\s*Lotes?:\s*\d+\s*-?\s*\d*/gi, '').trim();
+    descripcion = descripcion.replace(/,\s*$/, '').trim();
+
     // Agregar N° Finca si existe
     if (numeroFinca && numeroFinca.trim()) {
       descripcion += ` - N° Finca: ${numeroFinca.trim()}`;
     }
-    
+
     // Agregar Otro Número si existe (opcional)
     if (otroNumero && otroNumero.trim()) {
       descripcion += ` - Otro N°: ${otroNumero.trim()}`;
@@ -524,8 +498,12 @@ const PredioForm: React.FC<PredioFormProps> = ({
             {...field}
             options={options}
             getOptionLabel={(option) => option?.label || ''}
-            value={options.find(opt => opt.value === field.value) || null}
-            onChange={(_, newValue) => field.onChange(newValue?.value || '')}
+            value={options.find(opt => String(opt.value) === String(field.value)) || null}
+            onChange={(_, newValue) => {
+              console.log(`🔄 [PredioForm] ${name} seleccionado:`, newValue);
+              field.onChange(newValue?.value || '');
+            }}
+            isOptionEqualToValue={(option, value) => String(option.value) === String(value.value)}
             disabled={loading || customDisabled}
             size="small"
             renderInput={(params) => (

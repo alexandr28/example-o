@@ -9,7 +9,7 @@ import {
 
 /**
  * Hook para gestionar la Cuenta Corriente y Estado de Cuenta
- * NO requiere autenticación para ninguna operación
+ * NO requiere autenticacion para ninguna operacion
  */
 export const useCuentaCorriente = () => {
   // Estados para Estado de Cuenta Anual
@@ -51,7 +51,7 @@ export const useCuentaCorriente = () => {
   }, []);
 
   /**
-   * Cargar detalle de estado de cuenta por año
+   * Cargar detalle de estado de cuenta por anio
    * GET /api/estadoCuenta/listarDetalle?codContribuyente=10&anio=2024
    */
   const cargarDetalleEstadoCuenta = useCallback(async (

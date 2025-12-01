@@ -3,19 +3,29 @@ import { NotificationService } from '../components/utils/Notification';
 
 // Configuración de autenticación
 const AUTH_CONFIG = {
-  TOKEN_EXPIRY_HOURS: 6, // 6 horas de duración del token
+  TOKEN_EXPIRY_HOURS: 6, // 6 horas de duracion del token
   TOKEN_RENEWAL_THRESHOLD_MINUTES: 30, // Renovar cuando falten 30 minutos
   API_BASE_URL: 'http://26.161.18.122:8085',
   ENDPOINTS: {
     LOGIN: '/auth/login',
     REFRESH: '/auth/refresh',
-    LOGOUT: '/auth/logout'
+    LOGOUT: '/auth/logout',
+    REGISTER: '/auth/register'
   }
 };
 
 export interface AuthCredentials {
   username: string;
   password: string;
+}
+
+export interface RegisterData {
+  username: string;
+  nombrePersona: string;
+  documento: string;
+  codEstado: string;
+  password: string;
+  role: string;
 }
 
 export interface AuthResponse {
@@ -26,6 +36,18 @@ export interface AuthResponse {
     username: string;
     nombreCompleto?: string;
     roles?: string[];
+  };
+  message?: string;
+}
+
+export interface RegisterResponse {
+  success: boolean;
+  user?: {
+    id: string;
+    username: string;
+    nombrePersona: string;
+    documento: string;
+    role: string;
   };
   message?: string;
 }
@@ -111,7 +133,77 @@ export class AuthService {
   }
   
   /**
-   * Realiza el login y guarda el token con expiración de 6 horas
+   * Registra un nuevo usuario
+   * POST /auth/register
+   * NO requiere autenticacion
+   */
+  async register(data: RegisterData): Promise<RegisterResponse> {
+    try {
+      console.log('[AuthService] Registrando nuevo usuario:', data.username);
+
+      // Validar datos requeridos
+      if (!data.username || !data.nombrePersona || !data.documento || !data.codEstado || !data.password || !data.role) {
+        throw new Error('Todos los campos son requeridos');
+      }
+
+      const response = await fetch(`${AUTH_CONFIG.API_BASE_URL}${AUTH_CONFIG.ENDPOINTS.REGISTER}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+
+      console.log(`[AuthService] Respuesta del registro: ${response.status} ${response.statusText}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[AuthService] Error del servidor:', errorText);
+
+        if (response.status === 409) {
+          throw new Error('El usuario ya existe');
+        }
+        if (response.status === 400) {
+          throw new Error('Datos invalidos. Verifique la informacion.');
+        }
+
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const responseData = await response.json();
+      console.log('[AuthService] Usuario registrado exitosamente:', responseData);
+
+      // Extraer datos del usuario
+      const userData = responseData.data || responseData.user || responseData;
+
+      NotificationService.success(`Usuario ${data.username} registrado correctamente`);
+
+      return {
+        success: true,
+        user: {
+          id: userData.id || userData.codUsuario || '0',
+          username: userData.username || data.username,
+          nombrePersona: userData.nombrePersona || data.nombrePersona,
+          documento: userData.documento || data.documento,
+          role: userData.role || data.role
+        },
+        message: responseData.message || 'Usuario registrado exitosamente'
+      };
+
+    } catch (error: any) {
+      console.error('[AuthService] Error en registro:', error);
+      NotificationService.error(error.message || 'Error al registrar usuario');
+
+      return {
+        success: false,
+        message: error.message || 'Error al registrar usuario'
+      };
+    }
+  }
+
+  /**
+   * Realiza el login y guarda el token con expiracion de 6 horas
    */
   async login(credentials: AuthCredentials): Promise<AuthResponse> {
     try {

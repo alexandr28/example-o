@@ -40,7 +40,7 @@ import SelectorPredios from './SelectorPredios';
 import { PisoData } from '../../../services/pisoService';
 import { Predio } from '../../../models/Predio';
 import { NotificationService } from '../../utils/Notification';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 // Interfaces
 interface Piso {
@@ -52,6 +52,8 @@ interface Piso {
   porcentajeDepreciacion: number;
   valorUnicoDepreciado: number;
   valorAreaConstruida: number;
+  areaConstruida: number;
+  areaTotalConstruccion: number;
 }
 
 // Usar la interfaz del modelo importado
@@ -59,8 +61,9 @@ interface Piso {
 const ConsultaPisos: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const { consultarPisos, loading } = usePisos();
-  
+
   // Estados
   const [predio, setPredio] = useState<Predio | null>(null);
   const [pisos, setPisos] = useState<Piso[]>([]);
@@ -72,6 +75,7 @@ const ConsultaPisos: React.FC = () => {
     numeroPiso: ''
   });
   const [showSelectorPredios, setShowSelectorPredios] = useState(false);
+  const [autoSearchTriggered, setAutoSearchTriggered] = useState(false);
   
   // Debug: Logging cuando cambia el estado de pisos
   React.useEffect(() => {
@@ -79,7 +83,35 @@ const ConsultaPisos: React.FC = () => {
     console.log('🔍 [ConsultaPisos] Cantidad de pisos en estado:', pisos.length);
     console.log('🔍 [ConsultaPisos] Loading:', loading);
   }, [pisos, loading]);
-  
+
+  // Efecto para recibir predio desde navegación y buscar automáticamente
+  React.useEffect(() => {
+    const state = location.state as { codigoPredio?: string; predio?: Predio; codPredioBase?: string };
+
+    if (state && state.codigoPredio && !autoSearchTriggered) {
+      console.log('🔍 [ConsultaPisos] Recibido predio desde navegación:', state);
+      console.log('🔍 [ConsultaPisos] Usando código base:', state.codPredioBase || state.codigoPredio);
+
+      // Establecer el predio
+      if (state.predio) {
+        setPredio(state.predio);
+      }
+
+      // Pre-llenar filtros con el código base del predio (prioridad) o código completo
+      setFiltros(prev => ({
+        ...prev,
+        codPredio: state.codPredioBase || state.codigoPredio || ''
+      }));
+
+      // Marcar que ya se realizó la búsqueda automática
+      setAutoSearchTriggered(true);
+
+      // Buscar pisos automáticamente después de un pequeño delay
+      setTimeout(() => {
+        handleBuscar();
+      }, 100);
+    }
+  }, [location.state, autoSearchTriggered]);
 
   // Buscar pisos con filtros
   const handleBuscar = async () => {
@@ -115,7 +147,9 @@ const ConsultaPisos: React.FC = () => {
         incremento: piso.incremento ?? 0,
         porcentajeDepreciacion: piso.depreciacion ?? 0,
         valorUnicoDepreciado: piso.valorUnitarioDepreciado ?? 0,
-        valorAreaConstruida: piso.valorAreaConstruida ?? 0
+        valorAreaConstruida: piso.valorAreaConstruida ?? 0,
+        areaConstruida: piso.areaConstruida ?? 0,
+        areaTotalConstruccion: piso.areaTotalConstruccion ?? 0
       }));
 
       console.log('📊 [ConsultaPisos] Pisos formateados para tabla:', pisosFormateados);
@@ -138,7 +172,9 @@ const ConsultaPisos: React.FC = () => {
           incremento: 0,
           porcentajeDepreciacion: 0.6,
           valorUnicoDepreciado: 208.31,
-          valorAreaConstruida: 15500.75
+          valorAreaConstruida: 15500.75,
+          areaConstruida: 19.8,
+          areaTotalConstruccion: 89.8
         },
         {
           id: 2,
@@ -148,7 +184,9 @@ const ConsultaPisos: React.FC = () => {
           incremento: 0,
           porcentajeDepreciacion: 0.6,
           valorUnicoDepreciado: 208.31,
-          valorAreaConstruida: 18200.50
+          valorAreaConstruida: 18200.50,
+          areaConstruida: 25.5,
+          areaTotalConstruccion: 89.8
         },
         {
           id: 3,
@@ -158,7 +196,9 @@ const ConsultaPisos: React.FC = () => {
           incremento: 0.05,
           porcentajeDepreciacion: 0.55,
           valorUnicoDepreciado: 173.36,
-          valorAreaConstruida: 22100.00
+          valorAreaConstruida: 22100.00,
+          areaConstruida: 44.5,
+          areaTotalConstruccion: 89.8
         }
       ];
       
@@ -247,13 +287,25 @@ const ConsultaPisos: React.FC = () => {
   // Editar piso
   const handleEdit = (piso: Piso) => {
     console.log('✏️ [ConsultaPisos] Editando piso:', piso);
-    
-    // Obtener los datos completos del piso desde pisosData
-    const pisoCompleto = pisosData.find(p => 
-      (p.id === piso.id) || (p.codPiso === piso.id) || (p.numeroPiso === piso.item)
-    );
-    
-    console.log('📊 [ConsultaPisos] Datos completos del piso:', pisoCompleto);
+    console.log('📊 [ConsultaPisos] pisosData disponibles:', pisosData);
+
+    // Obtener el índice del piso en la tabla (item es index + 1)
+    const indexEnTabla = piso.item - 1;
+
+    // Obtener los datos completos del piso desde pisosData usando el mismo índice
+    // ya que pisosFormateados y pisosData se crean en el mismo orden
+    let pisoCompleto: PisoData | undefined = pisosData[indexEnTabla];
+
+    // Si no se encuentra por índice, intentar búsqueda por id/codPiso
+    if (!pisoCompleto) {
+      pisoCompleto = pisosData.find(p =>
+        (p.id === piso.id) ||
+        (p.codPiso === piso.id) ||
+        (Number(p.codPiso) === Number(piso.id))
+      );
+    }
+
+    console.log('📊 [ConsultaPisos] Datos completos del piso encontrado:', pisoCompleto);
     
     if (pisoCompleto && predio) {
       // Preparar datos para enviar al formulario de registro/edición
@@ -468,18 +520,6 @@ const ConsultaPisos: React.FC = () => {
               />
             </Box>
 
-            {/* Código Piso */}
-            <Box sx={{ flex: '0 0 100px' }}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Código Piso"
-                value={filtros.codPiso}
-                onChange={(e) => setFiltros(prev => ({ ...prev, codPiso: e.target.value }))}
-                placeholder="Opcional"
-              />
-            </Box>
-
             {/* Código Predio */}
             <Box sx={{ flex: '0 0 120px' }}>
               <TextField
@@ -488,7 +528,7 @@ const ConsultaPisos: React.FC = () => {
                 label="Código Predio"
                 value={filtros.codPredio}
                 onChange={(e) => setFiltros(prev => ({ ...prev, codPredio: e.target.value }))}
-                placeholder="Ej: 20255"
+                placeholder="Ej: 5"
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -665,6 +705,12 @@ const ConsultaPisos: React.FC = () => {
                     <Box sx={{ display: { xs: 'none', lg: 'block' } }}>VALOR ÁREA CONSTRUIDA</Box>
                   </TableCell>
                   <TableCell align="center" sx={headerCellStyle}>
+                    <Box sx={{ display: { xs: 'none', md: 'block' } }}>ÁREA CONSTRUIDA</Box>
+                  </TableCell>
+                  <TableCell align="center" sx={headerCellStyle}>
+                    <Box sx={{ display: { xs: 'none', md: 'block' } }}>ÁREA TOTAL CONST.</Box>
+                  </TableCell>
+                  <TableCell align="center" sx={headerCellStyle}>
                     ACCIONES
                   </TableCell>
                 </TableRow>
@@ -774,11 +820,11 @@ const ConsultaPisos: React.FC = () => {
                         </Typography>
                       </TableCell>
                       <TableCell align="center" sx={bodyCellStyle}>
-                        <Typography 
-                          variant="body2" 
-                          fontWeight={700} 
-                          color="primary.main" 
-                          sx={{ 
+                        <Typography
+                          variant="body2"
+                          fontWeight={700}
+                          color="primary.main"
+                          sx={{
                             lineHeight: 1.43,
                             fontSize: { xs: '0.75rem', sm: '0.85rem', md: '0.9rem' }
                           }}
@@ -787,7 +833,33 @@ const ConsultaPisos: React.FC = () => {
                         </Typography>
                       </TableCell>
                       <TableCell align="center" sx={bodyCellStyle}>
-                        <Tooltip 
+                        <Typography
+                          variant="body2"
+                          fontWeight={500}
+                          color="info.main"
+                          sx={{
+                            lineHeight: 1.43,
+                            fontSize: { xs: '0.7rem', sm: '0.8rem', md: '0.875rem' }
+                          }}
+                        >
+                          {formatNumber(piso.areaConstruida)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center" sx={bodyCellStyle}>
+                        <Typography
+                          variant="body2"
+                          fontWeight={500}
+                          color="success.main"
+                          sx={{
+                            lineHeight: 1.43,
+                            fontSize: { xs: '0.7rem', sm: '0.8rem', md: '0.875rem' }
+                          }}
+                        >
+                          {formatNumber(piso.areaTotalConstruccion)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center" sx={bodyCellStyle}>
+                        <Tooltip
                           title="Editar datos del piso" 
                           arrow
                           placement="top"

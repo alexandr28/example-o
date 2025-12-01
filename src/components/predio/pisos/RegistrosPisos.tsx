@@ -178,17 +178,27 @@ const RegistrosPisos: React.FC = () => {
   });
 
   // Opciones para selectores
-  
-  
-    // Calcular antigüedad cuando cambia la fecha
+
+
+  // Calcular antigüedad basándose en el Año seleccionado y la Fecha de Construcción
   useEffect(() => {
-    if (formData.fechaConstruccion) {
-      const fecha = new Date(formData.fechaConstruccion);
-      const hoy = new Date();
-      const antiguedad = hoy.getFullYear() - fecha.getFullYear();
-      setFormData(prev => ({ ...prev, antiguedad: `${antiguedad} años` }));
+    if (formData.fechaConstruccion && formData.anio) {
+      const fechaConstruccion = new Date(formData.fechaConstruccion);
+      const anioConstruccion = fechaConstruccion.getFullYear();
+      const anioSeleccionado = formData.anio;
+
+      // Calcular la diferencia entre el año seleccionado y el año de construcción
+      const antiguedad = anioSeleccionado - anioConstruccion;
+
+      // Si la antigüedad es negativa (fecha de construcción posterior al año seleccionado), mostrar 0
+      const antiguedadFinal = antiguedad >= 0 ? antiguedad : 0;
+
+      setFormData(prev => ({ ...prev, antiguedad: `${antiguedadFinal} años` }));
+    } else if (!formData.fechaConstruccion) {
+      // Si no hay fecha de construcción, limpiar la antigüedad
+      setFormData(prev => ({ ...prev, antiguedad: '' }));
     }
-  }, [formData.fechaConstruccion]);
+  }, [formData.fechaConstruccion, formData.anio]);
 
   // Cargar valores unitarios cuando cambia el año - usando el servicio directamente
   useEffect(() => {
@@ -294,6 +304,7 @@ const RegistrosPisos: React.FC = () => {
       subcategoriaLabel: subcategoria.label,
       letraValue: letra.value,
       letraLabel: letra.label,
+      letraId: letra.id,
       año: formData.anio
     });
 
@@ -304,7 +315,7 @@ const RegistrosPisos: React.FC = () => {
 
     // Mostrar algunos valores unitarios para debugging
     if (valoresUnitarios.length > 0) {
-      console.log('📊 [RegistrosPisos] Primeros 3 valores unitarios disponibles:', 
+      console.log('📊 [RegistrosPisos] Primeros 3 valores unitarios disponibles:',
         valoresUnitarios.slice(0, 3).map(v => ({
           categoria: v.categoria,
           subcategoria: v.subcategoria,
@@ -315,73 +326,121 @@ const RegistrosPisos: React.FC = () => {
       );
     }
 
-    // ===== MAPEO CORRECTO BASADO EN EL JSON REAL DEL API =====
-    
-    // El API devuelve TEXTO para categorías y subcategorías, NO códigos numéricos
-    // Ejemplo del API: codCategoria: "ESTRUCTURAS", codSubcategoria: "MUROS Y COLUMNAS", codLetra: "A"
-    
-    // 1. Categoría: mapear códigos del hook a texto del API
-    const categoriaToTextMap: Record<string, string> = {
+    // ===== MAPEO BIDIRECCIONAL: código <-> texto =====
+    // El API puede devolver TEXTO o CÓDIGO dependiendo del año/configuración
+
+    // Mapeo código -> texto
+    const categoriaCodigoToTexto: Record<string, string> = {
       '1001': 'ESTRUCTURAS',
-      '1002': 'ACABADOS', 
+      '1002': 'ACABADOS',
       '1003': 'INSTALACIONES ELECTRICAS Y SANITARIAS'
     };
-    
-    // 2. Subcategoría: mapear códigos del hook a texto del API
-    const subcategoriaToTextMap: Record<string, string> = {
+
+    // Mapeo texto -> código (inverso)
+    const categoriaTextoToCodigo: Record<string, string> = {
+      'ESTRUCTURAS': '1001',
+      'ACABADOS': '1002',
+      'INSTALACIONES ELECTRICAS Y SANITARIAS': '1003'
+    };
+
+    // Mapeo código -> texto para subcategorías
+    const subcategoriaCodigoToTexto: Record<string, string> = {
       '100101': 'MUROS Y COLUMNAS',
       '100102': 'TECHOS',
       '100201': 'PISOS',
       '100202': 'PUERTAS Y VENTANAS',
-      '100203': 'REVESTIMIENTOS', 
+      '100203': 'REVESTIMIENTOS',
       '100204': 'BAÑOS',
       '100301': 'INSTALACIONES ELECTRICAS Y SANITARIAS'
     };
-    
-    // 3. Letra: usar directamente (viene como 'A', 'B', 'C' en ambos lados)
-    const categoriaTexto = categoriaToTextMap[String(categoria.value)] || String(categoria.value);
-    const subcategoriaTexto = subcategoriaToTextMap[String(subcategoria.value)] || String(subcategoria.value);
-    const letraTexto = String(letra.value); // Directo: 'A', 'B', 'C'
 
-    console.log('🔄 [RegistrosPisos] Mapeo para búsqueda (basado en API real):', {
-      categoriaOriginal: categoria.value,
-      categoriaTextoAPI: categoriaTexto,
-      subcategoriaOriginal: subcategoria.value, 
-      subcategoriaTextoAPI: subcategoriaTexto,
-      letraOriginal: letra.value,
-      letraTextoAPI: letraTexto,
+    // Mapeo texto -> código para subcategorías (inverso)
+    const subcategoriaTextoToCodigo: Record<string, string> = {
+      'MUROS Y COLUMNAS': '100101',
+      'TECHOS': '100102',
+      'PISOS': '100201',
+      'PUERTAS Y VENTANAS': '100202',
+      'REVESTIMIENTOS': '100203',
+      'BAÑOS': '100204',
+      'INSTALACIONES ELECTRICAS Y SANITARIAS': '100301'
+    };
+
+    // Mapeo de letras: código <-> letra
+    const letraCodigoToLetra: Record<string, string> = {
+      '1101': 'A', '1102': 'B', '1103': 'C', '1104': 'D',
+      '1105': 'E', '1106': 'F', '1107': 'G', '1108': 'H', '1109': 'I'
+    };
+
+    // Obtener valores de búsqueda (el value del select es el código: 1001, 100101, etc.)
+    const categoriaCodigo = String(categoria.value);
+    const subcategoriaCodigo = String(subcategoria.value);
+    // Para letra, el value es la letra (A, B, C...) y el id es el código (1101, 1102...)
+    const letraValor = String(letra.value); // "A", "B", etc.
+
+    // Convertir código a texto para búsqueda
+    const categoriaTexto = categoriaCodigoToTexto[categoriaCodigo] || categoriaCodigo;
+    const subcategoriaTexto = subcategoriaCodigoToTexto[subcategoriaCodigo] || subcategoriaCodigo;
+
+    console.log('🔄 [RegistrosPisos] Valores para búsqueda:', {
+      categoriaCodigo,
+      categoriaTexto,
+      subcategoriaCodigo,
+      subcategoriaTexto,
+      letraValor,
       año: formData.anio
     });
 
-    // ===== BÚSQUEDA EXACTA CON TEXTOS DEL API =====
+    // ===== BÚSQUEDA FLEXIBLE: acepta código O texto =====
     const valorEncontrado = valoresUnitarios.find(valor => {
-      const categoriaMatch = String(valor.categoria) === categoriaTexto;
-      const subcategoriaMatch = String(valor.subcategoria) === subcategoriaTexto;
-      const letraMatch = String(valor.letra) === letraTexto;
-      const añoMatch = valor.año === formData.anio;
+      const valorCat = String(valor.categoria).trim().toUpperCase();
+      const valorSub = String(valor.subcategoria).trim().toUpperCase();
+      const valorLetra = String(valor.letra).trim().toUpperCase();
+
+      // Comparar categoría: acepta código o texto
+      const categoriaMatch =
+        valorCat === categoriaTexto.toUpperCase() ||
+        valorCat === categoriaCodigo ||
+        categoriaTextoToCodigo[valorCat] === categoriaCodigo;
+
+      // Comparar subcategoría: acepta código o texto
+      const subcategoriaMatch =
+        valorSub === subcategoriaTexto.toUpperCase() ||
+        valorSub === subcategoriaCodigo ||
+        subcategoriaTextoToCodigo[valorSub] === subcategoriaCodigo;
+
+      // Comparar letra: acepta letra directa o código de letra
+      const letraMatch =
+        valorLetra === letraValor.toUpperCase() ||
+        letraCodigoToLetra[valorLetra] === letraValor.toUpperCase() ||
+        valorLetra === String(letra.id);
+
+      // Comparar año (asegurar que ambos sean números)
+      const añoMatch = Number(valor.año) === Number(formData.anio);
 
       const esMatch = categoriaMatch && subcategoriaMatch && letraMatch && añoMatch;
-      
+
       // Log detallado solo para los primeros 5 valores para debugging
       if (valoresUnitarios.indexOf(valor) < 5) {
         console.log(`🔎 [RegistrosPisos] Comparando valor ${valoresUnitarios.indexOf(valor) + 1}:`, {
-          valorAPI: { 
-            cat: valor.categoria, 
-            sub: valor.subcategoria, 
-            letra: valor.letra, 
+          valorAPI: {
+            cat: valor.categoria,
+            sub: valor.subcategoria,
+            letra: valor.letra,
             año: valor.año,
-            costo: valor.costo 
+            costo: valor.costo
           },
-          buscando: { 
-            cat: categoriaTexto, 
-            sub: subcategoriaTexto, 
-            letra: letraTexto, 
-            año: formData.anio 
+          buscando: {
+            catTexto: categoriaTexto,
+            catCodigo: categoriaCodigo,
+            subTexto: subcategoriaTexto,
+            subCodigo: subcategoriaCodigo,
+            letra: letraValor,
+            año: formData.anio
           },
-          matches: { 
-            cat: categoriaMatch, 
-            sub: subcategoriaMatch, 
-            letra: letraMatch, 
+          matches: {
+            cat: categoriaMatch,
+            sub: subcategoriaMatch,
+            letra: letraMatch,
             año: añoMatch,
             final: esMatch
           }
@@ -403,34 +462,33 @@ const RegistrosPisos: React.FC = () => {
     } else {
       console.log('❌ [RegistrosPisos] NO SE ENCONTRÓ VALOR para:', {
         categoriaTexto,
+        categoriaCodigo,
         subcategoriaTexto,
-        letraTexto,
+        subcategoriaCodigo,
+        letraValor,
         año: formData.anio
       });
-      
-      // Debug: mostrar valores que tienen categoría y subcategoría correctas
-      const valoresConCatSub = valoresUnitarios.filter(v => 
-        String(v.categoria) === categoriaTexto && 
-        String(v.subcategoria) === subcategoriaTexto &&
-        v.año === formData.anio
-      );
-      
-      if (valoresConCatSub.length > 0) {
-        console.log('🔍 [RegistrosPisos] Valores con categoría/subcategoría correctas:', 
-          valoresConCatSub.map(v => ({ letra: v.letra, costo: v.costo }))
+
+      // Debug: mostrar valores que tienen el año correcto
+      const valoresDelAnio = valoresUnitarios.filter(v => Number(v.año) === Number(formData.anio));
+
+      if (valoresDelAnio.length > 0) {
+        console.log(`🔍 [RegistrosPisos] ${valoresDelAnio.length} valores encontrados para el año ${formData.anio}:`);
+        console.log('📊 Primeros 10 valores:',
+          valoresDelAnio.slice(0, 10).map(v => ({
+            cat: v.categoria,
+            sub: v.subcategoria,
+            letra: v.letra,
+            costo: v.costo
+          }))
         );
       } else {
-        console.log('🔍 [RegistrosPisos] No hay valores con esa categoría/subcategoría/año');
-        
-        // Mostrar todas las combinaciones disponibles para ayudar con el debugging
-        const combinacionesDisponibles = valoresUnitarios
-          .filter(v => v.año === formData.anio)
-          .slice(0, 10) // Solo las primeras 10 para no saturar
-          .map(v => `"${v.categoria}" + "${v.subcategoria}" + "${v.letra}"`);
-        
-        console.log('🔍 [RegistrosPisos] Combinaciones disponibles (año correcto):', combinacionesDisponibles);
+        console.log(`⚠️ [RegistrosPisos] NO hay valores unitarios para el año ${formData.anio}`);
+        console.log('📊 Años disponibles en valores cargados:',
+          [...new Set(valoresUnitarios.map(v => v.año))].sort()
+        );
       }
-      
+
       return 0;
     }
   };
@@ -683,16 +741,8 @@ const RegistrosPisos: React.FC = () => {
         
         // Estado de conservación del formulario
         codEstadoConservacion: String(formData.estadoConservacion || '9402').trim(),
-        codMaterialEstructural: (() => {
-          const materialMap: Record<string, string> = {
-            'Concreto': '0703',
-            'Ladrillo': '0702',
-            'Adobe': '0701',
-            'Madera': '0704',
-            'Metal': '0705'
-          };
-          return materialMap[formData.materialPredominante] || '0703';
-        })()
+        // Material Estructural - el valor ya viene como código desde el Autocomplete (ej: '0701', '0702', etc.)
+        codMaterialEstructural: String(formData.materialPredominante || '0701').trim()
       };
       
       // Obtener el código de predio correcto
@@ -1034,7 +1084,7 @@ const RegistrosPisos: React.FC = () => {
                     }}
                   />
                 </Box>
-
+                {/* Antiguedad */}
                 <Box sx={{ flex: '0 0 100px' }}>
                   <TextField
                     fullWidth
@@ -1119,8 +1169,12 @@ const RegistrosPisos: React.FC = () => {
                   <Autocomplete
                     options={opcionesMaterialPredominante}
                     getOptionLabel={(option) => option?.label || ''}
-                    value={opcionesMaterialPredominante.find(opt => opt.value === formData.materialPredominante) || null}
-                    onChange={(_, newValue) => handleInputChange('materialPredominante', newValue?.value || '')}
+                    value={opcionesMaterialPredominante.find(opt => String(opt.value) === String(formData.materialPredominante)) || null}
+                    onChange={(_, newValue) => {
+                      console.log('🔄 [RegistrosPisos] Material seleccionado:', newValue);
+                      handleInputChange('materialPredominante', newValue?.value || '');
+                    }}
+                    isOptionEqualToValue={(option, value) => String(option.value) === String(value.value)}
                     disabled={loadingMaterial}
                     size="small"
                     renderInput={(params) => (
@@ -1131,9 +1185,9 @@ const RegistrosPisos: React.FC = () => {
                         required
                         error={!!errors.materialPredominante || !!errorMaterial}
                         helperText={errors.materialPredominante || errorMaterial}
-                        sx={{ 
-                          '& .MuiInputBase-root': { 
-                            height: '33px' 
+                        sx={{
+                          '& .MuiInputBase-root': {
+                            height: '33px'
                           }
                         }}
                         InputProps={{
@@ -1348,7 +1402,7 @@ const RegistrosPisos: React.FC = () => {
                       <TextField
                         {...params}
                         label="Letra"
-                        placeholder="A-Z"
+                        placeholder="A-I"
                         required
                         error={!!errorLetras}
                         helperText={
@@ -1591,7 +1645,6 @@ const RegistrosPisos: React.FC = () => {
           onSelect={(predioSeleccionado) => {
             // El predio ya tiene todas las propiedades necesarias del modelo
             setPredio(predioSeleccionado);
-            setShowSelectorPredios(false);
             console.log('📋 [RegistrosPisos] Predio seleccionado:', predioSeleccionado);
           }}
         />
