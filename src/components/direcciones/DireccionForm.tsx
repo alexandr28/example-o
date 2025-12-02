@@ -58,13 +58,10 @@ const direccionSchema = z.object({
   }).nullable().optional(),
   
   codigoCalle: z.number({
-    required_error: 'La calle/Mz es requerida',
     invalid_type_error: 'Seleccione una calle válida'
-  }).nullable().refine((val) => val !== null && val > 0, {
-    message: 'Seleccione una calle/Mz'
-  }),
-  
-  cuadra: z.string().optional(),
+  }).nullable().optional(),
+
+  cuadra: z.coerce.number().nullable().optional(),
 
   manzana: z.string().optional(),
 
@@ -77,19 +74,16 @@ const direccionSchema = z.object({
     .min(0, 'El lote final debe ser mayor o igual a 0'),
     
   ruta: z.number({
-    required_error: 'La ruta es requerida',
     invalid_type_error: 'Seleccione una ruta válida'
-  }).min(1, 'Debe seleccionar una ruta'),
-  
+  }).nullable().optional(),
+
   zona: z.number({
-    required_error: 'La zona es requerida', 
     invalid_type_error: 'Seleccione una zona válida'
-  }).min(1, 'Debe seleccionar una zona'),
-  
+  }).nullable().optional(),
+
   ubicacionAreaVerde: z.number({
-    required_error: 'La ubicación área verde es requerida',
     invalid_type_error: 'Seleccione una ubicación válida'
-  }).optional(),
+  }).nullable().optional(),
 });
 
 type DireccionFormData = z.infer<typeof direccionSchema>;
@@ -191,13 +185,14 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
       codigoSector: null,
       codigoBarrio: null,
       codigoCalle: null,
-      cuadra: '',
+      cuadra: null,
       manzana: '',
       lado: '',
       loteInicial: 0,
       loteFinal: 0,
       ruta: null as any,
-      zona: null as any
+      zona: null as any,
+      ubicacionAreaVerde: null as any
     }
   });
 
@@ -258,33 +253,35 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
           codigoSector: direccionSeleccionada.codigoSector || 0,
           codigoBarrio: direccionSeleccionada.codigoBarrio || 0,
           codigoCalle: direccionSeleccionada.codigoCalle || 0,
-          cuadra: direccionSeleccionada.cuadra || '',
+          cuadra: direccionSeleccionada.cuadra ? parseInt(direccionSeleccionada.cuadra) : null,
           manzana: (direccionSeleccionada as any).manzana || '',
           lado: direccionSeleccionada.lado || defaultLado,
           loteInicial: direccionSeleccionada.loteInicial || 0,
           loteFinal: direccionSeleccionada.loteFinal || 0,
           ruta: (direccionSeleccionada as any).ruta || undefined,
-          zona: (direccionSeleccionada as any).zona || undefined
+          zona: (direccionSeleccionada as any).zona || undefined,
+          ubicacionAreaVerde: (direccionSeleccionada as any).ubicacionAreaVerde || undefined
         });
       }, 100);
       
       return () => clearTimeout(timeoutId);
     } else if (!direccionSeleccionada && !isEditMode) {
       // Limpiar el formulario cuando no hay selección
-      const defaultLado = effectiveLadoOptions?.find(opt => opt.value === 'NINGUNO')?.value || 
-                         effectiveLadoOptions?.[0]?.value || 
+      const defaultLado = effectiveLadoOptions?.find(opt => opt.value === 'NINGUNO')?.value ||
+                         effectiveLadoOptions?.[0]?.value ||
                          'NINGUNO';
       reset({
         codigoSector: null,
         codigoBarrio: null,
         codigoCalle: null,
-        cuadra: '',
+        cuadra: null,
         manzana: '',
         lado: defaultLado,
         loteInicial: 0,
         loteFinal: 0,
         ruta: null as any,
-        zona: null as any
+        zona: null as any,
+        ubicacionAreaVerde: null as any
       });
     }
   }, [direccionSeleccionada, isEditMode, reset, filtrarBarriosPorSector, effectiveLadoOptions, onDelete]);
@@ -303,22 +300,24 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
 
   const handleFormSubmit = async (data: DireccionFormData) => {
     try {
-      // Asegurar que los datos están en el formato correcto para el servicio
+      // Asegurar que los datos están en el formato correcto para el nuevo API
+      // JSON: { codSector, codBarrio, codVia, cuadra, manzana, codLado, loteInicial, loteFinal, codZona, codRuta, codUbicacionAreaVerde, parametroBusqueda, codUsuario }
       const direccionData: CreateDireccionDTO = {
         codigoSector: data.codigoSector || 0,
         codigoBarrio: (data.codigoBarrio && data.codigoBarrio > 0) ? data.codigoBarrio : null,
-        codigoCalle: data.codigoCalle || 0,
+        codigoCalle: (data.codigoCalle && data.codigoCalle > 0) ? data.codigoCalle : null,
         cuadra: data.cuadra || null,
         manzana: data.manzana || null,
         lado: data.lado || (effectiveLadoOptions?.find(opt => opt.value === 'NINGUNO')?.value || effectiveLadoOptions?.[0]?.value || 'NINGUNO'),
-        loteInicial: data.loteInicial || 0,
-        loteFinal: data.loteFinal || 0,
-        ruta: data.ruta,
-        zona: data.zona,
-        ubicacionAreaVerde: data.ubicacionAreaVerde || undefined
+        loteInicial: data.loteInicial || 1,
+        loteFinal: data.loteFinal || 20,
+        ruta: data.ruta || null,
+        zona: data.zona || null,
+        ubicacionAreaVerde: data.ubicacionAreaVerde || null,
+        codUsuario: 1
       };
 
-      console.log('📤 [DireccionForm] Enviando datos:', direccionData);
+      console.log('📤 [DireccionForm] Enviando datos al API:', direccionData);
       await onSubmit(direccionData);
 
       if (!isEditMode) {
@@ -527,7 +526,7 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        label="Calle / Mz"
+                        label="Calle"
                         error={!!errors.codigoCalle}
                         helperText={errors.codigoCalle?.message || (!sectorValue ? 'Seleccione un sector primero' : '')}
                         sx={{
@@ -535,7 +534,6 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                              height:'40px'
                           }
                         }}
-                        required
                         InputProps={{
                           ...params.InputProps,
                           endAdornment: (
@@ -626,7 +624,13 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
               render={({ field }) => (
                 <TextField
                   {...field}
+                  value={field.value === null || field.value === 0 ? '' : field.value}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    field.onChange(value === '' ? null : parseInt(value, 10) || null);
+                  }}
                   fullWidth
+                  type="number"
                   label="Cuadra"
                   placeholder="Ej: 10"
                   error={!!errors.cuadra}
@@ -639,6 +643,9 @@ const DireccionFormMUI: React.FC<DireccionFormProps> = ({
                     '& .MuiInputLabel-root': {
                       fontSize: '0.875rem'
                     },
+                  }}
+                  InputProps={{
+                    inputProps: { min: 0 }
                   }}
                 />
               )}

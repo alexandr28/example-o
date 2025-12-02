@@ -37,15 +37,17 @@ interface DireccionData {
 
 interface CreateDireccionDTO {
   codigoSector: number;
-  codigoBarrio: number;
-  codigoCalle: number;
-  cuadra?: string;
-  manzana?: string;
-  lado?: string;
+  codigoBarrio?: number | null;
+  codigoCalle?: number | null;  // codVia en el API
+  cuadra?: number | null;       // Ahora es number en el API
+  manzana?: string | null;
+  lado?: string;                // Se convierte a codLado (8101=PAR, 8102=IMPAR, 8103=NINGUNO)
   loteInicial?: number;
   loteFinal?: number;
-  ruta: number; // Requerido
-  zona: number; // Requerido
+  ruta?: number | null;         // codRuta en el API
+  zona?: number | null;         // codZona en el API
+  ubicacionAreaVerde?: number | null;  // codUbicacionAreaVerde en el API
+  codUsuario?: number;
 }
 
 interface UpdateDireccionDTO extends Partial<CreateDireccionDTO> {

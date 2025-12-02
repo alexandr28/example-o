@@ -37,17 +37,17 @@ export interface DireccionData {
 export interface CreateDireccionDTO {
   codigoSector: number;
   codigoBarrio?: number | null;
-  codigoCalle: number;
-  cuadra?: string | null;
+  codigoCalle?: number | null;  // codVia en el API
+  cuadra?: number | null;       // Ahora es number en el API
   manzana?: string | null;
-  lado?: string;
+  lado?: string;                // Se convierte a codLado (8101=PAR, 8102=IMPAR, 8103=NINGUNO)
   loteInicial?: number;
   loteFinal?: number;
   descripcion?: string;
   codUsuario?: number;
-  ruta?: number;
-  zona?: number;
-  ubicacionAreaVerde?: number;
+  ruta?: number;                // codRuta en el API
+  zona?: number;                // codZona en el API
+  ubicacionAreaVerde?: number;  // codUbicacionAreaVerde en el API
 }
 
 export interface UpdateDireccionDTO extends Partial<CreateDireccionDTO> {
@@ -371,29 +371,15 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
   /**
    * Crea una nueva dirección
    * POST http://26.161.18.122:8085/api/direccion sin autenticación
-   * Soporta dos formatos: con barrio y sin barrio
+   * JSON: { codSector, codBarrio, codVia, cuadra, manzana, codLado, loteInicial, loteFinal, codZona, codRuta, codUbicacionAreaVerde, parametroBusqueda, codUsuario }
    */
   async crearDireccion(datos: CreateDireccionDTO): Promise<DireccionData> {
     try {
       console.log('🔍 [DireccionService] Creando dirección con datos:', datos);
-      console.log('🔍 [DireccionService] codigoBarrio tipo:', typeof datos.codigoBarrio, 'valor:', datos.codigoBarrio);
-      console.log('🔍 [DireccionService] codigoSector tipo:', typeof datos.codigoSector, 'valor:', datos.codigoSector);
 
       // Validaciones
-      if (!datos.codigoSector && !datos.codigoBarrio) {
-        throw new Error('Debe proporcionar sector o barrio');
-      }
-
-      if (!datos.codigoCalle) {
-        throw new Error('Debe proporcionar una calle');
-      }
-
-      if (!datos.ruta) {
-        throw new Error('Debe seleccionar una ruta');
-      }
-
-      if (!datos.zona) {
-        throw new Error('Debe seleccionar una zona');
+      if (!datos.codigoSector) {
+        throw new Error('Debe proporcionar el sector');
       }
 
       if (datos.loteInicial && datos.loteFinal) {
@@ -402,55 +388,27 @@ class DireccionService extends BaseApiService<DireccionData, CreateDireccionDTO,
         }
       }
 
-      // Convertir lado a código
+      // Convertir lado a código (8101=PAR, 8102=IMPAR, 8103=NINGUNO)
       const codLado = datos.lado === 'PAR' ? 8101 : datos.lado === 'IMPAR' ? 8102 : 8103;
 
-      // Determinar si tiene barrio o no
-      const tieneBarrio = datos.codigoBarrio && datos.codigoBarrio > 0;
-
-      console.log('🔍 [DireccionService] tieneBarrio:', tieneBarrio, 'condición:', datos.codigoBarrio, '>', 0);
-
-      let requestData: any;
-
-      if (tieneBarrio) {
-        // Método POST con Barrio
-        requestData = {
-          codDireccion: null,
-          codBarrioVia: datos.codigoBarrio,
-          cuadra: datos.cuadra && datos.cuadra.trim() !== '' ? parseInt(datos.cuadra) : 1,
-          manzana: datos.manzana && datos.manzana.trim() !== '' ? datos.manzana.trim() : null,
-          codLado: codLado,
-          loteInicial: datos.loteInicial || 1,
-          loteFinal: datos.loteFinal || 20,
-          codUsuario: datos.codUsuario || 1,
-          codZona: datos.zona,
-          codRuta: datos.ruta,
-          codVia: datos.codigoCalle,
-          codBarrio: datos.codigoBarrio,
-          codUbicacionAreaVerde: datos.ubicacionAreaVerde || 1,
-          parametroBusqueda: null
-        };
-      } else {
-        // Método POST sin Barrio
-        requestData = {
-          codSector: datos.codigoSector,
-          codBarrio: null,
-          codVia: datos.codigoCalle,
-          cuadra: datos.cuadra && datos.cuadra.trim() !== '' ? parseInt(datos.cuadra) : null,
-          manzana: datos.manzana && datos.manzana.trim() !== '' ? datos.manzana.trim() : null,
-          codLado: codLado,
-          loteInicial: datos.loteInicial || 1,
-          loteFinal: datos.loteFinal || 20,
-          codZona: datos.zona,
-          codRuta: datos.ruta,
-          codUbicacionAreaVerde: datos.ubicacionAreaVerde || 1,
-          parametroBusqueda: null,
-          codUsuario: datos.codUsuario || 1
-        };
-      }
+      // Construir el request según el nuevo formato del API
+      const requestData = {
+        codSector: datos.codigoSector,
+        codBarrio: (datos.codigoBarrio && datos.codigoBarrio > 0) ? datos.codigoBarrio : null,
+        codVia: datos.codigoCalle || null,
+        cuadra: datos.cuadra || null,
+        manzana: datos.manzana && datos.manzana.trim() !== '' ? datos.manzana.trim() : null,
+        codLado: codLado,
+        loteInicial: datos.loteInicial || 1,
+        loteFinal: datos.loteFinal || 20,
+        codZona: datos.zona || null,
+        codRuta: datos.ruta || null,
+        codUbicacionAreaVerde: datos.ubicacionAreaVerde || null,
+        parametroBusqueda: null,
+        codUsuario: datos.codUsuario || 1
+      };
 
       console.log('📡 [DireccionService] Enviando POST a:', `${API_CONFIG.baseURL}${this.endpoint}`);
-      console.log('📡 [DireccionService] Tipo:', tieneBarrio ? 'CON BARRIO' : 'SIN BARRIO');
       console.log('📡 [DireccionService] Datos a enviar:', requestData);
 
       const response = await fetch(`${API_CONFIG.baseURL}${this.endpoint}`, {
